@@ -42,6 +42,8 @@ const SportsHeader = ({ query, onQueryChange }: { query: string; onQueryChange: 
     <ServiceMobileMenu
       title="SMAJ Sports"
       accent="#1d64d8"
+      tone="dark"
+      showHubLink={false}
       items={links.map(([path, label]) => ({
         label,
         to: `/services/sports${path ? `/${path}` : ""}`,

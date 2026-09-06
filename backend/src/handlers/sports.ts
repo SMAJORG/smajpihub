@@ -505,14 +505,20 @@ const fetchSportsDbEvents = async (
 };
 
 const fetchProviderCatalog = async (): Promise<SportsCatalog> => {
-  const [eventGroups, rosterGroups, leagueDirectory] = await Promise.all([
+  const [eventGroups, leagueDirectory] = await Promise.all([
     Promise.all(env.sports_league_ids.flatMap((leagueId) => [
       fetchSportsDbEvents(leagueId, "eventsnextleague"),
       fetchSportsDbEvents(leagueId, "eventspastleague"),
     ])),
-    Promise.all(env.sports_league_ids.map(fetchSportsDbTeams)),
     fetchSportsDbLeagues(),
   ]);
+  const teamSports = new Set(["Soccer", "Basketball", "American Football", "Baseball", "Ice Hockey", "Rugby", "Cricket", "Volleyball"]);
+  const discoveryLeagueIds = [...new Set([
+    ...env.sports_league_ids,
+    ...leagueDirectory.filter((league) => teamSports.has(String(league.strSport || ""))).map((league) => String(league.idLeague || "")).filter(Boolean),
+  ])].slice(0, 40);
+  const rosterResults = await Promise.allSettled(discoveryLeagueIds.map(fetchSportsDbTeams));
+  const rosterGroups = rosterResults.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
   const providerMatches = eventGroups.flat().map(normalizeEvent);
   if (!providerMatches.length) throw new Error("TheSportsDB returned no events for the configured leagues.");
   const teamMap = new Map<string, Team>();

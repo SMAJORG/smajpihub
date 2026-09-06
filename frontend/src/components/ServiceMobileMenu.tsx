@@ -14,11 +14,15 @@ export type ServiceMenuItem = {
 const ServiceMobileMenu = ({
   title,
   items,
-  accent,
+  accent = "#6b3fc5",
+  tone = "light",
+  showHubLink = true,
 }: {
   title: string;
   items: ServiceMenuItem[];
   accent?: string;
+  tone?: "light" | "dark";
+  showHubLink?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -51,7 +55,7 @@ const ServiceMobileMenu = ({
       {open
         ? createPortal(
         <div
-          className="service-mobile-menu-layer"
+          className={`service-mobile-menu-layer ${tone === "dark" ? "service-mobile-menu-layer-dark" : ""}`}
           style={{ "--service-menu-accent": accent } as React.CSSProperties}
         >
           <button
@@ -82,9 +86,9 @@ const ServiceMobileMenu = ({
                 );
               })}
             </nav>
-            <Link className="service-mobile-menu-hub" to="/app/services" onClick={() => setOpen(false)}>
+            {showHubLink ? <Link className="service-mobile-menu-hub" to="/app/services" onClick={() => setOpen(false)}>
               <AppsOutlinedIcon /> All SMAJ Services
-            </Link>
+            </Link> : null}
           </aside>
         </div>,
         document.body
