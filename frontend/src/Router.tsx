@@ -11,6 +11,7 @@ import ServicesPage from "./pages/ServicesPage.tsx";
 import HowItWorksPage from "./pages/HowItWorksPage.tsx";
 import FaqPage from "./pages/FaqPage.tsx";
 import ContactPage from "./pages/ContactPage.tsx";
+import DownloadPage from "./pages/DownloadPage.tsx";
 import WhitePaperPage from "./pages/WhitePaperPage.tsx";
 import TrustPage from "./pages/TrustPage.tsx";
 import CompanyPage from "./pages/CompanyPage.tsx";
@@ -287,6 +288,10 @@ export const router = createBrowserRouter([
   {
     path: "/contact",
     element: <ContactPage />,
+  },
+  {
+    path: "/download",
+    element: <DownloadPage />,
   },
   {
     path: "/onboarding",

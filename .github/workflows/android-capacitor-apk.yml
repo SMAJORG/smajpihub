@@ -52,3 +52,10 @@ jobs:
           name: SMAJ-PI-HUB-Android
           path: frontend/android/app/build/outputs/apk/debug/SMAJ-PI-HUB.apk
           if-no-files-found: error
+
+      - name: Publish public APK release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view android-latest --repo "$GITHUB_REPOSITORY" || gh release create android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android" --notes "Latest installable SMAJ PI HUB Android preview build." --prerelease
+          gh release upload android-latest android/app/build/outputs/apk/debug/SMAJ-PI-HUB.apk --repo "$GITHUB_REPOSITORY" --clobber
