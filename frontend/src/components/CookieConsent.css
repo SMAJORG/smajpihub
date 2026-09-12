@@ -1,0 +1,19 @@
+﻿.cookie-consent-backdrop { position:fixed; inset:0; z-index:6000; display:flex; align-items:flex-end; justify-content:center; padding:18px max(14px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); background:linear-gradient(180deg,transparent 40%,rgba(4,18,13,.28)); pointer-events:none; }
+.cookie-consent { width:min(100%,680px); padding:18px; color:#17231f; background:rgba(255,255,255,.98); border:1px solid #dbe5e1; border-radius:22px; box-shadow:0 22px 70px rgba(4,24,17,.25); pointer-events:auto; }
+.cookie-consent header { display:flex; align-items:center; gap:11px; }
+.cookie-consent header>div { min-width:0; display:grid; gap:2px; }
+.cookie-consent header strong { font-size:17px; }
+.cookie-consent header small,.cookie-consent p,.cookie-settings-list small { color:#66736e; }
+.cookie-consent p { margin:13px 0 8px; font-size:13px; line-height:1.55; }
+.cookie-consent-icon { width:42px; height:42px; display:grid; place-items:center; flex:0 0 auto; color:#42208f; background:#eee8ff; border-radius:13px; }
+.cookie-consent-close { margin-left:auto; width:34px; height:34px; display:grid; place-items:center; color:#45534e; background:#f4f6f5; border:0; border-radius:50%; cursor:pointer; }
+.cookie-policy-link { display:inline-flex; margin:3px 0 13px; color:#5425c8; font-size:12px; font-weight:800; }
+.cookie-consent-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.cookie-consent-actions button { min-height:44px; padding:9px 12px; color:#fff; background:#5425c8; border:1px solid #5425c8; border-radius:12px; font:800 13px/1.2 inherit; cursor:pointer; }
+.cookie-consent-actions .cookie-settings-button { grid-column:1/-1; color:#43229c; background:#fff; }
+.cookie-settings-list { display:grid; gap:8px; margin:14px 0 10px; }
+.cookie-settings-list label { min-height:57px; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 12px; background:#f7f8f8; border:1px solid #e5e9e7; border-radius:12px; }
+.cookie-settings-list label span { display:grid; gap:2px; }
+.cookie-settings-list input { width:21px; height:21px; accent-color:#5425c8; }
+@media(min-width:700px) { .cookie-consent-backdrop { justify-content:flex-start; } .cookie-consent { width:620px; } }
+@media(prefers-reduced-motion:no-preference) { .cookie-consent { animation:cookieConsentIn .25s ease-out both; } @keyframes cookieConsentIn { from { opacity:0; transform:translateY(18px); } } }

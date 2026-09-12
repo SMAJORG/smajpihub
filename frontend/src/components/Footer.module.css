@@ -219,3 +219,6 @@
   background-color: #512da8;
   transform: translateY(-5px);
 }
+
+.cookieSettingsButton { padding: 0; color: #ffffff; background: none; border: 0; font: inherit; font-size: 0.75rem; cursor: pointer; }
+.cookieSettingsButton:hover { color: #8b5cf6; }

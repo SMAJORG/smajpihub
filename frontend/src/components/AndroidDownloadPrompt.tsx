@@ -4,6 +4,7 @@ import AndroidRoundedIcon from "@mui/icons-material/AndroidRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import { isCapacitorNative } from "../lib/capacitorPiAuth";
+import { COOKIE_CONSENT_EVENT, COOKIE_CONSENT_KEY } from "./CookieConsent";
 import "./AndroidDownloadPrompt.css";
 
 const HIDDEN_UNTIL_KEY = "smaj_android_prompt_hidden_until";
@@ -15,10 +16,17 @@ const isEligiblePath = (pathname: string) =>
 const AndroidDownloadPrompt = () => {
   const { pathname } = useLocation();
   const [visible, setVisible] = useState(false);
+  const [consentRevision, setConsentRevision] = useState(0);
+
+  useEffect(() => {
+    const handleConsent = () => setConsentRevision(value => value + 1);
+    window.addEventListener(COOKIE_CONSENT_EVENT, handleConsent);
+    return () => window.removeEventListener(COOKIE_CONSENT_EVENT, handleConsent);
+  }, []);
 
   useEffect(() => {
     setVisible(false);
-    if (!isEligiblePath(pathname) || isCapacitorNative()) return;
+    if (!isEligiblePath(pathname) || isCapacitorNative() || !window.localStorage.getItem(COOKIE_CONSENT_KEY)) return;
     const userAgent = navigator.userAgent || "";
     const isAndroid = /Android/i.test(userAgent);
     const isPiBrowser = /PiBrowser|Pi Browser/i.test(userAgent);
@@ -32,7 +40,7 @@ const AndroidDownloadPrompt = () => {
       setVisible(true);
     }, 5000);
     return () => window.clearTimeout(timer);
-  }, [pathname]);
+  }, [pathname, consentRevision]);
 
   const hideFor = (days: number) => {
     window.localStorage.setItem(HIDDEN_UNTIL_KEY, String(Date.now() + days * DAY));

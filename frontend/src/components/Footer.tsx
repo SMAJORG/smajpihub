@@ -116,6 +116,8 @@ const Footer = () => {
           <span className={styles.legalSeparator}>|</span>
           <Link to="/cookies">{t("footer.cookies")}</Link>
           <span className={styles.legalSeparator}>|</span>
+          <button type="button" className={styles.cookieSettingsButton} onClick={() => window.dispatchEvent(new Event("smaj-cookie-settings-open"))}>Cookie settings</button>
+          <span className={styles.legalSeparator}>|</span>
           <Link to="/report-abuse">{t("footer.reportAbuse")}</Link>
           <span className={styles.legalSeparator}>|</span>
           <Link to="/seller-agreement">{t("footer.sellerAgreement")}</Link>

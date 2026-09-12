@@ -6,6 +6,7 @@ import SignIn from "../components/SignIn";
 import { useNavigate } from "react-router-dom";
 import useRouteScrollTop from "../hooks/useRouteScrollTop";
 import AndroidDownloadPrompt from "../components/AndroidDownloadPrompt";
+import CookieConsent from "../components/CookieConsent";
 
 type AppLayoutProps = {
   children: ReactNode;
@@ -29,6 +30,7 @@ const AppLayout = ({ children, showFooter = true, showHeader = true }: AppLayout
       {children}
       {showFooter ? <Footer /> : null}
       <AndroidDownloadPrompt />
+      <CookieConsent />
       {showSignIn && (
         <div
           className="sign-in-overlay"
