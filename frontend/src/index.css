@@ -22169,3 +22169,18 @@ svg {
   .language-choice-backdrop { align-items: center; padding: 24px; }
   .language-choice-dialog { min-height: 520px; border-radius: 32px; }
 }
+/* Public navigation uses the mobile drawer across the full tablet range. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .smaj-menu-toggle { display:inline-flex !important; align-items:center; justify-content:center; }
+  .smaj-public-search-mobile-toggle { display:inline-flex !important; margin-left:auto; }
+  .smaj-auth-section { display:none !important; }
+  .smaj-nav { display:flex; position:fixed; top:0; right:-100%; bottom:0; width:280px; height:100dvh; margin-left:0; padding:12px 16px 0; flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:0; overflow-y:auto; z-index:40; }
+  .smaj-nav.smaj-nav-open { right:0; }
+  .smaj-nav a { padding:11px 10px; border-radius:8px; font-size:.98rem; }
+  .smaj-services-menu { position:static; }
+  .smaj-services-trigger { width:100%; padding:11px 10px; justify-content:space-between; border-radius:8px; font-size:.98rem; }
+  .smaj-services-dropdown { position:static; margin:4px 0 8px; }
+  .smaj-drawer-close { display:inline-flex; }
+  .smaj-nav-overlay { display:block; }
+  .smaj-mobile-auth-sheet { display:block; }
+}

@@ -30,19 +30,8 @@ const DownloadPage = () => (
           <span>Powered by Pi</span>
         </div>
       </section>
-      <section className="download-details">
-        <header><span>INSTALLATION</span><h2>Install in a few steps</h2></header>
-        <div className="download-step-grid">
-          <article><b>01</b><h3>Download</h3><p>Tap Download APK and wait for Android to finish downloading the file.</p></article>
-          <article><b>02</b><h3>Allow installation</h3><p>If Android asks, allow your browser to install this app from the downloaded file.</p></article>
-          <article><b>03</b><h3>Open and sign in</h3><p>Open SMAJ PI HUB, continue with Pi and return to the same SMAJ account.</p></article>
-        </div>
-      </section>
-      <section className="download-release">
-        <div><UpdateRoundedIcon /><span><small>CURRENT RELEASE</small><strong>Android preview</strong><p>The latest successful Android build is always available from this page.</p></span></div>
-        <div><SecurityRoundedIcon /><span><small>INSTALL SAFELY</small><strong>Official SMAJ PI HUB build</strong><p>Only install an APK downloaded from smajpihub.com or the official GitHub release.</p></span></div>
-      </section>      <section className="download-use-guide">
-        <header><span>DOWNLOAD & USE</span><h2>From download to your SMAJ home</h2><p>Follow these steps on the Android phone where you want to use SMAJ PI HUB.</p></header>
+      <section className="download-use-guide">
+        <header><span>INSTALLATION & USE</span><h2>From download to your SMAJ home</h2><p>Follow these steps on the Android phone where you want to use SMAJ PI HUB.</p></header>
         <ol>
           <li><b>1</b><span><strong>Tap Download APK</strong><small>Your browser downloads <code>SMAJ-PI-HUB.apk</code>.</small></span></li>
           <li><b>2</b><span><strong>Open the downloaded file</strong><small>Use the browser download notification or the phone’s Downloads folder.</small></span></li>
@@ -78,6 +67,11 @@ const DownloadPage = () => (
           <a className="download-primary" href={APK_URL} download><DownloadRoundedIcon /> Download APK</a>
         </div>
       </section>
+      <section className="download-release">
+        <div><UpdateRoundedIcon /><span><small>CURRENT RELEASE</small><strong>Android preview</strong><p>The latest successful Android build is always available from this page.</p></span></div>
+        <div><SecurityRoundedIcon /><span><small>INSTALL SAFELY</small><strong>Official SMAJ PI HUB build</strong><p>Only install an APK downloaded from smajpihub.com or the official GitHub release.</p></span></div>
+      </section>
+
     </main>
   </AppLayout>
 );
