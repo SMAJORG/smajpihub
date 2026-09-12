@@ -316,7 +316,7 @@ const Header = () => {
               {t(["nav.whitePaper", "nav.howItWorks", "nav.join", "nav.contact"][index])}
             </NavLink>
           ))}
-          <NavLink to="/download" className="smaj-download-nav-link">Download App</NavLink>
+          <NavLink to="/download">Download App</NavLink>
           <div className="smaj-mobile-auth-sheet">
             <div className="smaj-mobile-pref-list" aria-label="Mobile preferences">
               <div className="smaj-mobile-pref-item">
