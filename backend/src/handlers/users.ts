@@ -466,9 +466,10 @@ export default function mountUserEndpoints(router: Router) {
   router.get("/sessions", async (req: Request, res: Response) => {
     const currentUser = await resolveCurrentUser(req);
     if (!currentUser) return res.status(401).json({ error: "unauthorized" });
-    if (!req.session.deviceSessionId) {
-      await ensureDeviceSession(req, currentUser.uid);
-    }
+    // Always upsert the current device. The express session can outlive its
+    // device_sessions record (for example after TTL cleanup or an older login),
+    // so checking only for deviceSessionId can incorrectly return an empty list.
+    await ensureDeviceSession(req, currentUser.uid);
     const currentKey = currentDeviceSessionKey(req);
     const sessions = await req.app.locals.deviceSessionCollection
       .find({ userId: currentUser.uid, active: true })
