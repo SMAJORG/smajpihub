@@ -21078,6 +21078,18 @@ svg {
     display: none;
   }
 
+  body.desktop-public-route {
+    overflow: auto;
+  }
+
+  body.desktop-public-route .mobile-tablet-app {
+    display: block;
+  }
+
+  body.desktop-public-route .desktop-access-block {
+    display: none;
+  }
+
   body.desktop-admin-route {
     overflow: auto;
   }

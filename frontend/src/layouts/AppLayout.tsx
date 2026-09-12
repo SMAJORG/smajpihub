@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import { useAuthContext } from "../contexts/AuthContext";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -15,6 +15,10 @@ type AppLayoutProps = {
 };
 
 const AppLayout = ({ children, showFooter = true, showHeader = true }: AppLayoutProps) => {
+  useLayoutEffect(() => {
+    document.body.classList.add("desktop-public-route");
+    return () => document.body.classList.remove("desktop-public-route");
+  }, []);
   useRouteScrollTop();
   const { showSignIn, closeSignIn, isLoading, signIn } = useAuthContext();
   const navigate = useNavigate();
