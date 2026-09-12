@@ -36,7 +36,9 @@ const PiBrowserHandoff = () => {
     const isMinePiSandbox =
       window.location.hostname === "sandbox.minepi.com" || document.referrer.includes("sandbox.minepi.com");
     const dismissed = window.sessionStorage.getItem(AUTO_HANDOFF_DISMISSED_KEY) === "true";
-    if (!isMobileOrTablet || isPiBrowser || isMinePiSandbox || dismissed) return;
+    const isAndroid = /Android/i.test(navigator.userAgent || "");
+    const isDownloadPromptPage = ["/home", "/about", "/services", "/white-paper", "/how-it-works", "/onboarding", "/contact"].includes(window.location.pathname) || window.location.pathname.startsWith("/services/");
+    if (!isMobileOrTablet || isPiBrowser || isMinePiSandbox || dismissed || (isAndroid && isDownloadPromptPage)) return;
 
     const timer = window.setTimeout(() => {
       setDetail({

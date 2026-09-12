@@ -1,0 +1,13 @@
+.android-download-prompt { position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); z-index:1200; width:min(calc(100% - 28px),620px); transform:translateX(-50%); display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; padding:14px; color:#15221d; background:rgba(255,255,255,.98); border:1px solid rgba(19,84,59,.14); border-radius:22px; box-shadow:0 18px 50px rgba(5,24,17,.22); animation:androidPromptIn 260ms ease-out both; }
+.android-download-icon { width:48px; height:48px; display:grid; place-items:center; color:#052e22; background:#43dda7; border-radius:15px; }
+.android-download-icon svg { font-size:29px; }
+.android-download-copy { min-width:0; display:grid; gap:3px; }
+.android-download-copy strong { font-size:15px; line-height:1.2; }
+.android-download-copy span { color:#66736e; font-size:12px; line-height:1.35; }
+.android-download-action { min-height:42px; padding:0 14px; display:inline-flex; align-items:center; justify-content:center; gap:6px; color:#06271c; background:#43dda7; border-radius:13px; font-size:13px; font-weight:800; text-decoration:none; white-space:nowrap; }
+.android-download-action svg { font-size:18px; }
+.android-download-close { position:absolute; top:-10px; right:-6px; width:30px; height:30px; display:grid; place-items:center; color:#53615c; background:#fff; border:1px solid #dce4e1; border-radius:50%; box-shadow:0 5px 15px rgba(5,24,17,.15); cursor:pointer; }
+.android-download-close svg { font-size:18px; }
+@keyframes androidPromptIn { from { opacity:0; transform:translate(-50%,18px); } to { opacity:1; transform:translate(-50%,0); } }
+@media (max-width:520px) { .android-download-prompt { grid-template-columns:auto minmax(0,1fr); bottom:calc(12px + env(safe-area-inset-bottom)); } .android-download-action { grid-column:1/-1; width:100%; } }
+@media (prefers-reduced-motion:reduce) { .android-download-prompt { animation:none; } }

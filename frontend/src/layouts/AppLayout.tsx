@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import SignIn from "../components/SignIn";
 import { useNavigate } from "react-router-dom";
 import useRouteScrollTop from "../hooks/useRouteScrollTop";
+import AndroidDownloadPrompt from "../components/AndroidDownloadPrompt";
 
 type AppLayoutProps = {
   children: ReactNode;
@@ -27,6 +28,7 @@ const AppLayout = ({ children, showFooter = true, showHeader = true }: AppLayout
       {showHeader ? <Header /> : null}
       {children}
       {showFooter ? <Footer /> : null}
+      <AndroidDownloadPrompt />
       {showSignIn && (
         <div
           className="sign-in-overlay"
