@@ -23,11 +23,8 @@ const DownloadPage = () => (
           </div>
           <small>Android 8 or newer · Direct APK installation</small>
         </div>
-        <div className="download-phone" aria-label="SMAJ PI HUB Android app preview">
-          <div className="download-phone-speaker" />
-          <img src="/logo.png" alt="SMAJ PI HUB" />
-          <strong>Everything you need.<br />One place.</strong>
-          <span>Powered by Pi</span>
+        <div className="download-phone download-phone-preview">
+          <img src="/assets/smaj-android-app-preview.png" alt="SMAJ PI HUB Android app home screen on a Galaxy Note phone" />
         </div>
       </section>
       <section className="download-use-guide">
