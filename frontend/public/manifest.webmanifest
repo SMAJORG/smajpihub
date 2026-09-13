@@ -1,1 +1,1 @@
-{"name":"SMAJ PI HUB","short_name":"SMAJ PI HUB","start_url":"/dashboard","display":"standalone","background_color":"#111827","theme_color":"#111827","icons":[{"src":"/logo.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
+{"name":"SMAJ PI HUB","short_name":"SMAJ PI HUB","start_url":"/dashboard","display":"standalone","background_color":"#111827","theme_color":"#111827","icons":[{"src":"/icon-192x192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"/logo.png","sizes":"500x500","type":"image/png","purpose":"any"}]}
