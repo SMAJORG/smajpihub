@@ -4,6 +4,7 @@ import { Network } from "@capacitor/network";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { enableNativePushNotifications, ensureNativePushNotificationsEnabled } from "../lib/nativePushNotifications";
+import { runPostHomePermissionOnboarding } from "../lib/nativePermissionOnboarding";
 import "./NativeRuntimeBridge.css";
 
 const notificationErrorMessage = (error: unknown) =>
@@ -44,10 +45,13 @@ const NativeRuntimeBridge = () => {
 
     void Network.getStatus().then(status => updateNetwork(status.connected, status.connectionType));
     void PushNotifications.createChannel({ id: "smaj_notifications", name: "SMAJ Notifications", description: "Messages, orders, jobs, courses and account alerts", importance: 5, visibility: 1, vibration: true }).catch(() => undefined);
-    // This bridge mounts immediately after authentication. Android 13+ displays
-    // its system permission dialog here; older Android versions grant it automatically.
-    void ensureNativePushNotificationsEnabled().catch(error => {
-      if (active) setNotificationIssue(notificationErrorMessage(error));
+    // Wait for the authenticated Home dashboard to be visible before asking for
+    // Android permissions. Firebase registration follows the native dialogs.
+    void runPostHomePermissionOnboarding().then(({ reachedHome, notificationGranted }) => {
+      if (!active || !reachedHome || !notificationGranted) return;
+      void ensureNativePushNotificationsEnabled().catch(error => {
+        if (active) setNotificationIssue(notificationErrorMessage(error));
+      });
     });
     void Network.addListener("networkStatusChange", status =>
       updateNetwork(status.connected, status.connectionType)
