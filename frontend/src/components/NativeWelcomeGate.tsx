@@ -5,44 +5,44 @@ import "./NativeWelcomeGate.css";
 
 const slides = [
   {
-    eyebrow: "ONE PI IDENTITY",
-    title: "Everything you need. One place.",
-    description: "Use one Pi identity across every SMAJ PI HUB service.",
-    image: "/assets/smaj-mobile-hero-v2.png",
-    alt: "SMAJ PI HUB services",
-    tone: "violet",
-  },
-  {
-    eyebrow: "SHOP WITH PI",
-    title: "Discover products and trusted sellers.",
-    description: "Browse the SMAJ Store, manage orders and use supported Pi payments.",
-    image: "/assets/smaj-mobile-hero-business.jpg",
-    alt: "SMAJ commerce and business services",
-    tone: "indigo",
-  },
-  {
-    eyebrow: "WORK AND GROW",
-    title: "Find opportunities built around you.",
-    description: "Explore jobs, services and tools that connect people with real opportunities.",
-    image: "/assets/smaj-mobile-hero-work.jpg",
-    alt: "SMAJ jobs and professional opportunities",
-    tone: "gold",
-  },
-  {
-    eyebrow: "LEARN AND CONNECT",
-    title: "Services for learning and daily life.",
-    description: "Move between education, sports, health, food and more from one hub.",
-    image: "/assets/smaj-service-atlas.png",
-    alt: "SMAJ PI HUB connected service directory",
+    eyebrow: "LEARN. LIVE. CONNECT.",
+    title: "Grow through one connected hub.",
+    description: "Access education, health, entertainment and more through SMAJ PI HUB.",
+    image: "/assets/smaj-pi-login-learn.jpg",
+    alt: "Learn, live and connect with SMAJ PI HUB",
     tone: "teal",
   },
   {
-    eyebrow: "SAME SMAJ ACCOUNT",
-    title: "Your world stays connected.",
-    description: "Keep your profile, messages and activity connected across Android and Pi Browser.",
-    image: "/assets/smaj-android-app-preview.png",
-    alt: "SMAJ PI HUB Android application",
+    eyebrow: "WORK. LEARN. EARN.",
+    title: "Build skills and create opportunity.",
+    description: "Find jobs, offer services and grow your business from one account.",
+    image: "/assets/smaj-pi-login-work.jpg",
+    alt: "Work, learn, earn and grow with SMAJ PI HUB",
+    tone: "indigo",
+  },
+  {
+    eyebrow: "SHOP WITH PI",
+    title: "Discover products around the world.",
+    description: "Browse products, services and local businesses through the SMAJ Store.",
+    image: "/assets/smaj-pi-login-shop.jpg",
+    alt: "Shop globally with Pi through SMAJ PI HUB",
     tone: "purple",
+  },
+  {
+    eyebrow: "ONE PI IDENTITY",
+    title: "One identity. Many possibilities.",
+    description: "Connect to real services and opportunities across the SMAJ ecosystem.",
+    image: "/assets/smaj-pi-login-identity.jpg",
+    alt: "One Pi identity connecting the SMAJ PI HUB ecosystem",
+    tone: "gold",
+  },
+  {
+    eyebrow: "THE SMAJ ECOSYSTEM",
+    title: "Everything you need. One place.",
+    description: "Move between everyday services while keeping the same SMAJ account.",
+    image: "/assets/smaj-pi-login-ecosystem.jpg",
+    alt: "SMAJ PI HUB services connected around one identity",
+    tone: "violet",
   },
 ] as const;
 
@@ -125,8 +125,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
             onClick={() => void loginWithPi()}
             disabled={isLoading}
           >
-            {isLoading ? <span className="native-welcome__spinner" aria-hidden="true" /> : null}
-            {isLoading ? "Checking your session…" : "Continue with Pi"}
+            Continue with Pi
           </button>
           {authFeedback?.type === "error" ? (
             <p className="native-welcome__error" role="alert">{authFeedback.message}</p>
