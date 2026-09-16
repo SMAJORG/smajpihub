@@ -22196,3 +22196,54 @@ svg {
   .smaj-nav-overlay { display:block; }
   .smaj-mobile-auth-sheet { display:block; }
 }
+/* Capacitor Android system-bar and app-header isolation. */
+@media (max-width: 1023px) {
+  html[data-native-app="android"] .smaj-header,
+  html[data-native-app="android"] .smaj-nav-overlay,
+  html[data-native-app="android"] .smaj-mobile-auth-sheet {
+    display: none !important;
+  }
+
+  html[data-native-app="android"] .private-header {
+    top: 0 !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)) !important;
+    background: var(--smaj-card) !important;
+    border-bottom: 1px solid var(--smaj-border) !important;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, .04) !important;
+    backdrop-filter: none !important;
+  }
+
+  html[data-native-app="android"] .mobile-private-header-content {
+    width: 100%;
+    height: 56px !important;
+    min-height: 56px;
+  }
+
+  html[data-native-app="android"] .mobile-private-brand img {
+    width: 36px;
+    height: 36px;
+  }
+
+  html[data-native-app="android"] .mobile-private-icon,
+  html[data-native-app="android"] .mobile-private-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  html[data-native-app="android"] .private-body {
+    padding-top: 56px !important;
+  }
+
+  html[data-native-app="android"] .hide-mobile-header .private-body,
+  html[data-native-app="android"] .full-screen-page .private-body {
+    padding-top: 0 !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  html[data-native-app="android"] .smaj-header {
+    display: none !important;
+  }
+}

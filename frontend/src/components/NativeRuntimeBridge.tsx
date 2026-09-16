@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { Network } from "@capacitor/network";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { StatusBar, Style } from "@capacitor/status-bar";
 import { enableNativePushNotifications, ensureNativePushNotificationsEnabled } from "../lib/nativePushNotifications";
 import { runPostHomePermissionOnboarding } from "../lib/nativePermissionOnboarding";
 import "./NativeRuntimeBridge.css";
@@ -32,6 +33,9 @@ const NativeRuntimeBridge = () => {
     if (!Capacitor.isNativePlatform()) return;
 
     document.documentElement.dataset.nativeApp = Capacitor.getPlatform();
+    void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
+    void StatusBar.setBackgroundColor({ color: "#ffffff" }).catch(() => undefined);
+    void StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
     let active = true;
     const cleanups: Array<() => Promise<void>> = [];
 
