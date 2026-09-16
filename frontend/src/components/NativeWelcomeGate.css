@@ -1,48 +1,76 @@
 .native-welcome {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  min-height: 100dvh;
-  overflow: hidden;
-  color: #14121b;
-  background: radial-gradient(circle at 88% 5%, rgba(119,55,244,.18), transparent 36%), linear-gradient(155deg,#fff 0%,#f7f3ff 55%,#fff9eb 100%);
-  font-family: Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --welcome-accent:#6f35dc;
+  --welcome-accent-2:#355cf4;
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  min-height:100dvh;
+  overflow:hidden;
+  color:#17131f;
+  background:linear-gradient(155deg,#fff 0%,#f7f3ff 58%,#fff9ed 100%);
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  transition:background .45s ease;
 }
+.native-welcome--indigo { --welcome-accent:#4738df;--welcome-accent-2:#6457f5;background:linear-gradient(155deg,#f9f8ff,#eeefff 58%,#fff); }
+.native-welcome--gold { --welcome-accent:#9c6500;--welcome-accent-2:#e0a526;background:linear-gradient(155deg,#fffdf7,#fff4d8 58%,#fff); }
+.native-welcome--teal { --welcome-accent:#007a72;--welcome-accent-2:#19aa9b;background:linear-gradient(155deg,#f9fffe,#e8f8f5 58%,#fff); }
+.native-welcome--purple { --welcome-accent:#6925d0;--welcome-accent-2:#a063f4;background:linear-gradient(155deg,#fff,#f4efff 58%,#fff8eb); }
 .native-welcome__content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  width: min(100%,34rem);
-  min-height: 100dvh;
-  margin: 0 auto;
-  padding: max(2rem,env(safe-area-inset-top)) 1.5rem max(1.4rem,env(safe-area-inset-bottom));
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  width:min(100%,34rem);
+  height:100dvh;
+  margin:0 auto;
+  padding:max(1rem,env(safe-area-inset-top)) 1.25rem max(.8rem,env(safe-area-inset-bottom));
 }
-.native-welcome__brand { display:flex;align-items:center;gap:.75rem; }
-.native-welcome__logo { width:auto;height:2.7rem;object-fit:contain; }
-.native-welcome__beta { padding:.35rem .65rem;border:1px solid #f0cd73;border-radius:999px;color:#755a13;background:#fff2bd;font-size:.65rem;font-weight:800;letter-spacing:.08em; }
-.native-welcome__copy { margin-top:clamp(3.2rem,11vh,6rem); }
-.native-welcome__eyebrow { margin:0 0 .8rem;color:#6f35dc;font-size:.72rem;font-weight:900;letter-spacing:.13em; }
-.native-welcome__copy h1 { margin:0;font-size:clamp(2.65rem,12vw,4.25rem);line-height:.96;letter-spacing:-.055em; }
-.native-welcome__copy>p:last-child { max-width:29rem;margin:1.25rem 0 0;color:#625d6b;font-size:1rem;line-height:1.6; }
-.native-welcome__card { display:grid;grid-template-columns:auto 1fr;gap:.2rem .9rem;margin-top:auto;padding:1.15rem;border:1px solid rgba(91,46,168,.13);border-radius:1.6rem;background:rgba(255,255,255,.88);box-shadow:0 1.2rem 3.5rem rgba(57,32,102,.14);backdrop-filter:blur(18px); }
-.native-welcome__pi { display:grid;grid-row:span 2;width:3.25rem;height:3.25rem;place-items:center;border-radius:1rem;color:#fff;background:linear-gradient(145deg,#5b24c8,#8247f5);box-shadow:0 .6rem 1.5rem rgba(111,53,220,.25);font:700 1.8rem Georgia,serif; }
-.native-welcome__card strong,.native-welcome__card span { display:block; }
-.native-welcome__card strong { align-self:end;font-size:1.08rem; }
-.native-welcome__card>div:nth-child(2)>span { margin-top:.25rem;color:#77717e;font-size:.78rem; }
-.native-welcome__button { grid-column:1/-1;display:flex;min-height:3.4rem;margin-top:1rem;align-items:center;justify-content:center;gap:.65rem;border:0;border-radius:1.1rem;color:#fff;background:linear-gradient(110deg,#5921c7,#7c3ff2 58%,#315bf4);box-shadow:0 .8rem 1.8rem rgba(103,49,220,.26);font-family:inherit;font-size:1rem;font-weight:800; }
+.native-welcome__topbar { position:relative;z-index:2; }
+.native-welcome__brand { display:flex;align-items:center;gap:.65rem; }
+.native-welcome__logo { width:auto;height:2.25rem;object-fit:contain; }
+.native-welcome__beta { padding:.3rem .58rem;border:1px solid #e9c55d;border-radius:999px;color:#705411;background:#fff1b9;font-size:.62rem;font-weight:900;letter-spacing:.08em; }
+.native-welcome__progress { display:grid;grid-template-columns:repeat(5,1fr);gap:.45rem;margin-top:1rem; }
+.native-welcome__progress button { position:relative;height:.28rem;padding:0;overflow:hidden;border:0;border-radius:999px;background:rgba(78,65,100,.14); }
+.native-welcome__progress button::after { content:"";position:absolute;inset:0;transform:scaleX(0);transform-origin:left;border-radius:inherit;background:var(--welcome-accent); }
+.native-welcome__progress button.complete::after { transform:scaleX(1); }
+.native-welcome__progress button.active::after { animation:native-welcome-progress 4.5s linear forwards; }
+.native-welcome__slide { display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;padding-top:clamp(1.2rem,4.2vh,2.4rem);animation:native-welcome-enter .45s ease both; }
+.native-welcome__copy { position:relative;z-index:1; }
+.native-welcome__eyebrow { margin:0 0 .55rem;color:var(--welcome-accent);font-size:.68rem;font-weight:900;letter-spacing:.14em; }
+.native-welcome__copy h1 { max-width:30rem;margin:0;font-size:clamp(2rem,8.8vw,3rem);line-height:1.02;letter-spacing:-.045em; }
+.native-welcome__copy>p:last-child { max-width:28rem;margin:.7rem 0 0;color:#625d6b;font-size:.88rem;line-height:1.45; }
+.native-welcome__visual { position:relative;min-height:0;margin:.8rem 0 0;overflow:hidden;border-radius:clamp(1.3rem,5vw,2rem);background:linear-gradient(145deg,color-mix(in srgb,var(--welcome-accent) 13%,white),#fff);box-shadow:0 1rem 2.8rem rgba(38,24,65,.13); }
+.native-welcome__visual::after { content:"";position:absolute;inset:auto 0 0;height:28%;background:linear-gradient(transparent,rgba(15,9,27,.16));pointer-events:none; }
+.native-welcome__visual img { width:100%;height:100%;min-height:12rem;object-fit:cover;object-position:center;user-select:none; }
+.native-welcome--teal .native-welcome__visual img,.native-welcome--purple .native-welcome__visual img { object-fit:contain;padding:.45rem; }
+.native-welcome__actions { position:relative;z-index:2;margin-top:-1.35rem;padding:1rem;border:1px solid rgba(91,46,168,.12);border-radius:1.45rem;background:rgba(255,255,255,.94);box-shadow:0 1rem 2.8rem rgba(57,32,102,.16);backdrop-filter:blur(18px); }
+.native-welcome__signin-label { display:flex;align-items:center;gap:.75rem; }
+.native-welcome__pi { display:grid;flex:0 0 auto;width:2.8rem;height:2.8rem;place-items:center;border-radius:.9rem;color:#fff;background:linear-gradient(145deg,var(--welcome-accent),var(--welcome-accent-2));font:700 1.55rem Georgia,serif; }
+.native-welcome__signin-label strong,.native-welcome__signin-label small { display:block; }
+.native-welcome__signin-label strong { font-size:1rem; }
+.native-welcome__signin-label small { margin-top:.15rem;color:#77717e;font-size:.72rem; }
+.native-welcome__button { display:flex;width:100%;min-height:3.2rem;margin-top:.8rem;align-items:center;justify-content:center;gap:.6rem;border:0;border-radius:1rem;color:#fff;background:linear-gradient(110deg,var(--welcome-accent),var(--welcome-accent-2));box-shadow:0 .65rem 1.45rem color-mix(in srgb,var(--welcome-accent) 24%,transparent);font-family:inherit;font-size:.95rem;font-weight:800; }
 .native-welcome__button:disabled { opacity:.72; }
-.native-welcome__spinner { width:1.1rem;height:1.1rem;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:native-welcome-spin .75s linear infinite; }
-.native-welcome__error { grid-column:1/-1;margin:.8rem 0 0;color:#b42318;font-size:.78rem;line-height:1.4;text-align:center; }
-.native-welcome__trust { display:flex;margin-top:1.15rem;align-items:center;justify-content:center;gap:.65rem;color:#797281;font-size:.67rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase; }
-.native-welcome__trust i { width:.22rem;height:.22rem;border-radius:50%;background:#d6a522; }
-.native-welcome__glow { position:absolute;border-radius:50%;pointer-events:none; }
-.native-welcome__glow--top { top:-6rem;right:-7rem;width:18rem;height:18rem;border:3.5rem solid rgba(120,59,237,.07); }
-.native-welcome__glow--bottom { bottom:-10rem;left:-10rem;width:22rem;height:22rem;background:rgba(249,191,49,.09); }
+.native-welcome__spinner { width:1.05rem;height:1.05rem;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:native-welcome-spin .75s linear infinite; }
+.native-welcome__error { margin:.65rem 0 0;color:#b42318;font-size:.74rem;line-height:1.35;text-align:center; }
+.native-welcome__trust { display:flex;margin-top:.65rem;align-items:center;justify-content:center;gap:.55rem;color:#797281;font-size:.58rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase; }
+.native-welcome__trust i { width:.2rem;height:.2rem;border-radius:50%;background:#d6a522; }
 @keyframes native-welcome-spin { to { transform:rotate(360deg); } }
-@media (min-width:600px) {
-  .native-welcome__content { justify-content:center;padding-inline:2.5rem; }
-  .native-welcome__copy { margin-top:5rem; }
-  .native-welcome__card { margin-top:4rem; }
+@keyframes native-welcome-progress { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@keyframes native-welcome-enter { from { opacity:.25;transform:translateX(1rem); } to { opacity:1;transform:none; } }
+@media (max-height:700px) {
+  .native-welcome__content { padding-top:max(.55rem,env(safe-area-inset-top)); }
+  .native-welcome__progress { margin-top:.55rem; }
+  .native-welcome__slide { padding-top:.7rem; }
+  .native-welcome__copy h1 { font-size:clamp(1.7rem,7.5vw,2.2rem); }
+  .native-welcome__copy>p:last-child { margin-top:.4rem;font-size:.78rem; }
+  .native-welcome__visual { margin-top:.5rem; }
+  .native-welcome__actions { padding:.75rem; }
+  .native-welcome__signin-label { display:none; }
+  .native-welcome__button { margin-top:0; }
 }
-@media (prefers-reduced-motion:reduce) { .native-welcome__spinner { animation:none; } }
+@media (min-width:600px) {
+  .native-welcome__content { width:min(100%,42rem);padding-inline:2.5rem; }
+  .native-welcome__copy h1 { font-size:3.2rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .native-welcome__spinner,.native-welcome__progress button.active::after,.native-welcome__slide { animation:none; }
+}
