@@ -1,0 +1,5 @@
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
+import { TUTORIAL_OPEN_EVENT, tutorials } from "../../content/tutorials";
+const TutorialCenterPage=()=>{const categories=[...new Set(tutorials.map(t=>t.category))];const play=(id:string)=>window.dispatchEvent(new CustomEvent(TUTORIAL_OPEN_EVENT,{detail:{id}}));return <main className="private-page tutorial-center-page"><header className="tutorial-center-hero"><span><SchoolOutlinedIcon/></span><div><small>HELP & LEARNING</small><h1>App Guide</h1><p>Learn SMAJ PI HUB one feature at a time. Guides are optional and can be replayed whenever you need them.</p></div></header>{categories.map(category=><section className="tutorial-category" key={category}><h2>{category}</h2><div className="tutorial-guide-grid">{tutorials.filter(t=>t.category===category).map(t=><article key={t.id}><div><h3>{t.title}</h3><p>{t.summary}</p><small>{t.steps.length} steps</small></div><button type="button" onClick={()=>play(t.id)}><PlayCircleOutlineIcon/>Start guide</button></article>)}</div></section>)}</main>};
+export default TutorialCenterPage;

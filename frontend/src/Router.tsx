@@ -52,6 +52,7 @@ import NotificationsPage from "./pages/private/NotificationsPage";
 import ServicesHubPage from "./pages/private/ServicesHubPage";
 import WalletPage from "./pages/private/WalletPage";
 import HelpCenterPage from "./pages/private/HelpCenterPage";
+import TutorialCenterPage from "./pages/private/TutorialCenterPage";
 import ServiceDetailPage from "./pages/private/ServiceDetailPage";
 import ServiceDiscoveryPage from "./pages/private/ServiceDiscoveryPage";
 import CommerceFlowPage from "./pages/private/CommerceFlowPage";
@@ -1064,6 +1065,16 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <PrivateLayout>
           <ServiceDiscoveryPage mode="categories" />
+        </PrivateLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/app/tutorials",
+    element: (
+      <ProtectedRoute>
+        <PrivateLayout>
+          <TutorialCenterPage />
         </PrivateLayout>
       </ProtectedRoute>
     ),

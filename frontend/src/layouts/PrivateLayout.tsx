@@ -71,6 +71,7 @@ const pageTitles: Record<string, string> = {
   "/lifestyle": "Lifestyle",
   "/categories": "Categories",
   "/app/help-center": "Help Center",
+  "/app/tutorials": "App Guide",
   "/app/wallet": "SMAJ PI Activity",
 };
 
@@ -98,7 +99,7 @@ const backFallbackForPath = (pathname: string) => {
   if (pathname === "/cart" || pathname === "/checkout" || pathname === "/payment-method") return "/store";
   if (pathname === "/profile" || pathname === "/app/wallet" || pathname === "/settings/preferences") return "/settings";
   if (pathname === "/saved" || pathname === "/orders" || pathname === "/seller") return "/settings";
-  if (pathname === "/notifications" || pathname === "/app/help-center" || pathname === "/help") return "/dashboard";
+  if (pathname === "/notifications" || pathname === "/app/help-center" || pathname === "/app/tutorials" || pathname === "/help") return "/dashboard";
   if (pathname === "/trending" || pathname === "/lifestyle" || pathname === "/categories") return "/dashboard";
   return "";
 };
@@ -398,7 +399,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           </button>
           <Link to="/dashboard" className="private-header-brand" aria-label="SMAJ PI HUB Home"><img src={logoImage} alt="" /></Link>
           <span className="environment-badge" aria-label="Testnet beta environment">Testnet / Beta</span>
-          <form className="private-global-search" onSubmit={submitHeaderSearch}><SearchOutlinedIcon /><input value={headerSearch} onFocus={() => setSearchOpen(true)} onChange={(event) => { setHeaderSearch(event.target.value); setSearchOpen(true); }} placeholder="Search SMAJ PI HUB..." />{searchOpen && headerSearch.trim() ? <div className="private-search-results">{headerResults.length ? Object.entries(headerResults.reduce<Record<string, typeof headerResults>>((groups, item) => { (groups[item.group] ||= []).push(item); return groups; }, {})).map(([group, items]) => <section key={group}><strong>{group}</strong>{items.map((item) => <button type="button" key={`${group}-${item.label}`} onClick={() => { navigate(item.to); setHeaderSearch(""); setSearchOpen(false); }}>{item.label}</button>)}</section>) : <button type="submit">Search Marketplace for “{headerSearch}”</button>}</div> : null}</form>
+          <form className="private-global-search" data-tour="search" onSubmit={submitHeaderSearch}><SearchOutlinedIcon /><input value={headerSearch} onFocus={() => setSearchOpen(true)} onChange={(event) => { setHeaderSearch(event.target.value); setSearchOpen(true); }} placeholder="Search SMAJ PI HUB..." />{searchOpen && headerSearch.trim() ? <div className="private-search-results">{headerResults.length ? Object.entries(headerResults.reduce<Record<string, typeof headerResults>>((groups, item) => { (groups[item.group] ||= []).push(item); return groups; }, {})).map(([group, items]) => <section key={group}><strong>{group}</strong>{items.map((item) => <button type="button" key={`${group}-${item.label}`} onClick={() => { navigate(item.to); setHeaderSearch(""); setSearchOpen(false); }}>{item.label}</button>)}</section>) : <button type="submit">Search Marketplace for “{headerSearch}”</button>}</div> : null}</form>
           <div className="private-header-title"><span>Workspace</span><strong>{pageTitle}</strong></div>
           <div className="private-header-actions">
             <Link className="private-header-icon notification-icon" to="/notifications" aria-label="Notifications" title="Notifications"><NotificationsNoneOutlinedIcon />{unreadCount ? <span>{notificationBadgeLabel}</span> : null}</Link>
@@ -407,7 +408,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
             </button>
             <div className="private-header-profile">
               {profileMenuOpen ? <div className="private-profile-menu private-header-profile-menu" style={profileMenuPosition}><Link to="/settings" onClick={() => setProfileMenuOpen(false)}><PersonOutlineIcon />Account</Link><Link to="/app/wallet" onClick={() => setProfileMenuOpen(false)}><AccountBalanceWalletOutlinedIcon />Wallet</Link><Link to="/settings/preferences" onClick={() => setProfileMenuOpen(false)}><SettingsOutlinedIcon />Settings</Link><Link to="/app/help-center" onClick={() => setProfileMenuOpen(false)}><HelpOutlineOutlinedIcon />Help Center</Link><button type="button" className="profile-menu-logout" onClick={() => { setProfileMenuOpen(false); setShowSignOut(true); }}><LogoutIcon />Logout</button></div> : null}
-              <button ref={profileAvatarRef} type="button" className="private-header-avatar" title="Account" aria-label="Open account menu" aria-expanded={profileMenuOpen} onClick={() => { positionProfileMenu(); setProfileMenuOpen((open) => !open); }}>{user?.avatar ? <img src={user.avatar} alt="" /> : (user?.displayName || user?.username || "U").slice(0, 1).toUpperCase()}</button>
+              <button ref={profileAvatarRef} data-tour="you" type="button" className="private-header-avatar" title="Account" aria-label="Open account menu" aria-expanded={profileMenuOpen} onClick={() => { positionProfileMenu(); setProfileMenuOpen((open) => !open); }}>{user?.avatar ? <img src={user.avatar} alt="" /> : (user?.displayName || user?.username || "U").slice(0, 1).toUpperCase()}</button>
             </div>
           </div>
         </header>
@@ -423,7 +424,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
             </div>
             <nav aria-label="Private navigation">
               {links.map((link) => (
-                <NavLink key={link.to} to={link.to} onClick={() => setMobileSidebarOpen(false)} title={sidebarCollapsed ? link.label : undefined} aria-label={link.label}>
+                <NavLink key={link.to} to={link.to} data-tour={link.label.toLowerCase()} onClick={() => setMobileSidebarOpen(false)} title={sidebarCollapsed ? link.label : undefined} aria-label={link.label}>
                   {link.icon}
                   <span className="private-nav-label">{link.label}</span>
                   {link.to === "/notifications" && unreadCount ? <b className="sidebar-count">{notificationBadgeLabel}</b> : null}
@@ -480,6 +481,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           <NavLink
             key={tab.to}
             to={tab.to}
+            data-tour={tab.label.toLowerCase()}
           >
             {tab.icon}
             <span>{tab.label}</span>

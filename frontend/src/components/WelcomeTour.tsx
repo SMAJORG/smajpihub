@@ -1,167 +1,48 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { App as CapacitorApp } from "@capacitor/app";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
-import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
-import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
-import CloseIcon from "@mui/icons-material/Close";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
+import { TUTORIAL_OPEN_EVENT, tutorialById, tutorialStorageKey, type TutorialDefinition } from "../content/tutorials";
 
-const WELCOME_STORAGE_KEY = "smaj_welcome_seen";
-const WELCOME_REPLAY_EVENT = "smaj:welcome-tour-open";
+const WELCOME_STORAGE_KEY="smaj_welcome_seen";
+const WELCOME_REPLAY_EVENT="smaj:welcome-tour-open";
+const GAP=12;
+const ACTIVE_TOUR_KEY="smaj_active_tutorial";
+type Box={top:number;left:number;width:number;height:number;right:number;bottom:number};
+const visibleTarget=(selector?:string)=>selector ? [...document.querySelectorAll<HTMLElement>(selector)].find(el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1}) : undefined;
+const iconFor=(icon:string)=> icon==="home"?<HomeOutlinedIcon/>:icon==="services"?<AppsOutlinedIcon/>:icon==="search"?<SearchOutlinedIcon/>:icon==="messages"?<ChatOutlinedIcon/>:icon==="profile"?<PersonOutlineIcon/>:icon==="done"?<CheckCircleOutlineIcon/>:<LightbulbOutlinedIcon/>;
 
-const tourSteps = [
-  {
-    title: "Dashboard",
-    description: "Check your account, seller status, recent activity, and quick actions from one private home.",
-    to: "/dashboard",
-    icon: <DashboardOutlinedIcon />,
-  },
-  {
-    title: "Services",
-    description: "Move through SMAJ PI HUB services like jobs, health, food, learning, lifestyle, and more.",
-    to: "/app/services",
-    icon: <AppsOutlinedIcon />,
-  },
-  {
-    title: "SMAJ Store",
-    description: "Browse live products, manage saved items, and open seller tools when you are ready to sell.",
-    to: "/store",
-    icon: <StorefrontOutlinedIcon />,
-  },
-  {
-    title: "Messages",
-    description: "Keep buyer, seller, and support conversations in one private inbox.",
-    to: "/messages",
-    icon: <ChatOutlinedIcon />,
-  },
-  {
-    title: "Notifications",
-    description: "Watch alerts for login, logout, orders, seller activity, profile updates, and messages.",
-    to: "/notifications",
-    icon: <NotificationsNoneOutlinedIcon />,
-  },
-  {
-    title: "Profile & Settings",
-    description: "Update your profile picture, display name, trust badge, privacy, and account settings.",
-    to: "/settings",
-    icon: <PersonOutlineIcon />,
-  },
-];
-
-const WelcomeTour = () => {
-  const { user, isAuthenticated, isLoading } = useAuthContext();
-  const location = useLocation();
-  const [open, setOpen] = useState(false);
-  const [started, setStarted] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
-
-  const userWelcomeStorageKey = useMemo(() => {
-    const userKey = user?.uid || user?.piUsername || user?.username;
-    return userKey ? `${WELCOME_STORAGE_KEY}:${userKey}` : WELCOME_STORAGE_KEY;
-  }, [user?.piUsername, user?.uid, user?.username]);
-  const displayName = user?.displayName || user?.piUsername || user?.username || "Pi user";
-  const currentStep = tourSteps[stepIndex];
-  const initials = useMemo(() => displayName.trim().slice(0, 1).toUpperCase() || "S", [displayName]);
-
-  const closeTour = useCallback(() => {
-    window.localStorage.setItem(userWelcomeStorageKey, "true");
-    setOpen(false);
-    setStarted(false);
-    setStepIndex(0);
-  }, [userWelcomeStorageKey]);
-
-  useEffect(() => {
-    const openTour = () => {
-      setStepIndex(0);
-      setStarted(false);
-      setOpen(true);
-    };
-    window.addEventListener(WELCOME_REPLAY_EVENT, openTour);
-    return () => window.removeEventListener(WELCOME_REPLAY_EVENT, openTour);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeTour();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closeTour, open]);
-
-  useEffect(() => {
-    if (!isAuthenticated || isLoading || !user || window.localStorage.getItem(userWelcomeStorageKey) === "true") return;
-    const timer = window.setTimeout(() => setOpen(true), 450);
-    return () => window.clearTimeout(timer);
-  }, [isAuthenticated, isLoading, user, userWelcomeStorageKey]);
-
-  const goNext = () => {
-    if (stepIndex === tourSteps.length - 1) {
-      closeTour();
-      return;
-    }
-    setStepIndex((current) => current + 1);
-  };
-
-  if (!open) return null;
-
-  return (
-    <div className="welcome-tour-backdrop" role="dialog" aria-modal="true" aria-labelledby="welcome-tour-title">
-      <section className={`welcome-tour ${started ? "tour-active" : "welcome-active"}`}>
-        <button className="welcome-tour-close" type="button" aria-label="Close welcome tour" onClick={closeTour}>
-          <CloseIcon />
-        </button>
-
-        {!started ? (
-          <>
-            <div className="welcome-tour-profile">
-              <span className="welcome-tour-avatar">
-                {user?.avatar ? <img src={user.avatar} alt="" /> : initials}
-              </span>
-              <div>
-                <p className="welcome-tour-kicker">Welcome back</p>
-                <h2 id="welcome-tour-title">{displayName}</h2>
-              </div>
-            </div>
-            <p className="welcome-tour-copy">Here is a quick private tour so you know where dashboard, store, messages, notifications, profile, and settings live.</p>
-            <div className="welcome-tour-preview" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="welcome-tour-actions">
-              <button className="welcome-tour-secondary" type="button" onClick={closeTour}>Skip</button>
-              <button className="welcome-tour-primary" type="button" onClick={() => setStarted(true)}>Start tour</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="welcome-tour-step-icon">{currentStep.icon}</div>
-            <p className="welcome-tour-kicker">Step {stepIndex + 1} of {tourSteps.length}</p>
-            <h2 id="welcome-tour-title">{currentStep.title}</h2>
-            <p className="welcome-tour-copy">{currentStep.description}</p>
-            <Link className="welcome-tour-link" to={currentStep.to} aria-current={location.pathname === currentStep.to ? "page" : undefined}>
-              Open {currentStep.title}
-            </Link>
-            <div className="welcome-tour-dots" aria-label="Tour progress">
-              {tourSteps.map((step) => (
-                <span key={step.title} className={step.title === currentStep.title ? "active" : ""} />
-              ))}
-            </div>
-            <div className="welcome-tour-actions">
-              <button className="welcome-tour-secondary" type="button" disabled={stepIndex === 0} onClick={() => setStepIndex((current) => Math.max(0, current - 1))}>Back</button>
-              <button className="welcome-tour-primary" type="button" onClick={goNext}>{stepIndex === tourSteps.length - 1 ? "Done" : "Next"}</button>
-            </div>
-          </>
-        )}
-      </section>
-    </div>
-  );
+const WelcomeTour=()=>{
+ const {user,isAuthenticated,isLoading}=useAuthContext(); const navigate=useNavigate(); const location=useLocation();
+ const [tutorial,setTutorial]=useState<TutorialDefinition|null>(null); const [index,setIndex]=useState(0); const [box,setBox]=useState<Box|null>(null); const [card,setCard]=useState({top:0,left:0,ready:false}); const cardRef=useRef<HTMLElement>(null);
+ const userKey=user?.uid||user?.piUsername||user?.username; const oldKey=useMemo(()=>userKey?`${WELCOME_STORAGE_KEY}:${userKey}`:WELCOME_STORAGE_KEY,[userKey]); const step=tutorial?.steps[index];
+ const markComplete=useCallback((current:TutorialDefinition|null)=>{if(!current)return;localStorage.setItem(tutorialStorageKey(userKey,current.id),"true");if(current.id==="main-tour")localStorage.setItem(oldKey,"true");},[oldKey,userKey]);
+ const close=useCallback((complete=true)=>{if(complete)markComplete(tutorial);sessionStorage.removeItem(ACTIVE_TOUR_KEY);setTutorial(null);setIndex(0);setBox(null);},[markComplete,tutorial]);
+ const start=useCallback((id:string)=>{const found=tutorialById(id);if(!found)return;sessionStorage.setItem(ACTIVE_TOUR_KEY,JSON.stringify({id,index:0}));setTutorial(found);setIndex(0);if(location.pathname!==found.steps[0].route)navigate(found.steps[0].route);},[location.pathname,navigate]);
+ useEffect(()=>{try{const saved=JSON.parse(sessionStorage.getItem(ACTIVE_TOUR_KEY)||"null") as {id?:string;index?:number}|null;const found=saved?.id?tutorialById(saved.id):undefined;if(found){setTutorial(found);setIndex(Math.min(saved?.index||0,found.steps.length-1));}}catch{sessionStorage.removeItem(ACTIVE_TOUR_KEY)}},[]);
+ useEffect(()=>{const replay=()=>start("main-tour");const open=(e:Event)=>start((e as CustomEvent<{id?:string}>).detail?.id||"main-tour");window.addEventListener(WELCOME_REPLAY_EVENT,replay);window.addEventListener(TUTORIAL_OPEN_EVENT,open);return()=>{window.removeEventListener(WELCOME_REPLAY_EVENT,replay);window.removeEventListener(TUTORIAL_OPEN_EVENT,open)}},[start]);
+ useEffect(()=>{if(!isAuthenticated||isLoading||!user)return;if(localStorage.getItem(oldKey)==="true"||localStorage.getItem(tutorialStorageKey(userKey,"main-tour"))==="true")return;const timer=setTimeout(()=>start("main-tour"),650);return()=>clearTimeout(timer)},[isAuthenticated,isLoading,oldKey,start,user,userKey]);
+ useEffect(()=>{if(!step)return;if(location.pathname!==step.route)navigate(step.route);},[location.pathname,navigate,step]);
+ const measure=useCallback(()=>{if(!step?.target){setBox(null);return}const element=visibleTarget(step.target);if(!element){setBox(null);return}const r=element.getBoundingClientRect(),pad=7;setBox({top:Math.max(6,r.top-pad),left:Math.max(6,r.left-pad),width:Math.min(innerWidth-12,r.width+pad*2),height:Math.min(innerHeight-12,r.height+pad*2),right:Math.min(innerWidth-6,r.right+pad),bottom:Math.min(innerHeight-6,r.bottom+pad)});},[step]);
+ useEffect(()=>{if(!tutorial)return;setCard(c=>({...c,ready:false}));const timer=setTimeout(measure,180);addEventListener("resize",measure);addEventListener("orientationchange",measure);addEventListener("scroll",measure,true);return()=>{clearTimeout(timer);removeEventListener("resize",measure);removeEventListener("orientationchange",measure);removeEventListener("scroll",measure,true)}},[index,measure,tutorial,location.pathname]);
+ useLayoutEffect(()=>{if(!tutorial||!cardRef.current)return;const r=cardRef.current.getBoundingClientRect(),margin=12,safeBottom=20;let top=(innerHeight-r.height)/2,left=(innerWidth-r.width)/2;if(box){const preferred=step?.position||"bottom";if(preferred==="top")top=box.top-r.height-GAP;else if(preferred==="left")left=box.left-r.width-GAP;else if(preferred==="right")left=box.right+GAP;else top=box.bottom+GAP;if((preferred==="top"||preferred==="bottom")){left=box.left+box.width/2-r.width/2;if(top<margin)top=box.bottom+GAP;if(top+r.height>innerHeight-safeBottom)top=box.top-r.height-GAP}else{top=box.top+box.height/2-r.height/2;if(left<margin)left=box.right+GAP;if(left+r.width>innerWidth-margin)left=box.left-r.width-GAP}}setCard({top:Math.max(margin,Math.min(top,innerHeight-r.height-safeBottom)),left:Math.max(margin,Math.min(left,innerWidth-r.width-margin)),ready:true});},[box,index,step,tutorial]);
+ const previous=useCallback(()=>setIndex(i=>{const nextIndex=Math.max(0,i-1);if(tutorial)sessionStorage.setItem(ACTIVE_TOUR_KEY,JSON.stringify({id:tutorial.id,index:nextIndex}));return nextIndex}),[tutorial]);const next=()=>{if(!tutorial)return;if(index===tutorial.steps.length-1){close();return}const nextIndex=index+1;sessionStorage.setItem(ACTIVE_TOUR_KEY,JSON.stringify({id:tutorial.id,index:nextIndex}));setIndex(nextIndex);const route=tutorial.steps[nextIndex].route;if(location.pathname!==route)navigate(route)};
+ useEffect(()=>{if(!tutorial)return;const key=(e:KeyboardEvent)=>{if(e.key==="Escape")close()};addEventListener("keydown",key);const listener=CapacitorApp.addListener("backButton",()=>index>0?previous():close(false));return()=>{removeEventListener("keydown",key);void listener.then(h=>h.remove())}},[close,index,previous,tutorial]);
+ if(!tutorial||!step)return null;
+ return <div className="guided-tour-root" role="dialog" aria-modal="true" aria-labelledby="guided-tour-title">
+   {box?<><div className="guided-tour-mask top" style={{height:box.top}}/><div className="guided-tour-mask left" style={{top:box.top,left:0,width:box.left,height:box.height}}/><div className="guided-tour-mask right" style={{top:box.top,left:box.right,right:0,height:box.height}}/><div className="guided-tour-mask bottom" style={{top:box.bottom,bottom:0}}/><div className="guided-tour-highlight" style={{top:box.top,left:box.left,width:box.width,height:box.height}}/></>:<div className="guided-tour-mask full"/>}
+   <section ref={cardRef} className="guided-tour-card" style={{top:card.top,left:card.left,visibility:card.ready?"visible":"hidden"}}>
+    <div className="guided-tour-heading"><span>{iconFor(step.icon)}</span><small>{index+1} of {tutorial.steps.length}</small></div><h2 id="guided-tour-title">{step.title}</h2><p>{step.description}</p>
+    <div className="guided-tour-progress">{tutorial.steps.map((s,i)=><i key={s.id} className={i<=index?"active":""}/>)}</div>
+    <div className="guided-tour-actions"><button type="button" className="skip" onClick={()=>close()}>Skip</button>{index>0?<button type="button" onClick={previous}>Back</button>:null}<button type="button" className="next" onClick={next}>{index===tutorial.steps.length-1?"Done":"Next"}</button></div>
+   </section>
+ </div>
 };
-
-export { WELCOME_REPLAY_EVENT };
-export default WelcomeTour;
+export { WELCOME_REPLAY_EVENT }; export default WelcomeTour;
