@@ -33,8 +33,8 @@ const NativeRuntimeBridge = () => {
     if (!Capacitor.isNativePlatform()) return;
 
     document.documentElement.dataset.nativeApp = Capacitor.getPlatform();
-    void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
-    void StatusBar.setBackgroundColor({ color: "#ffffff" }).catch(() => undefined);
+    void StatusBar.setOverlaysWebView({ overlay: true }).catch(() => undefined);
+    void StatusBar.setBackgroundColor({ color: "#00000000" }).catch(() => undefined);
     void StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
     let active = true;
     const cleanups: Array<() => Promise<void>> = [];

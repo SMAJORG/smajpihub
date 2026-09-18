@@ -30,6 +30,16 @@ const waitForHome = async () => {
   return false;
 };
 
+const waitForMainTutorialToClose = async () => {
+  // The first-login guide is scheduled shortly after Home renders. Give it
+  // time to mount, then keep Android permission dialogs behind the guide.
+  await pause(900);
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    if (!document.querySelector(".guided-tour-root")) return;
+    await pause(250);
+  }
+};
+
 const requestWithoutBlockingNext = async (request: () => Promise<unknown>) => {
   try {
     await request();
@@ -46,6 +56,8 @@ export const runPostHomePermissionOnboarding = async () => {
 
   const reachedHome = await waitForHome();
   if (!reachedHome) return { reachedHome: false, firstRun: false, notificationGranted: false };
+
+  await waitForMainTutorialToClose();
 
   const { value } = await Preferences.get({ key: COMPLETED_KEY });
   if (value === "complete") {
