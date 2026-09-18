@@ -85,14 +85,26 @@ const toUser = (candidate: Partial<User> | null | undefined, fallback: User): Us
 const getStoredPiUser = () => {
   try {
     const stored = window.localStorage.getItem(PI_USER_STORAGE_KEY);
-    return stored ? (JSON.parse(stored) as User) : null;
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as User;
+    if (isCapacitorNative() && parsed.accessToken) {
+      const token = parsed.accessToken;
+      parsed.accessToken = undefined;
+      window.localStorage.setItem(PI_USER_STORAGE_KEY, JSON.stringify(parsed));
+      void import("../lib/nativeAppLock").then(({ storeNativeSessionToken }) => storeNativeSessionToken(token)).catch(() => undefined);
+    }
+    return parsed;
   } catch {
     return null;
   }
 };
 
 const storeUser = (user: User) => {
-  window.localStorage.setItem(PI_USER_STORAGE_KEY, JSON.stringify(user));
+  const browserSafeUser = isCapacitorNative() ? { ...user, accessToken: undefined } : user;
+  window.localStorage.setItem(PI_USER_STORAGE_KEY, JSON.stringify(browserSafeUser));
+  if (isCapacitorNative() && user.accessToken) {
+    void import("../lib/nativeAppLock").then(({ storeNativeSessionToken }) => storeNativeSessionToken(user.accessToken)).catch(() => undefined);
+  }
   return user;
 };
 
@@ -169,6 +181,7 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(initialUserRef.current);
   const [showSignIn, setShowSignIn] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialUserRef.current);
+  const [isPiLoginPending, setIsPiLoginPending] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<AuthFeedback | null>(null);
   const loginInProgressRef = useRef(false);
   const showFeedback = useCallback((feedback: AuthFeedback | null) => {
@@ -256,6 +269,7 @@ export const useAuth = () => {
   const loginWithPi = useCallback(async () => {
     if (loginInProgressRef.current) return false;
     loginInProgressRef.current = true;
+    setIsPiLoginPending(true);
     setIsLoading(true);
     setAuthFeedback({ type: "success", message: "Connecting to Pi Browser…" });
     // The Pi SDK script can exist inside Capacitor's WebView, but it cannot
@@ -272,6 +286,7 @@ export const useAuth = () => {
         return false;
       } finally {
         loginInProgressRef.current = false;
+        setIsPiLoginPending(false);
         setIsLoading(false);
       }
     }
@@ -311,6 +326,7 @@ export const useAuth = () => {
           return false;
         } finally {
           loginInProgressRef.current = false;
+        setIsPiLoginPending(false);
           setIsLoading(false);
         }
       }
@@ -320,12 +336,14 @@ export const useAuth = () => {
       if (isPiSandboxMode()) {
         setAuthFeedback({ type: "error", message: "Pi SDK is unavailable in this Sandbox preview. Refresh the preview, confirm your sandbox Pi account is signed in, and try again." });
         loginInProgressRef.current = false;
+        setIsPiLoginPending(false);
         setIsLoading(false);
         return false;
       }
       requestPiBrowserHandoff("Pi login required");
       setAuthFeedback(null);
       loginInProgressRef.current = false;
+        setIsPiLoginPending(false);
       setIsLoading(false);
       return false;
     }
@@ -358,6 +376,7 @@ export const useAuth = () => {
       return false;
     } finally {
       loginInProgressRef.current = false;
+        setIsPiLoginPending(false);
       setIsLoading(false);
     }
   }, [signInUser]);
@@ -439,11 +458,13 @@ export const useAuth = () => {
       if (supportsNativePushNotifications()) await unregisterNativePushOnLogout();
       if (getBaseURL()) await axiosClient.post("/user/signout", undefined, AUTH_REQUEST_CONFIG);
       window.localStorage.removeItem(PI_USER_STORAGE_KEY);
+      if (isCapacitorNative()) void import("../lib/nativeAppLock").then(({ clearAppLockSettings, clearNativeSessionToken }) => Promise.all([clearAppLockSettings(), clearNativeSessionToken()])).catch(() => undefined);
       setUser(null);
       setAuthFeedback({ type: "success", message: "Signed out successfully." });
     } catch (err) {
       console.error("Sign-out failed:", err);
       window.localStorage.removeItem(PI_USER_STORAGE_KEY);
+      if (isCapacitorNative()) void import("../lib/nativeAppLock").then(({ clearAppLockSettings, clearNativeSessionToken }) => Promise.all([clearAppLockSettings(), clearNativeSessionToken()])).catch(() => undefined);
       setUser(null);
       setAuthFeedback({ type: "error", message: "Failed to sign out." });
     } finally {
@@ -464,6 +485,7 @@ export const useAuth = () => {
     closeSignIn: () => setShowSignIn(false),
     requireAuth: () => setShowSignIn(true),
     isLoading,
+    isPiLoginPending,
     authFeedback,
     showFeedback,
   };

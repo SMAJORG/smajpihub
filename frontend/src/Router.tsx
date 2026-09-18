@@ -42,6 +42,7 @@ import ProfilePage from "./pages/private/ProfilePage";
 import TokenRewardsPage from "./pages/private/TokenRewardsPage";
 import SettingsPage from "./pages/private/SettingsPage";
 import DeviceSessionsPage from "./pages/private/DeviceSessionsPage";
+import AppLockSettingsPage from "./pages/private/AppLockSettingsPage";
 import AccountDashboardPage from "./pages/private/AccountDashboardPage";
 import SellerPage from "./pages/private/SellerPage";
 import EditProductPage from "./pages/private/EditProductPage";
@@ -1115,6 +1116,16 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <PrivateLayout fullScreen>
           <SettingsPage />
+        </PrivateLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/settings/security/app-lock",
+    element: (
+      <ProtectedRoute>
+        <PrivateLayout fullScreen>
+          <AppLockSettingsPage />
         </PrivateLayout>
       </ProtectedRoute>
     ),

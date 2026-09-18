@@ -47,7 +47,7 @@ const slides = [
 ] as const;
 
 const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
-  const { isAuthenticated, isLoading, loginWithPi, authFeedback } = useAuthContext();
+  const { isAuthenticated, isLoading, isPiLoginPending, loginWithPi, authFeedback } = useAuthContext();
   const [activeSlide, setActiveSlide] = useState(0);
   const touchStartX = useRef<number | null>(null);
 
@@ -125,7 +125,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
             onClick={() => void loginWithPi()}
             disabled={isLoading}
           >
-            Continue with Pi
+            {isPiLoginPending ? <><span className="native-welcome__spinner" aria-hidden="true" /> Returning from Pi…</> : "Continue with Pi"}
           </button>
           {authFeedback?.type === "error" ? (
             <p className="native-welcome__error" role="alert">{authFeedback.message}</p>

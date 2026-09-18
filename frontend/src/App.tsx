@@ -11,6 +11,7 @@ import PiBrowserHandoff from "./components/PiBrowserHandoff";
 import NativeWelcomeGate from "./components/NativeWelcomeGate";
 import NativeRuntimeBridge from "./components/NativeRuntimeBridge";
 import OfflineStatus from "./components/OfflineStatus";
+import NativeAppLockGate from "./components/NativeAppLockGate";
 
 function App() {
   useSliceReveal();
@@ -25,6 +26,7 @@ function App() {
     <>
       <OfflineStatus />
       <NativeWelcomeGate>
+        <NativeAppLockGate>
         <NativeRuntimeBridge />
         {!isAdminRoute ? (
           <main className="desktop-access-block" aria-labelledby="desktop-access-title">
@@ -46,6 +48,7 @@ function App() {
           <AutomaticPageTranslator />
         </div>
         <PiBrowserHandoff />
+        </NativeAppLockGate>
       </NativeWelcomeGate>
     </>
   );
