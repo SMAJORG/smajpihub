@@ -3,6 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import ConfirmSignOutModal from "../../components/ConfirmSignOutModal";
 import TrustBadge from "../../components/TrustBadge";
 import LanguageSoonButton from "../../components/LanguageSoonButton";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
+import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 import { WELCOME_REPLAY_EVENT } from "../../components/WelcomeTour";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { axiosClient } from "../../lib/axiosClient";
@@ -316,8 +319,8 @@ const SettingsPage = () => {
 
         <section>
           <h2>Privacy & Security</h2>
-          <Link className="settings-device-link" to="/settings/security/app-lock"><span className="settings-device-icon"><span aria-hidden="true">⌾</span></span><span><strong>App Lock</strong><small>Fingerprint, face, or device credential protection</small></span><b aria-hidden="true">›</b></Link>
-          <Link className="settings-device-link" to="/settings/devices"><span className="settings-device-icon"><span aria-hidden="true">â–£</span></span><span><strong>Devices & Sessions</strong><small>Manage active web and Android logins</small></span><b aria-hidden="true">â€º</b></Link>
+          <Link className="settings-device-link" to="/settings/security/app-lock"><span className="settings-device-icon" aria-hidden="true"><LockOutlinedIcon /></span><span><strong>App Lock</strong><small>Fingerprint, face, or device credential protection</small></span><ChevronRightOutlinedIcon aria-hidden="true" /></Link>
+          <Link className="settings-device-link" to="/settings/devices"><span className="settings-device-icon" aria-hidden="true"><DevicesOutlinedIcon /></span><span><strong>Devices & Sessions</strong><small>Manage active web and Android logins</small></span><ChevronRightOutlinedIcon aria-hidden="true" /></Link>
           <label className="setting-line toggle-line"><span><strong>Show profile publicly</strong><small>Allow marketplace users to see your public seller or buyer profile.</small></span><input type="checkbox" checked={form.publicProfile} onChange={(event) => setField("publicProfile", event.target.checked)} /></label>
           <label className="setting-line toggle-line"><span><strong>Allow sellers/buyers to contact me</strong><small>Enable safe marketplace contact for service and order activity.</small></span><input type="checkbox" checked={form.allowContact} onChange={(event) => setField("allowContact", event.target.checked)} /></label>
           <button type="button" className="private-secondary-button danger" onClick={() => setDeleteRequested(true)}>Delete account</button>

@@ -8,16 +8,23 @@ type LanguageChoiceButtonProps = {
 };
 
 const languages = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "Francais" },
+  { code: "sw", label: "Kiswahili", available: false },
+  { code: "en", label: "English", available: true },
+  { code: "fr", label: "Francais", available: true },
+  { code: "ar", label: "العربية", available: false },
+  { code: "zh", label: "中文", available: false },
 ] as const;
+type LanguageCode = (typeof languages)[number]["code"];
 
 const LanguageSoonButton = ({ dashboardPrompt = false }: LanguageChoiceButtonProps) => {
   const [hidden, setHidden] = useState(
     () => dashboardPrompt && window.localStorage.getItem(DASHBOARD_LANGUAGE_SAVED_KEY) === "true",
   );
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState(i18n.resolvedLanguage === "fr" ? "fr" : "en");
+  const [selected, setSelected] = useState<LanguageCode>(() => {
+    const saved = window.localStorage.getItem("smaj_language") as LanguageCode | null;
+    return languages.some(language => language.code === saved) ? saved! : i18n.resolvedLanguage === "fr" ? "fr" : "en";
+  });
 
   if (hidden) return null;
 
@@ -53,12 +60,11 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: LanguageChoiceButtonPro
           >
             <button type="button" className="language-choice-close" aria-label="Close" onClick={() => setOpen(false)}>x</button>
             <h2 id="language-choice-title">Pick language</h2>
-            <label>
-              <span>Language</span>
-              <select value={selected} onChange={(event) => setSelected(event.target.value as "en" | "fr")}>
-                {languages.map((language) => <option value={language.code} key={language.code}>{language.label}</option>)}
-              </select>
-            </label>
+            <div className="language-choice-list" role="radiogroup" aria-label="Languages">
+              {languages.map((language) => (
+                <button type="button" role="radio" disabled={!language.available} aria-checked={selected === language.code} className={selected === language.code ? "active" : ""} onClick={() => setSelected(language.code)} key={language.code}><span>{language.label}</span>{!language.available ? <small>Coming soon</small> : null}</button>
+              ))}
+            </div>
             <div className="language-choice-actions">
               <button type="button" className="language-choice-cancel" onClick={() => setOpen(false)}>Cancel</button>
               <button type="button" className="language-choice-save" onClick={() => void saveLanguage()}>Save</button>

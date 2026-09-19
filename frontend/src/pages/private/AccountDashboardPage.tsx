@@ -32,7 +32,6 @@ const marketplaceCards = [
 
 const accountRows = [
   ["Help center", "Support and marketplace guidance", "/help"],
-  ["App Guide", "Replay tutorials and learn each feature", "/app/tutorials"],
   ["Legal", "Terms, privacy, and platform rules", "/terms"],
   ["White Paper", "Vision, ecosystem, utility, and roadmap", "/white-paper"],
 ] as const;

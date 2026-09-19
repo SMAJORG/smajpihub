@@ -22153,7 +22153,32 @@ svg {
   border-radius: 15px;
   font: 600 17px/1.2 inherit;
 }
-.language-choice-actions {
+.language-choice-list {
+  display: grid;
+  gap: 12px;
+  max-height: min(48vh, 390px);
+  overflow-y: auto;
+}
+.language-choice-list button {
+  width: 100%;
+  min-height: 58px;
+  padding: 12px 18px;
+  color: #17211e;
+  background: #f7faf9;
+  border: 1px solid #dce5e2;
+  border-radius: 14px;
+  box-shadow: 0 3px 8px rgba(22, 38, 33, .1);
+  font: 750 18px/1.2 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+.language-choice-list button { position: relative; }
+.language-choice-list button small { position: absolute; right: 14px; color: #7b8792; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.language-choice-list button:disabled { cursor: not-allowed; opacity: .62; }
+.language-choice-list button.active {
+  color: #fff;
+  background: linear-gradient(110deg, #008c83, #7040e8);
+  border-color: transparent;
+}.language-choice-actions {
   margin-top: auto;
   display: grid;
   gap: 14px;

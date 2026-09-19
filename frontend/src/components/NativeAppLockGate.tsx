@@ -1,8 +1,9 @@
-﻿import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { App } from "@capacitor/app";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import FingerprintRoundedIcon from "@mui/icons-material/FingerprintRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import logoImage from "/logo.png";
 import { useAuthContext } from "../contexts/AuthContext";
 import { APP_LOCK_CHANGED_EVENT, authenticateNativeDevice, clearAppLockSettings, getAppLockSettings, isNativeAuthenticationActive, supportsNativeAppLock, type AppLockSettings } from "../lib/nativeAppLock";
 import "./NativeAppLockGate.css";
@@ -50,6 +51,6 @@ const NativeAppLockGate = ({ children }: { children: ReactNode }) => {
   if (!supportsNativeAppLock()) return <>{children}</>;
   if (!ready) return <div className="native-app-lock native-app-lock--boot" aria-label="Securing SMAJ PI HUB"><span /></div>;
   if (!locked) return <>{children}</>;
-  return <main className="native-app-lock" aria-labelledby="native-app-lock-title"><section><div className="native-app-lock__icon"><LockOutlinedIcon /></div><p>SMAJ PI HUB SECURITY</p><h1 id="native-app-lock-title">App locked</h1><span>Your Pi session is still active. Verify with this device to continue.</span><button type="button" className="native-app-lock__unlock" onClick={() => void unlock()} disabled={busy}>{busy ? <i aria-hidden="true" /> : <FingerprintRoundedIcon />}{busy ? "Authenticating…" : "Unlock SMAJ PI HUB"}</button>{message ? <small role="alert">{message}</small> : null}<button type="button" className="native-app-lock__logout" onClick={() => void logout()} disabled={busy}><LogoutRoundedIcon /> Sign out</button></section></main>;
+  return <main className="native-app-lock" aria-labelledby="native-app-lock-title"><section><img className="native-app-lock__brand" src={logoImage} alt="SMAJ PI HUB" /><div className="native-app-lock__icon"><LockOutlinedIcon /></div><p>SMAJ PI HUB SECURITY</p><h1 id="native-app-lock-title">App locked</h1><span>Your Pi session is still active. Verify with this device to continue.</span><button type="button" className="native-app-lock__unlock" onClick={() => void unlock()} disabled={busy}>{busy ? <i aria-hidden="true" /> : <FingerprintRoundedIcon />}{busy ? "Authenticating…" : "Unlock SMAJ PI HUB"}</button>{message ? <small role="alert">{message}</small> : null}<button type="button" className="native-app-lock__logout" onClick={() => void logout()} disabled={busy}><LogoutRoundedIcon /> Sign out</button></section></main>;
 };
 export default NativeAppLockGate;
