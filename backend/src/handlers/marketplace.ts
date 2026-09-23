@@ -5,15 +5,9 @@ import env from "../environments";
 import { resolveCurrentUser } from "../services/auth";
 import { assertNoBase64Images, resolveImageValue } from "../services/imageStorage";
 import { piFromUsdt } from "../services/piPricing";
+import { canTransitionOrder, releaseOrderInventory, timelineEntry } from "../services/orderLifecycle";
 
 const STORE_CATEGORIES = ["Deals", "Grocery", "Electronics", "Mobiles", "Laptops", "Fashion", "Beauty", "Home", "Vehicles", "Accessories"];
-
-const timelineEntry = (status: string, label: string, note?: string) => ({
-  status,
-  label,
-  note,
-  at: new Date().toISOString(),
-});
 
 const serialize = (document: Record<string, any> | null) =>
   document ? { ...document, _id: document._id.toString() } : null;
@@ -355,6 +349,16 @@ export default function mountMarketplaceEndpoints(router: Router) {
       return res.status(400).json({ error: "bad_request", message: "You cannot order your own product" });
     }
 
+    const quantity = Math.min(20, Math.max(1, Math.floor(Number(req.body?.quantity) || 1)));
+    const reservation = await req.app.locals.productCollection.updateOne(
+      { _id: product._id, active: true, quantity: { $gte: quantity } },
+      { $inc: { quantity: -quantity }, $set: { updatedAt: new Date() } },
+    );
+    if (!reservation.modifiedCount) {
+      return res.status(409).json({ error: "out_of_stock", message: "The requested quantity is no longer available" });
+    }
+    const unitPricePi = Number(withResolvedPiPrice(product).pricePi);
+
     const order = {
       buyerId: user.uid,
       buyerName: user.displayName || user.piUsername || user.username,
@@ -364,7 +368,11 @@ export default function mountMarketplaceEndpoints(router: Router) {
       productTitle: product.title,
       productImage: product.image,
       productCategory: product.category,
-      pricePi: withResolvedPiPrice(product).pricePi,
+      unitPricePi,
+      quantity,
+      pricePi: unitPricePi * quantity,
+      inventoryReserved: true,
+      inventoryReleased: false,
       status: "pending",
       paymentStatus: "pending",
       paymentId: null,
@@ -377,7 +385,16 @@ export default function mountMarketplaceEndpoints(router: Router) {
         timelineEntry("payment_pending", "Payment Pending", "Open Pi Browser to complete payment."),
       ],
     };
-    const result = await req.app.locals.marketplaceOrderCollection.insertOne(order);
+    let result;
+    try {
+      result = await req.app.locals.marketplaceOrderCollection.insertOne(order);
+    } catch (error) {
+      await req.app.locals.productCollection.updateOne(
+        { _id: product._id },
+        { $inc: { quantity }, $set: { updatedAt: new Date() } },
+      );
+      throw error;
+    }
     await Promise.all([
       createNotification(req.app, { userId: user.uid, type: "order_created", title: "Order created", message: `${product.title} order was created. Payment is pending.`, relatedId: result.insertedId.toString(), image: product.image }),
       createNotification(req.app, { userId: user.uid, type: "payment_pending", title: "Payment pending", message: `Complete payment for ${product.title} to confirm your order.`, relatedId: result.insertedId.toString(), image: product.image }),
@@ -433,20 +450,11 @@ export default function mountMarketplaceEndpoints(router: Router) {
     if (["delivered", "completed"].includes(status) && order.buyerId !== user.uid) {
       return res.status(403).json({ error: "forbidden", message: "Only the buyer can confirm delivery" });
     }
-    if (status === "cancelled" && order.status !== "pending") {
-      return res.status(400).json({ error: "bad_request", message: "Only pending orders can be cancelled" });
-    }
-    if (status === "processing" && order.status !== "paid") {
-      return res.status(400).json({ error: "bad_request", message: "Only paid orders can move to processing" });
-    }
-    if (status === "shipped" && order.status !== "processing") {
-      return res.status(400).json({ error: "bad_request", message: "Only processing orders can be marked shipped" });
-    }
-    if (status === "delivered" && order.status !== "shipped") {
-      return res.status(400).json({ error: "bad_request", message: "Only shipped orders can be marked delivered" });
-    }
-    if (status === "completed" && !["shipped", "delivered"].includes(order.status)) {
-      return res.status(400).json({ error: "bad_request", message: "Only shipped orders can be confirmed received" });
+    if (!canTransitionOrder(order.status, status)) {
+      return res.status(409).json({
+        error: "invalid_transition",
+        message: `Order cannot move from ${order.status} to ${status}`,
+      });
     }
     const labels: Record<string, string> = {
       processing: "Processing",
@@ -467,7 +475,16 @@ export default function mountMarketplaceEndpoints(router: Router) {
       updatedAt: new Date(),
       timeline: [...(Array.isArray(order.timeline) ? order.timeline : []), timelineEntry(status, labels[status], noteMap[status])],
     };
-    await req.app.locals.marketplaceOrderCollection.updateOne({ _id: order._id }, { $set: updates });
+    const transition = await req.app.locals.marketplaceOrderCollection.updateOne(
+      { _id: order._id, status: order.status },
+      { $set: updates },
+    );
+    if (!transition.modifiedCount) {
+      return res.status(409).json({ error: "order_changed", message: "Order changed while it was being updated" });
+    }
+    if (status === "cancelled") {
+      await releaseOrderInventory(req.app, order, "order_cancelled");
+    }
     const receiverId = order.buyerId === user.uid ? order.sellerId : order.buyerId;
     const notificationTitle = status === "shipped" ? "Order shipped" : status === "completed" ? "Delivery confirmed" : `Order ${status}`;
     const notificationMessage = status === "shipped"
@@ -477,6 +494,83 @@ export default function mountMarketplaceEndpoints(router: Router) {
         : `${order.productTitle} was marked ${status}`;
     await createNotification(req.app, { userId: receiverId, type: status === "completed" ? "order_completed" : "order_update", title: notificationTitle, message: notificationMessage, relatedId: order._id.toString(), image: order.productImage });
     return res.status(200).json({ message: `Order marked ${status}` });
+  });
+
+  router.post("/orders/:id/refund-request", async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid order id" });
+    const reason = String(req.body?.reason || "").trim();
+    if (reason.length < 10 || reason.length > 500) return res.status(400).json({ error: "bad_request", message: "Refund reason must be 10-500 characters" });
+    const order = await req.app.locals.marketplaceOrderCollection.findOne({ _id: new ObjectId(req.params.id), buyerId: user.uid });
+    if (!order) return res.status(404).json({ error: "not_found", message: "Order not found" });
+    if (order.paymentStatus !== "paid" || !["paid", "processing", "shipped", "delivered", "completed"].includes(order.status)) {
+      return res.status(409).json({ error: "not_refundable", message: "Only paid orders can have a refund request" });
+    }
+    if (["requested", "approved", "manual_required", "completed"].includes(order.refundStatus)) {
+      return res.status(409).json({ error: "refund_exists", message: "A refund workflow already exists for this order" });
+    }
+    const now = new Date();
+    await req.app.locals.marketplaceOrderCollection.updateOne(
+      { _id: order._id },
+      { $set: { refundStatus: "requested", refundReason: reason, refundRequestedAt: now, refundRequestedBy: user.uid, updatedAt: now } },
+    );
+    await Promise.all([
+      createNotification(req.app, { userId: order.sellerId, type: "refund_requested", title: "Refund requested", message: `${order.buyerName} requested a refund for ${order.productTitle}.`, relatedId: req.params.id, image: order.productImage }),
+      createNotification(req.app, { userId: user.uid, type: "refund_requested", title: "Refund request received", message: "An administrator will review your request. Pi refunds require a separately recorded return transaction.", relatedId: req.params.id, image: order.productImage }),
+    ]);
+    return res.status(201).json({ message: "Refund request submitted", refundStatus: "requested" });
+  });
+
+  router.post("/orders/:id/disputes", async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid order id" });
+    const reason = String(req.body?.reason || "").trim();
+    if (reason.length < 10 || reason.length > 1000) return res.status(400).json({ error: "bad_request", message: "Dispute details must be 10-1000 characters" });
+    const order = await req.app.locals.marketplaceOrderCollection.findOne({
+      _id: new ObjectId(req.params.id),
+      $or: [{ buyerId: user.uid }, { sellerId: user.uid }],
+    });
+    if (!order) return res.status(404).json({ error: "not_found", message: "Order not found" });
+    if (["pending", "cancelled"].includes(order.status)) return res.status(409).json({ error: "not_disputable", message: "This order is not eligible for a dispute" });
+    const existing = await req.app.locals.orderDisputeCollection.findOne({ orderId: req.params.id, status: { $in: ["open", "under_review"] } });
+    if (existing) return res.status(409).json({ error: "dispute_exists", message: "An active dispute already exists for this order" });
+    const now = new Date();
+    const dispute = {
+      orderId: req.params.id,
+      productId: order.productId,
+      openedBy: user.uid,
+      openedByRole: order.buyerId === user.uid ? "buyer" : "seller",
+      buyerId: order.buyerId,
+      sellerId: order.sellerId,
+      reason,
+      status: "open",
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const result = await req.app.locals.orderDisputeCollection.insertOne(dispute);
+    await req.app.locals.marketplaceOrderCollection.updateOne(
+      { _id: order._id },
+      { $set: { disputeStatus: "open", activeDisputeId: result.insertedId.toString(), updatedAt: now } },
+    );
+    const counterpartId = order.buyerId === user.uid ? order.sellerId : order.buyerId;
+    await createNotification(req.app, { userId: counterpartId, type: "order_dispute", title: "Order dispute opened", message: `A dispute was opened for ${order.productTitle}. An administrator will review it.`, relatedId: req.params.id, image: order.productImage });
+    return res.status(201).json({ message: "Dispute opened", dispute: serialize({ ...dispute, _id: result.insertedId }) });
+  });
+
+  router.get("/orders/:id/disputes", async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid order id" });
+    const order = await req.app.locals.marketplaceOrderCollection.findOne({
+      _id: new ObjectId(req.params.id),
+      $or: [{ buyerId: user.uid }, { sellerId: user.uid }],
+    });
+    if (!order) return res.status(404).json({ error: "not_found", message: "Order not found" });
+    const disputes = await req.app.locals.orderDisputeCollection.find({ orderId: req.params.id }).sort({ createdAt: -1 }).toArray();
+    return res.status(200).json({ disputes: disputes.map(serialize) });
   });
 
   router.get("/saved", async (req, res) => {

@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
 import { resolveCurrentUser, setSessionUser } from "../services/auth";
 import env from "../environments";
+import { canTransitionOrder, releaseOrderInventory, timelineEntry } from "../services/orderLifecycle";
 
 const serialize = (document: Record<string, any>) => ({ ...document, _id: document._id.toString(), accessToken: undefined });
 const verificationLabel = (level: string) => level === "trusted_seller" ? "Trusted Seller" : level === "seller_verified" ? "Seller Verified" : level === "pi_verified" || level === "verified" ? "Pi Verified" : "Basic";
@@ -538,14 +539,102 @@ export default function mountAdminEndpoints(router: Router) {
   });
 
   router.patch("/orders/:id", async (req, res) => {
-    if (!ObjectId.isValid(req.params.id) || !["pending", "processing", "shipped", "delivered", "completed", "cancelled"].includes(req.body?.status)) {
+    if (!ObjectId.isValid(req.params.id) || !["processing", "shipped", "delivered", "completed", "cancelled"].includes(req.body?.status)) {
       return res.status(400).json({ error: "bad_request", message: "Invalid order update" });
     }
-    await req.app.locals.marketplaceOrderCollection.updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { status: req.body.status, updatedAt: new Date() } },
+    const order = await req.app.locals.marketplaceOrderCollection.findOne({ _id: new ObjectId(req.params.id) });
+    if (!order) return res.status(404).json({ error: "not_found", message: "Order not found" });
+    if (!canTransitionOrder(order.status, req.body.status)) {
+      return res.status(409).json({ error: "invalid_transition", message: `Order cannot move from ${order.status} to ${req.body.status}` });
+    }
+    const now = new Date();
+    const result = await req.app.locals.marketplaceOrderCollection.updateOne(
+      { _id: order._id, status: order.status },
+      { $set: {
+        status: req.body.status,
+        updatedAt: now,
+        timeline: [...(Array.isArray(order.timeline) ? order.timeline : []), timelineEntry(req.body.status, `Admin marked order ${req.body.status}`)],
+      } },
     );
+    if (!result.modifiedCount) return res.status(409).json({ error: "order_changed", message: "Order changed while it was being updated" });
+    if (req.body.status === "cancelled") await releaseOrderInventory(req.app, order, "admin_cancelled");
     return res.status(200).json({ message: "Order updated" });
+  });
+
+  router.patch("/orders/:id/refund", async (req, res) => {
+    if (!ObjectId.isValid(req.params.id) || !["approve", "reject", "complete"].includes(req.body?.action)) {
+      return res.status(400).json({ error: "bad_request", message: "Invalid refund action" });
+    }
+    const order = await req.app.locals.marketplaceOrderCollection.findOne({ _id: new ObjectId(req.params.id) });
+    if (!order) return res.status(404).json({ error: "not_found", message: "Order not found" });
+    const action = req.body.action;
+    if (action !== "complete" && order.refundStatus !== "requested") {
+      return res.status(409).json({ error: "invalid_refund_state", message: "Refund is not awaiting review" });
+    }
+    if (action === "complete" && !["approved", "manual_required"].includes(order.refundStatus)) {
+      return res.status(409).json({ error: "invalid_refund_state", message: "Refund must be approved first" });
+    }
+    const reference = String(req.body?.reference || "").trim();
+    if (action === "complete" && reference.length < 6) {
+      return res.status(400).json({ error: "bad_request", message: "A manual Pi refund transaction reference is required" });
+    }
+    const note = String(req.body?.note || "").trim().slice(0, 500);
+    const refundStatus = action === "approve" ? "manual_required" : action === "reject" ? "rejected" : "completed";
+    const now = new Date();
+    const refundUpdate = await req.app.locals.marketplaceOrderCollection.updateOne({
+      _id: order._id,
+      refundStatus: action === "complete" ? { $in: ["approved", "manual_required"] } : "requested",
+    }, { $set: {
+      refundStatus,
+      refundReviewNote: note,
+      refundReviewedBy: req.session.user?.userId,
+      refundReviewedAt: now,
+      refundReference: action === "complete" ? reference : order.refundReference || null,
+      refundedAt: action === "complete" ? now : null,
+      updatedAt: now,
+    } });
+    if (!refundUpdate.modifiedCount) return res.status(409).json({ error: "refund_changed", message: "Refund changed while it was being updated" });
+    await createNotification(req.app, {
+      userId: order.buyerId,
+      type: "refund_update",
+      title: action === "complete" ? "Refund recorded" : action === "reject" ? "Refund request declined" : "Refund approved",
+      message: action === "approve" ? "Your refund was approved. A separate Pi return transaction must now be completed and recorded." : action === "complete" ? "The Pi return transaction was recorded for your order." : "Your refund request was reviewed and declined.",
+      relatedId: req.params.id,
+      image: order.productImage,
+    });
+    return res.status(200).json({ message: "Refund updated", refundStatus });
+  });
+
+  router.get("/disputes", async (req, res) => {
+    const disputes = await req.app.locals.orderDisputeCollection.find({}).sort({ updatedAt: -1 }).toArray();
+    return res.status(200).json({ disputes: disputes.map(serialize) });
+  });
+
+  router.patch("/disputes/:id", async (req, res) => {
+    if (!ObjectId.isValid(req.params.id) || !["under_review", "resolved", "rejected"].includes(req.body?.status)) {
+      return res.status(400).json({ error: "bad_request", message: "Invalid dispute update" });
+    }
+    const dispute = await req.app.locals.orderDisputeCollection.findOne({ _id: new ObjectId(req.params.id) });
+    if (!dispute) return res.status(404).json({ error: "not_found", message: "Dispute not found" });
+    const allowed = dispute.status === "open"
+      ? ["under_review", "resolved", "rejected"]
+      : dispute.status === "under_review" ? ["resolved", "rejected"] : [];
+    if (!allowed.includes(req.body.status)) return res.status(409).json({ error: "invalid_transition", message: "Dispute status cannot move backwards" });
+    const resolution = String(req.body?.resolution || "").trim().slice(0, 1000);
+    if (["resolved", "rejected"].includes(req.body.status) && resolution.length < 5) {
+      return res.status(400).json({ error: "bad_request", message: "A resolution note is required" });
+    }
+    const now = new Date();
+    const disputeUpdate = await req.app.locals.orderDisputeCollection.updateOne(
+      { _id: dispute._id, status: dispute.status },
+      { $set: { status: req.body.status, active: !["resolved", "rejected"].includes(req.body.status), resolution, reviewedBy: req.session.user?.userId, resolvedAt: ["resolved", "rejected"].includes(req.body.status) ? now : null, updatedAt: now } },
+    );
+    if (!disputeUpdate.modifiedCount) return res.status(409).json({ error: "dispute_changed", message: "Dispute changed while it was being updated" });
+    await Promise.all([
+      req.app.locals.marketplaceOrderCollection.updateOne({ _id: new ObjectId(dispute.orderId) }, { $set: { disputeStatus: req.body.status, updatedAt: now } }),
+      ...[dispute.buyerId, dispute.sellerId].filter(Boolean).map((userId: string) => createNotification(req.app, { userId, type: "dispute_update", title: "Order dispute updated", message: `The order dispute is now ${String(req.body.status).replace("_", " ")}.`, relatedId: dispute.orderId })),
+    ]);
+    return res.status(200).json({ message: "Dispute updated" });
   });
 
   router.get("/reports", async (req, res) => {

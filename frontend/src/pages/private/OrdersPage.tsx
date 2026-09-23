@@ -20,6 +20,9 @@ const OrdersPage = () => {
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewMessage, setReviewMessage] = useState("");
+  const [actionOrder, setActionOrder] = useState<Order | null>(null);
+  const [actionKind, setActionKind] = useState<"refund" | "dispute">("refund");
+  const [actionReason, setActionReason] = useState("");
 
   const loadOrders = useCallback(async () => {
     try {
@@ -84,6 +87,28 @@ const OrdersPage = () => {
     }
   };
 
+  const submitOrderAction = async () => {
+    if (!actionOrder) return;
+    try {
+      const path = actionKind === "refund"
+        ? `/marketplace/orders/${actionOrder._id}/refund-request`
+        : `/marketplace/orders/${actionOrder._id}/disputes`;
+      await axiosClient.post(path, { reason: actionReason });
+      setMessage(actionKind === "refund" ? "Refund request submitted." : "Order dispute opened.");
+      setActionOrder(null);
+      setActionReason("");
+      await loadOrders();
+    } catch (err: unknown) {
+      setMessage(isAxiosError<{ message?: string }>(err) ? err.response?.data?.message || "Could not submit request." : "Could not submit request.");
+    }
+  };
+
+  const openOrderAction = (order: Order, kind: "refund" | "dispute") => {
+    setActionOrder(order);
+    setActionKind(kind);
+    setActionReason("");
+  };
+
   const openReview = (order: Order) => {
     setReviewOrder(order);
     setReviewRating(5);
@@ -107,6 +132,9 @@ const OrdersPage = () => {
           </p>
           <p>{new Date(order.createdAt).toLocaleString()}</p>
           {order.paidAt ? <p>Paid: {new Date(order.paidAt).toLocaleString()}</p> : null}
+          {order.quantity && order.quantity > 1 ? <p>Quantity: {order.quantity}</p> : null}
+          {order.refundStatus ? <p>Refund: {order.refundStatus.replace("_", " ")}</p> : null}
+          {order.disputeStatus ? <p>Dispute: {order.disputeStatus.replace("_", " ")}</p> : null}
         </div>
         <strong className="order-price">{formatPiAmount(order.pricePi)}</strong>
         <span className={`order-status ${order.status}`}>{order.status}</span>
@@ -148,6 +176,12 @@ const OrdersPage = () => {
             <button disabled={updatingId === order._id} onClick={() => void updateStatus(order._id, "completed")}>
               Confirm Received
             </button>
+          ) : null}
+          {mode === "buyer" && order.paymentStatus === "paid" && !order.refundStatus ? (
+            <button className="secondary" onClick={() => openOrderAction(order, "refund")}>Request Refund</button>
+          ) : null}
+          {!["pending", "cancelled"].includes(order.status) && !["open", "under_review"].includes(order.disputeStatus || "") ? (
+            <button className="secondary" onClick={() => openOrderAction(order, "dispute")}>Open Dispute</button>
           ) : null}
           {mode === "buyer" && ["delivered", "completed"].includes(order.status) ? (
             <button onClick={() => openReview(order)}>Rate Seller</button>
@@ -214,6 +248,22 @@ const OrdersPage = () => {
           {orderSection("Buyer Orders", "Products you ordered from SMAJ sellers.", buyerOrders, "buyer")}
           {orderSection("Seller Orders", "Orders customers placed for your products.", sellerOrders, "seller")}
         </>
+      ) : null}
+      {actionOrder ? (
+        <div className="service-modal-backdrop" onMouseDown={() => setActionOrder(null)}>
+          <form className="service-modal marketplace-action-modal" onSubmit={(event) => { event.preventDefault(); void submitOrderAction(); }} onMouseDown={(event) => event.stopPropagation()}>
+            <h2>{actionKind === "refund" ? "Request Refund" : "Open Order Dispute"}</h2>
+            <p>{actionKind === "refund" ? "Explain why you are requesting a refund. Pi returns are reviewed and recorded as a separate transaction." : "Explain the problem clearly so an administrator can review the order."}</p>
+            <label>
+              Details
+              <textarea rows={5} minLength={10} maxLength={actionKind === "refund" ? 500 : 1000} required value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="Provide at least 10 characters..." />
+            </label>
+            <div className="confirm-modal-actions">
+              <button type="button" className="modal-cancel-button" onClick={() => setActionOrder(null)}>Cancel</button>
+              <button type="submit" className="private-primary-button">Submit</button>
+            </div>
+          </form>
+        </div>
       ) : null}
       {reviewOrder ? (
         <div className="service-modal-backdrop" onMouseDown={() => setReviewOrder(null)}>

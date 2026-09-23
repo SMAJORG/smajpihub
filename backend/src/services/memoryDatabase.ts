@@ -25,6 +25,10 @@ const matchesValue = (value: any, condition: any): boolean => {
   }
   if ("$ne" in condition && sameValue(value, condition.$ne)) return false;
   if ("$in" in condition && !condition.$in.some((item: any) => sameValue(value, item))) return false;
+  if ("$gte" in condition && !(value >= condition.$gte)) return false;
+  if ("$gt" in condition && !(value > condition.$gt)) return false;
+  if ("$lte" in condition && !(value <= condition.$lte)) return false;
+  if ("$lt" in condition && !(value < condition.$lt)) return false;
   if ("$elemMatch" in condition && (!Array.isArray(value) || !value.some((item: any) => matchesObject(item, condition.$elemMatch)))) return false;
   if ("$regex" in condition) {
     const flags = String(condition.$options || "");
@@ -42,6 +46,11 @@ const matchesQuery = (document: Document, query: Query = {}): boolean =>
 
 const applyUpdate = (document: Document, update: Document, inserting = false) => {
   if (update.$set) Object.assign(document, update.$set);
+  if (update.$inc) {
+    Object.entries(update.$inc).forEach(([key, value]) => {
+      document[key] = Number(document[key] || 0) + Number(value || 0);
+    });
+  }
   if (update.$unset) Object.keys(update.$unset).forEach((key) => delete document[key]);
   if (inserting && update.$setOnInsert) Object.assign(document, update.$setOnInsert);
   if (update.$push) {
@@ -180,6 +189,7 @@ export class MemoryCollection {
 export const createMemoryCollections = () => ({
   paymentCollection: new MemoryCollection(),
   marketplaceOrderCollection: new MemoryCollection(),
+  orderDisputeCollection: new MemoryCollection(),
   productCollection: new MemoryCollection(),
   userCollection: new MemoryCollection(),
   reportCollection: new MemoryCollection(),

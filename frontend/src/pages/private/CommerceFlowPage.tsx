@@ -82,6 +82,7 @@ const CommerceFlowPage = ({ mode }: { mode: "cart" | "checkout" | "payment-metho
     try {
       const { data } = await axiosClient.post<{ order: Order }>("/marketplace/orders", {
         productId: checkoutItem.productId,
+        quantity: checkoutItem.quantity,
       });
 
       setOrder(data.order);

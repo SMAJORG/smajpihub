@@ -358,6 +358,7 @@ const start = async () => {
       const db = client.db(dbName);
       app.locals.paymentCollection = db.collection("pi_payments");
       app.locals.marketplaceOrderCollection = db.collection("orders");
+      app.locals.orderDisputeCollection = db.collection("order_disputes");
       app.locals.productCollection = db.collection("products");
       app.locals.userCollection = db.collection("users");
       app.locals.reportCollection = db.collection("reports");
@@ -449,6 +450,18 @@ const start = async () => {
           sellerId: 1,
           createdAt: -1,
         }),
+        app.locals.orderDisputeCollection.createIndex({
+          orderId: 1,
+          createdAt: -1,
+        }),
+        app.locals.orderDisputeCollection.createIndex({
+          status: 1,
+          updatedAt: -1,
+        }),
+        app.locals.orderDisputeCollection.createIndex(
+          { orderId: 1, active: 1 },
+          { unique: true, partialFilterExpression: { active: true } },
+        ),
         app.locals.conversationCollection.createIndex({
           participants: 1,
           updatedAt: -1,

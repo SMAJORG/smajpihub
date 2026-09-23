@@ -12,6 +12,7 @@
     "start": "ts-node-dev ./src/index.ts",
     "test:validation": "ts-node ./src/tests/storageValidation.test.ts",
     "test:jobs": "ts-node ./src/tests/jobsValidation.test.ts",
+    "test:orders": "ts-node ./src/tests/orderLifecycle.test.ts",
     "sessions:cleanup": "ts-node ./src/scripts/cleanupUserSessions.ts",
     "storage:report": "ts-node ./src/scripts/storageReport.ts",
     "storage:migrate-images": "ts-node ./src/scripts/migrateBase64ImagesToCloudinary.ts"

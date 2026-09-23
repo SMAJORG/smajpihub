@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { isAxiosError } from "axios";
 import { Link } from "react-router-dom";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import PullToRefresh from "../../components/PullToRefresh";
 import { axiosClient } from "../../lib/axiosClient";
 import { formatPiAmount } from "../../lib/formatters";
-import type { Order, Product } from "../../types/marketplace";
+import type { Order, OrderStatus, Product } from "../../types/marketplace";
 import type { User } from "../../types/pi";
 import { getStreamAdminOverview, type StreamAdminOverview } from "../../lib/streamAdmin";
 import ActionDialog from "../../components/ActionDialog";
@@ -582,23 +583,70 @@ export const AdminProductsPage = () => {
   );
 };
 
+type OrderDispute = { _id: string; orderId: string; reason: string; status: "open" | "under_review" | "resolved" | "rejected"; openedByRole: string; createdAt: string };
+
 export const AdminOrdersPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [disputes, setDisputes] = useState<OrderDispute[]>([]);
   const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const load = useCallback(async () => setOrders((await axiosClient.get("/admin/orders")).data.orders), []);
+  const load = useCallback(async () => {
+    const [orderResponse, disputeResponse] = await Promise.all([
+      axiosClient.get("/admin/orders"),
+      axiosClient.get("/admin/disputes"),
+    ]);
+    setOrders(orderResponse.data.orders);
+    setDisputes(disputeResponse.data.disputes);
+  }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
-  const update = async (id: string, status: string) => { await axiosClient.patch(`/admin/orders/${id}`, { status }); setMessage("Order status updated."); await load(); };
+  const update = async (id: string, status: string) => {
+    try {
+      await axiosClient.patch(`/admin/orders/${id}`, { status });
+      setMessage("Order status updated.");
+      await load();
+    } catch (error) {
+      setMessage(isAxiosError<{ message?: string }>(error) ? error.response?.data?.message || "Could not update order." : "Could not update order.");
+    }
+  };
+  const updateRefund = async (order: Order, action: "approve" | "reject" | "complete") => {
+    const value = window.prompt(action === "complete" ? "Enter the Pi refund transaction reference" : "Enter an administrator note", "");
+    if (value === null) return;
+    try {
+      await axiosClient.patch(`/admin/orders/${order._id}/refund`, action === "complete" ? { action, reference: value } : { action, note: value });
+      setMessage("Refund workflow updated.");
+      setSelected(null);
+      await load();
+    } catch (error) {
+      setMessage(isAxiosError<{ message?: string }>(error) ? error.response?.data?.message || "Could not update refund." : "Could not update refund.");
+    }
+  };
+  const updateDispute = async (dispute: OrderDispute, status: "under_review" | "resolved" | "rejected") => {
+    const resolution = ["resolved", "rejected"].includes(status) ? window.prompt("Enter the dispute resolution", "") : "";
+    if (resolution === null) return;
+    await axiosClient.patch(`/admin/disputes/${dispute._id}`, { status, resolution });
+    setMessage("Dispute updated.");
+    await load();
+  };
+  const nextStatuses = (status: OrderStatus) => ({
+    pending: ["cancelled"],
+    paid: ["processing"],
+    processing: ["shipped"],
+    shipped: ["delivered", "completed"],
+    delivered: ["completed"],
+    completed: [],
+    cancelled: [],
+  }[status] as OrderStatus[]);
   const filteredOrders = statusFilter === "all" ? orders : orders.filter((order) => order.status === statusFilter);
 
   return (
     <main className="private-page">
-      <Head title="Orders" description="Review order details and correct statuses when necessary." />
+      <Head title="Orders" description="Review lifecycle, refunds, and disputes without bypassing fulfillment rules." />
       <Notice text={message} />
       <section className="admin-filter-bar"><label>Status filter<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="paid">Paid</option><option value="processing">Processing</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label><span>{filteredOrders.length} orders</span></section>
-      {filteredOrders.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Buyer / Seller</th><th>Price</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredOrders.map((order) => <tr key={order._id}><td>{order.productTitle}</td><td><small>{order.buyerName}<br />{order.sellerName}</small></td><td>{formatPiAmount(order.pricePi)}</td><td><select value={order.status} onChange={(event) => void update(order._id, event.target.value)}><option>pending</option><option>processing</option><option>shipped</option><option>delivered</option><option>completed</option><option>cancelled</option></select></td><td><button onClick={() => setSelected(order)}>Details</button></td></tr>)}</tbody></table></div> : <div className="private-state compact"><h3>No matching orders</h3><p>Choose another status to view more orders.</p></div>}
-      {selected ? <div className="detail-panel"><button onClick={() => setSelected(null)}>Close</button><h2>{selected.productTitle}</h2><p>Order ID: {selected._id}</p><p>Payment ID: {selected.paymentId || "Not paid"}</p><p>Transaction: {selected.paymentTxid || "Not available"}</p><p>Created: {new Date(selected.createdAt).toLocaleString()}</p></div> : null}
+      {filteredOrders.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Buyer / Seller</th><th>Price</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredOrders.map((order) => <tr key={order._id}><td>{order.productTitle}</td><td><small>{order.buyerName}<br />{order.sellerName}</small></td><td>{formatPiAmount(order.pricePi)}</td><td><select value="" disabled={!nextStatuses(order.status).length} onChange={(event) => void update(order._id, event.target.value)}><option value="">{order.status}</option>{nextStatuses(order.status).map(status => <option key={status} value={status}>Mark {status}</option>)}</select></td><td><button onClick={() => setSelected(order)}>Details</button></td></tr>)}</tbody></table></div> : <div className="private-state compact"><h3>No matching orders</h3><p>Choose another status to view more orders.</p></div>}
+      {selected ? <div className="detail-panel"><button onClick={() => setSelected(null)}>Close</button><h2>{selected.productTitle}</h2><p>Order ID: {selected._id}</p><p>Payment ID: {selected.paymentId || "Not paid"}</p><p>Transaction: {selected.paymentTxid || "Not available"}</p><p>Refund: {selected.refundStatus || "None"}</p><p>Dispute: {selected.disputeStatus || "None"}</p><p>Created: {new Date(selected.createdAt).toLocaleString()}</p>{selected.refundStatus === "requested" ? <><button onClick={() => void updateRefund(selected, "approve")}>Approve refund</button><button onClick={() => void updateRefund(selected, "reject")}>Reject refund</button></> : null}{selected.refundStatus === "manual_required" ? <button onClick={() => void updateRefund(selected, "complete")}>Record Pi refund</button> : null}</div> : null}
+      <section className="orders-section"><div className="section-title"><div><h2>Order disputes</h2><p>Open cases requiring administrator review.</p></div><span>{disputes.length}</span></div>{disputes.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Order</th><th>Opened by</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead><tbody>{disputes.map(dispute => <tr key={dispute._id}><td>{dispute.orderId}</td><td>{dispute.openedByRole}</td><td>{dispute.reason}</td><td>{dispute.status}</td><td>{dispute.status === "open" ? <button onClick={() => void updateDispute(dispute, "under_review")}>Review</button> : null}{["open", "under_review"].includes(dispute.status) ? <><button onClick={() => void updateDispute(dispute, "resolved")}>Resolve</button><button onClick={() => void updateDispute(dispute, "rejected")}>Reject</button></> : null}</td></tr>)}</tbody></table></div> : <div className="private-state compact"><p>No disputes.</p></div>}</section>
     </main>
   );
 };
