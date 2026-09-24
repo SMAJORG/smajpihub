@@ -390,6 +390,8 @@ const start = async () => {
       app.locals.jobProfileCollection = db.collection("job_profiles");
       app.locals.jobAuditCollection = db.collection("job_audit_log");
       app.locals.jobBillingCollection = db.collection("job_billing");
+      app.locals.jobPaymentCollection = db.collection("job_payments");
+      app.locals.jobDisputeCollection = db.collection("job_disputes");
       app.locals.sessionCollection = db.collection("user_sessions");
       app.locals.transportBookingCollection =
         db.collection("transport_bookings");
@@ -581,6 +583,26 @@ const start = async () => {
         ),
         app.locals.jobBillingCollection.createIndex({
           employerId: 1,
+          status: 1,
+          createdAt: -1,
+        }),
+        app.locals.jobPaymentCollection.createIndex(
+          { paymentRecordId: 1 },
+          { unique: true },
+        ),
+        app.locals.jobPaymentCollection.createIndex(
+          { txid: 1 },
+          { unique: true },
+        ),
+        app.locals.jobPaymentCollection.createIndex({
+          applicationId: 1,
+          createdAt: -1,
+        }),
+        app.locals.jobDisputeCollection.createIndex(
+          { disputeId: 1 },
+          { unique: true },
+        ),
+        app.locals.jobDisputeCollection.createIndex({
           status: 1,
           createdAt: -1,
         }),

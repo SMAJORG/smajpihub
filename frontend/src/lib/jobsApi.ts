@@ -39,6 +39,28 @@ export type JobsApiCompany = {
 };
 
 export type JobsApiInterview = { id: string; scheduledAt: string; note?: string; createdAt: string; createdBy: string };
+export type JobsApiOffer = {
+  offerId: string;
+  amountPi: number;
+  period: string;
+  startDate?: string;
+  terms?: string;
+  status: "sent" | "accepted" | "declined" | "withdrawn";
+  sentAt: string;
+  respondedAt?: string;
+};
+export type JobsSalaryPayment = {
+  id: string;
+  paymentRecordId: string;
+  applicationId: string;
+  amountPi: number;
+  txid: string;
+  note?: string;
+  status: "awaiting_candidate_confirmation" | "completed" | "disputed" | "voided";
+  createdAt: string;
+  confirmedAt?: string;
+  disputeId?: string;
+};
 export type JobsApiApplication = {
   id: string;
   jobId: string;
@@ -51,6 +73,7 @@ export type JobsApiApplication = {
   profileSnapshot?: JobsProfile;
   notes?: string;
   interviews?: JobsApiInterview[];
+  offer?: JobsApiOffer;
 };
 
 export type JobsProfile = {
@@ -227,6 +250,51 @@ export const scheduleApplicationInterview = async (id: string, scheduledAt: stri
   ).data.interview;
 export const cancelApplicationInterview = async (id: string, interviewId: string) =>
   axiosClient.delete(`/jobs/employer/applications/${encodeURIComponent(id)}/interviews/${encodeURIComponent(interviewId)}`);
+export const sendJobOffer = async (
+  id: string,
+  offer: { amountPi: number; period: string; startDate?: string; terms?: string }
+) =>
+  (
+    await axiosClient.post<{ offer: JobsApiOffer; status: string }>(
+      `/jobs/employer/applications/${encodeURIComponent(id)}/offer`,
+      offer
+    )
+  ).data;
+export const respondToJobOffer = async (id: string, decision: "accepted" | "declined") =>
+  (
+    await axiosClient.patch<{ status: string; offerStatus: string }>(
+      `/jobs/applications/${encodeURIComponent(id)}/offer`,
+      { decision }
+    )
+  ).data;
+export const recordJobSalaryPayment = async (
+  id: string,
+  payment: { amountPi: number; txid: string; note?: string }
+) =>
+  (
+    await axiosClient.post<{ payment: JobsSalaryPayment }>(
+      `/jobs/employer/applications/${encodeURIComponent(id)}/payments`,
+      payment
+    )
+  ).data.payment;
+export const getJobSalaryPayments = async (id: string) =>
+  (
+    await axiosClient.get<{ payments: JobsSalaryPayment[] }>(
+      `/jobs/applications/${encodeURIComponent(id)}/payments`
+    )
+  ).data.payments;
+export const respondToJobSalaryPayment = async (
+  applicationId: string,
+  paymentId: string,
+  action: "confirm" | "dispute",
+  reason = ""
+) =>
+  (
+    await axiosClient.patch(
+      `/jobs/applications/${encodeURIComponent(applicationId)}/payments/${encodeURIComponent(paymentId)}`,
+      { action, reason }
+    )
+  ).data;
 export const withdrawJobApplication = async (id: string) =>
   (await axiosClient.patch<{ status: string }>(`/jobs/applications/${encodeURIComponent(id)}/withdraw`)).data.status;
 export const archiveJobApplication = async (id: string) =>
@@ -297,6 +365,26 @@ export const verifyJobsCompany = async (id: string, status: "verified" | "pi_kyb
 export const verifyJobsCandidate = async (userId: string, status: "verified" | "rejected") =>
   (await axiosClient.patch<{ verificationStatus: string }>(`/jobs/admin/profiles/${encodeURIComponent(userId)}/verify`, { status })).data;
 
+export type JobsSalaryDispute = {
+  id: string;
+  disputeId: string;
+  paymentRecordId: string;
+  applicationId: string;
+  candidateId: string;
+  employerId: string;
+  reason: string;
+  status: "open" | "resolved" | "closed";
+  createdAt: string;
+  resolution?: string;
+};
+export const getJobsSalaryDisputes = async () =>
+  (await axiosClient.get<{ disputes: JobsSalaryDispute[] }>("/jobs/admin/disputes")).data.disputes;
+export const resolveJobsSalaryDispute = async (
+  id: string,
+  outcome: "payment_confirmed" | "payment_voided",
+  resolution: string,
+) =>
+  (await axiosClient.patch(`/jobs/admin/disputes/${encodeURIComponent(id)}`, { status: "resolved", outcome, resolution })).data;
 export type JobsCandidateSearchResult = {
   userId: string;
   title: string;
@@ -358,6 +446,10 @@ export type JobsEarningItem = {
   compensationMaxPi: number;
   period: string;
   piRateUsed: number;
+  completedPaymentsPi: number;
+  pendingPaymentsPi: number;
+  payments: JobsSalaryPayment[];
+  offer?: JobsApiOffer;
   createdAt: string;
   updatedAt: string;
 };

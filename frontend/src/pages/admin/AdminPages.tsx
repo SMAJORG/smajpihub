@@ -16,9 +16,12 @@ import {
   moderateJobCompany,
   verifyJobsCompany,
   verifyJobsCandidate,
+  getJobsSalaryDisputes,
+  resolveJobsSalaryDispute,
   type JobsAdminReviewJob,
   type JobsAdminReviewCompany,
   type JobsAdminReviewProfile,
+  type JobsSalaryDispute,
 } from "../../lib/jobsApi";
 
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
@@ -388,12 +391,14 @@ export const AdminJobsReviewPage = () => {
   const [companyReviewFilter, setCompanyReviewFilter] = useState("all");
   const [companyUpdatingId, setCompanyUpdatingId] = useState("");
   const [profiles, setProfiles] = useState<JobsAdminReviewProfile[]>([]);
+  const [salaryDisputes, setSalaryDisputes] = useState<JobsSalaryDispute[]>([]);
   const [message, setMessage] = useState("");
   const load = useCallback(async () => {
-    const data = await getJobsAdminReview();
+    const [data, disputes] = await Promise.all([getJobsAdminReview(), getJobsSalaryDisputes()]);
     setJobs(data.jobs);
     setCompanies(data.companies);
     setProfiles(data.profiles);
+    setSalaryDisputes(disputes);
   }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   const visibleCompanies = useMemo(() => {
@@ -451,6 +456,20 @@ export const AdminJobsReviewPage = () => {
     }
   };
 
+  const decideSalaryDispute = async (dispute: JobsSalaryDispute, outcome: "payment_confirmed" | "payment_voided") => {
+    const resolution = window.prompt("Admin resolution note", "") || "";
+    if (resolution.trim().length < 5) {
+      showFeedback("Add a short resolution note before closing the dispute.", "error");
+      return;
+    }
+    try {
+      await resolveJobsSalaryDispute(dispute.disputeId, outcome, resolution);
+      setMessage(outcome === "payment_confirmed" ? "Salary payment confirmed." : "Salary payment record voided.");
+      await load();
+    } catch (error) {
+      reportError(error, "Salary dispute could not be resolved.");
+    }
+  };
   return (
     <main className="private-page">
       <Head title="Jobs Review" description="Approve job postings and review employer and candidate verification requests." />
@@ -509,6 +528,21 @@ export const AdminJobsReviewPage = () => {
       })}</div> : <div className="private-state"><h2>No matching company requests</h2><p>New listing and verification submissions will appear here.</p></div>}
 
       <section className="admin-filter-bar"><span>{profiles.length} candidate verification requests</span></section>
+      <section className="admin-filter-bar"><span>{salaryDisputes.length} salary payment disputes</span></section>
+      {salaryDisputes.length ? <div className="management-list">{salaryDisputes.map(dispute => (
+        <article className="report-card" key={dispute.disputeId}>
+          <div>
+            <span>Salary dispute · {dispute.status}</span>
+            <h3>{dispute.paymentRecordId}</h3>
+            <p>{dispute.reason}</p>
+            <small>{new Date(dispute.createdAt).toLocaleString()}</small>
+          </div>
+          {dispute.status === "open" ? <div className="row-actions">
+            <button onClick={() => void decideSalaryDispute(dispute, "payment_confirmed")}>Confirm payment</button>
+            <button className="danger" onClick={() => void decideSalaryDispute(dispute, "payment_voided")}>Void record</button>
+          </div> : <strong className="resolved">{dispute.status}</strong>}
+        </article>
+      ))}</div> : <div className="private-state"><h2>No salary disputes</h2><p>Candidate payment disputes will appear here for review.</p></div>}
       {profiles.length ? <div className="management-list">{profiles.map((profile) => (
         <article className="report-card" key={profile.userId}>
           <div>

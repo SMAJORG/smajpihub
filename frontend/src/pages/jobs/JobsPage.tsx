@@ -41,6 +41,10 @@ import {
   getSavedJobs,
   saveJobsProfileSection,
   requestCandidateVerification,
+  recordJobSalaryPayment,
+  respondToJobOffer,
+  respondToJobSalaryPayment,
+  sendJobOffer,
   requestCompanyVerification,
   saveApplicationNotes,
   saveJobsCv,
@@ -1482,6 +1486,84 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       setActionMessage("Application status could not be updated.");
     }
   };
+  const sendCandidateOffer = async (application: JobsApiApplication) => {
+    const amountValue = window.prompt("Offer amount in Pi");
+    if (!amountValue) return;
+    const amountPi = Number(amountValue);
+    if (!Number.isFinite(amountPi) || amountPi <= 0) {
+      setActionMessage("Enter a valid offer amount in Pi.");
+      return;
+    }
+    const terms = window.prompt("Offer terms (role, schedule, deliverables)", "") || "";
+    try {
+      const result = await sendJobOffer(application.id, {
+        amountPi,
+        period: "month",
+        terms,
+      });
+      const updated = { ...application, status: result.status, offer: result.offer };
+      setEmployerApplications(current => current.map(item => item.id === application.id ? updated : item));
+      setSelectedCandidate(updated);
+      setActionMessage("Offer sent. The candidate must accept before salary can be recorded.");
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setActionMessage(message || "The offer could not be sent.");
+    }
+  };
+  const respondToCandidateOffer = async (application: JobsApiApplication, decision: "accepted" | "declined") => {
+    try {
+      const result = await respondToJobOffer(application.id, decision);
+      setApplications(current => current.map(item => item.id === application.id
+        ? { ...item, status: result.status, offer: item.offer ? { ...item.offer, status: decision } : item.offer }
+        : item));
+      setActionMessage(decision === "accepted" ? "Offer accepted. Your employer can now record salary payments." : "Offer declined.");
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setActionMessage(message || "The offer response could not be saved.");
+    }
+  };
+  const recordCandidateSalary = async (application: JobsApiApplication) => {
+    const amountValue = window.prompt("Salary amount paid in Pi");
+    const txid = window.prompt("Pi transaction ID from the payer wallet");
+    if (!amountValue || !txid) return;
+    try {
+      await recordJobSalaryPayment(application.id, {
+        amountPi: Number(amountValue),
+        txid,
+        note: window.prompt("Payment note (optional)", "") || "",
+      });
+      setActionMessage("Salary record created. The candidate must verify the transaction in their wallet and confirm receipt.");
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setActionMessage(message || "The salary payment could not be recorded.");
+    }
+  };
+  const respondToSalaryPayment = async (
+    item: JobsEarningItem,
+    paymentId: string,
+    decision: "confirmed" | "disputed",
+  ) => {
+    const reason = decision === "disputed"
+      ? window.prompt("Explain why this salary payment is disputed (at least 10 characters)", "") || ""
+      : "";
+    if (decision === "disputed" && reason.trim().length < 10) {
+      setActionMessage("Please explain the dispute in at least 10 characters.");
+      return;
+    }
+    try {
+      const result = await respondToJobSalaryPayment(item.applicationId, paymentId, decision === "confirmed" ? "confirm" : "dispute", reason);
+      setEarnings(current => current.map(entry => entry.applicationId === item.applicationId
+        ? { ...entry, payments: entry.payments.map(payment => payment.paymentRecordId === paymentId ? { ...payment, status: result.status } : payment) }
+        : entry));
+      setActionMessage(decision === "confirmed" ? "Salary receipt confirmed." : "Payment disputed and sent for admin review.");
+      const refreshed = await getJobsEarnings();
+      setEarnings(refreshed.items || []);
+      setEarningsSummary(refreshed.summary || null);
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setActionMessage(message || "The payment response could not be saved.");
+    }
+  };
   const withdrawCandidateApplication = async (application: JobsApiApplication) => {
     try {
       const status = await withdrawJobApplicationRequest(application.id);
@@ -1829,6 +1911,25 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       </select>
                     </article>
                     <article className="wide"><span>Cover note</span><p>{selectedCandidate.coverNote || "No cover note attached."}</p></article>
+                    <article className="wide jobs-offer-panel">
+                      <span>Offer & salary</span>
+                      {selectedCandidate.offer ? (
+                        <p>
+                          {formatJobsPi(selectedCandidate.offer.amountPi)} / {selectedCandidate.offer.period}
+                          {" · "}{selectedCandidate.offer.status}
+                        </p>
+                      ) : <p>No formal offer sent.</p>}
+                      {selectedCandidate.status === "hired" && selectedCandidate.offer?.status === "accepted" ? (
+                        <button type="button" onClick={() => void recordCandidateSalary(selectedCandidate)}>
+                          Record salary payment
+                        </button>
+                      ) : ["reviewing", "shortlisted", "offer_sent"].includes(selectedCandidate.status) ? (
+                        <button type="button" onClick={() => void sendCandidateOffer(selectedCandidate)}>
+                          {selectedCandidate.offer?.status === "sent" ? "Replace offer" : "Send formal offer"}
+                        </button>
+                      ) : <small>Move this application to reviewing or shortlisted before sending an offer.</small>}
+                      <small>Salary is confirmed only after the candidate verifies the Pi transaction in their own wallet.</small>
+                    </article>
                   </div>
                 ) : candidateDrawerTab === "Interviews" ? (
                   <div className="jobs-candidate-interviews">
@@ -2835,10 +2936,30 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                           <small>Applied {formatJobDate(item.createdAt)}</small>
                         </div>
                         <div className="jobs-earning-amount">
-                          <strong>{formatJobsPi(item.agreedCompensationPi)}</strong>
-                          <span>{item.status === "hired" ? "Hired" : item.status}</span>
-                          <small>{formatJobsPi(item.compensationMinPi)}{item.compensationMaxPi > item.compensationMinPi ? ` – ${formatJobsPi(item.compensationMaxPi)}` : ""} / {item.period}</small>
+                          <strong>{formatJobsPi(item.completedPaymentsPi)}</strong>
+                          <span>{item.pendingPaymentsPi > 0 ? `${formatJobsPi(item.pendingPaymentsPi)} awaiting confirmation` : "Confirmed earnings"}</span>
+                          <small>Offer: {formatJobsPi(item.agreedCompensationPi)} / {item.period}</small>
                         </div>
+                        {item.payments?.length ? (
+                          <div className="jobs-salary-records">
+                            {item.payments.map(payment => (
+                              <article key={payment.paymentRecordId} className="jobs-salary-record">
+                                <div>
+                                  <strong>{formatJobsPi(payment.amountPi)}</strong>
+                                  <span>{payment.status.replaceAll("_", " ")}</span>
+                                  <small>Transaction: {payment.txid}</small>
+                                  <small>{formatJobDate(payment.createdAt)}</small>
+                                </div>
+                                {payment.status === "awaiting_candidate_confirmation" ? (
+                                  <div className="jobs-salary-actions">
+                                    <button type="button" onClick={() => void respondToSalaryPayment(item, payment.paymentRecordId, "confirmed")}>Confirm received</button>
+                                    <button type="button" className="secondary" onClick={() => void respondToSalaryPayment(item, payment.paymentRecordId, "disputed")}>Dispute</button>
+                                  </div>
+                                ) : null}
+                              </article>
+                            ))}
+                          </div>
+                        ) : <p className="jobs-salary-empty">No salary transaction has been recorded yet.</p>}
                       </article>
                     ))}
                   </div>
@@ -3004,6 +3125,14 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       <p>{application.company}</p>
                       <p>{application.profileSnapshot?.location || "Abu Dhabi"}</p>
                       <small>Applied on SMAJ PI HUB Jobs on {new Date(application.createdAt).toLocaleDateString()}</small>
+                      {application.offer?.status === "sent" ? (
+                        <div className="jobs-application-update-card jobs-offer-response">
+                          <p><b>Offer received:</b> {formatJobsPi(application.offer.amountPi)} / {application.offer.period}</p>
+                          {application.offer.terms ? <p>{application.offer.terms}</p> : null}
+                          <button type="button" onClick={() => void respondToCandidateOffer(application, "accepted")}>Accept offer</button>
+                          <button type="button" onClick={() => void respondToCandidateOffer(application, "declined")}>Decline</button>
+                        </div>
+                      ) : null}
                       {applicationUi.action === "status" ? (
                         <button type="button" className="jobs-update-status-button">Update status</button>
                       ) : null}

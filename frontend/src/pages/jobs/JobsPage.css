@@ -5007,3 +5007,27 @@
     text-align: center !important;
   }
 }
+.jobs-offer-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #d8cdf8;
+  border-radius: 14px;
+  background: #faf8ff;
+}
+.jobs-offer-panel h3, .jobs-offer-panel p { margin: 0; }
+.jobs-offer-panel small { color: #5f6f79; }
+.jobs-salary-records { grid-column: 1 / -1; display: grid; gap: 10px; }
+.jobs-salary-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #e4e1df; border-radius: 12px; background: #fff; overflow-wrap: anywhere; }
+.jobs-salary-record > div:first-child { display: grid; gap: 3px; }
+.jobs-salary-record span { text-transform: capitalize; color: #3c4b44; }
+.jobs-salary-record small { color: #68766f; }
+.jobs-salary-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.jobs-salary-actions button { width: auto; min-height: 40px; }
+.jobs-salary-actions button.secondary { background: #fff; color: #5b2bd9; border: 1px solid #5b2bd9; }
+.jobs-salary-empty { grid-column: 1 / -1; margin: 0; color: #68766f; }
+@media (max-width: 720px) {
+  .jobs-salary-record { align-items: stretch; flex-direction: column; }
+  .jobs-salary-actions { justify-content: stretch; }
+  .jobs-salary-actions button { flex: 1 1 130px; }
+}

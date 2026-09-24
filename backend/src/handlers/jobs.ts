@@ -1465,6 +1465,247 @@ export default function mountJobsEndpoints(router: Router) {
     });
   });
 
+  router.post("/employer/applications/:id/offer", async (req, res) => {
+    const user = await requireEmployer(req, res);
+    if (!user) return;
+    const application = await req.app.locals.jobApplicationCollection.findOne({
+      _id: documentId(req.params.id),
+    });
+    if (!application || (!isAdmin(user) && application.employerId !== userId(user)))
+      return res.status(404).json({ error: "not_found" });
+    if (!["reviewing", "shortlisted", "offer_sent"].includes(application.status))
+      return res.status(409).json({ error: "invalid_transition", message: "Review or shortlist the candidate before sending an offer." });
+    const amountPi = Number(req.body?.amountPi);
+    if (!Number.isFinite(amountPi) || amountPi <= 0 || amountPi > 10_000_000)
+      return res.status(400).json({ error: "invalid_amount", message: "Enter a valid compensation amount in Pi." });
+    const period = ["hour", "day", "week", "month", "year", "project"].includes(req.body?.period)
+      ? req.body.period : "project";
+    const startDate = String(req.body?.startDate || "").trim();
+    if (startDate && Number.isNaN(new Date(startDate).getTime()))
+      return res.status(400).json({ error: "invalid_start_date" });
+    const now = new Date().toISOString();
+    const offer = {
+      offerId: `job-offer-${Date.now().toString(36)}`,
+      amountPi,
+      period,
+      startDate: startDate || undefined,
+      terms: String(req.body?.terms || "").trim().slice(0, 4000),
+      status: "sent",
+      sentAt: now,
+      sentBy: userId(user),
+    };
+    await req.app.locals.jobApplicationCollection.updateOne(
+      { _id: application._id },
+      { $set: { offer, status: "offer_sent", updatedAt: now }, $push: { statusHistory: { status: "offer_sent", at: now, actorId: userId(user) } } },
+    );
+    await audit(req, user, "application.offer_sent", req.params.id, { amountPi, period });
+    const candidate = ObjectId.isValid(application.candidateId) && req.app.locals.userCollection
+      ? await req.app.locals.userCollection.findOne({ _id: new ObjectId(application.candidateId) })
+      : await req.app.locals.userCollection?.findOne({ uid: application.candidateId });
+    if (candidate) await createNotification(req.app, {
+      userId: candidate.uid,
+      type: "jobs_offer_received",
+      title: "Job offer received",
+      message: `${application.company} sent you an offer for ${application.jobTitle}.`,
+      relatedId: application._id.toString(),
+    });
+    res.status(201).json({ offer, status: "offer_sent" });
+  });
+
+  router.patch("/applications/:id/offer", async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const decision = String(req.body?.decision || "");
+    if (!["accepted", "declined"].includes(decision))
+      return res.status(400).json({ error: "invalid_decision" });
+    const application = await req.app.locals.jobApplicationCollection.findOne({
+      _id: documentId(req.params.id), candidateId: userId(user),
+    });
+    if (!application?.offer || application.offer.status !== "sent")
+      return res.status(409).json({ error: "offer_unavailable", message: "This offer is no longer available." });
+    const now = new Date().toISOString();
+    const status = decision === "accepted" ? "hired" : "rejected";
+    await req.app.locals.jobApplicationCollection.updateOne(
+      { _id: application._id, "offer.status": "sent" },
+      { $set: { "offer.status": decision, "offer.respondedAt": now, status, updatedAt: now }, $push: { statusHistory: { status, at: now, actorId: userId(user) } } },
+    );
+    await audit(req, user, `application.offer_${decision}`, req.params.id);
+    const employer = ObjectId.isValid(application.employerId) && req.app.locals.userCollection
+      ? await req.app.locals.userCollection.findOne({ _id: new ObjectId(application.employerId) })
+      : null;
+    if (employer) await createNotification(req.app, {
+      userId: employer.uid,
+      type: "jobs_offer_response",
+      title: `Offer ${decision}`,
+      message: `The candidate ${decision} your offer for ${application.jobTitle}.`,
+      relatedId: application._id.toString(),
+    });
+    res.json({ status, offerStatus: decision });
+  });
+
+  router.post("/employer/applications/:id/payments", async (req, res) => {
+    const user = await requireEmployer(req, res);
+    if (!user) return;
+    const application = await req.app.locals.jobApplicationCollection.findOne({ _id: documentId(req.params.id) });
+    if (!application || (!isAdmin(user) && application.employerId !== userId(user)))
+      return res.status(404).json({ error: "not_found" });
+    if (application.status !== "hired" || application.offer?.status !== "accepted")
+      return res.status(409).json({ error: "not_hired", message: "An accepted offer is required before recording salary." });
+    const amountPi = Number(req.body?.amountPi);
+    const txid = String(req.body?.txid || "").trim().slice(0, 200);
+    if (!Number.isFinite(amountPi) || amountPi <= 0 || !txid)
+      return res.status(400).json({ error: "invalid_payment", message: "Amount and Pi transaction ID are required." });
+    if (await req.app.locals.jobPaymentCollection.findOne({ txid }))
+      return res.status(409).json({ error: "duplicate_txid", message: "This transaction ID is already recorded." });
+    const now = new Date().toISOString();
+    const payment = {
+      paymentRecordId: `job-pay-${Date.now().toString(36)}`,
+      applicationId: application._id.toString(),
+      jobId: application.jobId,
+      employerId: application.employerId,
+      candidateId: application.candidateId,
+      amountPi,
+      txid,
+      note: String(req.body?.note || "").trim().slice(0, 1000),
+      status: "awaiting_candidate_confirmation",
+      createdAt: now,
+      updatedAt: now,
+    };
+    await req.app.locals.jobPaymentCollection.insertOne(payment);
+    await audit(req, user, "salary.recorded", payment.paymentRecordId, { amountPi, txid });
+    const candidate = ObjectId.isValid(application.candidateId) && req.app.locals.userCollection
+      ? await req.app.locals.userCollection.findOne({ _id: new ObjectId(application.candidateId) })
+      : await req.app.locals.userCollection?.findOne({ uid: application.candidateId });
+    if (candidate) await createNotification(req.app, {
+      userId: candidate.uid,
+      type: "jobs_salary_recorded",
+      title: "Salary payment recorded",
+      message: `${application.company} recorded a payment of ${amountPi} Pi. Confirm it after checking your wallet.`,
+      relatedId: payment.paymentRecordId,
+    });
+    res.status(201).json({ payment });
+  });
+
+  router.get("/applications/:id/payments", async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const application = await req.app.locals.jobApplicationCollection.findOne({ _id: documentId(req.params.id) });
+    if (!application || (!isAdmin(user) && application.candidateId !== userId(user) && application.employerId !== userId(user)))
+      return res.status(404).json({ error: "not_found" });
+    const payments = await req.app.locals.jobPaymentCollection.find({ applicationId: application._id.toString() }).sort({ createdAt: -1 }).toArray();
+    res.json({ payments: payments.map(serializeJobDocument) });
+  });
+
+  router.patch("/applications/:applicationId/payments/:paymentId", async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const application = await req.app.locals.jobApplicationCollection.findOne({
+      _id: documentId(req.params.applicationId), candidateId: userId(user),
+    });
+    if (!application) return res.status(404).json({ error: "not_found" });
+    const payment = await req.app.locals.jobPaymentCollection.findOne({
+      paymentRecordId: req.params.paymentId, applicationId: application._id.toString(),
+    });
+    if (!payment || payment.status !== "awaiting_candidate_confirmation")
+      return res.status(409).json({ error: "payment_unavailable" });
+    const action = String(req.body?.action || "");
+    if (!["confirm", "dispute"].includes(action))
+      return res.status(400).json({ error: "invalid_action" });
+    const now = new Date().toISOString();
+    if (action === "confirm") {
+      await req.app.locals.jobPaymentCollection.updateOne(
+        { paymentRecordId: payment.paymentRecordId },
+        { $set: { status: "completed", confirmedAt: now, updatedAt: now } },
+      );
+      await audit(req, user, "salary.confirmed", payment.paymentRecordId);
+      const employer = ObjectId.isValid(application.employerId) && req.app.locals.userCollection
+        ? await req.app.locals.userCollection.findOne({ _id: new ObjectId(application.employerId) })
+        : null;
+      if (employer) await createNotification(req.app, {
+        userId: employer.uid,
+        type: "jobs_salary_confirmed",
+        title: "Salary payment confirmed",
+        message: `The candidate confirmed receipt of ${payment.amountPi} Pi.`,
+        relatedId: payment.paymentRecordId,
+      });
+      return res.json({ status: "completed" });
+    }
+    const reason = String(req.body?.reason || "").trim().slice(0, 2000);
+    if (reason.length < 10)
+      return res.status(400).json({ error: "reason_required", message: "Explain the payment problem in at least 10 characters." });
+    const dispute = {
+      disputeId: `job-dispute-${Date.now().toString(36)}`,
+      paymentRecordId: payment.paymentRecordId,
+      applicationId: application._id.toString(),
+      candidateId: application.candidateId,
+      employerId: application.employerId,
+      reason,
+      status: "open",
+      createdAt: now,
+      updatedAt: now,
+    };
+    await req.app.locals.jobDisputeCollection.insertOne(dispute);
+    await req.app.locals.jobPaymentCollection.updateOne(
+      { paymentRecordId: payment.paymentRecordId },
+      { $set: { status: "disputed", disputeId: dispute.disputeId, updatedAt: now } },
+    );
+    await audit(req, user, "salary.disputed", payment.paymentRecordId, { disputeId: dispute.disputeId });
+    const employer = ObjectId.isValid(application.employerId) && req.app.locals.userCollection
+      ? await req.app.locals.userCollection.findOne({ _id: new ObjectId(application.employerId) })
+      : null;
+    if (employer) await createNotification(req.app, {
+      userId: employer.uid,
+      type: "jobs_salary_disputed",
+      title: "Salary payment disputed",
+      message: "A candidate disputed a recorded salary transaction. The case is awaiting admin review.",
+      relatedId: dispute.disputeId,
+    });
+    res.status(201).json({ status: "disputed", dispute });
+  });
+
+  router.get("/admin/disputes", async (req, res) => {
+    const user = await requireEmployer(req, res);
+    if (!user || !isAdmin(user)) return user ? res.status(403).json({ error: "admin_required" }) : undefined;
+    const disputes = await req.app.locals.jobDisputeCollection.find({}).sort({ createdAt: -1 }).toArray();
+    res.json({ disputes: disputes.map(serializeJobDocument) });
+  });
+
+  router.patch("/admin/disputes/:id", async (req, res) => {
+    const user = await requireEmployer(req, res);
+    if (!user || !isAdmin(user)) return user ? res.status(403).json({ error: "admin_required" }) : undefined;
+    const status = String(req.body?.status || "");
+    const outcome = String(req.body?.outcome || "");
+    if (!["resolved", "closed"].includes(status)) return res.status(400).json({ error: "invalid_status" });
+    if (status === "resolved" && !["payment_confirmed", "payment_voided"].includes(outcome))
+      return res.status(400).json({ error: "invalid_outcome", message: "Choose whether the payment was confirmed or voided." });
+    const dispute = await req.app.locals.jobDisputeCollection.findOne({ disputeId: req.params.id });
+    if (!dispute) return res.status(404).json({ error: "not_found" });
+    const now = new Date().toISOString();
+    await req.app.locals.jobDisputeCollection.updateOne(
+      { disputeId: dispute.disputeId },
+      { $set: { status, resolution: String(req.body?.resolution || "").trim().slice(0, 2000), resolvedAt: now, resolvedBy: userId(user), updatedAt: now } },
+    );
+    const paymentStatus = status === "resolved"
+      ? (outcome === "payment_confirmed" ? "completed" : "voided")
+      : "disputed";
+    await req.app.locals.jobPaymentCollection.updateOne(
+      { paymentRecordId: dispute.paymentRecordId },
+      { $set: { status: paymentStatus, resolution: String(req.body?.resolution || "").trim().slice(0, 2000), updatedAt: now } },
+    );
+    await audit(req, user, "salary.dispute_resolved", dispute.paymentRecordId, { disputeId: dispute.disputeId, status, outcome });
+    const participantIds = [dispute.candidateId, dispute.employerId].filter((id: string) => ObjectId.isValid(id));
+    if (participantIds.length && req.app.locals.userCollection) {
+      const participants = await req.app.locals.userCollection.find({ _id: { $in: participantIds.map((id: string) => new ObjectId(id)) } }).toArray();
+      await Promise.all(participants.map((participant: any) => createNotification(req.app, {
+        userId: participant.uid,
+        type: "jobs_salary_dispute_resolved",
+        title: "Salary dispute reviewed",
+        message: outcome === "payment_confirmed" ? "The salary transaction was confirmed." : "The salary transaction record was voided.",
+        relatedId: dispute.disputeId,
+      })));
+    }
+    res.json({ status, outcome, paymentStatus });
+  });
   router.get("/earnings", async (req, res) => {
     const user = await requireUser(req, res);
     if (!user) return;
@@ -1478,6 +1719,16 @@ export default function mountJobsEndpoints(router: Router) {
       ? await req.app.locals.jobCollection.find({ slug: { $in: jobSlugs } }).toArray()
       : [];
     const jobBySlug = new Map<string, any>(jobs.map((job: any) => [job.slug, job]));
+    const payments = await req.app.locals.jobPaymentCollection
+      .find({ candidateId: owner })
+      .sort({ createdAt: -1 })
+      .toArray();
+    const paymentsByApplication = new Map<string, any[]>();
+    for (const payment of payments) {
+      const list = paymentsByApplication.get(payment.applicationId) || [];
+      list.push(payment);
+      paymentsByApplication.set(payment.applicationId, list);
+    }
     const items = applications.map((application: any) => {
       const job = jobBySlug.get(application.jobId);
       const minUsdt = Number(job?.compensationMinUsdt || 0);
@@ -1487,6 +1738,13 @@ export default function mountJobsEndpoints(router: Router) {
       const maxPi = maxUsdt > 0 ? maxUsdt / PI_USDT_RATE : 0;
       const agreedPi = maxPi >= minPi && maxPi > 0 ? maxPi : minPi;
       const status = application.status === "hired" ? "hired" : application.status;
+      const salaryPayments = paymentsByApplication.get(application._id.toString()) || [];
+      const completedPi = salaryPayments
+        .filter((payment: any) => payment.status === "completed")
+        .reduce((sum: number, payment: any) => sum + Number(payment.amountPi || 0), 0);
+      const pendingPi = salaryPayments
+        .filter((payment: any) => ["awaiting_candidate_confirmation", "disputed"].includes(payment.status))
+        .reduce((sum: number, payment: any) => sum + Number(payment.amountPi || 0), 0);
       return {
         applicationId: application._id.toString(),
         jobId: application.jobId,
@@ -1498,17 +1756,21 @@ export default function mountJobsEndpoints(router: Router) {
         compensationMaxPi: maxPi,
         period,
         piRateUsed: PI_USDT_RATE,
+        completedPaymentsPi: completedPi,
+        pendingPaymentsPi: pendingPi,
+        payments: salaryPayments.map(serializeJobDocument),
+        offer: application.offer,
         createdAt: application.createdAt,
         updatedAt: application.updatedAt,
       };
     });
     const hired = items.filter((item: any) => item.status === "hired");
-    const totalEarnedPi = hired.reduce((sum: number, item: any) => sum + item.agreedCompensationPi, 0);
-    const pendingEarningsPi = hired.filter((item: any) => item.status === "hired").reduce((sum: number, item: any) => sum + item.agreedCompensationPi, 0);
+    const completedPaymentsPi = items.reduce((sum: number, item: any) => sum + item.completedPaymentsPi, 0);
+    const pendingEarningsPi = items.reduce((sum: number, item: any) => sum + item.pendingPaymentsPi, 0);
     const summary = {
-      totalEarnedPi,
+      totalEarnedPi: completedPaymentsPi,
       pendingEarningsPi,
-      completedPaymentsPi: 0,
+      completedPaymentsPi,
       hiredCount: hired.length,
       applicationsCount: items.length,
     };
