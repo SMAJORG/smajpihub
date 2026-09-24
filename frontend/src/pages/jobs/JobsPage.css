@@ -5031,3 +5031,70 @@
   .jobs-salary-actions { justify-content: stretch; }
   .jobs-salary-actions button { flex: 1 1 130px; }
 }
+
+/* Jobs company directory */
+.jobs-company-directory-tools {
+  margin: 0 0 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px) auto;
+  gap: 10px;
+}
+.jobs-company-directory-tools .jobs-company-search { margin: 0; }
+.jobs-company-directory-tools select,
+.jobs-company-directory-tools > button {
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid #dfe8e3;
+  border-radius: 14px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+}
+.jobs-company-directory-tools > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.jobs-company-directory-tools > button.active {
+  border-color: #6d3df5;
+  color: #fff;
+  background: #6d3df5;
+}
+.jobs-company-logo {
+  width: 58px;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: 0 0 auto;
+  border: 1px solid #e3e8e5;
+  border-radius: 15px;
+  color: #5b2bd9;
+  background: #f4f0ff;
+  font-size: 17px;
+  font-weight: 900;
+}
+.jobs-company-logo img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.company-grid > a { display: grid; grid-template-columns: 58px minmax(0, 1fr); column-gap: 15px; align-items: center; }
+.company-grid > a > h2,
+.company-grid > a > p,
+.company-grid > a > b { grid-column: 2; margin: 2px 0; }
+.company-grid > a > .jobs-company-logo { grid-row: 1 / span 3; }
+.company-hero .company-hero-logo { width: 78px; height: 78px; border-color: rgba(255,255,255,.25); }
+.company-hero-meta { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.company-hero-meta span,
+.company-hero-meta a { display: inline-flex; align-items: center; gap: 5px; color: #fff; font-weight: 800; text-decoration: none; }
+.company-hero-meta svg { font-size: 18px; }
+.jobs-company-register-form label.wide { grid-column: 1 / -1; }
+@media (max-width: 720px) {
+  .jobs-company-directory-tools { grid-template-columns: 1fr 1fr; }
+  .jobs-company-directory-tools .jobs-company-search { grid-column: 1 / -1; }
+  .company-grid { grid-template-columns: 1fr; }
+  .company-grid > a { padding: 18px; }
+  .company-hero { margin-bottom: 24px; padding: 22px 18px; align-items: flex-start; }
+  .company-hero h1 { font-size: 28px; }
+}

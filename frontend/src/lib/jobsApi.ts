@@ -35,6 +35,10 @@ export type JobsApiCompany = {
   verificationStatus?: "unclaimed" | "claimed" | "pending" | "verified" | "pi_kyb" | "rejected";
   ownerId?: string;
   website?: string;
+  logoUrl?: string;
+  description?: string;
+  location?: string;
+  country?: string;
   moderationStatus?: "pending" | "approved" | "rejected";
 };
 
@@ -143,8 +147,8 @@ export const getJobsMetrics = async () =>
 export const getJobById = async (id: string) =>
   (await axiosClient.get<{ job: JobsApiJob }>(`/jobs/jobs/${encodeURIComponent(id)}`)).data.job;
 
-export const getJobCompanies = async () => {
-  const response = await axiosClient.get<{ companies: JobsApiCompany[] }>("/jobs/companies");
+export const getJobCompanies = async (params: { search?: string; field?: string; country?: string; verified?: boolean } = {}) => {
+  const response = await axiosClient.get<{ companies: JobsApiCompany[] }>("/jobs/companies", { params });
   return response.data.companies;
 };
 
@@ -227,8 +231,17 @@ export const toggleBlockedEmployer = async (companyId: string) =>
     )
   ).data;
 export const enrollEmployer = async () => (await axiosClient.post<{ role: string }>("/jobs/employer/enroll")).data;
-export const createJobCompany = async (company: { name: string; field: string }) =>
-  (await axiosClient.post<{ company: JobsApiCompany }>("/jobs/companies", company)).data.company;
+export const createJobCompany = async (company: {
+  name: string;
+  field: string;
+  logoUrl?: string;
+  website?: string;
+  description?: string;
+  location?: string;
+  country?: string;
+}) => (await axiosClient.post<{ company: JobsApiCompany }>("/jobs/companies", company)).data.company;
+export const updateJobCompany = async (id: string, company: Partial<JobsApiCompany>) =>
+  (await axiosClient.patch<{ company: JobsApiCompany }>(`/jobs/companies/${encodeURIComponent(id)}`, company)).data.company;
 export const getEmployerDashboard = async () =>
   (
     await axiosClient.get<{ jobs: JobsApiJob[]; applications: JobsApiApplication[]; companies: JobsApiCompany[] }>(

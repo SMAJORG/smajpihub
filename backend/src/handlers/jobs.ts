@@ -329,6 +329,16 @@ const audit = (
   });
 const safeRegex = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 80);
+const cleanPublicUrl = (value: unknown, maxLength = 1000) => {
+  const candidate = String(value || "").trim().slice(0, maxLength);
+  if (!candidate) return "";
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : "";
+  } catch {
+    return "";
+  }
+};
 const documentId = (value: string) =>
   ObjectId.isValid(value) ? new ObjectId(value) : value;
 
@@ -515,7 +525,10 @@ export default function mountJobsEndpoints(router: Router) {
       ownerId,
       verified: false,
       verificationStatus: "claimed",
-      website: String(req.body?.website || "").trim().slice(0, 500),
+      website: cleanPublicUrl(req.body?.website, 500),
+      logoUrl: cleanPublicUrl(req.body?.logoUrl),
+      description: String(req.body?.description || "").trim().slice(0, 1200),
+      location: String(req.body?.location || "").trim().slice(0, 160),
       country: String(req.body?.country || "").trim().slice(0, 120),
       registrationNumber: String(req.body?.registrationNumber || "").trim().slice(0, 120),
       representativeRole: String(req.body?.representativeRole || "").trim().slice(0, 120),
@@ -526,11 +539,31 @@ export default function mountJobsEndpoints(router: Router) {
     await audit(req, user, "company.created", slug);
     res.status(201).json({ company: serializeJobDocument(company) });
   });
+  router.patch("/companies/:id", async (req, res) => {
+    const user = await requireEmployer(req, res);
+    if (!user) return;
+    const company = await req.app.locals.jobCompanyCollection.findOne({ slug: req.params.id, ownerId: userId(user) });
+    if (!company) return res.status(404).json({ error: "not_found", message: "Company not found." });
+    const updates = {
+      name: String(req.body?.name || company.name).trim().slice(0, 120),
+      field: String(req.body?.field || company.field || "Other").trim().slice(0, 100),
+      logoUrl: cleanPublicUrl(req.body?.logoUrl ?? company.logoUrl),
+      website: cleanPublicUrl(req.body?.website ?? company.website, 500),
+      description: String(req.body?.description ?? company.description ?? "").trim().slice(0, 1200),
+      location: String(req.body?.location ?? company.location ?? "").trim().slice(0, 160),
+      country: String(req.body?.country ?? company.country ?? "").trim().slice(0, 120),
+      updatedAt: new Date().toISOString(),
+    };
+    if (updates.name.length < 2) return res.status(400).json({ error: "invalid_company", message: "Company name is required." });
+    await req.app.locals.jobCompanyCollection.updateOne({ slug: company.slug }, { $set: updates });
+    await audit(req, user, "company.profile_updated", company.slug);
+    res.json({ company: serializeJobDocument({ ...company, ...updates }) });
+  });
   router.post("/companies/:id/claim", async (req, res) => {
     const user = await requireEmployer(req, res); if (!user) return;
     const company = await req.app.locals.jobCompanyCollection.findOne({ slug: req.params.id });
     if (!company || (company.ownerId && company.ownerId !== userId(user))) return res.status(409).json({ error: "not_claimable", message: "This company is already claimed." });
-    const evidence = String(req.body?.evidence || "").trim().slice(0, 1000); const website = String(req.body?.website || company.website || "").trim().slice(0, 500);
+    const evidence = String(req.body?.evidence || "").trim().slice(0, 1000); const website = cleanPublicUrl(req.body?.website || company.website, 500);
     if (!evidence || !website) return res.status(400).json({ error: "evidence_required" });
     await req.app.locals.jobCompanyCollection.updateOne({ slug: company.slug }, { $set: { ownerId: userId(user), website, claimEvidence: evidence, verificationStatus: "claimed", claimedAt: new Date().toISOString() } });
     await audit(req, user, "company.claimed", company.slug); res.json({ verificationStatus: "claimed" });
@@ -593,10 +626,18 @@ export default function mountJobsEndpoints(router: Router) {
   });
   router.get("/companies", async (req, res) => {
     await ensureSeedData(req);
-    const companies = await req.app.locals.jobCompanyCollection
-      .find({ moderationStatus: "approved", $or: [{ slug: { $in: seedCompanies.map(company => company.slug) } }, { ownerId: { $exists: true } }] })
-      .sort({ directoryPriority: 1, name: 1 })
-      .toArray();
+    const search = String(req.query.search || "").trim();
+    const field = String(req.query.field || "").trim();
+    const country = String(req.query.country || "").trim();
+    const query: Record<string, any> = {
+      moderationStatus: "approved",
+      $and: [{ $or: [{ slug: { $in: seedCompanies.map(company => company.slug) } }, { ownerId: { $exists: true } }] }],
+    };
+    if (search) query.$and.push({ $or: ["name", "field", "description", "location", "country"].map(key => ({ [key]: { $regex: safeRegex(search), $options: "i" } })) });
+    if (field) query.$and.push({ field: { $regex: safeRegex(field), $options: "i" } });
+    if (country) query.$and.push({ country: { $regex: safeRegex(country), $options: "i" } });
+    if (req.query.verified === "true") query.$and.push({ verificationStatus: { $in: ["verified", "pi_kyb"] } });
+    const companies = await req.app.locals.jobCompanyCollection.find(query).sort({ directoryPriority: 1, name: 1 }).toArray();
     const results = await Promise.all(
       companies.map(async (company: any) => ({
         ...serializeJobDocument(company),

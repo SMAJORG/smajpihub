@@ -303,6 +303,11 @@ const fallbackCompanies: JobsApiCompany[] = [
   { id: "smaj-services", name: "SMAJ Services", field: "Digital services", openings: 8, mark: "SS" },
 ];
 
+const CompanyLogo = ({ company, className = "" }: { company: JobsApiCompany; className?: string }) => (
+  <span className={`jobs-company-logo ${className}`.trim()} aria-hidden="true">
+    {company.logoUrl ? <img src={company.logoUrl} alt="" loading="lazy" /> : <b>{company.mark}</b>}
+  </span>
+);
 const JobCard = ({ job, saved, onSave }: { job: Job; saved: boolean; onSave: () => void }) => (
   <article className="job-card">
     <div className="job-company-mark">
@@ -351,6 +356,8 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   const [jobs, setJobs] = useState<Job[]>(fallbackJobs);
   const [companies, setCompanies] = useState<JobsApiCompany[]>(fallbackCompanies);
   const [companyQuery, setCompanyQuery] = useState("");
+  const [companyIndustry, setCompanyIndustry] = useState("All");
+  const [verifiedCompaniesOnly, setVerifiedCompaniesOnly] = useState(false);
   const [employerCompanyQuery, setEmployerCompanyQuery] = useState("");
   const [employerCompanyStatus, setEmployerCompanyStatus] = useState("all");
   const [companyRegistrationOpen, setCompanyRegistrationOpen] = useState(false);
@@ -579,13 +586,21 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       return matchesStage && (!query || haystack.includes(query));
     });
   }, [employerApplicationQuery, employerApplicationStage, employerApplications]);
+  const companyIndustries = useMemo(
+    () => ["All", ...Array.from(new Set(companies.map(company => company.field).filter(Boolean))).sort()],
+    [companies],
+  );
   const filteredCompanies = useMemo(() => {
     const term = companyQuery.trim().toLowerCase();
-    if (!term) return companies;
-    return companies.filter(company =>
-      [company.name, company.field].some(value => value.toLowerCase().includes(term)),
-    );
-  }, [companies, companyQuery]);  const filteredEmployerCompanies = useMemo(() => {
+    return companies.filter(company => {
+      const matchesTerm = !term || [company.name, company.field, company.description, company.location, company.country]
+        .some(value => String(value || "").toLowerCase().includes(term));
+      const matchesIndustry = companyIndustry === "All" || company.field === companyIndustry;
+      const matchesVerified = !verifiedCompaniesOnly || ["verified", "pi_kyb"].includes(company.verificationStatus || "");
+      return matchesTerm && matchesIndustry && matchesVerified;
+    });
+  }, [companies, companyIndustry, companyQuery, verifiedCompaniesOnly]);
+  const filteredEmployerCompanies = useMemo(() => {
     const term = employerCompanyQuery.trim().toLowerCase();
     return employerCompanies.filter(company => {
       const status = company.moderationStatus === "pending"
@@ -1464,6 +1479,10 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       const company = await createJobCompany({
         name: String(data.get("name") || "").trim(),
         field: String(data.get("field") || "").trim(),
+        logoUrl: String(data.get("logoUrl") || "").trim(),
+        website: String(data.get("website") || "").trim(),
+        location: String(data.get("location") || "").trim(),
+        description: String(data.get("description") || "").trim(),
       });
       setEmployerCompanies(current => [company, ...current]);
       setCompanies(current => [company, ...current.filter(item => item.id !== company.id)]);
@@ -2329,20 +2348,28 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               <h1>Explore companies</h1>
               <p>Discover verified teams building products and services across the Pi ecosystem.</p>
             </div>
-            <label className="jobs-company-search">
-              <SearchRoundedIcon />
-              <input
-                type="search"
-                value={companyQuery}
-                onChange={event => setCompanyQuery(event.target.value)}
-                placeholder="Search companies or industries"
-                aria-label="Search companies"
-              />
-            </label>
+            <div className="jobs-company-directory-tools">
+              <label className="jobs-company-search">
+                <SearchRoundedIcon />
+                <input
+                  type="search"
+                  value={companyQuery}
+                  onChange={event => setCompanyQuery(event.target.value)}
+                  placeholder="Search company, industry or location"
+                  aria-label="Search companies"
+                />
+              </label>
+              <select value={companyIndustry} onChange={event => setCompanyIndustry(event.target.value)} aria-label="Filter companies by industry">
+                {companyIndustries.map(industry => <option value={industry} key={industry}>{industry}</option>)}
+              </select>
+              <button type="button" className={verifiedCompaniesOnly ? "active" : ""} onClick={() => setVerifiedCompaniesOnly(value => !value)}>
+                <CheckCircleRoundedIcon /> Verified only
+              </button>
+            </div>
             <div className="company-grid">
               {filteredCompanies.map(company => (
                 <Link to={`/services/jobs/company/${company.id}`} key={company.id}>
-                  <span>{company.mark}</span>
+                  <CompanyLogo company={company} />
                   <h2>
                     {company.name}{" "}
                     {company.verificationStatus === "verified" || company.verificationStatus === "pi_kyb" ? (
@@ -2469,7 +2496,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
         ) : kind === "company" && selectedCompany ? (
           <section className="jobs-directory">
             <div className="company-hero">
-              <span>{selectedCompany.mark}</span>
+              <CompanyLogo company={selectedCompany} className="company-hero-logo" />
               <div>
                 <small>
                   {selectedCompany.verificationStatus === "pi_kyb"
@@ -2483,7 +2510,11 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                           : "COMPANY PROFILE"}
                 </small>
                 <h1>{selectedCompany.name}</h1>
-                <p>{selectedCompany.field} · Building useful products for the Pi community.</p>
+                <p>{selectedCompany.description || `${selectedCompany.field} company building useful products and opportunities.`}</p>
+                <div className="company-hero-meta">
+                  {selectedCompany.location || selectedCompany.country ? <span><LocationOnOutlinedIcon /> {selectedCompany.location || selectedCompany.country}</span> : null}
+                  {selectedCompany.website ? <a href={selectedCompany.website} target="_blank" rel="noreferrer">Visit website <ArrowForwardRoundedIcon /></a> : null}
+                </div>
               </div>
             </div>
             <div className="jobs-page-heading">
@@ -2494,6 +2525,14 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                 <JobCard key={job.id} job={job} saved={saved.has(job.id)} onSave={() => saveJob(job.id)} />
               ))}
             </div>
+            {!selectedCompanyJobs.length ? (
+              <div className="workspace-empty jobs-company-empty">
+                <WorkOutlineRoundedIcon />
+                <h2>No open opportunities</h2>
+                <p>Follow this company profile and check again when new roles are approved.</p>
+                <Link to="/services/jobs/search">Browse all jobs</Link>
+              </div>
+            ) : null}
           </section>
         ) : kind === "company" && detailLoading ? (
           <section className="jobs-directory jobs-detail-loading" aria-busy="true">
@@ -4257,6 +4296,22 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                         Industry
                         <input name="field" required maxLength={100} placeholder="e.g. Software, Retail, Education" />
                       </label>
+                      <label>
+                        Logo URL
+                        <input name="logoUrl" type="url" maxLength={1000} placeholder="https://company.com/logo.png" />
+                      </label>
+                      <label>
+                        Website
+                        <input name="website" type="url" maxLength={500} placeholder="https://company.com" />
+                      </label>
+                      <label>
+                        Location
+                        <input name="location" maxLength={160} placeholder="City, country or Remote" />
+                      </label>
+                      <label className="wide">
+                        About company
+                        <textarea name="description" rows={3} maxLength={1200} placeholder="What your company builds and who you serve" />
+                      </label>
                       <button type="submit" disabled={companySubmitting} aria-busy={companySubmitting}>
                         {companySubmitting ? "Submitting…" : "Submit company for review"}
                       </button>
@@ -4309,7 +4364,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                         return (
                           <article className="jobs-company-manage-card" key={company.id}>
                             <Link to={`/services/jobs/company/${company.id}`} className="jobs-company-card-main">
-                              <span className="jobs-company-mark">{company.mark}</span>
+                              <CompanyLogo company={company} className="jobs-company-mark" />
                               <div>
                                 <small className={`jobs-company-status ${reviewStatus}`}>{statusLabel}</small>
                                 <h3>{company.name}</h3>
@@ -4347,7 +4402,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                         onSubmit={event => void submitCompanyVerification(event, company.id)}
                       >
                         <div className="jobs-verification-panel-head">
-                          <span className="jobs-company-mark">{company.mark}</span>
+                          <CompanyLogo company={company} className="jobs-company-mark" />
                           <div><small>VERIFICATION REQUEST</small><h3>{company.name}</h3></div>
                           <button type="button" onClick={() => setVerificationCompanyId("")} aria-label="Close verification form">×</button>
                         </div>
