@@ -1305,10 +1305,19 @@ const StreamPlansPanel = () => {
             await approveStreamSubscriptionPayment(result.checkout.plan, paymentId);
           },
           onReadyForServerCompletion: async (paymentId, txid) => {
-            const completed = await completeStreamSubscriptionPayment(result.checkout.plan, paymentId, txid);
-            setSubscription(completed.subscription);
-            setMessage(completed.message);
-            setState("ready");
+            try {
+              const completed = await completeStreamSubscriptionPayment(result.checkout.plan, paymentId, txid);
+              setSubscription(completed.subscription);
+              setMessage(completed.message);
+              setState("ready");
+            } catch (completionError) {
+              setMessage(
+                (completionError as { response?: { data?: { message?: string } } }).response?.data?.message ||
+                  (completionError instanceof Error ? completionError.message : "") ||
+                  "Pi payment completed, but Stream could not activate the plan. Contact support with your transaction ID."
+              );
+              setState("error");
+            }
           },
           onCancel: () => {
             setMessage("Pi payment was cancelled. Your plan was not changed.");

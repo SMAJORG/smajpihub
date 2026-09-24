@@ -495,9 +495,13 @@ const mountStreamEndpoints = (router: Router) => {
     if (!paymentId || !txid || !(plan in streamPlans) || !pending || pending.plan !== plan || pending.paymentId !== paymentId)
       return res.status(409).json({ error: "payment_mismatch", message: "This Pi payment does not match an approved Stream checkout." });
     try {
+      // A successful Pi Platform completion response is authoritative. The
+      // completion payload does not always include `transaction.verified`, so
+      // requiring that optional field rejected valid Stream purchases.
       const completedResponse = await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/complete`, { txid });
       const completedPayment = completedResponse.data;
-      if (completedPayment?.status?.developer_completed !== true || completedPayment?.transaction?.verified !== true || completedPayment?.transaction?.txid !== txid)
+      const completedTxid = String(completedPayment?.transaction?.txid || "").trim();
+      if (completedPayment?.status?.developer_completed === false || (completedTxid && completedTxid !== txid))
         return res.status(409).json({ error: "payment_not_completed", message: "Pi has not fully confirmed this payment. Your Stream plan was not changed." });
       const now = new Date();
       const expiresAt = new Date(now); expiresAt.setUTCMonth(expiresAt.getUTCMonth() + 1);

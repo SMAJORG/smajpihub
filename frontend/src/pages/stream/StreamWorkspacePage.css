@@ -104,6 +104,16 @@
   color: #17131a !important;
   background: #fff !important;
 }
+.sw-detail-list-action > span {
+  display: inline-block !important;
+  min-width: 0;
+  color: #17131a !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
 .sw-detail-download-action {
   width: 48px !important;
   min-width: 48px !important;
@@ -2844,7 +2854,7 @@
 }
 .sw-player-controls.hidden > * { pointer-events: none !important; }
 .sw-detail-list-action > span,
-.sw-detail-download-action > span { display: inline !important; overflow: hidden; text-overflow: ellipsis; }
+.sw-detail-download-action > span { display: inline-block !important; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 380px) {
   .sw-detail-secondary-row { grid-template-columns: 1fr 1fr 1.18fr; }
   .sw-detail-list-action > span,
