@@ -22284,16 +22284,18 @@ svg {
 .tutorial-center-page{display:grid;gap:26px}.tutorial-center-hero{display:flex;gap:16px;align-items:center;padding:24px;color:#fff;background:linear-gradient(135deg,#057d8f,var(--smaj-primary));border-radius:20px}.tutorial-center-hero>span{width:58px;height:58px;display:grid;place-items:center;background:rgba(255,255,255,.16);border-radius:16px}.tutorial-center-hero>span svg{font-size:32px}.tutorial-center-hero small{font-size:10px;font-weight:900;letter-spacing:.12em}.tutorial-center-hero h1{margin:4px 0;font-size:28px}.tutorial-center-hero p{max-width:620px;margin:0;color:rgba(255,255,255,.88);line-height:1.5}.tutorial-category{display:grid;gap:12px}.tutorial-category h2{margin:0;font-size:19px}.tutorial-guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.tutorial-guide-grid article{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px;background:var(--smaj-card);border:1px solid var(--smaj-border);border-radius:16px}.tutorial-guide-grid h3{margin:0 0 5px;font-size:16px}.tutorial-guide-grid p{margin:0;color:var(--smaj-text-secondary);font-size:13px;line-height:1.45}.tutorial-guide-grid small{display:block;margin-top:8px;color:var(--smaj-primary);font-weight:800}.tutorial-guide-grid button{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:40px;padding:0 12px;color:#fff;background:var(--smaj-primary);border:0;border-radius:10px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
 @media(max-width:700px){.tutorial-center-page{gap:20px}.tutorial-center-hero{align-items:flex-start;padding:18px}.tutorial-center-hero h1{font-size:24px}.tutorial-guide-grid{grid-template-columns:1fr}.tutorial-guide-grid article{align-items:flex-start;flex-direction:column}.tutorial-guide-grid button{width:100%;justify-content:center}}@media(prefers-reduced-motion:reduce){.guided-tour-mask,.guided-tour-highlight,.guided-tour-card{transition:none}}
 
-/* Installed Android dashboard chrome: transparent Play-style overlay. */
+/* Installed Android dashboard chrome. Android owns the status-bar strip, so
+   the web header must not add the system safe-area inset a second time. */
 @media (max-width: 1023px) {
   html[data-native-app="android"] .private-header {
-    height: calc(56px + env(safe-area-inset-top)) !important;
-    min-height: calc(56px + env(safe-area-inset-top)) !important;
-    padding-top: env(safe-area-inset-top) !important;
+    top: 0 !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    padding-top: 0 !important;
   }
 
   html[data-native-app="android"] .private-body {
-    padding-top: calc(56px + env(safe-area-inset-top)) !important;
+    padding-top: 56px !important;
   }
 
   html[data-native-app="android"] .mobile-home-shell .private-header {
