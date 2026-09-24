@@ -453,6 +453,16 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   const descriptionSelectionAnchor = useRef<number | null>(null);
   const [postSubmitting, setPostSubmitting] = useState(false);
   const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [postContactDraft, setPostContactDraft] = useState({
+    companyName: "",
+    companyWebsite: "",
+    firstName: "",
+    lastName: "",
+    phoneCountry: "+234",
+    phoneNumber: "",
+    referralSource: "",
+    marketingConsent: false,
+  });
   const [postSponsorPlan, setPostSponsorPlan] = useState("none");
   const [employerHeroVideoPaused, setEmployerHeroVideoPaused] = useState(false);
   const [workspaceSwitchingTo, setWorkspaceSwitchingTo] = useState<"candidate" | "employer" | "">("");
@@ -483,20 +493,14 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   const [jobsChatDraft, setJobsChatDraft] = useState("");
   const [jobsChatSending, setJobsChatSending] = useState(false);
   const employerHeroVideoRef = useRef<HTMLVideoElement>(null);
-  const previousStep = (step: typeof postStep) => {
-    const order = ["contact", "title", "location", "hires", "timeframe", "type", "salary", "benefits", "skills", "description", "review", "sponsor", "details"] as const;
-    const index = order.indexOf(step);
-    if (index <= 0) return null;
-    return order[index - 1];
-  };
   const isStepValid = useMemo(() => {
     switch (postStep) {
       case "contact":
-        return postCompanyId.length > 0;
+        return Boolean(postCompanyId || (postContactDraft.companyName.trim().length >= 2 && postContactDraft.firstName.trim() && postContactDraft.lastName.trim()));
       case "title":
         return postJobTitle.trim().length > 0;
       case "location":
-        return postCountry.trim().length > 0;
+        return Boolean(postLocationType);
       case "hires":
         return postHires > 0;
       case "timeframe":
@@ -518,7 +522,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       default:
         return true;
     }
-  }, [postStep, postCompanyId, postJobTitle, postCountry, postHires, postHiringTimeframe, postJobType, payMin, postBenefits, postSkills, postDescription]);
+  }, [postStep, postCompanyId, postContactDraft, postJobTitle, postLocationType, postHires, postHiringTimeframe, postJobType, payMin, postBenefits, postSkills, postDescription]);
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
   const [locationSheetOpen, setLocationSheetOpen] = useState(false);
   const [recentJobSearches, setRecentJobSearches] = useState<string[]>(() => {
@@ -1269,6 +1273,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       if (saved.postPayType) setPostPayType(saved.postPayType);
       if (saved.postCompanyId) setPostCompanyId(saved.postCompanyId);
       if (saved.postSponsorPlan) setPostSponsorPlan(saved.postSponsorPlan);
+      if (saved.postContactDraft) setPostContactDraft((current) => ({ ...current, ...saved.postContactDraft }));
     } catch {
       // Ignore malformed drafts.
     }
@@ -1296,6 +1301,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       postPayType,
       postCompanyId,
       postSponsorPlan,
+      postContactDraft,
     };
     try {
       window.localStorage.setItem(POST_DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -1324,6 +1330,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
     postPayType,
     postCompanyId,
     postSponsorPlan,
+    postContactDraft,
   ]);
   useEffect(() => {
     if (kind !== "post") return;
@@ -1359,6 +1366,15 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       descriptionSelectionAnchor.current = null;
     }
   }, [postDescription]);
+  useEffect(() => {
+    const names = String(user?.displayName || "").trim().split(/\s+/).filter(Boolean);
+    setPostContactDraft(current => ({
+      ...current,
+      firstName: current.firstName || names[0]?.toUpperCase() || "",
+      lastName: current.lastName || names.slice(1).join(" ").toUpperCase(),
+      phoneNumber: current.phoneNumber || user?.contactPhone || "",
+    }));
+  }, [user?.displayName, user?.contactPhone]);
   const submitContactStep = async (form: HTMLFormElement) => {
     if (contactSubmitting) return;
     setContactSubmitting(true);
@@ -1369,7 +1385,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
         const data = new FormData(form);
         const name = String(data.get("companyName") || "").trim();
         await enrollEmployer();
-        const company = await createJobCompany({ name, field: "Other" });
+        const company = await createJobCompany({ name, field: "Other", website: String(data.get("companyWebsite") || "") });
         setEmployerCompanies(current => [...current, company]);
         setCompanies(current => [...current, company]);
         setPostCompanyId(company.id);
@@ -3327,18 +3343,19 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                 </header>
                 <label>
                   Company name *
-                  <input name="companyName" required minLength={2} maxLength={120} />
+                  <input name="companyName" required minLength={2} maxLength={120} value={postContactDraft.companyName} onChange={event => setPostContactDraft(current => ({ ...current, companyName: event.target.value }))} />
                 </label>
                 <label>
                   Company website (optional)
-                  <input name="companyWebsite" type="url" placeholder="https://www.example.com" />
+                  <input name="companyWebsite" type="url" placeholder="https://www.example.com" value={postContactDraft.companyWebsite} onChange={event => setPostContactDraft(current => ({ ...current, companyWebsite: event.target.value }))} />
                 </label>
                 <label>
                   First name *
                   <input
                     name="firstName"
                     required
-                    defaultValue={(user?.displayName || "").split(" ")[0]?.toUpperCase()}
+                    value={postContactDraft.firstName}
+                    onChange={event => setPostContactDraft(current => ({ ...current, firstName: event.target.value }))}
                   />
                 </label>
                 <label>
@@ -3346,26 +3363,27 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                   <input
                     name="lastName"
                     required
-                    defaultValue={(user?.displayName || "").split(" ").slice(1).join(" ").toUpperCase()}
+                    value={postContactDraft.lastName}
+                    onChange={event => setPostContactDraft(current => ({ ...current, lastName: event.target.value }))}
                   />
                 </label>
                 <label>
                   Phone number
                   <small>For account management communication. Not visible to job seekers.</small>
                   <span className="jobs-phone-input">
-                    <select name="phoneCountry" defaultValue="+234" aria-label="Phone country code">
+                    <select name="phoneCountry" value={postContactDraft.phoneCountry} onChange={event => setPostContactDraft(current => ({ ...current, phoneCountry: event.target.value }))} aria-label="Phone country code">
                       {JOB_PHONE_CODES.map(entry => (
                         <option key={entry.code} value={entry.dialCode}>
                           {entry.code} {entry.dialCode}
                         </option>
                       ))}
                     </select>
-                    <input name="phoneNumber" type="tel" placeholder="806-161-7175" defaultValue={user?.contactPhone} />
+                    <input name="phoneNumber" type="tel" placeholder="806-161-7175" value={postContactDraft.phoneNumber} onChange={event => setPostContactDraft(current => ({ ...current, phoneNumber: event.target.value }))} />
                   </span>
                 </label>
                 <label>
                   How did you hear about us?
-                  <select name="referralSource" defaultValue="">
+                  <select name="referralSource" value={postContactDraft.referralSource} onChange={event => setPostContactDraft(current => ({ ...current, referralSource: event.target.value }))}>
                     <option value="" disabled>
                       Select an option
                     </option>
@@ -3377,7 +3395,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                   </select>
                 </label>
                 <label className="jobs-employer-consent">
-                  <input type="checkbox" name="marketingConsent" />
+                  <input type="checkbox" name="marketingConsent" checked={postContactDraft.marketingConsent} onChange={event => setPostContactDraft(current => ({ ...current, marketingConsent: event.target.checked }))} />
                   <span>
                     By clicking this box and providing your telephone or wireless number, you agree to receive marketing
                     and informational calls and texts from SMAJ PI HUB Jobs at the telephone or wireless number
@@ -3398,7 +3416,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                   if (postJobTitle.trim()) setPostStep("location");
                 }}
               >
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <header>
                   <h2>Job title *</h2>
                   <p>
@@ -3464,10 +3481,10 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                 className="jobs-employer-location-form"
                 onSubmit={event => {
                   event.preventDefault();
-                  if (postCountry.trim()) setPostStep("hires");
+                  setPostCountry(current => current || postPostingRegion);
+                  setPostStep("hires");
                 }}
               >
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Location type *</h2>
                 <div className="jobs-location-type-options" role="radiogroup" aria-label="Location type">
                   {employerLocationTypes.map(option => (
@@ -3498,7 +3515,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "hires" ? (
               <form className="jobs-employer-step-form jobs-hires-step" onSubmit={event => { event.preventDefault(); setPostStep("timeframe"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Number of hires *</h2>
                 <div className="jobs-hires-control">
                   <button type="button" aria-label="Decrease hires" onClick={() => setPostHires(value => Math.max(0, value - 1))}>-</button>
@@ -3509,7 +3525,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "timeframe" ? (
               <form className="jobs-employer-step-form" onSubmit={event => { event.preventDefault(); setPostStep("type"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Hiring timeframe *</h2>
                 <div className="jobs-post-option-stack">
                   {hiringTimeframes.map(item => (
@@ -3522,7 +3537,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "type" ? (
               <form className="jobs-employer-step-form" onSubmit={event => { event.preventDefault(); setPostStep("salary"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Job type *</h2>
                 <div className="jobs-post-option-stack">
                   {employerJobTypes.map(item => (
@@ -3535,7 +3549,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "salary" ? (
               <form className="jobs-employer-step-form jobs-salary-step" onSubmit={event => { event.preventDefault(); setPostStep("benefits"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Salary *</h2>
                 <section>
                   <h3>Pay</h3>
@@ -3594,7 +3607,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "benefits" ? (
               <form className="jobs-employer-step-form" onSubmit={event => { event.preventDefault(); setPostStep("skills"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Benefits</h2>
                 <div className="jobs-post-option-stack">
                   {(benefitsExpanded ? employerBenefits : employerBenefits.slice(0, 4)).map(item => (
@@ -3612,7 +3624,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "skills" ? (
               <form className="jobs-employer-step-form" onSubmit={event => { event.preventDefault(); setPostStep("description"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Skills *</h2>
                 <p>Add skills that match this role. Separate multiple skills with commas.</p>
                 <label>
@@ -3631,7 +3642,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "description" ? (
               <form className="jobs-employer-step-form jobs-description-step" onSubmit={event => { event.preventDefault(); setPostStep("review"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Job description *</h2>
                 <p>This is a SMAJ PI HUB-assisted job description. You can edit or replace it.</p>
                 <div className="jobs-description-editor">
@@ -3672,7 +3682,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "review" ? (
               <form className="jobs-employer-step-form jobs-review-step" onSubmit={event => { event.preventDefault(); setPostStep("sponsor"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Review</h2>
                 <p>By selecting Confirm, you agree that this job post reflects your requirements and will be submitted through SMAJ PI HUB Jobs.</p>
                 <section>
@@ -3705,7 +3714,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" && postStep === "sponsor" ? (
               <form className="jobs-employer-step-form jobs-sponsor-step" onSubmit={event => { event.preventDefault(); setPostStep("details"); }}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <h2>Sponsor job</h2>
                 <h3>Choose a plan</h3>
                 <div className="jobs-sponsor-plans">
@@ -3723,7 +3731,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
               </form>
             ) : kind === "post" ? (
               <form className="job-form" onSubmit={event => void submitJob(event)}>
-                {previousStep(postStep) ? <button type="button" className="jobs-step-back" onClick={() => setPostStep(previousStep(postStep)!)}>← Back</button> : null}
                 <label>
                   Job title
                   <input

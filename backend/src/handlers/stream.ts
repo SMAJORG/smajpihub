@@ -470,9 +470,9 @@ const mountStreamEndpoints = (router: Router) => {
     const expectedAmount = streamPlanPrice(streamPlans[plan].priceUsd).pricePi;
     if (!pending || pending.plan !== plan || Math.abs(Number(pending.amountPi) - expectedAmount) > 0.00000001) return res.status(409).json({ error: "checkout_mismatch", message: "Start this Stream checkout again." });
     try {
-      const remote = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`);
+      const remote = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`, { timeout: 6000 });
       const payment = remote.data;
-      if (payment?.metadata?.plan !== plan || Math.abs(Number(payment?.amount) - expectedAmount) > 0.00000001 || (payment?.user_uid && user.uid && payment.user_uid !== user.uid))
+      if (payment?.metadata?.service !== "stream" || payment?.metadata?.plan !== plan || Math.abs(Number(payment?.amount) - expectedAmount) > 0.00000001 || (payment?.user_uid && user.uid && payment.user_uid !== user.uid))
         return res.status(409).json({ error: "payment_mismatch", message: "This Pi payment does not match the selected Stream plan." });
       await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/approve`);
       await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { "pendingStreamSubscription.paymentId": paymentId, "pendingStreamSubscription.approvedAt": new Date() } });

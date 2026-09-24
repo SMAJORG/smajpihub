@@ -1998,7 +1998,9 @@ const StreamWorkspacePage = ({ kind }: { kind: StreamPageKind }) => {
       {!managementKinds.includes(kind) &&
       !adminKinds.includes(kind) &&
       !["movie-detail", "series-detail", "search", "player", "live-player", "live-now"].includes(kind) ? (
-        <StreamHeader />
+        <StreamHeader
+          showCategoryNav={!['my-list', 'history', 'subscriptions', 'creator-directory', 'notifications', 'plans', 'parental'].includes(kind)}
+        />
       ) : null}
       <div className="sw-page-content">{content}</div>
     </main>

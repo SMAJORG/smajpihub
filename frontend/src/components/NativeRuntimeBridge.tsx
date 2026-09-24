@@ -36,8 +36,8 @@ const NativeRuntimeBridge = () => {
     // Keep Android system chrome in its own solid strip. Page artwork and app
     // controls must start below the clock, cutout, Wi-Fi, and battery area.
     void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
-    void StatusBar.setBackgroundColor({ color: "#0f1b2d" }).catch(() => undefined);
-    void StatusBar.setStyle({ style: Style.Light }).catch(() => undefined);
+    void StatusBar.setBackgroundColor({ color: "#ffffff" }).catch(() => undefined);
+    void StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
     let active = true;
     const cleanups: Array<() => Promise<void>> = [];
 

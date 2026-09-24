@@ -16,6 +16,7 @@ import "./StreamHeader.css";
 type StreamHeaderProps = {
   query?: string;
   onQueryChange?: (value: string) => void;
+  showCategoryNav?: boolean;
 };
 
 const links = [
@@ -41,8 +42,7 @@ const links = [
   ["Creators", "/app/services/stream/creators"],
 ] as const;
 
-const StreamHeader = (props: StreamHeaderProps) => {
-  void props;
+const StreamHeader = ({ showCategoryNav = true }: StreamHeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [castOpen, setCastOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
@@ -98,7 +98,7 @@ const StreamHeader = (props: StreamHeaderProps) => {
             <MenuRoundedIcon />
           </button>
         </div>
-        <nav ref={navRef} aria-label="SMAJ Stream categories">
+        {showCategoryNav ? <nav ref={navRef} aria-label="SMAJ Stream categories">
           {links.map(([label, to]) => {
             const current = `${location.pathname}${location.search}`;
             const active = to === "/app/services/stream" ? location.pathname === to : current === to;
@@ -108,7 +108,7 @@ const StreamHeader = (props: StreamHeaderProps) => {
               </Link>
             );
           })}
-        </nav>
+        </nav> : null}
       </header>
       {menuOpen ? (
         <div className="stream-menu-layer">
@@ -160,7 +160,6 @@ const StreamHeader = (props: StreamHeaderProps) => {
               <Link to="/app/help-center">
                 <HelpOutlineRoundedIcon /> Help Center
               </Link>
-              <Link to="/app/services">&lt;- Back to SMAJ Hub</Link>
             </section>
           </aside>
         </div>
