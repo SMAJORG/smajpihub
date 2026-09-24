@@ -10036,7 +10036,7 @@ html[data-private-theme="dark"] .storefront-tool-panel label { color: var(--smaj
 /* SMAJ Store commerce flow, orders, and tracking */
 
 /* =====================================================
-   PRODUCT CARD ONLY — FINAL DESIGN
+   PRODUCT CARD ONLY â€” FINAL DESIGN
    ===================================================== */
 
 .storefront-product-card {
@@ -15039,7 +15039,7 @@ html[data-private-theme="dark"] .storefront-search input::placeholder {
 }
 
 
-/* Seller profile mobile catalog — final readability and spacing */
+/* Seller profile mobile catalog â€” final readability and spacing */
 .seller-profile-page .seller-products-title {
   margin: 10px 0 8px !important;
 }
@@ -21483,6 +21483,10 @@ svg {
   .community-follow-prompt small { display: block; color: #fff; font-size: 8px; font-weight: 900; letter-spacing: .09em; opacity: .8; }
   .community-follow-prompt strong { display: block; margin-top: 2px; color: #fff; font-size: 16px; }
   .community-follow-prompt p { margin: 3px 30px 0 0; color: #fff; font-size: 10px; line-height: 1.4; opacity: .9; }
+  .community-follow-prompt > div:first-of-type { position: relative; z-index: 1; }
+  .community-follow-prompt > div:first-of-type small,
+  .community-follow-prompt > div:first-of-type strong { color: #fff !important; opacity: 1; }
+  .community-follow-prompt > div:first-of-type p { color: #ede9fe !important; opacity: 1; }
   .community-follow-close { position: absolute; top: 8px; right: 8px; width: 29px; height: 29px; padding: 0; display: grid; place-items: center; color: #fff; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.2); border-radius: 50%; }
   .community-follow-close svg { font-size: 18px; }
   .community-follow-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -22178,7 +22182,10 @@ svg {
   color: #fff;
   background: linear-gradient(110deg, #008c83, #7040e8);
   border-color: transparent;
-}.language-choice-actions {
+  box-shadow: 0 10px 24px rgba(48, 63, 190, .22);
+}
+.language-choice-list button.active > span { color: #fff !important; opacity: 1; }
+.language-choice-actions {
   margin-top: auto;
   display: grid;
   gap: 14px;

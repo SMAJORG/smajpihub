@@ -16,7 +16,11 @@ const randomState = () => {
   return Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
 };
 
-export async function authenticateWithCapacitorPi(): Promise<AuthResult> {
+export type CapacitorPiAuthStage = "opening" | "verifying";
+
+export async function authenticateWithCapacitorPi(
+  onStageChange?: (stage: CapacitorPiAuthStage) => void
+): Promise<AuthResult> {
   const state = randomState();
   await Preferences.set({ key: STATE_KEY, value: state });
 
@@ -40,6 +44,7 @@ export async function authenticateWithCapacitorPi(): Promise<AuthResult> {
     const handleCallback = async (url: string) => {
       if (!url.startsWith("smajpihub://oauth/pi") && !url.startsWith("https://smajpihub.com/signin/callback")) return;
       try {
+        onStageChange?.("verifying");
         const callback = new URL(url);
         const params = new URLSearchParams(callback.hash.replace(/^#/, ""));
         const storedState = (await Preferences.get({ key: STATE_KEY })).value || "";
@@ -75,6 +80,7 @@ export async function authenticateWithCapacitorPi(): Promise<AuthResult> {
     void (async () => {
       try {
         await listenerPromise;
+        onStageChange?.("opening");
         const launch = await AppLauncher.openUrl({ url: bridgeUrl.toString() });
         if (!launch.completed) throw new Error("Pi Browser could not be opened.");
       } catch (error) {

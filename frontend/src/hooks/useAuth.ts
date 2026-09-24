@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient, getBaseURL } from "../lib/axiosClient";
 import type { AuthResult, User } from "../types/pi";
 import { requestPiBrowserHandoff } from "../lib/piBrowserHandoff";
-import { authenticateWithCapacitorPi, isCapacitorNative } from "../lib/capacitorPiAuth";
+import { authenticateWithCapacitorPi, isCapacitorNative, type CapacitorPiAuthStage } from "../lib/capacitorPiAuth";
 
 type AuthFeedback = { type: "success" | "error"; message: string };
 type BackendErrorBody = { error?: string; message?: string };
@@ -182,6 +182,7 @@ export const useAuth = () => {
   const [showSignIn, setShowSignIn] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialUserRef.current);
   const [isPiLoginPending, setIsPiLoginPending] = useState(false);
+  const [piLoginStage, setPiLoginStage] = useState<CapacitorPiAuthStage | null>(null);
   const [authFeedback, setAuthFeedback] = useState<AuthFeedback | null>(null);
   const loginInProgressRef = useRef(false);
   const showFeedback = useCallback((feedback: AuthFeedback | null) => {
@@ -270,6 +271,7 @@ export const useAuth = () => {
     if (loginInProgressRef.current) return false;
     loginInProgressRef.current = true;
     setIsPiLoginPending(true);
+    setPiLoginStage(isCapacitorNative() ? "opening" : null);
     setIsLoading(true);
     setAuthFeedback({ type: "success", message: "Connecting to Pi Browser…" });
     // The Pi SDK script can exist inside Capacitor's WebView, but it cannot
@@ -277,7 +279,7 @@ export const useAuth = () => {
     // the OAuth browser/deep-link flow, regardless of window.Pi.
     if (isCapacitorNative()) {
       try {
-        const authResult = await authenticateWithCapacitorPi();
+        const authResult = await authenticateWithCapacitorPi(setPiLoginStage);
         await signInUser(authResult);
         await redirectToDashboard();
         return true;
@@ -287,6 +289,7 @@ export const useAuth = () => {
       } finally {
         loginInProgressRef.current = false;
         setIsPiLoginPending(false);
+        setPiLoginStage(null);
         setIsLoading(false);
       }
     }
@@ -327,6 +330,7 @@ export const useAuth = () => {
         } finally {
           loginInProgressRef.current = false;
         setIsPiLoginPending(false);
+        setPiLoginStage(null);
           setIsLoading(false);
         }
       }
@@ -337,6 +341,7 @@ export const useAuth = () => {
         setAuthFeedback({ type: "error", message: "Pi SDK is unavailable in this Sandbox preview. Refresh the preview, confirm your sandbox Pi account is signed in, and try again." });
         loginInProgressRef.current = false;
         setIsPiLoginPending(false);
+        setPiLoginStage(null);
         setIsLoading(false);
         return false;
       }
@@ -344,6 +349,7 @@ export const useAuth = () => {
       setAuthFeedback(null);
       loginInProgressRef.current = false;
         setIsPiLoginPending(false);
+        setPiLoginStage(null);
       setIsLoading(false);
       return false;
     }
@@ -377,6 +383,7 @@ export const useAuth = () => {
     } finally {
       loginInProgressRef.current = false;
         setIsPiLoginPending(false);
+        setPiLoginStage(null);
       setIsLoading(false);
     }
   }, [signInUser]);
@@ -486,6 +493,7 @@ export const useAuth = () => {
     requireAuth: () => setShowSignIn(true),
     isLoading,
     isPiLoginPending,
+    piLoginStage,
     authFeedback,
     showFeedback,
   };
