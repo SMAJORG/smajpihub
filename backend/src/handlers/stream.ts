@@ -18,7 +18,11 @@ type StreamPlanId = keyof typeof streamPlans;
 
 const streamPlanPrice = (priceUsd: number) => ({
   priceUsd,
-  pricePi: Number.isFinite(priceUsd) && priceUsd > 0 ? priceUsd / STREAM_PI_RATE : 0,
+  // Pi/Stellar amounts support seven decimal places. Sending more precision
+  // lets Wallet normalize the amount and then fails our strict comparison.
+  pricePi: Number.isFinite(priceUsd) && priceUsd > 0
+    ? Math.round((priceUsd / STREAM_PI_RATE) * 10_000_000) / 10_000_000
+    : 0,
   piRateUsed: STREAM_PI_RATE,
 });
 
@@ -474,7 +478,9 @@ const mountStreamEndpoints = (router: Router) => {
       const payment = remote.data;
       if (payment?.metadata?.service !== "stream" || payment?.metadata?.plan !== plan || Math.abs(Number(payment?.amount) - expectedAmount) > 0.00000001 || (payment?.user_uid && user.uid && payment.user_uid !== user.uid))
         return res.status(409).json({ error: "payment_mismatch", message: "This Pi payment does not match the selected Stream plan." });
-      await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/approve`);
+      // Pi may repeat the approval callback after returning from Wallet.
+      if (!payment?.status?.developer_approved)
+        await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/approve`);
       await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { "pendingStreamSubscription.paymentId": paymentId, "pendingStreamSubscription.approvedAt": new Date() } });
       return res.json({ approved: true });
     } catch (error) {

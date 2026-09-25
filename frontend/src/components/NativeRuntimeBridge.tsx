@@ -33,11 +33,11 @@ const NativeRuntimeBridge = () => {
     if (!Capacitor.isNativePlatform()) return;
 
     document.documentElement.dataset.nativeApp = Capacitor.getPlatform();
-    // Keep Android system chrome in its own solid strip. Page artwork and app
-    // controls must start below the clock, cutout, Wi-Fi, and battery area.
+    // Keep Android system chrome in its own branded strip. Page artwork and app
+    // controls start below the clock, cutout, Wi-Fi, and battery area.
     void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
-    void StatusBar.setBackgroundColor({ color: "#ffffff" }).catch(() => undefined);
-    void StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
+    void StatusBar.setBackgroundColor({ color: "#0f1b2d" }).catch(() => undefined);
+    void StatusBar.setStyle({ style: Style.Light }).catch(() => undefined);
     let active = true;
     const cleanups: Array<() => Promise<void>> = [];
 
