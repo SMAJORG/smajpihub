@@ -133,7 +133,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
             <p className="native-welcome__error" role="alert">{authFeedback.message}</p>
           ) : null}
           <div className="native-welcome__trust">
-            <span>Powered by Pi</span><i aria-hidden="true" /><span>Part of SMAJ PI HUB</span>
+            <span>Powered by Pi</span><i aria-hidden="true" /><span>PART OF THE SMAJ ECOSYSTEM</span>
           </div>
         </div>
       </section>

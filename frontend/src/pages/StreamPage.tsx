@@ -249,7 +249,7 @@ const StreamPage = ({ categorySlug }: StreamPageProps) => {
             <h1>{featured?.title ?? (catalogLoading ? `Loading ${categoryLabel}…` : `${categoryLabel} is unavailable`)}</h1>
             <p>{featured?.overview || (catalogLoading ? "Finding the best titles for this category." : "We could not load this category right now. Please try again shortly.")}</p>
             <div className="stream-hero-actions">
-              {featured ? <Link className="stream-primary-action" to={`/app/services/stream/${featured.mediaType === "tv" ? "series" : "title"}/${featured.id}`}><PlayArrowRoundedIcon /> View details</Link> : null}
+              {featured ? <Link className="stream-primary-action" to={`/app/services/stream/${featured.mediaType === "tv" ? "series" : "title"}/${featured.id}?autoplay=1`}><PlayArrowRoundedIcon /> Watch now</Link> : null}
               {featured ? <button type="button" disabled={downloadingId === catalogKey(featured) || downloadedIds.has(catalogKey(featured))} onClick={() => void downloadFeatured()}><DownloadRoundedIcon /> {downloadingId === catalogKey(featured) ? "Downloading…" : downloadedIds.has(catalogKey(featured)) ? "Downloaded" : "Download"}</button> : null}
             </div>
             {downloadError ? <small className="stream-download-error" role="alert">{downloadError}</small> : null}
