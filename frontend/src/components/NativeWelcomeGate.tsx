@@ -37,7 +37,7 @@ const slides = [
     tone: "gold",
   },
   {
-    eyebrow: "THE SMAJ ECOSYSTEM",
+    eyebrow: "THE SMAJ PI HUB",
     title: "Everything you need. One place.",
     description: "Move between everyday services while keeping the same SMAJ account.",
     image: "/assets/smaj-pi-login-ecosystem.jpg",
@@ -133,7 +133,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
             <p className="native-welcome__error" role="alert">{authFeedback.message}</p>
           ) : null}
           <div className="native-welcome__trust">
-            <span>Powered by Pi</span><i aria-hidden="true" /><span>Part of the SMAJ ecosystem</span>
+            <span>Powered by Pi</span><i aria-hidden="true" /><span>Part of SMAJ PI HUB</span>
           </div>
         </div>
       </section>
