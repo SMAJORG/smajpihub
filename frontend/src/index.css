@@ -22322,3 +22322,19 @@ svg {
     padding-top: 0 !important;
   }
 }
+
+/* Keep the fullscreen conversation above Android's soft keyboard. */
+.chat-panel-fullscreen {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.chat-panel-fullscreen .chat-messages {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.chat-panel-fullscreen > form {
+  flex: 0 0 auto;
+  padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  background: var(--smaj-card);
+}

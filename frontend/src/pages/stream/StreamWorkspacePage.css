@@ -2817,7 +2817,7 @@
 }
 .sw-player-stage.is-fullscreen .sw-player-controls-top,
 .sw-player-stage:fullscreen .sw-player-controls-top {
-  grid-template-columns: minmax(0,1fr) auto auto auto;
+  grid-template-columns: auto minmax(0,1fr) auto auto;
   padding: max(18px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) 10px max(24px, env(safe-area-inset-left));
 }
 .sw-player-stage.is-fullscreen .sw-player-controls-top strong,
@@ -2840,13 +2840,13 @@
 .sw-player-stage:fullscreen .sw-player-controls-center button { width: 64px; height: 64px; }
 .sw-player-stage.is-fullscreen .sw-player-controls-center button.primary,
 .sw-player-stage:fullscreen .sw-player-controls-center button.primary { width: 76px; height: 76px; }
-.sw-player-close-fullscreen {
-  width: 52px;
-  height: 52px;
+.sw-player-back-fullscreen {
+  width: 42px;
+  height: 42px;
   padding: 0 !important;
-  background: rgba(35,35,35,.82) !important;
+  background: rgba(20,20,20,.62) !important;
 }
-.sw-player-close-fullscreen svg { font-size: 32px; }
+.sw-player-back-fullscreen svg { font-size: 27px; }
 .sw-player-stage.is-fullscreen .sw-player-controls-bottom > input,
 .sw-player-stage:fullscreen .sw-player-controls-bottom > input { accent-color: #fff; }
 .sw-player-stage.is-fullscreen .sw-player-controls-bottom,

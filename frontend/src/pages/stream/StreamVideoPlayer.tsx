@@ -3,6 +3,8 @@ import Hls from "hls.js";
 import { Link } from "react-router-dom";
 import BookmarkRoundedIcon from "@mui/icons-material/BookmarkRounded";
 import PictureInPictureAltRoundedIcon from "@mui/icons-material/PictureInPictureAltRounded";
+import { Capacitor } from "@capacitor/core";
+import { SmajMedia } from "../../native/smajMedia";
 import StreamFullscreenFrame from "./StreamFullscreenFrame";
 import {
   getStreamPlayback,
@@ -201,6 +203,10 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
     const element = videoRef.current;
     if (!element) return;
     try {
+      if (Capacitor.isNativePlatform()) {
+        await SmajMedia.enterPictureInPicture();
+        return;
+      }
       if (!document.pictureInPictureEnabled || typeof element.requestPictureInPicture !== "function")
         throw new Error("Picture-in-Picture is unsupported");
       if (document.pictureInPictureElement) await document.exitPictureInPicture();

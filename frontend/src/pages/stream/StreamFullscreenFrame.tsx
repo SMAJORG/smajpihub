@@ -1,5 +1,5 @@
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { Capacitor } from "@capacitor/core";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
 import { StatusBar } from "@capacitor/status-bar";
@@ -14,6 +14,7 @@ import Replay10RoundedIcon from "@mui/icons-material/Replay10Rounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import VolumeOffRoundedIcon from "@mui/icons-material/VolumeOffRounded";
 import VolumeUpRoundedIcon from "@mui/icons-material/VolumeUpRounded";
+import { SmajMedia } from "../../native/smajMedia";
 
 type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
@@ -69,7 +70,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
 
   const restorePortraitUi = useCallback(async () => {
     if (Capacitor.isNativePlatform()) {
-      await Promise.allSettled([ScreenOrientation.unlock(), StatusBar.show()]);
+      await Promise.allSettled([SmajMedia.exitLandscape(), ScreenOrientation.unlock(), StatusBar.show()]);
     } else {
       (screen.orientation as LockableOrientation).unlock?.();
     }
@@ -94,10 +95,12 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
     else if (element.msRequestFullscreen) await element.msRequestFullscreen();
     else throw new Error("Fullscreen is not supported by this browser.");
     if (Capacitor.isNativePlatform()) {
-      await Promise.allSettled([
-        ScreenOrientation.lock({ orientation: "landscape" }),
-        StatusBar.hide(),
-      ]);
+      try {
+        await SmajMedia.enterLandscape();
+      } catch {
+        await ScreenOrientation.lock({ orientation: "landscape" });
+      }
+      await StatusBar.hide();
     } else {
       await (screen.orientation as LockableOrientation).lock?.("landscape").catch(() => undefined);
     }
@@ -213,6 +216,14 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
           }}
         >
           <div className="sw-player-controls-top">
+            <button
+              className="sw-player-back-fullscreen"
+              type="button"
+              onClick={() => void leaveFullscreen()}
+              aria-label="Leave fullscreen"
+            >
+              <ArrowBackRoundedIcon />
+            </button>
             <strong>{title}</strong>
             <button type="button" disabled={!castSupported} aria-label="Cast">
               <CastConnectedRoundedIcon />
@@ -220,9 +231,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
             <button type="button" onClick={changeSpeed} aria-label="Playback settings">
               <SettingsRoundedIcon />
             </button>
-            <button className="sw-player-close-fullscreen" type="button" onClick={() => void leaveFullscreen()} aria-label="Exit fullscreen">
-              <CloseRoundedIcon />
-            </button>
+
           </div>
           {mediaRef ? (
             <div className="sw-player-controls-center">
