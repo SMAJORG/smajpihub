@@ -2880,3 +2880,12 @@
 /* Compact web title layout: player, details/uploader, then similar movies. */
 .sw-detail-web-player{position:relative}.sw-detail-web-player .sw-watch.real{min-height:0!important;padding-bottom:0!important}.sw-detail-web-player .sw-real-player{height:auto!important;min-height:0!important}.sw-detail-web-back{position:absolute;z-index:30;top:14px;left:14px;width:44px;height:44px;display:grid;place-items:center;padding:0;border:1px solid #ffffff35;border-radius:50%;color:#fff;background:#111a}.sw-detail-web-back svg{font-size:28px}html:not([data-native-app="android"]) .sw-detail-hero.web-after-player{min-height:0;margin-top:0;padding-top:28px;padding-bottom:30px;background-image:none!important;background:#111217!important}html:not([data-native-app="android"]) .sw-detail-hero.web-after-player:after{display:none}html:not([data-native-app="android"]) .sw-detail-hero.web-after-player .sw-detail-poster,html:not([data-native-app="android"]) .sw-detail-hero.web-after-player>.sw-detail-back,html:not([data-native-app="android"]) .sw-detail-hero.web-after-player>.sw-detail-cast{display:none!important}html:not([data-native-app="android"]) .sw-detail-hero.web-after-player .sw-detail-hero-layout{grid-template-columns:minmax(0,760px);align-items:start}html:not([data-native-app="android"]) .sw-detail-hero.web-after-player h1{margin-top:0;font-size:clamp(28px,5vw,48px)}html:not([data-native-app="android"]) .sw-detail-hero.web-after-player .sw-detail-uploader{order:0}.sw-detail-page>.sw-related{padding-top:24px;background:#111217}
 @media(max-width:700px){html:not([data-native-app="android"]) .sw-detail-hero.web-after-player{margin-right:-16px;margin-left:-16px;padding:22px 20px 28px}.sw-detail-web-player .sw-player-stage,.sw-detail-web-player .sw-player-stage video,.sw-detail-web-player .sw-player-stage iframe{height:auto!important;min-height:0!important;aspect-ratio:16/9;max-height:none!important}}
+/* Web title player: the video is already active, so keep controls minimal. */
+html:not([data-native-app="android"]) .sw-detail-hero.web-after-player .sw-detail-primary-row { display: none !important; }
+html:not([data-native-app="android"]) .sw-detail-web-player .sw-player-frame-fullscreen,
+html:not([data-native-app="android"]) .sw-detail-web-player .sw-player-screen-actions button {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
