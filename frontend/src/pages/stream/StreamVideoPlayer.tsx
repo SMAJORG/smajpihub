@@ -204,7 +204,8 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
     if (!element) return;
     try {
       if (Capacitor.isNativePlatform()) {
-        await SmajMedia.enterPictureInPicture();
+        const result = await SmajMedia.enterPictureInPicture();
+        if (!result.entered) throw new Error("Android rejected Picture-in-Picture");
         return;
       }
       if (!document.pictureInPictureEnabled || typeof element.requestPictureInPicture !== "function")

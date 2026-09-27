@@ -18112,6 +18112,7 @@ html[data-private-theme="light"] .messages-page.conversation-selected .chat-pane
 .chat-image-viewer-actions {
   position: fixed;
   top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 14px;
   right: 14px;
   display: flex;
   align-items: center;
@@ -18129,6 +18130,8 @@ html[data-private-theme="light"] .messages-page.conversation-selected .chat-pane
   border-radius: 50%;
   cursor: pointer;
 }
+
+.chat-image-viewer-actions .chat-image-viewer-back { margin-right: auto; }
 
 .chat-image-viewer-actions .chat-image-viewer-delete {
   width: auto;
@@ -22325,8 +22328,10 @@ svg {
 
 /* Keep the fullscreen conversation above Android's soft keyboard. */
 .chat-panel-fullscreen {
-  height: 100dvh;
-  max-height: 100dvh;
+  top: var(--chat-viewport-top, 0px);
+  bottom: auto;
+  height: var(--chat-viewport-height, 100dvh);
+  max-height: var(--chat-viewport-height, 100dvh);
   overflow: hidden;
 }
 .chat-panel-fullscreen .chat-messages {

@@ -145,6 +145,29 @@ const MessagesPage = () => {
   const ignoreConversationMousePressRef = useRef(false);
   const selectedId = params.get("conversation");
   const [chatFullscreen, setChatFullscreen] = useState(false);
+  useEffect(() => {
+    if (!chatFullscreen) return;
+    const viewport = window.visualViewport;
+    const updateChatViewport = () => {
+      document.documentElement.style.setProperty("--chat-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
+      document.documentElement.style.setProperty("--chat-viewport-top", `${viewport?.offsetTop ?? 0}px`);
+      window.requestAnimationFrame(() => {
+        const messages = chatMessagesRef.current;
+        if (messages) messages.scrollTop = messages.scrollHeight;
+      });
+    };
+    updateChatViewport();
+    viewport?.addEventListener("resize", updateChatViewport);
+    viewport?.addEventListener("scroll", updateChatViewport);
+    window.addEventListener("resize", updateChatViewport);
+    return () => {
+      viewport?.removeEventListener("resize", updateChatViewport);
+      viewport?.removeEventListener("scroll", updateChatViewport);
+      window.removeEventListener("resize", updateChatViewport);
+      document.documentElement.style.removeProperty("--chat-viewport-height");
+      document.documentElement.style.removeProperty("--chat-viewport-top");
+    };
+  }, [chatFullscreen]);
   const filteredConversations = useMemo(() => {
     const query = conversationSearch.trim().toLowerCase();
     return conversations.filter((item) => inboxFilter === "archived" ? item.archived : !item.archived).filter((item) => !query || [
@@ -1132,7 +1155,7 @@ const MessagesPage = () => {
           </div>
         )}
       </section>
-      {imagePreview ? createPortal(<div className={`chat-image-viewer${imagePreviewFullscreen ? " chat-image-viewer-fullscreen" : ""}`} role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }}><div className="chat-image-viewer-actions" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }} aria-label="Close photo"><CloseOutlinedIcon /></button><button type="button" className="chat-image-viewer-delete" onClick={() => { setDeleteTarget(imagePreview.message); setImagePreview(null); setImagePreviewFullscreen(false); }}>Delete</button><button type="button" onClick={() => setImagePreviewFullscreen((open) => !open)} aria-label={imagePreviewFullscreen ? "Exit fullscreen" : "Fullscreen"}><FullscreenOutlinedIcon /></button></div><img src={imagePreview.src} alt={imagePreview.caption || "Shared photo"} onClick={(event) => event.stopPropagation()} />{imagePreview.caption && imagePreview.caption !== "Photo" ? <p>{imagePreview.caption}</p> : null}</div>, document.body) : null}
+      {imagePreview ? createPortal(<div className={`chat-image-viewer${imagePreviewFullscreen ? " chat-image-viewer-fullscreen" : ""}`} role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }}><div className="chat-image-viewer-actions" onClick={(event) => event.stopPropagation()}><button type="button" className="chat-image-viewer-back" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }} aria-label="Back to chat"><ArrowBackOutlinedIcon /></button><button type="button" className="chat-image-viewer-delete" onClick={() => { setDeleteTarget(imagePreview.message); setImagePreview(null); setImagePreviewFullscreen(false); }}>Delete</button><button type="button" onClick={() => setImagePreviewFullscreen((open) => !open)} aria-label={imagePreviewFullscreen ? "Exit fullscreen" : "Fullscreen"}><FullscreenOutlinedIcon /></button></div><img src={imagePreview.src} alt={imagePreview.caption || "Shared photo"} onClick={(event) => event.stopPropagation()} />{imagePreview.caption && imagePreview.caption !== "Photo" ? <p>{imagePreview.caption}</p> : null}</div>, document.body) : null}
     </main>
   );
 };

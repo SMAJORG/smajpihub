@@ -24,8 +24,13 @@ public class SmajMediaPlugin extends Plugin {
     @PluginMethod public void enterPictureInPicture(PluginCall call) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) { call.reject("Picture-in-Picture requires Android 8 or newer."); return; }
         getActivity().runOnUiThread(() -> {
-            boolean entered = getActivity().enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16, 9)).build());
-            JSObject result = new JSObject(); result.put("entered", entered); call.resolve(result);
+            try {
+                PictureInPictureParams params = new PictureInPictureParams.Builder().setAspectRatio(new Rational(16, 9)).build();
+                boolean entered = getActivity().enterPictureInPictureMode(params);
+                JSObject result = new JSObject(); result.put("entered", entered); call.resolve(result);
+            } catch (IllegalStateException | IllegalArgumentException error) {
+                call.reject("Android could not enter Picture-in-Picture mode.", error);
+            }
         });
     }
     private void hideSystemBars() {

@@ -52,6 +52,7 @@ const formatTime = (value: number) => {
 const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSupported = false }: Props) => {
   const frameRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | null>(null);
+  const nativeFullscreenRef = useRef(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [playing, setPlaying] = useState(false);
@@ -78,6 +79,9 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
 
   const leaveFullscreen = useCallback(async () => {
     const fullscreenDocument = document as FullscreenDocument;
+    nativeFullscreenRef.current = false;
+    setFullscreen(false);
+    document.documentElement.classList.remove("sw-player-is-fullscreen");
     try {
       if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
       else if (fullscreenDocument.webkitFullscreenElement) await fullscreenDocument.webkitExitFullscreen?.();
@@ -90,10 +94,6 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
   const enterFullscreen = useCallback(async () => {
     const element = frameRef.current as FullscreenElement | null;
     if (!element) return;
-    if (element.requestFullscreen) await element.requestFullscreen();
-    else if (element.webkitRequestFullscreen) await element.webkitRequestFullscreen();
-    else if (element.msRequestFullscreen) await element.msRequestFullscreen();
-    else throw new Error("Fullscreen is not supported by this browser.");
     if (Capacitor.isNativePlatform()) {
       try {
         await SmajMedia.enterLandscape();
@@ -101,7 +101,15 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
         await ScreenOrientation.lock({ orientation: "landscape" });
       }
       await StatusBar.hide();
+      nativeFullscreenRef.current = true;
+      setFullscreen(true);
+      setControlsVisible(true);
+      document.documentElement.classList.add("sw-player-is-fullscreen");
     } else {
+      if (element.requestFullscreen) await element.requestFullscreen();
+      else if (element.webkitRequestFullscreen) await element.webkitRequestFullscreen();
+      else if (element.msRequestFullscreen) await element.msRequestFullscreen();
+      else throw new Error("Fullscreen is not supported by this browser.");
       await (screen.orientation as LockableOrientation).lock?.("landscape").catch(() => undefined);
     }
   }, []);
@@ -109,7 +117,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
     const update = () => {
-      const active = Boolean(
+      const active = nativeFullscreenRef.current || Boolean(
         document.fullscreenElement ||
         fullscreenDocument.webkitFullscreenElement ||
         fullscreenDocument.msFullscreenElement
@@ -121,14 +129,12 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
     };
     document.addEventListener("fullscreenchange", update);
     document.addEventListener("webkitfullscreenchange", update);
-    window.addEventListener("orientationchange", update);
     return () => {
       if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
       document.documentElement.classList.remove("sw-player-is-fullscreen");
       void restorePortraitUi();
       document.removeEventListener("fullscreenchange", update);
       document.removeEventListener("webkitfullscreenchange", update);
-      window.removeEventListener("orientationchange", update);
     };
   }, [restorePortraitUi]);
 
