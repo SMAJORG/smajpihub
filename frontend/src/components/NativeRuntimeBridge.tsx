@@ -35,9 +35,16 @@ const NativeRuntimeBridge = () => {
     document.documentElement.dataset.nativeApp = Capacitor.getPlatform();
     // Keep Android system chrome in its own branded strip. Page artwork and app
     // controls start below the clock, cutout, Wi-Fi, and battery area.
-    void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
-    void StatusBar.setBackgroundColor({ color: "#0f1b2d" }).catch(() => undefined);
-    void StatusBar.setStyle({ style: Style.Light }).catch(() => undefined);
+    const showPhoneStatusBar = () => {
+      if (document.documentElement.classList.contains("sw-player-is-fullscreen")) return;
+      void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
+      void StatusBar.setBackgroundColor({ color: "#f2f2f2" }).catch(() => undefined);
+      void StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
+      void StatusBar.show().catch(() => undefined);
+    };
+    showPhoneStatusBar();
+    const handleVisibility = () => { if (!document.hidden) showPhoneStatusBar(); };
+    document.addEventListener("visibilitychange", handleVisibility);
     let active = true;
     const cleanups: Array<() => Promise<void>> = [];
 
@@ -93,6 +100,7 @@ const NativeRuntimeBridge = () => {
 
     return () => {
       active = false;
+      document.removeEventListener("visibilitychange", handleVisibility);
       delete document.documentElement.dataset.nativeApp;
       void Promise.all(cleanups.map(cleanup => cleanup()));
     };
