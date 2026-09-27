@@ -212,16 +212,16 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
           <FullscreenRoundedIcon />
         </button>
       ) : null}
-      {fullscreen ? (
+      {fullscreen || mediaRef ? (
         <div
-          className={`sw-player-controls ${controlsVisible ? "visible" : "hidden"}`}
+          className={`sw-player-controls ${fullscreen ? "fullscreen" : "inline"} ${controlsVisible ? "visible" : "hidden"}`}
           onClick={event => {
             event.stopPropagation();
             if ((event.target as Element).closest("button, input")) return;
             toggleControls();
           }}
         >
-          <div className="sw-player-controls-top">
+          {fullscreen ? <div className="sw-player-controls-top">
             <button
               className="sw-player-back-fullscreen"
               type="button"
@@ -237,8 +237,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
             <button type="button" onClick={changeSpeed} aria-label="Playback settings">
               <SettingsRoundedIcon />
             </button>
-
-          </div>
+          </div> : null}
           {mediaRef ? (
             <div className="sw-player-controls-center">
               <button type="button" onClick={() => seek(-10)} aria-label="Rewind 10 seconds">
@@ -291,9 +290,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
             <button type="button" onClick={changeSpeed} aria-label="Playback speed">
               <small>{speed}x</small>
             </button>
-            <button type="button" onClick={() => void leaveFullscreen()} aria-label="Exit fullscreen">
-              <FullscreenExitRoundedIcon />
-            </button>
+            {fullscreen ? <button type="button" onClick={() => void leaveFullscreen()} aria-label="Exit fullscreen"><FullscreenExitRoundedIcon /></button> : null}
           </div>
         </div>
       ) : null}

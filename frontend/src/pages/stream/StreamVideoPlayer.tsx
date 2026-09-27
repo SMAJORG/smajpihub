@@ -165,7 +165,7 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
         if (!active) return;
         player = new YT.Player(target, {
           videoId: video.youtubeVideoId!,
-          playerVars: { autoplay: 1, rel: 0, playsinline: 1 },
+          playerVars: { autoplay: 1, fs: 0, rel: 0, playsinline: 1 },
           events: {
             onReady: event => {
               player = event.target;
@@ -270,8 +270,7 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
           <iframe
             src={video.iframeUrl}
             title={video.title}
-            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
           />
           <span className="sw-licensed-badge">AUTHORIZED STREAM</span>
         </StreamFullscreenFrame>
@@ -292,7 +291,6 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
       <StreamFullscreenFrame className="sw-real-player" title={video.title} mediaRef={videoRef}>
         <video
           ref={videoRef}
-          controls
           autoPlay
           playsInline
           preload="metadata"
