@@ -438,6 +438,10 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [saveTarget, setSaveTarget] = useState<Title | null>(null);
+  const [saveLocation, setSaveLocation] = useState<"phone" | "sd" | "">("");
+  const [saveProgress, setSaveProgress] = useState<number | null>(null);
+  const [saveMessage, setSaveMessage] = useState("");
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const categoryName = slug
     .split("-")
@@ -583,6 +587,25 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const list = remoteTitles ?? localList;
   const filtered =
     kind === "search" ? list : list.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
+  const saveCompletedMovie = async () => {
+    if (!saveTarget || saveLocation !== "phone" || !Capacitor.isNativePlatform()) return;
+    const stored = window.localStorage.getItem(`smaj:stream-download:${saveTarget.mediaType}:${saveTarget.id}`);
+    if (!stored) { setSaveMessage("The downloaded file is not available on this device."); return; }
+    const record = JSON.parse(stored) as { downloadId: number; fileName: string };
+    setSaveProgress(0);
+    setSaveMessage("");
+    const listener = await SmajMedia.addListener("saveProgress", event => setSaveProgress(event.progress));
+    try {
+      await SmajMedia.saveDownloadToPhone({ downloadId: record.downloadId, fileName: record.fileName });
+      setSaveProgress(100);
+      setSaveMessage("Saved to Movies/SMAJ on your phone.");
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : "The movie could not be saved.");
+      setSaveProgress(null);
+    } finally {
+      await listener.remove();
+    }
+  };
   return (
     <>
       {kind !== "category" ? (
@@ -639,11 +662,12 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
           </div>
         </section>
       ) : null}
-      <div className="sw-title-grid">
-        {filtered.map(item => (
-          <Tile title={item} key={`${item.mediaType || "local"}-${item.id}`} />
-        ))}
+      <div className={`sw-title-grid${kind === "downloads" ? " sw-downloads-grid" : ""}`}>
+        {filtered.map(item => kind === "downloads" ? (
+          <article className="sw-downloaded-item" key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><button type="button" onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>
+        ) : <Tile title={item} key={`${item.mediaType || "local"}-${item.id}`} />)}
       </div>
+      {saveTarget ? <div className="sw-save-overlay" role="dialog" aria-modal="true" aria-label="Save movie to phone"><section className="sw-save-sheet"><header><h2>Save to...</h2><button type="button" onClick={() => setSaveTarget(null)} aria-label="Close">×</button></header>{saveProgress !== null ? <div className="sw-save-copy-progress"><div style={{ "--save-progress": `${saveProgress * 3.6}deg` } as CSSProperties}><strong>{saveProgress}%</strong></div><h3>{saveProgress === 100 ? "Saved to phone" : "Saving movie..."}</h3><p>{saveMessage || "Keep SMAJ open while the file is copied."}</p></div> : <><button type="button" className={`sw-save-choice ${saveLocation === "phone" ? "selected" : ""}`} onClick={() => setSaveLocation("phone")}><span>▣</span><div><strong>Phone storage</strong><small>Movies/SMAJ</small></div><i /></button><button type="button" className="sw-save-choice" disabled><span>▤</span><div><strong>SD card</strong><small>Not available on this device</small></div><i /></button>{saveMessage ? <p className="sw-save-error">{saveMessage}</p> : null}<button type="button" className="sw-save-confirm" disabled={saveLocation !== "phone"} onClick={() => void saveCompletedMovie()}>Confirm</button></>}</section></div> : null}
       {catalogState === "ready" && kind !== "my-list" && kind !== "downloads" ? (
         <div className="sw-load-more" ref={loadMoreRef}>
           {page < totalPages ? (
@@ -868,6 +892,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
             if (progress.status === "failed") throw new Error(`Android download failed (${progress.reason || "unknown"}).`);
           }
           setDownloadProgress(100);
+          window.localStorage.setItem(`smaj:stream-download:${type}:${id}`, JSON.stringify({ downloadId, fileName, title: detail.title }));
           setDownloadStage("complete");
         } else {
           const anchor = document.createElement("a");

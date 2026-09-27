@@ -4,9 +4,13 @@ import android.app.PictureInPictureParams;
 import android.content.pm.ActivityInfo;
 import android.app.DownloadManager;
 import android.content.Context;
+import android.content.ContentValues;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
+import android.provider.MediaStore;
+import java.io.InputStream;
+import java.io.OutputStream;
 import android.os.Build;
 import android.util.Rational;
 import android.view.View;
@@ -69,7 +73,37 @@ public class SmajMediaPlugin extends Plugin {
             int reasonColumn = cursor.getColumnIndex(DownloadManager.COLUMN_REASON); if (reasonColumn >= 0) result.put("reason", cursor.getInt(reasonColumn));
             call.resolve(result);
         } catch (Exception error) { call.reject("Download progress is unavailable.", error); }
-    }    private void hideSystemBars() {
+    }
+    @PluginMethod public void saveDownloadToPhone(PluginCall call) {
+        Long id = call.getLong("downloadId");
+        String fileName = call.getString("fileName", "smaj-video.mp4").replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (id == null) { call.reject("Download id is required."); return; }
+        new Thread(() -> {
+            DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+            Uri source = manager.getUriForDownloadedFile(id);
+            if (source == null) { call.reject("The downloaded movie file was not found."); return; }
+            long total = 0;
+            try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(id))) {
+                if (cursor.moveToFirst()) total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+            }
+            try {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
+                values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SMAJ"); values.put(MediaStore.Video.Media.IS_PENDING, 1); }
+                Uri destination = getContext().getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+                if (destination == null) throw new IllegalStateException("Phone storage is unavailable.");
+                long copied = 0; byte[] buffer = new byte[1024 * 1024]; int read;
+                try (InputStream input = getContext().getContentResolver().openInputStream(source); OutputStream output = getContext().getContentResolver().openOutputStream(destination)) {
+                    if (input == null || output == null) throw new IllegalStateException("The movie file could not be opened.");
+                    while ((read = input.read(buffer)) != -1) { output.write(buffer, 0, read); copied += read; JSObject progress = new JSObject(); progress.put("progress", total > 0 ? Math.min(100, Math.round(copied * 100f / total)) : 0); notifyListeners("saveProgress", progress); }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { ContentValues ready = new ContentValues(); ready.put(MediaStore.Video.Media.IS_PENDING, 0); getContext().getContentResolver().update(destination, ready, null, null); }
+                JSObject result = new JSObject(); result.put("saved", true); result.put("uri", destination.toString()); call.resolve(result);
+            } catch (Exception error) { call.reject("The movie could not be saved to phone storage.", error); }
+        }).start();
+    }
+    private void hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsetsController controller = getActivity().getWindow().getInsetsController();
             if (controller != null) { controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars()); controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE); }
