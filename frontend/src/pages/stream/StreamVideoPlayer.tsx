@@ -165,7 +165,7 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
         if (!active) return;
         player = new YT.Player(target, {
           videoId: video.youtubeVideoId!,
-          playerVars: { rel: 0, playsinline: 1 },
+          playerVars: { autoplay: 1, rel: 0, playsinline: 1 },
           events: {
             onReady: event => {
               player = event.target;

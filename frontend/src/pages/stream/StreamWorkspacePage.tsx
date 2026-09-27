@@ -10,6 +10,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import BookmarkRoundedIcon from "@mui/icons-material/BookmarkRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -68,6 +69,7 @@ import {
   type StreamSubscription,
 } from "../../lib/streamSubscription";
 import { requestPiBrowserHandoff } from "../../lib/piBrowserHandoff";
+import { axiosClient } from "../../lib/axiosClient";
 
 import { publishCloudflareMovie, uploadCloudflareMovie, type CloudflareUploadStage } from "../../lib/streamCloudflare";
 
@@ -679,6 +681,11 @@ const Detail = ({ series = false }: { series?: boolean }) => {
   const [playbackId, setPlaybackId] = useState("");
   const [playbackUnavailableMessage, setPlaybackUnavailableMessage] = useState("");
   const [downloadAllowed, setDownloadAllowed] = useState(false);
+  const [uploadedBy, setUploadedBy] = useState("SMAJ Stream");
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState("Viewing Experience");
+  const [feedbackDetails, setFeedbackDetails] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("");
   const [ambientColor, setAmbientColor] = useState("rgb(24 16 27)");
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [trailerLoaded, setTrailerLoaded] = useState(false);
@@ -695,7 +702,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
       getStreamMyListStatus(type, id).catch(() => false),
       getStreamDownloadStatus(type, id).catch(() => false),
       getTitleAvailability(type, id).catch(
-        (): { available: boolean; playbackId?: string; downloadAllowed: boolean; message?: string } => ({
+        (): { available: boolean; playbackId?: string; creatorName?: string; downloadAllowed: boolean; message?: string } => ({
           available: false,
           downloadAllowed: false,
         })
@@ -708,6 +715,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
         setPlaybackId(availability.available ? availability.playbackId || "" : "");
         setPlaybackUnavailableMessage(availability.available ? "" : availability.message || "");
         setDownloadAllowed(availability.available && availability.downloadAllowed === true);
+        setUploadedBy(availability.creatorName || "SMAJ Stream");
         setState("ready");
       })
       .catch(() => setState("error"));
@@ -888,8 +896,25 @@ const Detail = ({ series = false }: { series?: boolean }) => {
       setReviewSaving(false);
     }
   };
+  const submitTitleFeedback = async (event: FormEvent) => {
+    event.preventDefault();
+    setFeedbackStatus("Sending...");
+    try {
+      await axiosClient.post("/support", {
+        source: "stream-title-feedback",
+        topic: feedbackCategory,
+        message: `${feedbackCategory} feedback for ${detail.title} (${type}/${id}). ${feedbackDetails.trim() || "No additional details provided."}`,
+      });
+      setFeedbackStatus("Thank you. Your feedback was sent.");
+      setFeedbackDetails("");
+    } catch (error) {
+      setFeedbackStatus((error as { response?: { data?: { message?: string } } }).response?.data?.message || "Feedback could not be sent.");
+    }
+  };
+  const webInlinePlayback = !Capacitor.isNativePlatform() && Boolean(playbackId);
   return (
     <>
+      {webInlinePlayback ? <section className="sw-detail-web-player"><StreamVideoPlayer id={playbackId} /></section> : null}
       <section
         className="sw-detail-hero tmdb"
         style={
@@ -922,6 +947,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
               {detail.rating ? `Rating ${detail.rating}` : "New"} - {detail.releaseDate?.slice(0, 4) || "Coming soon"}
               {detail.runtime ? ` - ${Math.floor(detail.runtime / 60)}h ${detail.runtime % 60}m` : ""}
             </p>
+            {playbackId ? <div className="sw-detail-uploader"><span>Uploaded by <strong>{uploadedBy}</strong></span><button type="button" onClick={() => { setFeedbackStatus(""); setInfoOpen(true); }} aria-label="Open title information and feedback"><InfoOutlinedIcon /></button></div> : null}
             <div className="sw-detail-genres">
               {detail.genres.map(genre => (
                 <b key={genre.id}>{genre.name}</b>
@@ -1000,6 +1026,21 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           </div>
         </div>
       </section>
+      {infoOpen ? (
+        <div className="sw-feedback-overlay" role="dialog" aria-modal="true" aria-label="Title information and feedback">
+          <form className="sw-feedback-panel" onSubmit={event => void submitTitleFeedback(event)}>
+            <header><button type="button" onClick={() => setInfoOpen(false)} aria-label="Close feedback"><ArrowBackRoundedIcon /></button><h2>Feedback</h2></header>
+            <p className="sw-feedback-uploaded">Uploaded by <strong>{uploadedBy}</strong></p>
+            <h3>What's your feedback about?</h3>
+            <div className="sw-feedback-options">
+              {["Viewing Experience", "Subtitles", "Download", "File Management", "Infringement of my copyright or IP", "Pornographic content", "Other"].map(option => <label key={option}><span>{option}</span><input type="radio" name="feedbackCategory" value={option} checked={feedbackCategory === option} onChange={() => setFeedbackCategory(option)} /></label>)}
+            </div>
+            <label className="sw-feedback-details"><span>Tell us a little more (Optional)</span><textarea maxLength={500} value={feedbackDetails} onChange={event => setFeedbackDetails(event.target.value)} placeholder="Please describe the issue in detail." /><small>{feedbackDetails.length}/500</small></label>
+            {feedbackStatus ? <p className="sw-feedback-status" role="status">{feedbackStatus}</p> : null}
+            <button className="sw-feedback-submit" type="submit" disabled={feedbackStatus === "Sending..."}>Submit</button>
+          </form>
+        </div>
+      ) : null}
       {trailerOpen && detail.trailer ? (
         <div
           className={`sw-trailer ${trailerLoaded ? "loaded" : "loading"}`}

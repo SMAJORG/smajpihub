@@ -12,7 +12,8 @@ export const updateModerationVideo = async (uid: string, body: Record<string, un
 export const getStreamAdminOverview = async () => (await axiosClient.get<StreamAdminOverview>("/stream/admin/overview")).data;
 export const getStreamAdminSettings = async () => (await axiosClient.get<{ settings: StreamAdminSettings }>("/stream/admin/settings")).data.settings;
 export const saveStreamAdminSettings = async (settings: StreamAdminSettings) => (await axiosClient.put<{ settings: StreamAdminSettings }>("/stream/admin/settings", settings)).data.settings;
-export const getTitleAvailability = async (type: "movie" | "tv", id: string) => (await axiosClient.get<{ available: boolean; playbackId?: string; title?: string; downloadAllowed: boolean; message?: string }>(`/stream/availability/${type}/${id}`)).data;
+export type StreamTitleAvailability = { available: boolean; playbackId?: string; title?: string; creatorName?: string; downloadAllowed: boolean; message?: string };
+export const getTitleAvailability = async (type: "movie" | "tv", id: string) => (await axiosClient.get<StreamTitleAvailability>(`/stream/availability/${type}/${id}`)).data;
 
 export const importInternetArchiveTitle = async (input: { identifier: string; tmdbId: number; mediaType: "movie" | "tv"; title: string; license: string; rightsUrl: string; rightsConfirmed: boolean; downloadAllowed: boolean }) =>
   (await axiosClient.post("/stream/admin/internet-archive/import", input)).data;

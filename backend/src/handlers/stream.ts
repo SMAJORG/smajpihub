@@ -1236,7 +1236,7 @@ const mountStreamEndpoints = (router: Router) => {
     const subscription = normalizeStreamSubscription(storedViewer?.streamSubscription);
     const paidDownloads = subscription.status === "active" && (subscription.plan === "plus" || subscription.plan === "family");
     const sourceAllowsDownload = video.contentSource === "cloudflare_stream" || video.downloadAllowed === true;
-    return res.json({ available: true, playbackId: video.cloudflareUid, title: video.title, downloadAllowed: paidDownloads && sourceAllowsDownload });
+    return res.json({ available: true, playbackId: video.cloudflareUid, title: video.title, creatorName: video.creatorName || "SMAJ Stream", downloadAllowed: paidDownloads && sourceAllowsDownload });
   });
 
   router.get("/live/:uid/playback", async (req, res) => {
