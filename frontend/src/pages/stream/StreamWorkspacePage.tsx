@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { Browser } from "@capacitor/browser";
+import { SmajMedia } from "../../native/smajMedia";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CastConnectedRoundedIcon from "@mui/icons-material/CastConnectedRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -678,6 +678,8 @@ const Detail = ({ series = false }: { series?: boolean }) => {
   const [saving, setSaving] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStage, setDownloadStage] = useState<"idle" | "downloading" | "complete" | "failed">("idle");
   const [playbackId, setPlaybackId] = useState("");
   const [playbackUnavailableMessage, setPlaybackUnavailableMessage] = useState("");
   const [downloadAllowed, setDownloadAllowed] = useState(false);
@@ -851,12 +853,34 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           setPlaybackUnavailableMessage(result.message || "Cloudflare is preparing the download. Try again shortly.");
           return;
         }
+        if (Capacitor.isNativePlatform()) {
+          setDownloadStage("downloading");
+          setDownloadProgress(0);
+          const extension = new URL(result.downloadUrl).pathname.split(".").pop()?.toLowerCase();
+          const safeExtension = extension && /^[a-z0-9]{2,5}$/.test(extension) ? extension : "mp4";
+          const fileName = `${detail.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 80) || "smaj-video"}.${safeExtension}`;
+          const { downloadId } = await SmajMedia.startDownload({ url: result.downloadUrl, fileName, title: detail.title, location: "app" });
+          for (;;) {
+            await new Promise(resolve => window.setTimeout(resolve, 800));
+            const progress = await SmajMedia.getDownloadStatus({ downloadId });
+            setDownloadProgress(progress.progress);
+            if (progress.status === "complete") break;
+            if (progress.status === "failed") throw new Error(`Android download failed (${progress.reason || "unknown"}).`);
+          }
+          setDownloadProgress(100);
+          setDownloadStage("complete");
+        } else {
+          const anchor = document.createElement("a");
+          anchor.href = result.downloadUrl;
+          anchor.download = detail.title;
+          anchor.rel = "noopener";
+          anchor.click();
+        }
         await saveStreamDownload(detail);
         setDownloaded(true);
-        if (Capacitor.isNativePlatform()) await Browser.open({ url: result.downloadUrl });
-        else window.location.assign(result.downloadUrl);
       }
     } catch (error) {
+      if (Capacitor.isNativePlatform()) setDownloadStage("failed");
       const failure = error as { response?: { data?: { message?: string } } };
       setPlaybackUnavailableMessage(
         failure.response?.data?.message || "The download could not start. Please try again."
@@ -1026,6 +1050,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           </div>
         </div>
       </section>
+      {downloadStage !== "idle" ? <div className={`sw-download-progress-sheet ${downloadStage}`} role="status" aria-live="polite"><button className="sw-download-dismiss" type="button" onClick={() => setDownloadStage("idle")} aria-label="Close download status">×</button><div className="sw-download-progress-title"><DownloadRoundedIcon /><strong>{downloadStage === "complete" ? "Download complete" : downloadStage === "failed" ? "Download failed" : `Downloading ${downloadProgress}%`}</strong></div><div className="sw-download-progress-track"><i style={{ width: `${downloadProgress}%` }} /></div><p>{downloadStage === "complete" ? `${detail.title} is saved in the app.` : "You can keep watching while SMAJ downloads the movie."}</p><div><button type="button" onClick={() => navigate("/app/services/stream/downloads")}>View downloads</button><button type="button" className="primary" onClick={() => navigate(`/app/services/stream/watch/${playbackId}`)}>Watch now</button></div></div> : null}
       {infoOpen ? (
         <div className="sw-feedback-overlay" role="dialog" aria-modal="true" aria-label="Title information and feedback">
           <form className="sw-feedback-panel" onSubmit={event => void submitTitleFeedback(event)}>
