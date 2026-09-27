@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import Hls from "hls.js";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
@@ -27,6 +28,8 @@ import { getServiceLaunchLabel, getServiceLaunchStatus, serviceCatalog, type Ser
 import { axiosClient } from "../../lib/axiosClient";
 import { countryDisplayName, countryFlag, formatPiAmount } from "../../lib/formatters";
 import { getStreamCatalog, type StreamCatalogTitle } from "../../lib/streamCatalog";
+import { getTitleAvailability } from "../../lib/streamAdmin";
+import { getStreamPlayback, type StreamPlaybackVideo } from "../../lib/streamPlayback";
 import type { Product, VerificationLevel, VerificationStatus } from "../../types/marketplace";
 import useSportsCatalog from "../../hooks/useSportsCatalog";
 import type { SportsCatalog } from "../../types/sports";
@@ -314,18 +317,71 @@ const DesktopDiscoveryContent = ({ activeTab, products, productsLoading, product
   </>;
 };
 
+const DashboardStreamCard = ({ item, compact }: { item: StreamCatalogTitle; compact: boolean }) => {
+  const cardRef = useRef<HTMLAnchorElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [preview, setPreview] = useState<StreamPlaybackVideo | null>(null);
+  const attemptedRef = useRef(false);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const observer = new IntersectionObserver(
+      entries => setVisible(Boolean(entries[0]?.isIntersecting && entries[0].intersectionRatio >= 0.65)),
+      { threshold: [0, 0.65, 1] }
+    );
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!visible || attemptedRef.current) return;
+    attemptedRef.current = true;
+    let active = true;
+    void getTitleAvailability(item.mediaType === "tv" ? "tv" : "movie", item.id)
+      .then(availability => availability.available && availability.playbackId ? getStreamPlayback(availability.playbackId) : null)
+      .then(playback => {
+        if (active && playback?.playbackUrl && ["mp4", "hls"].includes(playback.sourceType)) setPreview(playback);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [item.id, item.mediaType, visible]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !preview?.playbackUrl) return;
+    let hls: Hls | null = null;
+    if (preview.sourceType === "mp4") video.src = preview.playbackUrl;
+    else if (Hls.isSupported()) {
+      hls = new Hls({ enableWorker: true });
+      hls.loadSource(preview.playbackUrl);
+      hls.attachMedia(video);
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = preview.playbackUrl;
+    return () => hls?.destroy();
+  }, [preview]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (visible) void video.play().catch(() => undefined);
+    else video.pause();
+  }, [preview, visible]);
+
+  return <Link ref={cardRef} to={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`} className={compact ? "mobile-media-card" : "desktop-media-card"}>
+    {preview ? <video ref={videoRef} muted playsInline loop preload="metadata" poster={item.backdropUrl || item.posterUrl || "/logo.png"} aria-label={`${item.title} autoplay preview`} /> : <img loading="lazy" src={item.backdropUrl || item.posterUrl || "/logo.png"} alt={`${item.title} artwork`} onError={(event) => { event.currentTarget.src = "/logo.png"; }} />}
+    <div><b>{item.mediaType === "tv" ? "SERIES" : "MOVIE"}</b><span>{item.title}</span><small>{item.rating ? `★ ${item.rating.toFixed(1)}` : "New"}{item.releaseDate ? ` · ${item.releaseDate.slice(0, 4)}` : ""}</small></div>
+  </Link>;
+};
+
 const DashboardStreamSections = ({ rows, loading, compact }: { rows: DashboardStreamRow[]; loading: boolean; compact: boolean }) => {
   if (loading) return <section className={compact ? "mobile-feed-section" : "desktop-feed-section"}><div className={compact ? "mobile-section-heading" : "desktop-feed-section-head"}><div><h2>Watch anytime</h2><p>Loading movies and series...</p></div></div><PrivateSkeleton variant="grid" count={4} /></section>;
   if (!rows.length) return <section className={compact ? "mobile-feed-section" : "desktop-feed-section"}><div className={compact ? "mobile-section-heading" : "desktop-feed-section-head"}><div><h2>Watch anytime</h2><p>The live entertainment catalogue is temporarily unavailable.</p></div><Link to="/app/services/stream">Open Stream</Link></div></section>;
   return <>{rows.map((row) => <section className={compact ? "mobile-feed-section" : "desktop-feed-section"} key={row.title}>
     <div className={compact ? "mobile-section-heading" : "desktop-feed-section-head"}><div><h2>{row.title}</h2>{compact ? null : <p>{row.description}</p>}</div><Link to={row.seeAll}>See all</Link></div>
-    <div className={compact ? "mobile-media-strip" : "desktop-media-grid"}>{row.items.map((item) => <Link to={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`} className={compact ? "mobile-media-card" : "desktop-media-card"} key={`${row.title}-${item.mediaType}-${item.id}`}>
-      <img loading="lazy" src={item.backdropUrl || item.posterUrl || "/logo.png"} alt={`${item.title} artwork`} onError={(event) => { event.currentTarget.src = "/logo.png"; }} />
-      <div><b>{item.mediaType === "tv" ? "SERIES" : "MOVIE"}</b><span>{item.title}</span><small>{item.rating ? `★ ${item.rating.toFixed(1)}` : "New"}{item.releaseDate ? ` · ${item.releaseDate.slice(0, 4)}` : ""}</small></div>
-    </Link>)}</div>
+    <div className={compact ? "mobile-media-strip" : "desktop-media-grid"}>{row.items.map((item) => <DashboardStreamCard item={item} compact={compact} key={`${row.title}-${item.mediaType}-${item.id}`} />)}</div>
   </section>)}</>;
 };
-
 const MobileHome = ({ activeTab, onTabChange, products, productsLoading, productsError, sellers, recentItems, recommendedServices, streamRows, streamLoading, sportsCatalog, sportsLoading }: { activeTab: DiscoveryTab; onTabChange: (tab: DiscoveryTab) => void; products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; recommendedServices: ServiceDefinition[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => {
   const [tabsPinned, setTabsPinned] = useState(false);
   const [heroSlide, setHeroSlide] = useState(0);

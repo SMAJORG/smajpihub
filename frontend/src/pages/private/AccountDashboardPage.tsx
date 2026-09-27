@@ -100,7 +100,7 @@ const AccountDashboardPage = () => {
         ))}
         <div>
           <span>App version</span>
-          <small>0.1.0</small>
+          <small>{import.meta.env.VITE_APP_VERSION || "1.0.2"}</small>
         </div>
         <div className="settings-social-row" aria-label="Official social handles">
           <span className="settings-social-title">Official social handles</span>

@@ -1,5 +1,7 @@
 apply plugin: 'com.android.application'
 
+def smajBuildNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "2"
+
 android {
     namespace = "com.smajpihub.mobile"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +9,8 @@ android {
         applicationId "com.smajpihub.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("GITHUB_RUN_NUMBER") ?: "2").toInteger()
-        versionName "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "2"}"
+        versionCode smajBuildNumber.toInteger()
+        versionName "1.0.${smajBuildNumber}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -12,6 +12,8 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      VITE_APP_VERSION: 1.0.${{ github.run_number }}
     defaults:
       run:
         working-directory: frontend
