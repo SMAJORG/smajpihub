@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useNavigationType, useParams } from "react-router-dom";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -6,6 +6,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import "./StreamPage.css";
 import StreamHeader from "./stream/StreamHeader";
+import ServiceLaunchSplash from "../components/ServiceLaunchSplash";
 import { getStreamCatalog, getStreamCategory, getStreamDownloads, saveStreamDownload, searchStreamCatalog, type StreamCatalogTitle } from "../lib/streamCatalog";
 import { getStreamCreators, getStreamSubscriptionStatus, subscribeToStreamChannel, unsubscribeFromStreamChannel, type StreamCreatorDirectoryItem } from "../lib/streamChannel";
 import { getPublishedLiveInputs, publishedLivePlaybackPath, type PublishedLiveInput } from "../lib/streamLive";
@@ -96,8 +97,7 @@ const StreamPage = ({ categorySlug }: StreamPageProps) => {
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(() => new Set());
   const [downloadError, setDownloadError] = useState("");
   const [liveNow, setLiveNow] = useState<PublishedLiveInput[]>([]);
-  const [streamReady, setStreamReady] = useState(() => navigationType !== "PUSH");
-  const loadStartTime = useRef(Date.now());
+  const [catalogRetryKey, setCatalogRetryKey] = useState(0);
 
   useEffect(() => { setFeatureIndex(0); }, [activeSlug]);
 
@@ -120,16 +120,16 @@ const StreamPage = ({ categorySlug }: StreamPageProps) => {
       .catch(() => active && setCatalogError(true))
       .finally(() => active && setCatalogLoading(false));
     return () => { active = false; };
-  }, [activeSlug]);
+  }, [activeSlug, catalogRetryKey]);
 
-  useEffect(() => {
-    if (!catalogLoading) {
-      const elapsed = Date.now() - loadStartTime.current;
-      const remaining = Math.max(0, 800 - elapsed);
-      const timer = window.setTimeout(() => setStreamReady(true), remaining);
-      return () => window.clearTimeout(timer);
-    }
-  }, [catalogLoading]);
+
+  const retryCatalog = useCallback(() => {
+    setCatalogError(false);
+    setCatalogRetryKey(current => current + 1);
+  }, []);
+  const leaveStreamLaunch = useCallback(() => {
+    navigate("/app/services", { replace: true });
+  }, [navigate]);
 
   useEffect(() => {
     void searchStreamCatalog("Anime").then((data) => setAnime(data.results)).catch(() => setAnime([]));
@@ -226,18 +226,20 @@ const StreamPage = ({ categorySlug }: StreamPageProps) => {
 
   const experience = (
     <>
-      {!streamReady ? <div className="store-loading-overlay" aria-label="Opening SMAJ Stream" aria-live="polite"><div className="store-loading-spinner" /><span>Opening stream...</span></div> : null}
-      {showEntryLoader && catalogLoading && activeSlug === "trending" ? (
-        <div className="stream-opening-loader" role="status" aria-live="polite" aria-label="Opening SMAJ Stream">
-          <div className="stream-opening-loader-content">
-            <div className="stream-opening-mark"><i /><i /><span><PlayArrowRoundedIcon /></span></div>
-            <h1>SMAJ STREAM</h1>
-            <strong>Watch differently. Create freely.</strong>
-            <p>Discover movies, live channels, and original creators.</p>
-            <small>Preparing your Stream…</small>
-            <div className="stream-opening-progress"><i /></div>
-          </div>
-        </div>
+      {showEntryLoader && activeSlug === "trending" ? (
+        <ServiceLaunchSplash
+          serviceName="SMAJ STREAM"
+          icon="/assets/smaj-stream-logo.png"
+          tagline="Watch differently. Create freely."
+          loadingText="Opening Stream..."
+          loading={catalogLoading}
+          error={catalogError ? "Unable to open SMAJ Stream" : ""}
+          onRetry={retryCatalog}
+          onBack={leaveStreamLaunch}
+          background="#0B0718"
+          accent="#7445ff"
+          minimumVisibleMs={600}
+        />
       ) : null}
       <main className="stream-page">
         <StreamHeader query={query} onQueryChange={setQuery} />

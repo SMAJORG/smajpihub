@@ -92,6 +92,7 @@ const servicePath = (service: ServiceDefinition) => {
   if (service.slug === "sports") return "/services/sports";
   return `/app/services/${service.slug}`;
 };
+const serviceNavigationState = (slug: string) => slug === "stream" ? { streamEntry: true } : undefined;
 type RecentItem = { label: string; to: string; meta?: string };
 type SellerCard = { id: string; name: string; location: string; rating: string; listings: number; avatar?: string; verificationLevel?: VerificationLevel; verificationStatus?: VerificationStatus };
 type DashboardStreamRow = { title: string; description: string; seeAll: string; items: StreamCatalogTitle[] };
@@ -252,7 +253,7 @@ const serviceBadgeClass = (service: ServiceDefinition, kind: "card" | "rating" =
 const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: "desktop" | "mobile" }) => (mode === "desktop" ? (
     <div className="desktop-suggested-grid">
       {services.map((service) => (
-        <Link to={servicePath(service)} state={service.slug === "stream" ? { streamEntry: true } : undefined} className={`desktop-service-app ${service.inProgress ? "service-in-progress-card" : ""}`} key={service.slug} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
+        <Link to={servicePath(service)} state={serviceNavigationState(service.slug)} className={`desktop-service-app ${service.inProgress ? "service-in-progress-card" : ""}`} key={service.slug} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
           <ServiceArt index={service.atlasIndex} />
           <div><strong>{service.name}</strong><span>{service.items.slice(0, 2).join(" - ")}</span></div>
           <small className={serviceBadgeClass(service, "rating")}>{getServiceLaunchLabel(service.slug)}</small>
@@ -262,7 +263,7 @@ const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: 
   ) : (
     <div className="mobile-services-grid">
       {services.map((service) => (
-        <Link key={service.slug} to={servicePath(service)} state={service.slug === "stream" ? { streamEntry: true } : undefined} className={service.inProgress ? "service-in-progress-card" : undefined} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
+        <Link key={service.slug} to={servicePath(service)} state={serviceNavigationState(service.slug)} className={service.inProgress ? "service-in-progress-card" : undefined} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
           <ServiceArt index={service.atlasIndex} />
           <em className={serviceBadgeClass(service)}>{getServiceLaunchLabel(service.slug)}</em>
           <strong>{service.name.replace("SMAJ ", "")}</strong>
@@ -460,7 +461,7 @@ const MobileHome = ({ activeTab, onTabChange, products, productsLoading, product
       <FeaturedSellersSection compact sellers={sellers} loading={productsLoading} error={productsError} />
       <ActivityFeedSection compact products={products} loading={productsLoading} error={productsError} />
       <TrustSection compact />
-      <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Suggested for you</h2><Link to="/app/services">See all</Link></div><div className="mobile-service-groups">{serviceGroups.map((group, index) => <div className="mobile-service-group" key={index}>{group.map((service) => <Link to={servicePath(service)} className="mobile-service-app" key={service.slug}><ServiceArt index={service.atlasIndex} /><div><strong>{service.name}</strong><span>{service.items.slice(0, 2).join(" - ")}</span><small className={serviceBadgeClass(service, "rating")}>{getServiceLaunchLabel(service.slug)}</small></div></Link>)}</div>)}</div></section>
+      <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Suggested for you</h2><Link to="/app/services">See all</Link></div><div className="mobile-service-groups">{serviceGroups.map((group, index) => <div className="mobile-service-group" key={index}>{group.map((service) => <Link to={servicePath(service)} state={serviceNavigationState(service.slug)} className="mobile-service-app" key={service.slug}><ServiceArt index={service.atlasIndex} /><div><strong>{service.name}</strong><span>{service.items.slice(0, 2).join(" - ")}</span><small className={serviceBadgeClass(service, "rating")}>{getServiceLaunchLabel(service.slug)}</small></div></Link>)}</div>)}</div></section>
       <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Discover what's new</h2></div><div className="mobile-feature-strip">{featureCards.map((card) => <Link className="mobile-feature-card" to={card.slug === "store" ? "/store" : `/app/services/${card.slug}`} key={card.slug}><img src={card.image} alt="" />{card.slug === "store" ? <b className="live-card-badge feature-live-badge">LIVE</b> : null}<div><h3>{card.title}</h3><p>{card.text}</p><span>Explore <ArrowForwardOutlinedIcon /></span></div></Link>)}</div></section>
       <DashboardStreamSections rows={streamRows} loading={streamLoading} compact />
       <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact />
@@ -471,7 +472,7 @@ const MobileHome = ({ activeTab, onTabChange, products, productsLoading, product
 };
 
 const DesktopFeedHome = ({ activeTab, onTabChange, products, productsLoading, productsError, sellers, recentItems, streamRows, streamLoading, sportsCatalog, sportsLoading }: { activeTab: DiscoveryTab; onTabChange: (tab: DiscoveryTab) => void; products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => <div className="desktop-private-home desktop-feed-home">
-  <section className="desktop-feed-hero"><div><p className="private-kicker">SMAJ PI HUB</p><h1>Everything you need.<br />One place.</h1><p>Discover services, products, media, support, and everyday tools from one connected dashboard.</p><div className="desktop-feed-hero-actions"><Link className="private-primary-button" to="/app/services">Explore Services <ArrowForwardOutlinedIcon /></Link><Link className="private-secondary-button" to="/store">Open SMAJ Store</Link></div></div><div className="desktop-feed-hero-icons">{serviceCatalog.slice(0, 6).map((service) => <Link key={service.slug} to={servicePath(service)} title={service.name}><ServiceArt index={service.atlasIndex} /><em className={serviceBadgeClass(service)}>{getServiceLaunchLabel(service.slug)}</em></Link>)}</div></section>
+  <section className="desktop-feed-hero"><div><p className="private-kicker">SMAJ PI HUB</p><h1>Everything you need.<br />One place.</h1><p>Discover services, products, media, support, and everyday tools from one connected dashboard.</p><div className="desktop-feed-hero-actions"><Link className="private-primary-button" to="/app/services">Explore Services <ArrowForwardOutlinedIcon /></Link><Link className="private-secondary-button" to="/store">Open SMAJ Store</Link></div></div><div className="desktop-feed-hero-icons">{serviceCatalog.slice(0, 6).map((service) => <Link key={service.slug} to={servicePath(service)} state={serviceNavigationState(service.slug)} title={service.name}><ServiceArt index={service.atlasIndex} /><em className={serviceBadgeClass(service)}>{getServiceLaunchLabel(service.slug)}</em></Link>)}</div></section>
   <DiscoveryTabButtons className="desktop-feed-tabs" activeTab={activeTab} onTabChange={onTabChange} />
   {activeTab === "for-you" ? <>
     <div className="desktop-feed-priority-grid">
