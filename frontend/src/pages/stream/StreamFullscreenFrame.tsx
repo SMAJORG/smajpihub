@@ -115,6 +115,13 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
   }, []);
 
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const routeNativeFullscreen = () => void enterFullscreen();
+    window.addEventListener("smaj:native-fullscreen-request", routeNativeFullscreen);
+    return () => window.removeEventListener("smaj:native-fullscreen-request", routeNativeFullscreen);
+  }, [enterFullscreen]);
+
+  useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
     const update = () => {
       const active = nativeFullscreenRef.current || Boolean(

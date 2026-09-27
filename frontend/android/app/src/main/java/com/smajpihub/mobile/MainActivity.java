@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SmajPermissionsPlugin.class);
         registerPlugin(SmajMediaPlugin.class);
         super.onCreate(savedInstanceState);
+        bridge.getWebView().setWebChromeClient(new SmajWebChromeClient(bridge));
         bridge.getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
     }
 }

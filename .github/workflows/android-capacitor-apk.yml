@@ -38,6 +38,12 @@ jobs:
         with:
           packages: platform-tools
 
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: smaj-android-debug-signing-v1
+
       - name: Install web dependencies
         run: npm ci
 
