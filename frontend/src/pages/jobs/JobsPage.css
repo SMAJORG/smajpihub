@@ -1858,6 +1858,32 @@
   background: #fff;
   font: inherit;
 }
+@media (max-width: 700px) {
+  .jobs-salary-inputs {
+    gap: 7px;
+  }
+
+  .jobs-salary-inputs input {
+    padding-inline: 10px;
+  }
+}
+.jobs-salary-inputs {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.jobs-salary-inputs label {
+  min-width: 0;
+}
+.jobs-salary-inputs input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.jobs-salary-pi-output {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
 .jobs-description-editor {
   border: 1px solid #777;
   border-radius: 8px;
