@@ -963,9 +963,9 @@ const Detail = ({ series = false }: { series?: boolean }) => {
   const webInlinePlayback = !Capacitor.isNativePlatform() && Boolean(playbackId);
   return (
     <>
-      {webInlinePlayback ? <section className="sw-detail-web-player"><StreamVideoPlayer id={playbackId} /></section> : null}
+      {webInlinePlayback ? <section className="sw-detail-web-player"><button className="sw-detail-web-back" type="button" onClick={() => navigate(-1)} aria-label="Go back"><ArrowBackRoundedIcon /></button><StreamVideoPlayer id={playbackId} /></section> : null}
       <section
-        className="sw-detail-hero tmdb"
+        className={`sw-detail-hero tmdb${webInlinePlayback ? " web-after-player" : ""}`}
         style={
           {
             backgroundImage: detail.backdropUrl ? `url(${detail.backdropUrl})` : undefined,
@@ -1075,6 +1075,16 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           </div>
         </div>
       </section>
+{webInlinePlayback ? (
+<section className="sw-related">
+        <h2>More like this</h2>
+        <div>
+          {(recommendations.length ? recommendations : titles.slice(1, 5)).map(item => (
+            <Tile compact title={item} key={`${item.mediaType}-${item.id}`} />
+          ))}
+        </div>
+      </section>
+) : null}
       {downloadStage !== "idle" ? <div className={`sw-download-progress-sheet ${downloadStage}`} role="status" aria-live="polite"><button className="sw-download-dismiss" type="button" onClick={() => setDownloadStage("idle")} aria-label="Close download status">×</button><div className="sw-download-progress-title"><DownloadRoundedIcon /><strong>{downloadStage === "complete" ? "Download complete" : downloadStage === "failed" ? "Download failed" : `Downloading ${downloadProgress}%`}</strong></div><div className="sw-download-progress-track"><i style={{ width: `${downloadProgress}%` }} /></div><p>{downloadStage === "complete" ? `${detail.title} is saved in the app.` : "You can keep watching while SMAJ downloads the movie."}</p><div><button type="button" onClick={() => navigate("/app/services/stream/downloads")}>View downloads</button><button type="button" className="primary" onClick={() => navigate(`/app/services/stream/watch/${playbackId}`)}>Watch now</button></div></div> : null}
       {infoOpen ? (
         <div className="sw-feedback-overlay" role="dialog" aria-modal="true" aria-label="Title information and feedback">
@@ -1252,7 +1262,8 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           </div>
         </section>
       ) : null}
-      <section className="sw-related">
+      {!webInlinePlayback ? (
+<section className="sw-related">
         <h2>More like this</h2>
         <div>
           {(recommendations.length ? recommendations : titles.slice(1, 5)).map(item => (
@@ -1260,6 +1271,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           ))}
         </div>
       </section>
+) : null}
     </>
   );
 };
