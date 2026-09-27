@@ -5,9 +5,9 @@ import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import UpdateRoundedIcon from "@mui/icons-material/UpdateRounded";
 import { Link } from "react-router-dom";
 import AppLayout from "../layouts/AppLayout";
+import { ANDROID_APK_URL } from "../lib/androidDownload";
 import "./DownloadPage.css";
 
-const APK_URL = "https://github.com/devsmaj/smajpihub/releases/download/android-latest/SMAJ-PI-HUB.apk";
 
 const DownloadPage = () => (
   <AppLayout>
@@ -18,7 +18,7 @@ const DownloadPage = () => (
           <h1>SMAJ PI HUB<br /><em>on your phone.</em></h1>
           <p>Use the same SMAJ account, services, products, jobs, courses and messages you already use in Pi Browser.</p>
           <div className="download-actions">
-            <a className="download-primary" href={APK_URL} download><DownloadRoundedIcon /> Download APK</a>
+            <a className="download-primary" href={ANDROID_APK_URL} download><DownloadRoundedIcon /> Download APK</a>
             <Link className="download-secondary" to="/home"><LanguageRoundedIcon /> Open Web App</Link>
           </div>
           <small>Android 8 or newer · Direct APK installation</small>
@@ -61,7 +61,7 @@ const DownloadPage = () => (
         <div className="download-final-cta">
           <img src="/logo.png" alt="" />
           <div><strong>Ready to use SMAJ PI HUB?</strong><small>Download the latest official Android build.</small></div>
-          <a className="download-primary" href={APK_URL} download><DownloadRoundedIcon /> Download APK</a>
+          <a className="download-primary" href={ANDROID_APK_URL} download><DownloadRoundedIcon /> Download APK</a>
         </div>
       </section>
       <section className="download-release">
