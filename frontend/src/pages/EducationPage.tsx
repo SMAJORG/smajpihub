@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigationType, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
@@ -18,14 +18,11 @@ import "./EducationPage.css";
 
 const EducationPage = () => {
   const [searchParams] = useSearchParams();
-  const navigationType = useNavigationType();
   const [categories, setCategories] = useState<string[]>([]);
   const [courses, setCourses] = useState<EducationCourse[]>([]);
   const [partners, setPartners] = useState<EducationPartner[]>([]);
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
-  const [educationReady, setEducationReady] = useState(() => navigationType !== "PUSH");
-  const loadStartTime = useRef(Date.now());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,15 +61,6 @@ const EducationPage = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!loading) {
-      const elapsed = Date.now() - loadStartTime.current;
-      const remaining = Math.max(0, 800 - elapsed);
-      const timer = window.setTimeout(() => setEducationReady(true), remaining);
-      return () => window.clearTimeout(timer);
-    }
-  }, [loading]);
-
   const secondaryCategories = categories.filter(
     category => !["Universities", "Online Courses", "Tutors", "Certificates"].includes(category)
   );
@@ -91,12 +79,6 @@ const EducationPage = () => {
 
   return (
     <AppLayout showHeader={false} showFooter={false}>
-      {!educationReady ? (
-        <div className="store-loading-overlay" aria-label="Opening Education" aria-live="polite">
-          <div className="store-loading-spinner" />
-          <span>Opening education...</span>
-        </div>
-      ) : null}
       <main className="education-page">
         <EducationHeader query={query} onQueryChange={setQuery} />
         <section className="education-hero">

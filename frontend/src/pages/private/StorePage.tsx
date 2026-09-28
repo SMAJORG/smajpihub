@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams, useNavigationType } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import ArrowForwardIosOutlinedIcon from "@mui/icons-material/ArrowForwardIosOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
@@ -48,12 +48,9 @@ const StorePage = () => {
   const { user } = useAuthContext();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const navigationType = useNavigationType();
   const [products, setProducts] = useState<Product[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [storeReady, setStoreReady] = useState(() => navigationType !== "PUSH");
-  const loadStartTime = useRef(Date.now());
   const [catalogError, setCatalogError] = useState("");
   const [search, setSearch] = useState(params.get("search") || "");
   const collection = params.get("collection") || "";
@@ -77,15 +74,6 @@ const StorePage = () => {
   const [cartQuantity, setCartQuantity] = useState(() => getCartQuantity());
   const { addProductToCart, cartToast } = useAddToCartToast();
   const profileName = user?.displayName || user?.username || "Pi User";
-
-  useEffect(() => {
-    if (!loading) {
-      const elapsed = Date.now() - loadStartTime.current;
-      const remaining = Math.max(0, 800 - elapsed);
-      const timer = window.setTimeout(() => setStoreReady(true), remaining);
-      return () => window.clearTimeout(timer);
-    }
-  }, [loading]);
 
   const loadCatalog = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
@@ -345,7 +333,6 @@ const StorePage = () => {
 
   return (
     <main className="private-page storefront-page">
-      {!storeReady ? <div className="store-loading-overlay" aria-label="Opening SMAJ Store" aria-live="polite"><div className="store-loading-spinner" /><span>Opening store...</span></div> : null}
       <PullToRefresh onRefresh={() => loadCatalog(false)} />
       {cartToast}
       <section className="storefront-shell">
