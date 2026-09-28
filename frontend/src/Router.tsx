@@ -20,7 +20,6 @@ import DevelopersPage from "./pages/DevelopersPage.tsx";
 import PartnersPage from "./pages/PartnersPage.tsx";
 import AffiliatePage from "./pages/AffiliatePage.tsx";
 import CollaboratePage from "./pages/CollaboratePage.tsx";
-import PublicStorePage from "./pages/PublicStorePage.tsx";
 import OnboardingPage from "./pages/OnboardingPage.tsx";
 import BlogPage from "./pages/BlogPage.tsx";
 import BlogPostPage from "./pages/BlogPostPage.tsx";
@@ -337,7 +336,7 @@ export const router = createBrowserRouter([
       ) : platform.routeSegment === "swap" ? (
         <SwapPage />
       ) : platform.routeSegment === "store" ? (
-        <PublicStorePage />
+        <StorePage />
       ) : (
         <GenericPage
           title={platform.name}
