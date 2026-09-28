@@ -87,11 +87,12 @@ const ServiceLaunchSplash = ({
       <div className="service-launch-splash__ambient" aria-hidden="true" />
       <div className="service-launch-splash__content">
         <div className="service-launch-splash__logo-wrap">
-          <i aria-hidden="true" />
           <img src={icon} alt={`${serviceName} icon`} draggable={false} />
         </div>
-        <h1>{serviceName}</h1>
-        <p>{tagline}</p>
+        <div className="service-launch-splash__brand">
+          <h1>{serviceName}</h1>
+          <p>{tagline}</p>
+        </div>
         {error ? (
           <div className="service-launch-splash__error">
             <strong>{error}</strong>
@@ -100,12 +101,7 @@ const ServiceLaunchSplash = ({
               <button type="button" className="secondary" onClick={onBack}>Back to Services</button>
             </div>
           </div>
-        ) : (
-          <div className="service-launch-splash__loading">
-            <span><i /></span>
-            <small>{loadingText}</small>
-          </div>
-        )}
+        ) : null}
       </div>
     </section>
   );
