@@ -457,7 +457,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
     companyWebsite: "",
     firstName: "",
     lastName: "",
-    phoneCountry: "+234",
+    phoneCountry: "+971",
     phoneNumber: "",
     referralSource: "",
     marketingConsent: false,
@@ -3422,7 +3422,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                         </option>
                       ))}
                     </select>
-                    <input name="phoneNumber" type="tel" placeholder="806-161-7175" value={postContactDraft.phoneNumber} onChange={event => setPostContactDraft(current => ({ ...current, phoneNumber: event.target.value }))} />
+                    <input name="phoneNumber" type="tel" placeholder="50 123 4567" value={postContactDraft.phoneNumber} onChange={event => setPostContactDraft(current => ({ ...current, phoneNumber: event.target.value }))} />
                   </span>
                 </label>
                 <label>
