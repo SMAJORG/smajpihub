@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import useRouteScrollTop from "../hooks/useRouteScrollTop";
 import AndroidDownloadPrompt from "../components/AndroidDownloadPrompt";
 import CookieConsent from "../components/CookieConsent";
+import ServiceLaunchGate from "../components/ServiceLaunchGate";
 
 type AppLayoutProps = {
   children: ReactNode;
@@ -30,6 +31,7 @@ const AppLayout = ({ children, showFooter = true, showHeader = true }: AppLayout
 
   return (
     <>
+      <ServiceLaunchGate />
       {showHeader ? <Header /> : null}
       {children}
       {showFooter ? <Footer /> : null}

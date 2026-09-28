@@ -36,6 +36,7 @@ import { serviceAppPath, serviceCatalog } from "../content/serviceCatalog";
 import useRouteScrollTop from "../hooks/useRouteScrollTop";
 import CommunityFollowPrompt from "../components/CommunityFollowPrompt";
 import { getStreamDownloads, STREAM_DOWNLOADS_CHANGED_EVENT } from "../lib/streamCatalog";
+import ServiceLaunchGate, { serviceLaunchNavigationState } from "../components/ServiceLaunchGate";
 
 type PrivateLayoutProps = { children: ReactNode; fullScreen?: boolean };
 type LiveConversation = {
@@ -382,6 +383,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
 
   return (
     <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${fullScreen ? "full-screen-page" : ""}`}>
+      <ServiceLaunchGate />
       {fullScreen ? null : (
         <header className="private-header">
           <div className="mobile-private-header-content">
@@ -438,7 +440,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
                 <KeyboardArrowUpIcon className={serviceMenuOpen ? "open" : ""} />
               </button>
               {serviceMenuOpen && !sidebarCollapsed ? <div>{serviceCatalog.map(service => (
-                <Link key={service.slug} to={service.live ? serviceAppPath(service.slug) : `/app/services/${service.slug}`} onClick={() => setMobileSidebarOpen(false)}>
+                <Link key={service.slug} to={service.live ? serviceAppPath(service.slug) : `/app/services/${service.slug}`} state={serviceLaunchNavigationState(service.slug)} onClick={() => setMobileSidebarOpen(false)}>
                   <span>{service.name.replace("SMAJ ", "")}</span><small>{service.live ? "Open" : "Soon"}</small>
                 </Link>
               ))}</div> : null}
