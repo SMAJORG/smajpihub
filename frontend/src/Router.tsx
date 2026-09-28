@@ -29,6 +29,7 @@ import { privatePages } from "./content/privatePages";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LastPrivateRouteRedirect from "./components/LastPrivateRouteRedirect";
 import PrivateLayout from "./layouts/PrivateLayout";
+import AppLayout from "./layouts/AppLayout";
 import PrivatePage from "./pages/private/PrivatePage";
 import RoleRoute from "./components/RoleRoute";
 import SearchPage from "./pages/private/SearchPage";
@@ -336,7 +337,7 @@ export const router = createBrowserRouter([
       ) : platform.routeSegment === "swap" ? (
         <SwapPage />
       ) : platform.routeSegment === "store" ? (
-        <StorePage />
+        <AppLayout showHeader={false} showFooter={false}><StorePage /></AppLayout>
       ) : (
         <GenericPage
           title={platform.name}

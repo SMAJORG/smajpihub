@@ -13,7 +13,6 @@ import { useAuthContext } from "../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 import LoginWithPiButton from "./LoginWithPiButton";
 import logoImage from "/logo.png";
-import { ANDROID_APK_URL } from "../lib/androidDownload";
 
 const navItems = [
   { to: "/white-paper", label: "White Paper" },
@@ -317,7 +316,7 @@ const Header = () => {
               {t(["nav.whitePaper", "nav.howItWorks", "nav.join", "nav.contact"][index])}
             </NavLink>
           ))}
-          <a href={ANDROID_APK_URL} download onClick={() => setIsMobileMenuOpen(false)}>Download App</a>
+          <NavLink to="/download" onClick={() => setIsMobileMenuOpen(false)}>Download App</NavLink>
           <div className="smaj-mobile-auth-sheet">
             <div className="smaj-mobile-pref-list" aria-label="Mobile preferences">
               <div className="smaj-mobile-pref-item">
