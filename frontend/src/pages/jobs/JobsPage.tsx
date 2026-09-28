@@ -25,6 +25,7 @@ import {
   createJobCompany,
   createJob,
   createJobsBillingIntent,
+  cancelJobsBillingPayment,
   confirmJobsProfileAvatar,
   deleteJobsCv,
   enrollEmployer,
@@ -445,6 +446,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   const [postDescription, setPostDescription] = useState("");
   const [postCustomCategory, setPostCustomCategory] = useState("");
   const [postSkills, setPostSkills] = useState("");
+  const [postSkillDraft, setPostSkillDraft] = useState("");
   const [postCompensationPeriod, setPostCompensationPeriod] = useState<
     "hour" | "day" | "week" | "month" | "year" | "project"
   >("hour");
@@ -548,6 +550,22 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   }, [jobs, postJobTitle]);
   const selectedPostLocationType =
     employerLocationTypes.find(item => item.id === postLocationType) || employerLocationTypes[0];
+  const selectedPostSkills = useMemo(
+    () => postSkills.split(",").map(skill => skill.trim()).filter(Boolean),
+    [postSkills]
+  );
+  const skillSuggestions = useMemo(() => [
+    "Communication", "Customer service", "Data analysis", "Design", "JavaScript", "Leadership",
+    "Marketing", "Microsoft Office", "Node.js", "Project management", "Python", "React", "Research",
+    "Sales", "TypeScript", "Writing",
+  ].filter(skill => !selectedPostSkills.some(selected => selected.toLowerCase() === skill.toLowerCase())), [selectedPostSkills]);
+  const addPostSkill = (value = postSkillDraft) => {
+    const skill = value.trim().replace(/,$/, "");
+    if (!skill || selectedPostSkills.some(selected => selected.toLowerCase() === skill.toLowerCase())) return;
+    setPostSkills([...selectedPostSkills, skill].join(", "));
+    setPostSkillDraft("");
+  };
+  const removePostSkill = (skill: string) => setPostSkills(selectedPostSkills.filter(item => item !== skill).join(", "));
   const filteredCandidates = useMemo(() => {
     const term = candidateQuery.trim().toLowerCase();
     return employerApplications.filter(application => {
@@ -1642,6 +1660,34 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       setActionMessage("Complete your professional profile before requesting verification.");
     }
   };
+  const refreshEmployerPayments = async () => {
+    const data = await getJobsEmployerPayments();
+    setEmployerPayments(data.payments);
+    setEmployerPaymentsSummary(data.summary);
+  };
+  const resumeEmployerPayment = async (payment: JobsEmployerPayment) => {
+    await payBilling(payment.billingId, payment.amountPi, `SMAJ Jobs — ${payment.planName}`, {
+      onReady: () => setActionMessage("Payment approved. Waiting for confirmation..."),
+      onComplete: () => {
+        setActionMessage(`${payment.planName} payment completed.`);
+        void refreshEmployerPayments();
+      },
+      onCancel: () => {
+        setActionMessage("Payment was cancelled.");
+        void refreshEmployerPayments();
+      },
+      onError: message => setActionMessage(message || "Payment could not be continued."),
+    });
+  };
+  const cancelEmployerPayment = async (payment: JobsEmployerPayment) => {
+    try {
+      await cancelJobsBillingPayment(payment.billingId, payment.paymentId || "");
+      setActionMessage("Pending payment cancelled.");
+      await refreshEmployerPayments();
+    } catch {
+      setActionMessage("Pending payment could not be cancelled.");
+    }
+  };
   const startBilling = async (planId: string) => {
     if (billingSubmittingPlanId) return;
     setBillingSubmittingPlanId(planId);
@@ -1891,6 +1937,9 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                   <div className="jobs-employer-application-actions">
                     <b>{stage}</b>
                     <button type="button" onClick={() => { setSelectedCandidate(application); setCandidateDrawerTab("Profile"); }}>Review</button>
+                    {application.status === "hired" && application.offer?.status === "accepted" ? (
+                      <button type="button" className="salary" onClick={() => void recordCandidateSalary(application)}>Pay / record salary</button>
+                    ) : null}
                   </div>
                 </article>
               );})}
@@ -2979,7 +3028,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                 </div>
                 <div className="jobs-page-heading" style={{ marginTop: 32 }}>
                   <h2>Payment history</h2>
-                  <small>GCV reference: {PI_USDT_RATE.toLocaleString()} USDT per Pi</small>
                 </div>
                 {earnings.length ? (
                   <div className="jobs-earnings-list">
@@ -3066,7 +3114,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                 </div>
                 <div className="jobs-page-heading" style={{ marginTop: 32 }}>
                   <h2>Payment history</h2>
-                  <small>GCV reference: {PI_USDT_RATE.toLocaleString()} USDT per Pi</small>
                 </div>
                 {employerPayments.length ? (
                   <div className="jobs-payments-list">
@@ -3084,8 +3131,18 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                             <span>{formatUsdAmount(payment.amountUsdt)}</span>
                           </div>
                           <div className={`jobs-payment-status jobs-status-badge ${payment.status}`}>
-                            {payment.status}
+                            {payment.status.replaceAll("_", " ")}
                           </div>
+                          {payment.status === "pending_payment" || payment.status === "processing" ? (
+                            <div className="jobs-payment-actions">
+                              {payment.status === "pending_payment" ? (
+                                <button type="button" disabled={billingPaying} onClick={() => void resumeEmployerPayment(payment)}>
+                                  {billingPaying ? "Opening…" : "Continue payment"}
+                                </button>
+                              ) : <span>Waiting for Pi confirmation</span>}
+                              <button type="button" className="secondary" disabled={billingPaying} onClick={() => void cancelEmployerPayment(payment)}>Cancel</button>
+                            </div>
+                          ) : null}
                         </div>
                       </article>
                     ))}
@@ -3625,16 +3682,27 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
             ) : kind === "post" && postStep === "skills" ? (
               <form className="jobs-employer-step-form" onSubmit={event => { event.preventDefault(); setPostStep("description"); }}>
                 <h2>Skills *</h2>
-                <p>Add skills that match this role. Separate multiple skills with commas.</p>
-                <label>
-                  Required skills
-                  <input
-                    value={postSkills}
-                    onChange={event => setPostSkills(event.target.value)}
-                    placeholder="React, Research, Communication"
-                    autoFocus
-                  />
-                </label>
+                <p>Select more than one skill or type a skill and add it.</p>
+                <div className="jobs-multi-select">
+                  <label htmlFor="required-skill-input">Required skills</label>
+                  {selectedPostSkills.length ? (
+                    <div className="jobs-multi-select-chips">
+                      {selectedPostSkills.map(skill => (
+                        <button type="button" key={skill} onClick={() => removePostSkill(skill)} title={`Remove ${skill}`}>
+                          {skill}<span aria-hidden="true">×</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="jobs-multi-select-entry">
+                    <input id="required-skill-input" value={postSkillDraft} onChange={event => setPostSkillDraft(event.target.value)}
+                      onKeyDown={event => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addPostSkill(); } }}
+                      placeholder="Search or add a skill" list="job-skill-options" autoComplete="off" autoFocus />
+                    <datalist id="job-skill-options">{skillSuggestions.map(skill => <option value={skill} key={skill} />)}</datalist>
+                    <button type="button" onClick={() => addPostSkill()} disabled={!postSkillDraft.trim()}>Add</button>
+                  </div>
+                  <small>{selectedPostSkills.length} selected</small>
+                </div>
                 <footer>
                   <button type="button" onClick={() => setPostStep("benefits")}>← Back</button>
                   <button type="submit" disabled={!isStepValid}>Continue <ArrowForwardRoundedIcon /></button>
@@ -3829,20 +3897,10 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                 <div>
                   <label>
                     Category
-                    <input
-                      name="category"
-                      required
-                      list="job-category-options"
-                      value={postCategory}
-                      onChange={event => setPostCategory(event.target.value)}
-                      placeholder="Search 100+ categories"
-                      autoComplete="off"
-                    />
-                    <datalist id="job-category-options">
-                      {JOB_CATEGORIES.map(item => (
-                        <option value={item} key={item} />
-                      ))}
-                    </datalist>
+                    <select name="category" required value={postCategory} onChange={event => setPostCategory(event.target.value)}>
+                      <option value="" disabled>Select a category</option>
+                      {JOB_CATEGORIES.map(item => <option value={item} key={item}>{item}</option>)}
+                    </select>
                   </label>
                 </div>
                 {postCategory === "Other" ? (
