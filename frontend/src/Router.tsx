@@ -313,7 +313,7 @@ export const router = createBrowserRouter([
       platform.routeSegment === "transport" ? (
         <TransportPage />
       ) : platform.routeSegment === "stream" ? (
-        <StreamPage />
+        <AppLayout showHeader={false} showFooter={false}><StreamPage /></AppLayout>
       ) : platform.routeSegment === "sports" ? (
         <SportsPage />
       ) : platform.routeSegment === "jobs" ? (
