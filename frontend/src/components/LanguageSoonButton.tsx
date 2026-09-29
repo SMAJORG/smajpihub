@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import i18n from "../i18n";
 
 const DASHBOARD_LANGUAGE_SAVED_KEY = "smaj_dashboard_language_saved";
@@ -8,11 +8,8 @@ type LanguageChoiceButtonProps = {
 };
 
 const languages = [
-  { code: "sw", label: "Kiswahili", available: false },
-  { code: "en", label: "English", available: true },
-  { code: "fr", label: "Francais", available: true },
-  { code: "ar", label: "العربية", available: false },
-  { code: "zh", label: "中文", available: false },
+  { code: "en", label: "English" },
+  { code: "fr", label: "Français" },
 ] as const;
 type LanguageCode = (typeof languages)[number]["code"];
 
@@ -25,6 +22,12 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: LanguageChoiceButtonPro
     const saved = window.localStorage.getItem("smaj_language") as LanguageCode | null;
     return languages.some(language => language.code === saved) ? saved! : i18n.resolvedLanguage === "fr" ? "fr" : "en";
   });
+
+  useEffect(() => {
+    const syncLanguage = (language: string) => setSelected(language.split("-")[0] === "fr" ? "fr" : "en");
+    i18n.on("languageChanged", syncLanguage);
+    return () => { i18n.off("languageChanged", syncLanguage); };
+  }, []);
 
   if (hidden) return null;
 
@@ -62,7 +65,7 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: LanguageChoiceButtonPro
             <h2 id="language-choice-title">Pick language</h2>
             <div className="language-choice-list" role="radiogroup" aria-label="Languages">
               {languages.map((language) => (
-                <button type="button" role="radio" disabled={!language.available} aria-checked={selected === language.code} className={selected === language.code ? "active" : ""} onClick={() => setSelected(language.code)} key={language.code}><span>{language.label}</span>{!language.available ? <small>Coming soon</small> : null}</button>
+                <button type="button" role="radio" aria-checked={selected === language.code} className={selected === language.code ? "active" : ""} onClick={() => setSelected(language.code)} key={language.code}><span>{language.label}</span></button>
               ))}
             </div>
             <div className="language-choice-actions">
