@@ -28,32 +28,32 @@ const pageTranslations = {
   },
   fr: {
     pillars: [
-      { title: "Une identit� Pi", text: "Utilisez une identit� Pi v�rifi�e dans tous les services." },
-      { title: "Un portefeuille Pi", text: "Acc�dez aux prix, paiements et utilit�s Pi avec un seul portefeuille." },
-      { title: "Plusieurs services", text: "Commerce, emploi, sant�, �ducation, transport, logement et m�dias sont r�unis dans un seul hub." },
+      { title: "Une identité Pi", text: "Utilisez une identité Pi vérifiée dans tous les services." },
+      { title: "Un portefeuille Pi", text: "Accédez aux prix, paiements et utilités Pi avec un seul portefeuille." },
+      { title: "Plusieurs services", text: "Commerce, emploi, santé, éducation, transport, logement et médias sont réunis dans un seul hub." },
     ],
-    servicesKicker: "SERVICES SMAJ PI HUB", servicesTitle: "15 services connect�s, une direction commune",
+    servicesKicker: "SERVICES SMAJ PI HUB", servicesTitle: "15 services connectés, une direction commune",
     servicesText: "Comprenez rapidement chaque plateforme, les services actifs et leur place dans le hub Pi.",
-    live: "ACTIF", inProgress: "EN COURS", soon: "BIENT�T", mvpKicker: "LE MVP COMMENCE ICI",
-    mvpTitle: "SMAJ Store est la premi�re place de march�", mvpText: "Un march� fiable o� les utilisateurs trouvent des produits, les vendeurs publient leurs offres et les paiements Pi deviennent pratiques.",
+    live: "ACTIF", inProgress: "EN COURS", soon: "BIENTÔT", mvpKicker: "LE MVP COMMENCE ICI",
+    mvpTitle: "SMAJ Store est la première place de marché", mvpText: "Un marché fiable où les utilisateurs trouvent des produits, les vendeurs publient leurs offres et les paiements Pi deviennent pratiques.",
     viewStore: "Voir le service Store", mvpFeatures: ["Fiches produits", "Chat acheteur/vendeur", "Paiement Pi", "Gestion des litiges", "Avis et notes", "Assistance litiges"],
-    howKicker: "COMMENT �A MARCHE", howTitle: "Un parcours simple � suivre",
+    howKicker: "COMMENT ÇA MARCHE", howTitle: "Un parcours simple à suivre",
     steps: [
-      { title: "Connexion", text: "Connectez-vous avec Pi et acc�dez � SMAJ PI HUB." }, { title: "V�rification", text: "Les contr�les d�identit� et de prestataire renforcent la confiance." },
-      { title: "Choix", text: "Ouvrez le march�, l�emploi, la sant�, l��ducation, le logement ou les m�dias." }, { title: "Utilisation de Pi", text: "Achetez, vendez et acc�dez aux services avec Pi." },
+      { title: "Connexion", text: "Connectez-vous avec Pi et accédez à SMAJ PI HUB." }, { title: "Vérification", text: "Les contrôles d’identité et de prestataire renforcent la confiance." },
+      { title: "Choix", text: "Ouvrez le marché, l’emploi, la santé, l’éducation, le logement ou les médias." }, { title: "Utilisation de Pi", text: "Achetez, vendez et accédez aux services avec Pi." },
     ],
-    trustKicker: "COUCHE DE CONFIANCE", trustTitle: "Con�u autour d�une participation v�rifi�e", trustText: "La confiance, la s�curit� du march� et l�utilit� r�elle de Pi restent prioritaires.",
+    trustKicker: "COUCHE DE CONFIANCE", trustTitle: "Conçu autour d’une participation vérifiée", trustText: "La confiance, la sécurité du marché et l’utilité réelle de Pi restent prioritaires.",
     trustFeatures: [
-      { title: "Acc�s v�rifi�", text: "L�identit� Pi limite les faux participants." }, { title: "S�curit� du march�", text: "S�questre, avis, notes et assistance structurent le march�." },
-      { title: "Aide par IA", text: "Un assistant aide � trouver les services et les prochaines �tapes." }, { title: "Statut clair", text: "Des �tiquettes indiquent les services actifs ou planifi�s." },
+      { title: "Accès vérifié", text: "L’identité Pi limite les faux participants." }, { title: "Sécurité du marché", text: "Séquestre, avis, notes et assistance structurent le marché." },
+      { title: "Aide par IA", text: "Un assistant aide à trouver les services et les prochaines étapes." }, { title: "Statut clair", text: "Des étiquettes indiquent les services actifs ou planifiés." },
     ],
-    finalTitle: "Une identit� Pi. Un portefeuille. Plusieurs services. Une utilit� r�elle.", readWhitePaper: "Lire le livre blanc",
+    finalTitle: "Une identité Pi. Un portefeuille. Plusieurs services. Une utilité réelle.", readWhitePaper: "Lire le livre blanc",
   },
 } as const;
 
 const footerTranslations = {
   en: { description: "Built for Pi wallet access, with SMAJ Token utility expanding across the ecosystem.", platform: "Platform", trust: "Trust & Safety", company: "Company", programs: "Programs", affiliate: "Affiliate Program", collaborate: "Collaborate With Us", partners: "Partners", community: "Community", developers: "Developers", keyServices: "Key Services", viewAll: "View All Services", social: "Social", poweredBy: "Powered By SMAJ Ecosystem", privacy: "Privacy Policy", terms: "Terms & Conditions", cookies: "Cookie Policy", reportAbuse: "Report Abuse", sellerAgreement: "Seller Agreement", rights: "All rights reserved.", scrollTop: "Scroll to top" },
-  fr: { description: "Con�u pour le portefeuille Pi et l�utilit� croissante du SMAJ Token.", platform: "Plateforme", trust: "Confiance et s�curit�", company: "Entreprise", programs: "Programmes", affiliate: "Programme d�affiliation", collaborate: "Collaborer avec nous", partners: "Partenaires", community: "Communaut�", developers: "D�veloppeurs", keyServices: "Services principaux", viewAll: "Voir tous les services", social: "R�seaux sociaux", poweredBy: "Propuls� par SMAJ Ecosystem", privacy: "Confidentialit�", terms: "Conditions g�n�rales", cookies: "Politique des cookies", reportAbuse: "Signaler un abus", sellerAgreement: "Accord vendeur", rights: "Tous droits r�serv�s.", scrollTop: "Retour en haut" },
+  fr: { description: "Conçu pour le portefeuille Pi et l’utilité croissante du SMAJ Token.", platform: "Plateforme", trust: "Confiance et sécurité", company: "Entreprise", programs: "Programmes", affiliate: "Programme d’affiliation", collaborate: "Collaborer avec nous", partners: "Partenaires", community: "Communauté", developers: "Développeurs", keyServices: "Services principaux", viewAll: "Voir tous les services", social: "Réseaux sociaux", poweredBy: "Propulsé par SMAJ Ecosystem", privacy: "Confidentialité", terms: "Conditions générales", cookies: "Politique des cookies", reportAbuse: "Signaler un abus", sellerAgreement: "Accord vendeur", rights: "Tous droits réservés.", scrollTop: "Retour en haut" },
 } as const;
 
 const resources = {
@@ -86,7 +86,7 @@ const resources = {
       language: {
         label: "Language",
         english: "English",
-        french: "Fran�ais",
+        french: "Français",
       },
     },
   },
@@ -94,32 +94,32 @@ const resources = {
     translation: {
       nav: {
         home: "Accueil",
-        about: "� propos",
+        about: "À propos",
         services: "Services",
         whitePaper: "Livre blanc",
         howItWorks: "Fonctionnement",
         join: "Nous rejoindre",
         contact: "Contact",
-        dashboard: "Acc�der au tableau de bord",
+        dashboard: "Accéder au tableau de bord",
         login: "Se connecter avec Pi",
         signingIn: "Connexion...",
       },
       home: {
         ...pageTranslations.fr,
-        kicker: "UNE IDENTIT� PI. UN PORTEFEUILLE. PLUSIEURS SERVICES.",
+        kicker: "UNE IDENTITÉ PI. UN PORTEFEUILLE. PLUSIEURS SERVICES.",
         description:
-          "SMAJ PI HUB connecte les utilisateurs v�rifi�s aux march�s, services, opportunit�s et outils num�riques gr�ce � une identit� Pi et un portefeuille Pi.",
+          "SMAJ PI HUB connecte les utilisateurs vérifiés aux marchés, services, opportunités et outils numériques grâce à une identité Pi et un portefeuille Pi.",
         explore: "Explorer les services",
         promise: "UNE PROMESSE CLAIRE",
-        promiseTitle: "Un point d�acc�s unique � l�utilit� r�elle de Pi",
+        promiseTitle: "Un point d’accès unique à l’utilité réelle de Pi",
         promiseText:
-          "La page publique pr�sente la plateforme. Le tableau de bord priv� devient l�espace o� les utilisateurs explorent, g�rent et utilisent les services SMAJ.",
+          "La page publique présente la plateforme. Le tableau de bord privé devient l’espace où les utilisateurs explorent, gèrent et utilisent les services SMAJ.",
       },
       footer: footerTranslations.fr,
       language: {
         label: "Langue",
         english: "English",
-        french: "Fran�ais",
+        french: "Français",
       },
     },
   },
