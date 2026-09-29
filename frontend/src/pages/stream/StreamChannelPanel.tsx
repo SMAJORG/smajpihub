@@ -230,7 +230,7 @@ const StreamChannelPanel = () => {
     <input className="sw-channel-file-input" ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => beginCrop("avatar", event)} />
     <input className="sw-channel-file-input" ref={bannerInputRef} type="file" accept="image/*" onChange={(event) => beginCrop("banner", event)} />
     <div className="sw-channel-banner" style={profile.channelBannerUrl ? { backgroundImage: `url(${profile.channelBannerUrl})` } : undefined}>
-      <span>{initials}</span>
+      {!profile.channelBannerUrl ? <span>{initials}</span> : null}
       <button className="sw-channel-banner-camera" type="button" onClick={() => bannerInputRef.current?.click()}><CameraAltOutlinedIcon /> Change banner</button>
     </div>
     <div className="sw-channel-identity">
