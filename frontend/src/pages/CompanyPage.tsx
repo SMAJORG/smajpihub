@@ -12,7 +12,7 @@ const officialLinks = [
   ["X", "@smajpihub", "https://x.com/smajpihub"],
   ["Telegram", "t.me/smajpihub", "https://t.me/smajpihub"],
   ["Instagram", "@smajpihub", "https://instagram.com/smajpihub"],
-  ["YouTube", "@smajpihub", "https://youtube.com/@smajpihub"],
+  ["YouTube", "@smajpihub", "https://www.youtube.com/@SPHcore"],
 ] as const;
 
 const profileFacts = [

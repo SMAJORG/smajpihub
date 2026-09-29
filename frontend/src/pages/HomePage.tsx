@@ -71,7 +71,7 @@ const mvpFeatures = [
 
 const HomePage = () => {
   const { t } = useTranslation();
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isPiLoginPending } = useAuthContext();
   const [servicesPage, setServicesPage] = useState(0);
   const [isMobileServices, setIsMobileServices] = useState(false);
   const [showDashboardWelcome, setShowDashboardWelcome] = useState(initialDashboardWelcomeAvailable);
@@ -129,7 +129,7 @@ const HomePage = () => {
               </p>
               <div className="home-hero-cta">
                 <LoginWithPiButton className="home-hero-primary-btn">
-                  {isLoading ? t("nav.signingIn") : t("nav.login")}
+                  {isPiLoginPending ? t("nav.signingIn") : t("nav.login")}
                 </LoginWithPiButton>
                 <Link to="/services" className="home-hero-secondary-btn">
                   {t("home.explore")}

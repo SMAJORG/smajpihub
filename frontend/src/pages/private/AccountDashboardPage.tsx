@@ -40,7 +40,7 @@ const socialLinks = [
   ["X", "https://x.com/smajpihub", XIcon],
   ["Telegram", "https://t.me/smajpihub", TelegramIcon],
   ["Instagram", "https://instagram.com/smajpihub", InstagramIcon],
-  ["YouTube", "https://youtube.com/@smajpihub", YouTubeIcon],
+  ["YouTube", "https://www.youtube.com/@SPHcore", YouTubeIcon],
   ["TikTok", "https://www.tiktok.com/@smajpihub", MusicNoteOutlinedIcon],
 ] as const;
 

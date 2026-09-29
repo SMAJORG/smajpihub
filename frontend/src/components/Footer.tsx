@@ -88,7 +88,7 @@ const Footer = () => {
             <a className={styles.socialIcon} href="https://instagram.com/smajpihub" aria-label="Instagram" target="_blank" rel="noreferrer">
               <InstagramIcon fontSize="small" />
             </a>
-            <a className={styles.socialIcon} href="https://youtube.com/@smajpihub" aria-label="YouTube" target="_blank" rel="noreferrer">
+            <a className={styles.socialIcon} href="https://www.youtube.com/@SPHcore" aria-label="YouTube" target="_blank" rel="noreferrer">
               <YouTubeIcon fontSize="small" />
             </a>
             <a className={styles.socialIcon} href="https://www.tiktok.com/@smajpihub" aria-label="TikTok" target="_blank" rel="noreferrer">
