@@ -6,16 +6,16 @@ type TranslationTarget =
   | { kind: "text"; node: Text; source: string }
   | { kind: "attribute"; element: Element; attribute: string; source: string };
 
-const CACHE_KEY = "smaj_auto_translation_fr_v1";
+const cacheKey = (language: string) => `smaj_auto_translation_${language}_v1`;
 const TRANSLATABLE_ATTRIBUTES = ["placeholder", "title", "aria-label"] as const;
 const originalText = new WeakMap<Text, string>();
 const appliedText = new WeakMap<Text, string>();
 const originalAttributes = new WeakMap<Element, Map<string, string>>();
 const appliedAttributes = new WeakMap<Element, Map<string, string>>();
 
-const readCache = () => {
+const readCache = (language: string) => {
   try {
-    return JSON.parse(window.localStorage.getItem(CACHE_KEY) || "{}") as Record<string, string>;
+    return JSON.parse(window.localStorage.getItem(cacheKey(language)) || "{}") as Record<string, string>;
   } catch {
     return {};
   }
@@ -89,13 +89,14 @@ const AutomaticPageTranslator = () => {
     let timer = 0;
     let retryTimer = 0;
     let generation = 0;
-    const cache = readCache();
+    let targetLanguage = (i18n.language || i18n.resolvedLanguage || "en").split("-")[0].toLowerCase();
+    let cache = readCache(targetLanguage);
     const pendingRoots = new Set<Node>();
 
-    const saveCache = () => {
+    const saveCache = (language: string, values: Record<string, string>) => {
       try {
-        const entries = Object.entries(cache).slice(-1_500);
-        window.localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+        const entries = Object.entries(values).slice(-1_500);
+        window.localStorage.setItem(cacheKey(language), JSON.stringify(Object.fromEntries(entries)));
       } catch {
         // Translation remains functional when storage is unavailable.
       }
@@ -117,9 +118,11 @@ const AutomaticPageTranslator = () => {
     };
 
     const translate = async (targets: TranslationTarget[], run: number) => {
+      const language = targetLanguage;
+      const runCache = cache;
       const bySource = new Map<string, TranslationTarget[]>();
       targets.forEach((target) => bySource.set(target.source, [...(bySource.get(target.source) || []), target]));
-      const missing = [...bySource.keys()].filter((source) => !cache[source]);
+      const missing = [...bySource.keys()].filter((source) => !runCache[source]);
 
       for (let index = 0; index < missing.length && !disposed; index += 40) {
         const texts = missing.slice(index, index + 40);
@@ -127,27 +130,27 @@ const AutomaticPageTranslator = () => {
           const response = await apiFetch("/translations/batch", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ texts, target: "fr" }),
+            body: JSON.stringify({ texts, target: language }),
           });
           if (!response.ok) continue;
           const data = (await response.json()) as { translations?: string[] };
-          texts.forEach((source, offset) => { cache[source] = data.translations?.[offset] || source; });
-          saveCache();
+          texts.forEach((source, offset) => { runCache[source] = data.translations?.[offset] || source; });
+          saveCache(language, runCache);
         } catch {
           window.clearTimeout(retryTimer);
           retryTimer = window.setTimeout(() => schedule(document.body), 5_000);
         }
       }
 
-      if (disposed || run !== generation || i18n.resolvedLanguage !== "fr") return;
-      bySource.forEach((items, source) => items.forEach((target) => apply(target, cache[source])));
+      if (disposed || run !== generation || language !== targetLanguage || language === "en") return;
+      bySource.forEach((items, source) => items.forEach((target) => apply(target, runCache[source])));
     };
 
     const process = () => {
       timer = 0;
       const root = document.body;
       if (!root) return;
-      if (i18n.resolvedLanguage !== "fr") {
+      if (targetLanguage === "en") {
         restoreEnglish(root);
         pendingRoots.clear();
         return;
@@ -167,7 +170,7 @@ const AutomaticPageTranslator = () => {
     };
 
     const observer = new MutationObserver((mutations) => {
-      if (i18n.resolvedLanguage !== "fr") return;
+      if (targetLanguage === "en") return;
       mutations.forEach((mutation) => {
         if (mutation.type === "characterData") schedule(mutation.target);
         mutation.addedNodes.forEach((node) => schedule(node));
@@ -176,7 +179,9 @@ const AutomaticPageTranslator = () => {
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: [...TRANSLATABLE_ATTRIBUTES] });
 
-    const onLanguageChanged = () => {
+    const onLanguageChanged = (language: string) => {
+      targetLanguage = language.split("-")[0].toLowerCase();
+      cache = readCache(targetLanguage);
       generation += 1;
       schedule(document.body);
     };

@@ -131,7 +131,7 @@ void i18n
   .init({
     resources,
     fallbackLng: "en",
-    supportedLngs: ["en", "fr"],
+    supportedLngs: false,
     load: "languageOnly",
     interpolation: { escapeValue: false },
     detection: {
@@ -142,7 +142,9 @@ void i18n
   });
 
 i18n.on("languageChanged", (language) => {
+  const code = language.split("-")[0].toLowerCase();
   document.documentElement.lang = language;
+  document.documentElement.dir = ["ar", "fa", "he", "ur"].includes(code) ? "rtl" : "ltr";
 });
 
 export default i18n;

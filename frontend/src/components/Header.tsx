@@ -86,6 +86,7 @@ const UtilityIcons = ({
     <label className="smaj-language-picker" aria-label="Language and region">
       <LanguageIcon fontSize="small" />
       <select value={language} onChange={(event) => onLanguageChange(event.target.value)}>
+        {!["en", "fr"].includes(language) ? <option value={language}>{language.toUpperCase()}</option> : null}
         <option value="en">EN</option>
         <option value="fr">FR</option>
       </select>
@@ -115,7 +116,7 @@ const Header = () => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("smaj_public_theme", theme);
   };
-  const language = i18n.resolvedLanguage === "fr" ? "fr" : "en";
+  const language = (i18n.language || i18n.resolvedLanguage || "en").split("-")[0].toLowerCase();
   const selectLanguage = (nextLanguage: string) => {
     void i18n.changeLanguage(nextLanguage);
     document.documentElement.lang = nextLanguage;
@@ -352,6 +353,7 @@ const Header = () => {
                     onChange={(event) => selectLanguage(event.target.value)}
                     aria-label={t("language.label")}
                   >
+                    {!["en", "fr"].includes(language) ? <option value={language}>{`Auto (${language.toUpperCase()})`}</option> : null}
                     <option value="en">English</option>
                     <option value="fr">Français</option>
                   </select>

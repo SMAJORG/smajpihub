@@ -28,8 +28,8 @@ const mountTranslationEndpoints = (router: Router) => {
     const texts = Array.isArray(req.body?.texts) ? req.body.texts : [];
     const target = String(req.body?.target || "").toLowerCase();
 
-    if (target !== "fr" || !texts.length || texts.length > MAX_TEXTS) {
-      res.status(400).json({ message: "Provide 1-50 texts and the supported target language 'fr'." });
+    if (!/^[a-z]{2,3}$/.test(target) || target === "en" || !texts.length || texts.length > MAX_TEXTS) {
+      res.status(400).json({ message: "Provide 1-50 texts and a valid non-English target language code." });
       return;
     }
 
@@ -39,7 +39,7 @@ const mountTranslationEndpoints = (router: Router) => {
       return;
     }
 
-    const missing = [...new Set(normalized.filter((text: string) => !translationCache.has(`fr:${text}`)))];
+    const missing = [...new Set(normalized.filter((text: string) => !translationCache.has(`${target}:${text}`)))];
 
     try {
       if (missing.length) {
@@ -48,7 +48,7 @@ const mountTranslationEndpoints = (router: Router) => {
           {
             q: missing,
             source: "auto",
-            target: "fr",
+            target,
             format: "text",
             ...(env.translation_api_key ? { api_key: env.translation_api_key } : {}),
           },
@@ -57,12 +57,12 @@ const mountTranslationEndpoints = (router: Router) => {
         const results = Array.isArray(response.data) ? response.data : [response.data];
         missing.forEach((text, index) => {
           const translated = String(results[index]?.translatedText || text).trim();
-          translationCache.set(`fr:${text}`, translated || text);
+          translationCache.set(`${target}:${text}`, translated || text);
           if (translationCache.size > 10_000) translationCache.delete(translationCache.keys().next().value as string);
         });
       }
 
-      res.json({ translations: normalized.map((text: string) => translationCache.get(`fr:${text}`) || text) });
+      res.json({ translations: normalized.map((text: string) => translationCache.get(`${target}:${text}`) || text) });
     } catch (error) {
       console.error("[translation] provider request failed", axios.isAxiosError(error) ? error.message : error);
       res.status(502).json({ message: "Automatic translation is temporarily unavailable." });
