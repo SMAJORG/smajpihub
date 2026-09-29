@@ -704,9 +704,10 @@ const mountStreamEndpoints = (router: Router) => {
     const watchSeconds = videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.watchSeconds) || 0), 0);
     const publishedVideos = count(video => video.visibility === "public" && video.moderationStatus === "approved" && video.playbackAllowed === true);
     const rejectedVideos = count(video => video.moderationStatus === "rejected");
+    const creatorProfile = (user as unknown as { streamProfile?: { channelName?: string; channelHandle?: string } }).streamProfile;
     const eligibility = {
-      channelProfile: Boolean(user.streamProfile?.channelName && user.streamProfile?.channelHandle),
-      rightsConfirmed: videos.some(video => video.rightsConfirmed === true),
+      channelProfile: Boolean(creatorProfile?.channelName && creatorProfile?.channelHandle),
+      rightsConfirmed: videos.some((video: Record<string, any>) => video.rightsConfirmed === true),
       publishedVideo: publishedVideos > 0,
       minimumViews: totalViews >= 1_000,
       minimumWatchSeconds: watchSeconds >= 36_000,
@@ -924,7 +925,7 @@ const mountStreamEndpoints = (router: Router) => {
     const title = String(req.body?.title || "").trim().slice(0, 180);
     const posterUrl = String(req.body?.posterUrl || "").trim().slice(0, 800);
     if (!Number.isInteger(tmdbId) || tmdbId < 1 || !Number.isInteger(rating) || rating < 1 || rating > 5 || body.length < 10 || !title)
-      return res.status(400).json({ error: "invalid_review", message: "Choose 1–5 stars and write at least 10 characters." });
+      return res.status(400).json({ error: "invalid_review", message: "Choose 1â€“5 stars and write at least 10 characters." });
     const now = new Date();
     const reviewer = {
       id: String(user._id),
