@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 import ServiceArt from "../../components/ServiceArt";
+import { serviceLaunchNavigationState } from "../../components/ServiceLaunchGate";
 import { serviceAppPath, serviceCatalog, type ServiceDefinition } from "../../content/serviceCatalog";
 
 type DiscoveryMode = "trending" | "lifestyle" | "categories";
@@ -37,7 +38,7 @@ const RankedServices = ({ mode }: { mode: "trending" | "lifestyle" }) => {
       <Link to="/categories">All services<KeyboardArrowDownOutlinedIcon /></Link>
     </div>
     <section className="discovery-ranking" aria-label={`${mode} SMAJ services`}>
-      {services.map((service, index) => <Link to={routeFor(service)} key={service.slug} className={service.inProgress ? "service-in-progress-card" : undefined} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
+      {services.map((service, index) => <Link to={routeFor(service)} key={service.slug} state={serviceLaunchNavigationState(service.slug)} className={service.inProgress ? "service-in-progress-card" : undefined}>
         <span className="discovery-rank">{index + 1}</span>
         <ServiceArt index={service.atlasIndex} />
         <span className="discovery-service-copy"><strong>{service.name}</strong><small>{service.experience} • {service.items.slice(0, 2).join(" • ")}</small><b>{ratings[service.slug]}★</b></span>
@@ -51,7 +52,7 @@ const ServiceCategories = () => {
   return <main className="service-categories-page">
     <header><button type="button" onClick={() => navigate(-1)} aria-label="Close categories"><CloseOutlinedIcon /></button><h1>Categories</h1></header>
     <section aria-label="All SMAJ PI HUB service categories">
-      {serviceCatalog.map((service) => <Link to={routeFor(service)} key={service.slug} className={service.inProgress ? "service-in-progress-card" : undefined} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}><ServiceArt index={service.atlasIndex} /><span><strong>{service.name}</strong><small>{service.inProgress ? "IN PROGRESS" : service.experience}</small></span></Link>)}
+      {serviceCatalog.map((service) => <Link to={routeFor(service)} key={service.slug} state={serviceLaunchNavigationState(service.slug)} className={service.inProgress ? "service-in-progress-card" : undefined}><ServiceArt index={service.atlasIndex} /><span><strong>{service.name}</strong><small>{service.inProgress ? "IN PROGRESS" : service.experience}</small></span></Link>)}
     </section>
   </main>;
 };

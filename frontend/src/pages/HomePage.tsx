@@ -2,6 +2,7 @@ import { Link, Navigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import ServiceArt from "../components/ServiceArt";
+import { serviceLaunchNavigationState } from "../components/ServiceLaunchGate";
 import { getServiceLaunchLabel, getServiceLaunchStatus, serviceCatalog, type ServiceDefinition } from "../content/serviceCatalog";
 import { useAuthContext } from "../contexts/AuthContext";
 import LoginWithPiButton from "../components/LoginWithPiButton";
@@ -208,7 +209,7 @@ const HomePage = () => {
                     {page.map((group, groupIndex) => (
                       <div className="public-home-service-group" key={`${pageIndex}-${groupIndex}`}>
                         {group.map((service) => (
-                          <Link to={publicServicePath(service)} key={service.slug} className={`public-home-service-card ${service.inProgress ? "service-in-progress-card" : ""}`} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
+                          <Link to={publicServicePath(service)} key={service.slug} state={serviceLaunchNavigationState(service.slug)} className={`public-home-service-card ${getServiceLaunchStatus(service.slug) === "in-progress" ? "service-in-progress-card" : ""}`}>
                             <ServiceArt index={service.atlasIndex} />
                             <div>
                               <h3>{service.name}</h3>

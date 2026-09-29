@@ -253,7 +253,7 @@ const serviceBadgeClass = (service: ServiceDefinition, kind: "card" | "rating" =
 const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: "desktop" | "mobile" }) => (mode === "desktop" ? (
     <div className="desktop-suggested-grid">
       {services.map((service) => (
-        <Link to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={`desktop-service-app ${service.inProgress ? "service-in-progress-card" : ""}`} key={service.slug} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
+        <Link to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={`desktop-service-app ${service.inProgress ? "service-in-progress-card" : ""}`} key={service.slug}>
           <ServiceArt index={service.atlasIndex} />
           <div><strong>{service.name}</strong><span>{service.items.slice(0, 2).join(" - ")}</span></div>
           <small className={serviceBadgeClass(service, "rating")}>{getServiceLaunchLabel(service.slug)}</small>
@@ -263,7 +263,7 @@ const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: 
   ) : (
     <div className="mobile-services-grid">
       {services.map((service) => (
-        <Link key={service.slug} to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={service.inProgress ? "service-in-progress-card" : undefined} aria-disabled={service.inProgress || undefined} onClick={service.inProgress ? (event) => event.preventDefault() : undefined}>
+        <Link key={service.slug} to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={service.inProgress ? "service-in-progress-card" : undefined}>
           <ServiceArt index={service.atlasIndex} />
           <em className={serviceBadgeClass(service)}>{getServiceLaunchLabel(service.slug)}</em>
           <strong>{service.name.replace("SMAJ ", "")}</strong>

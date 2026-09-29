@@ -22367,3 +22367,53 @@ svg {
     pointer-events: none;
   }
 }
+/* Reusable confirmation shown before opening services that are still in progress. */
+.service-progress-warning {
+  position: fixed;
+  inset: 0;
+  z-index: 30000;
+  display: grid;
+  place-items: center;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  background: rgba(5, 5, 5, 0.78);
+  backdrop-filter: blur(8px);
+}
+.service-progress-warning-panel {
+  width: min(92vw, 430px);
+  overflow: hidden;
+  color: #fff;
+  background: #0c0c0c;
+  border: 2px solid #ffd21c;
+  border-radius: 22px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.48);
+}
+.service-progress-warning-panel > img {
+  width: 100%;
+  height: 180px;
+  display: block;
+  object-fit: cover;
+  background: #ffd21c;
+}
+.service-progress-warning-panel > div { padding: 24px; }
+.service-progress-warning-panel span {
+  display: inline-flex;
+  padding: 7px 11px;
+  color: #0a0a0a;
+  background: #ffd21c;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+.service-progress-warning-panel h2 { margin: 16px 0 8px; color: #fff; font-size: clamp(22px, 5vw, 30px); line-height: 1.08; }
+.service-progress-warning-panel p { margin: 0; color: #d6d6d6; line-height: 1.55; }
+.service-progress-warning-actions { display: grid; grid-template-columns: 1fr 1.25fr; gap: 10px; margin-top: 22px; }
+.service-progress-warning-actions button { min-height: 48px; padding: 0 14px; border: 1px solid #ffd21c; border-radius: 12px; font: inherit; font-weight: 800; cursor: pointer; }
+.service-progress-warning-actions button:first-child { color: #ffd21c; background: transparent; }
+.service-progress-warning-actions button:last-child { color: #0a0a0a; background: #ffd21c; }
+.storefront-location-button span { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 520px) {
+  .service-progress-warning-panel > img { height: 145px; }
+  .service-progress-warning-panel > div { padding: 20px; }
+  .service-progress-warning-actions { grid-template-columns: 1fr; }
+}

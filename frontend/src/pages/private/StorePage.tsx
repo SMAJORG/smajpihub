@@ -22,6 +22,20 @@ import logoImage from "/logo.png";
 import { PI_USDT_RATE } from "../../lib/piPricing";
 
 const STORE_CATEGORIES = ["Deals", "Grocery", "Electronics", "Mobiles", "Laptops", "Fashion", "Beauty", "Home", "Vehicles", "Accessories"];
+const STORE_LOCATION_STORAGE_KEY = "smaj-store-location";
+const detectApproximateBrowserLocation = () => {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  const knownLocations: Record<string, string> = {
+    "Asia/Dubai": "Dubai, UAE",
+    "Asia/Riyadh": "Riyadh, Saudi Arabia",
+    "Africa/Lagos": "Lagos, Nigeria",
+    "Europe/London": "London, United Kingdom",
+    "America/New_York": "New York, United States",
+  };
+  if (knownLocations[timezone]) return knownLocations[timezone];
+  const timezoneCity = timezone.split("/").pop()?.replace(/_/g, " ");
+  return timezoneCity || "Select location";
+};
 const STORE_SEARCH_FALLBACKS = [
   "iPhone", "Samsung phones", "laptops", "wireless headphones", "smart watches",
   "gaming consoles", "cameras", "men's shoes", "women's dresses", "handbags",
@@ -65,6 +79,7 @@ const StorePage = () => {
   const [minPrice, setMinPrice] = useState(params.get("minPrice") || "");
   const [maxPrice, setMaxPrice] = useState(params.get("maxPrice") || "");
   const [locationFilter, setLocationFilter] = useState(params.get("location") || "All");
+  const [detectedLocation, setDetectedLocation] = useState(() => window.localStorage.getItem(STORE_LOCATION_STORAGE_KEY) || detectApproximateBrowserLocation());
   const shoppingToolsRef = useRef<HTMLElement | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
   const [displayHeroSlides, setDisplayHeroSlides] = useState(heroSlides);
@@ -100,6 +115,15 @@ const StorePage = () => {
   useEffect(() => {
     void loadCatalog(true);
   }, [loadCatalog]);
+
+  useEffect(() => {
+    const nextLocation = user?.country || detectApproximateBrowserLocation();
+    const savedLocation = window.localStorage.getItem(STORE_LOCATION_STORAGE_KEY);
+    if (!savedLocation && nextLocation) {
+      setDetectedLocation(nextLocation);
+      window.localStorage.setItem(STORE_LOCATION_STORAGE_KEY, nextLocation);
+    }
+  }, [user?.country]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -346,9 +370,9 @@ const StorePage = () => {
               <strong>SMAJ Store</strong>
               <span className="environment-badge storefront-environment-badge" aria-label="Testnet beta environment">Testnet / Beta</span>
             </Link>
-            <button type="button" className="storefront-location storefront-location-button" onClick={() => updateSearch("Abu Dhabi")}>
+            <button type="button" className="storefront-location storefront-location-button" onClick={() => setOpenShoppingTool((value) => value === "Nearby" ? "" : "Nearby")}>
               <LocationOnOutlinedIcon />
-              <span>Location</span>
+              <span>{detectedLocation}</span>
               <KeyboardArrowDownOutlinedIcon className="storefront-location-chevron" />
             </button>
             {searchField()}
@@ -463,7 +487,7 @@ const StorePage = () => {
               <span>{locationFilter === "All" ? "Nearby" : locationFilter}</span><KeyboardArrowDownOutlinedIcon />
             </button>
             {openShoppingTool === "Nearby" ? <div className="storefront-tool-panel storefront-location-panel">
-              {user?.country ? <button type="button" onClick={() => { setLocationFilter(user.country || "All"); updateFilterParam("location", user.country || ""); setOpenShoppingTool(""); }}>Near me ({user.country})</button> : null}
+              {detectedLocation !== "Select location" ? <button type="button" onClick={() => { const nearbyArea = detectedLocation.split(",")[0] || "All"; setLocationFilter(nearbyArea); updateFilterParam("location", nearbyArea, "All"); setOpenShoppingTool(""); }}>Near me ({detectedLocation})</button> : null}
               <label>Product location<select value={locationFilter} onChange={(event) => { setLocationFilter(event.target.value); updateFilterParam("location", event.target.value, "All"); setOpenShoppingTool(""); }}>{availableLocations.map((item) => <option key={item}>{item}</option>)}</select></label>
             </div> : null}
           </div>

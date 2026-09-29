@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import AppLayout from "../layouts/AppLayout";
 import ServiceArt from "../components/ServiceArt";
+import { serviceLaunchNavigationState } from "../components/ServiceLaunchGate";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
@@ -91,9 +92,7 @@ const ServicesPage = () => {
                 {!inProgress ? <ArrowForwardOutlinedIcon /> : null}
               </>;
 
-              return inProgress
-                ? <article key={platform.routeSegment} className="services-directory-card service-in-progress-card">{card}</article>
-                : <Link to={servicePath(platform.routeSegment)} key={platform.routeSegment} className="services-directory-card">{card}</Link>;
+              return <Link to={servicePath(platform.routeSegment)} state={serviceLaunchNavigationState(catalogItem?.slug || platform.routeSegment)} key={platform.routeSegment} className={`services-directory-card${inProgress ? " service-in-progress-card" : ""}`}>{card}</Link>;
             })}
           </div>
         </section>

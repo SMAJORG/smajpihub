@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getServiceLaunchStatus } from "../content/serviceCatalog";
 import ServiceLaunchSplash from "./ServiceLaunchSplash";
 
 export const brandedServiceLaunchSlugs = ["store", "jobs", "education", "transport", "health"] as const;
@@ -13,17 +15,46 @@ const serviceLaunchConfig: Record<BrandedServiceLaunchSlug, { name: string; icon
 };
 
 export const serviceLaunchNavigationState = (slug: string) => {
+  if (getServiceLaunchStatus(slug) === "in-progress") return { inProgressEntry: slug };
   if (slug === "stream") return { streamEntry: true };
   return brandedServiceLaunchSlugs.includes(slug as BrandedServiceLaunchSlug) ? { serviceLaunch: slug } : undefined;
+};
+
+const displayServiceName = (slug: string) => {
+  if (slug === "food") return "SMAJ Food";
+  return `SMAJ ${slug.charAt(0).toUpperCase()}${slug.slice(1)}`;
 };
 
 const ServiceLaunchGate = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const slug = (location.state as { serviceLaunch?: string } | null)?.serviceLaunch;
+  const state = location.state as { serviceLaunch?: string; inProgressEntry?: string } | null;
+  const slug = state?.serviceLaunch;
+  const inProgressSlug = state?.inProgressEntry;
+  const [confirmedProgressSlug, setConfirmedProgressSlug] = useState<string | null>(null);
   const config = slug && brandedServiceLaunchSlugs.includes(slug as BrandedServiceLaunchSlug)
     ? serviceLaunchConfig[slug as BrandedServiceLaunchSlug]
     : null;
+
+  if (inProgressSlug && confirmedProgressSlug !== inProgressSlug) {
+    const serviceName = displayServiceName(inProgressSlug);
+    return (
+      <div className="service-progress-warning" role="dialog" aria-modal="true" aria-labelledby="service-progress-title">
+        <section className="service-progress-warning-panel">
+          <img src="/assets/services/in-progress-warning.jfif" alt="" />
+          <div>
+            <span>IN PROGRESS</span>
+            <h2 id="service-progress-title">{serviceName} is still being prepared</h2>
+            <p>Some features may be incomplete or unavailable while we finish this service.</p>
+            <div className="service-progress-warning-actions">
+              <button type="button" onClick={() => navigate(-1)}>Cancel</button>
+              <button type="button" onClick={() => setConfirmedProgressSlug(inProgressSlug)}>OK, continue</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   if (!config) return null;
 
