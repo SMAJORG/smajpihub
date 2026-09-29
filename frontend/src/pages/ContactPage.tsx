@@ -9,6 +9,7 @@ import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 
 const companyEmail = "info@smajpihub.com";
+const quickSupportEmail = "smajpihub@gmail.com";
 
 const contactRoutes = [
   ["Support", "Questions about using SMAJ PI HUB, account access, or service navigation.", SupportAgentOutlinedIcon],
@@ -34,7 +35,7 @@ const ContactPage = () => {
       event.currentTarget.reset();
       showFeedback?.({ type: "success", message: "Thanks. Your message has been recorded for the SMAJ PI HUB team." });
     } catch {
-      showFeedback?.({ type: "error", message: "Could not send your message. Please email info@smajpihub.com." });
+      showFeedback?.({ type: "error", message: `Could not send your message. For quick support, email ${quickSupportEmail}.` });
     }
   };
 

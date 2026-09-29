@@ -12,6 +12,7 @@ import styles from "./Footer.module.css";
 import { useTranslation } from "react-i18next";
 
 const companyEmail = "info@smajpihub.com";
+const quickSupportEmail = "smajpihub@gmail.com";
 
 const Footer = () => {
   const { t } = useTranslation();
@@ -76,6 +77,7 @@ const Footer = () => {
         <div>
           <h4>{t("footer.social")}</h4>
           <a href={`mailto:${companyEmail}`}><MailOutlineOutlinedIcon fontSize="small" />{companyEmail}</a>
+          <a href={`mailto:${quickSupportEmail}`}><MailOutlineOutlinedIcon fontSize="small" />Quick support: {quickSupportEmail}</a>
           <div className={styles.socialRow} aria-label="Social links">
             <a className={styles.socialIcon} href="https://x.com/smajpihub" aria-label="X" target="_blank" rel="noreferrer">
               <XIcon fontSize="small" />
