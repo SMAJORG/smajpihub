@@ -128,3 +128,5 @@
 }
 .stream-side-menu::-webkit-scrollbar{width:5px}
 .stream-side-menu::-webkit-scrollbar-thumb{background:#51455b;border-radius:99px}
+
+.stream-global-title{display:inline-flex;align-items:center;gap:8px}.stream-global-title img{width:34px;height:34px;display:block;object-fit:contain}.stream-side-menu>header>div>span{overflow:hidden;background:transparent;box-shadow:none}.stream-side-menu>header>div>span img{width:35px;height:35px;display:block;object-fit:contain}@media(max-width:640px){.stream-global-title img{width:31px;height:31px}.stream-global-title span{display:none}}

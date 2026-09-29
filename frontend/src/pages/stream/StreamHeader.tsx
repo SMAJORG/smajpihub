@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import CastConnectedRoundedIcon from "@mui/icons-material/CastConnectedRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -82,7 +81,8 @@ const StreamHeader = ({ showCategoryNav = true }: StreamHeaderProps) => {
             &lt;- Hub
           </Link>
           <Link className="stream-global-title" to="/app/services/stream">
-            Stream
+            <img src="/assets/smaj-stream-logo.png" alt="" />
+            <span>SMAJ Stream</span>
           </Link>
           <button className="stream-global-cast-button" type="button" onClick={() => setCastOpen(true)} aria-label="Find casting devices">
             <CastConnectedRoundedIcon />
@@ -117,7 +117,7 @@ const StreamHeader = ({ showCategoryNav = true }: StreamHeaderProps) => {
             <header>
               <div>
                 <span>
-                  <PlayArrowRoundedIcon />
+                  <img src="/assets/smaj-stream-logo.png" alt="" />
                 </span>
                 <b>SMAJ Stream</b>
               </div>
