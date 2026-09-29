@@ -9,11 +9,17 @@ const MAX_TEXT_LENGTH = 1_000;
 const MAX_REQUESTS_PER_MINUTE = 60;
 const MAX_CACHE_ENTRIES = 3_000;
 const REQUEST_WINDOW_TTL_MS = 2 * 60_000;
-let providerRequestActive = false;
+const SUPPORTED_TARGETS = new Set(["fr", "sw", "ar", "zh"]);
+const activeProviderTargets = new Set<string>();
 let lastWindowCleanupAt = 0;
 
-const getProviderBaseUrl = () => {
-  const configured = env.translation_api_url.replace(/\/+$/, "");
+const getProviderBaseUrl = (target: string) => {
+  const providers: Record<string, string> = {
+    ar: env.translation_api_url_ar,
+    sw: env.translation_api_url_sw,
+    zh: env.translation_api_url_zh,
+  };
+  const configured = (providers[target] || env.translation_api_url).replace(/\/+$/, "");
   return /^https?:\/\//i.test(configured) ? configured : `http://${configured}`;
 };
 
@@ -38,7 +44,7 @@ const mountTranslationEndpoints = (router: Router) => {
     const texts = Array.isArray(req.body?.texts) ? req.body.texts : [];
     const target = String(req.body?.target || "").toLowerCase();
 
-    if (!/^[a-z]{2,3}$/.test(target) || target === "en" || !texts.length || texts.length > MAX_TEXTS) {
+    if (!SUPPORTED_TARGETS.has(target) || !texts.length || texts.length > MAX_TEXTS) {
       res.status(400).json({ message: `Provide 1-${MAX_TEXTS} texts and a valid non-English target language code.` });
       return;
     }
@@ -51,7 +57,7 @@ const mountTranslationEndpoints = (router: Router) => {
 
     const missing = [...new Set(normalized.filter((text: string) => !translationCache.has(`${target}:${text}`)))];
 
-    if (missing.length && providerRequestActive) {
+    if (missing.length && activeProviderTargets.has(target)) {
       res.setHeader("Retry-After", "2");
       res.status(503).json({ message: "Translation service is busy. Please retry shortly." });
       return;
@@ -59,9 +65,9 @@ const mountTranslationEndpoints = (router: Router) => {
 
     try {
       if (missing.length) {
-        providerRequestActive = true;
+        activeProviderTargets.add(target);
         const response = await axios.post(
-          `${getProviderBaseUrl()}/translate`,
+          `${getProviderBaseUrl(target)}/translate`,
           {
             q: missing,
             source: "auto",
@@ -84,7 +90,7 @@ const mountTranslationEndpoints = (router: Router) => {
       console.error("[translation] provider request failed", axios.isAxiosError(error) ? error.message : error);
       res.status(502).json({ message: "Automatic translation is temporarily unavailable." });
     } finally {
-      if (missing.length) providerRequestActive = false;
+      if (missing.length) activeProviderTargets.delete(target);
     }
   });
 };

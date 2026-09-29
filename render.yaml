@@ -22,6 +22,12 @@ services:
     envVars:
       - key: TRANSLATION_API_URL
         value: https://smajpihub-translate.onrender.com
+      - key: TRANSLATION_API_URL_AR
+        value: https://smajpihub-translate-ar.onrender.com
+      - key: TRANSLATION_API_URL_SW
+        value: https://smajpihub-translate-sw.onrender.com
+      - key: TRANSLATION_API_URL_ZH
+        value: https://smajpihub-translate-zh.onrender.com
 
   - type: web
     name: smajpihub-translate
@@ -33,6 +39,73 @@ services:
     envVars:
       - key: LT_LOAD_ONLY
         value: en,fr
+      - key: LT_DISABLE_WEB_UI
+        value: "true"
+      - key: LT_BATCH_LIMIT
+        value: "20"
+      - key: LT_CHAR_LIMIT
+        value: "20000"
+      - key: LT_REQ_LIMIT
+        value: "60"
+      - key: LT_THREADS
+        value: "1"
+      - key: LT_DISABLE_FILES_TRANSLATION
+        value: "true"
+
+  - type: web
+    name: smajpihub-translate-ar
+    runtime: image
+    plan: free
+    image:
+      url: docker.io/libretranslate/libretranslate:latest
+    healthCheckPath: /languages
+    envVars:
+      - key: LT_LOAD_ONLY
+        value: en,ar
+      - key: LT_DISABLE_WEB_UI
+        value: "true"
+      - key: LT_BATCH_LIMIT
+        value: "20"
+      - key: LT_CHAR_LIMIT
+        value: "20000"
+      - key: LT_REQ_LIMIT
+        value: "60"
+      - key: LT_THREADS
+        value: "1"
+      - key: LT_DISABLE_FILES_TRANSLATION
+        value: "true"
+  - type: web
+    name: smajpihub-translate-sw
+    runtime: image
+    plan: free
+    image:
+      url: docker.io/libretranslate/libretranslate:latest
+    healthCheckPath: /languages
+    envVars:
+      - key: LT_LOAD_ONLY
+        value: en,sw
+      - key: LT_DISABLE_WEB_UI
+        value: "true"
+      - key: LT_BATCH_LIMIT
+        value: "20"
+      - key: LT_CHAR_LIMIT
+        value: "20000"
+      - key: LT_REQ_LIMIT
+        value: "60"
+      - key: LT_THREADS
+        value: "1"
+      - key: LT_DISABLE_FILES_TRANSLATION
+        value: "true"
+  - type: web
+    name: smajpihub-translate-zh
+    runtime: image
+    plan: free
+    image:
+      url: docker.io/libretranslate/libretranslate:latest
+    healthCheckPath: /languages
+    envVars:
+      - key: LT_LOAD_ONLY
+        value: en,zh
       - key: LT_DISABLE_WEB_UI
         value: "true"
       - key: LT_BATCH_LIMIT

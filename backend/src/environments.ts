@@ -51,6 +51,9 @@ interface Environment {
   sports_cache_seconds: number;
   news_api_key: string;
   translation_api_url: string;
+  translation_api_url_ar: string;
+  translation_api_url_sw: string;
+  translation_api_url_zh: string;
   translation_api_key: string;
   google_maps_api_key: string;
 }
@@ -126,6 +129,9 @@ const env: Environment = {
   ),
   news_api_key: String(process.env.NEWS_API_KEY || "").trim(),
   translation_api_url: String(process.env.TRANSLATION_API_URL || "http://localhost:5000").trim(),
+  translation_api_url_ar: String(process.env.TRANSLATION_API_URL_AR || process.env.TRANSLATION_API_URL || "http://localhost:5000").trim(),
+  translation_api_url_sw: String(process.env.TRANSLATION_API_URL_SW || process.env.TRANSLATION_API_URL || "http://localhost:5000").trim(),
+  translation_api_url_zh: String(process.env.TRANSLATION_API_URL_ZH || process.env.TRANSLATION_API_URL || "http://localhost:5000").trim(),
   translation_api_key: String(process.env.TRANSLATION_API_KEY || "").trim(),
   google_maps_api_key: String(process.env.GOOGLE_MAPS_API_KEY || "").trim(),
 };

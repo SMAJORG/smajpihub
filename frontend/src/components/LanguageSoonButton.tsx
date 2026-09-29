@@ -9,7 +9,10 @@ type LanguageChoiceButtonProps = {
 
 const languages = [
   { code: "en", label: "English" },
-  { code: "fr", label: "Français" },
+  { code: "fr", label: "Fran\u00e7ais" },
+  { code: "sw", label: "Kiswahili" },
+  { code: "ar", label: "\u0627\u0644\u0639\u0631\u0628\u064a\u0629" },
+  { code: "zh", label: "\u4e2d\u6587" },
 ] as const;
 type LanguageCode = (typeof languages)[number]["code"];
 
@@ -20,11 +23,15 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: LanguageChoiceButtonPro
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<LanguageCode>(() => {
     const saved = window.localStorage.getItem("smaj_language") as LanguageCode | null;
-    return languages.some(language => language.code === saved) ? saved! : i18n.resolvedLanguage === "fr" ? "fr" : "en";
+    const detected = (i18n.language || i18n.resolvedLanguage || "en").split("-")[0] as LanguageCode;
+    return languages.some((language) => language.code === saved) ? saved! : languages.some((language) => language.code === detected) ? detected : "en";
   });
 
   useEffect(() => {
-    const syncLanguage = (language: string) => setSelected(language.split("-")[0] === "fr" ? "fr" : "en");
+    const syncLanguage = (language: string) => {
+      const code = language.split("-")[0] as LanguageCode;
+      setSelected(languages.some((item) => item.code === code) ? code : "en");
+    };
     i18n.on("languageChanged", syncLanguage);
     return () => { i18n.off("languageChanged", syncLanguage); };
   }, []);
