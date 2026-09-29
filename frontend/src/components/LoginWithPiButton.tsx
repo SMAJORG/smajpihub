@@ -7,15 +7,15 @@ type LoginWithPiButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onC
 };
 
 const LoginWithPiButton = ({ children, disabled, loadingContent, redirectTo, ...props }: LoginWithPiButtonProps) => {
-  const { loginWithPi, isLoading } = useAuthContext();
+  const { loginWithPi, isPiLoginPending } = useAuthContext();
   const login = () => {
     if (redirectTo) window.sessionStorage.setItem("smaj_post_auth_redirect", redirectTo);
     void loginWithPi();
   };
 
   return (
-    <button type="button" {...props} onClick={login} disabled={disabled || isLoading}>
-      {isLoading && loadingContent ? loadingContent : children}
+    <button type="button" {...props} onClick={login} disabled={disabled || isPiLoginPending}>
+      {isPiLoginPending && loadingContent ? loadingContent : children}
     </button>
   );
 };

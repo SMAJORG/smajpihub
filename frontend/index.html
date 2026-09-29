@@ -90,32 +90,12 @@
     </script>
 
     <title>SMAJ PI HUB | The Pi-Powered Super App for Real-World Utility</title>
-    <link rel="preload" href="/logo.png" as="image" />
-    <style>
-      .smaj-startup-splash { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; padding: 32px 24px; box-sizing: border-box; color: #2b1b3f; background: #ffffff; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-align: center; }
-      .smaj-startup-splash > div { display: grid; justify-items: center; gap: 14px; }
-      .smaj-startup-splash img { width: clamp(132px, 34vw, 220px); height: auto; display: block; object-fit: contain; animation: smajStartupPulse 1.7s ease-in-out infinite; }
-      .smaj-startup-splash h1 { margin: 14px 0 0; color: #6d28d9; font-size: clamp(1.22rem, 5.2vw, 3rem); line-height: 1.08; letter-spacing: -.035em; white-space: nowrap; }
-      .smaj-startup-splash p { margin: 0; color: #f59e0b; font-size: clamp(.82rem, 3vw, 1rem); font-weight: 850; letter-spacing: .16em; text-transform: uppercase; }
-      .smaj-startup-splash small { margin-top: -7px; color: #7c6f8d; font-size: clamp(.62rem, 2.25vw, .78rem); font-weight: 700; letter-spacing: .035em; }
-      @keyframes smajStartupPulse { 0%, 100% { transform: scale(.92); } 50% { transform: scale(1.06); } }
-      @media (prefers-reduced-motion: reduce) { .smaj-startup-splash img { animation: none; } }
-    </style>
   </head>
 
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
-    <div id="root">
-      <main class="smaj-startup-splash" role="status" aria-live="polite" aria-label="Loading SMAJ PI HUB">
-        <div>
-          <img src="/logo.png" alt="SMAJ PI HUB" />
-          <h1>Welcome to <strong>SMAJ PI HUB</strong></h1>
-          <p>Powered by Pi</p>
-          <small>Part of the SMAJ Ecosystem</small>
-        </div>
-      </main>
-    </div>
+    <div id="root"></div>
 
     <!-- Vite entry -->
     <script type="module" src="/src/main.tsx"></script>

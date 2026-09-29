@@ -99,7 +99,7 @@ const UtilityIcons = ({
 
 const Header = () => {
   const { t, i18n } = useTranslation();
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isPiLoginPending } = useAuthContext();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isServicesMenuOpen, setIsServicesMenuOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -367,7 +367,7 @@ const Header = () => {
                 <span className="smaj-login-icon" aria-hidden="true">
                   <LoginIcon fontSize="small" />
                 </span>
-                <span className="smaj-login-text">{isLoading ? t("nav.signingIn") : t("nav.login")}</span>
+                <span className="smaj-login-text">{isPiLoginPending ? t("nav.signingIn") : t("nav.login")}</span>
               </LoginWithPiButton>
             )}
           </div>
@@ -392,7 +392,7 @@ const Header = () => {
                 <span className="smaj-login-icon" aria-hidden="true">
                   <LoginIcon fontSize="small" />
                 </span>
-                <span className="smaj-login-text">{isLoading ? t("nav.signingIn") : t("nav.login")}</span>
+                <span className="smaj-login-text">{isPiLoginPending ? t("nav.signingIn") : t("nav.login")}</span>
               </LoginWithPiButton>
               <UtilityIcons
                 theme={mobileThemeMode}
