@@ -22417,3 +22417,4 @@ svg {
   .service-progress-warning-panel > div { padding: 20px; }
   .service-progress-warning-actions { grid-template-columns: 1fr; }
 }
+.storefront-brand-logo{width:38px;height:38px;display:block;object-fit:contain}.storefront-mobile-logo img,.storefront-mobile-drawer header img{filter:none!important}

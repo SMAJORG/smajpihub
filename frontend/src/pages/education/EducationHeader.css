@@ -287,3 +287,5 @@
   background: transparent !important;
   box-shadow: none !important;
 }
+
+.education-brand{display:inline-flex;align-items:center;gap:8px}.education-brand img{width:36px;height:36px;display:block;object-fit:contain}@media(max-width:640px){.education-brand img{width:32px;height:32px}.education-brand b{font-size:0}.education-brand b::after{content:'Education';font-size:1.05rem}}

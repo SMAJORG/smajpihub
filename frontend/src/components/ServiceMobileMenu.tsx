@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -13,12 +13,14 @@ export type ServiceMenuItem = {
 
 const ServiceMobileMenu = ({
   title,
+  icon,
   items,
   accent = "#6b3fc5",
   tone = "light",
   showHubLink = true,
 }: {
   title: string;
+  icon?: ReactNode;
   items: ServiceMenuItem[];
   accent?: string;
   tone?: "light" | "dark";
@@ -66,7 +68,7 @@ const ServiceMobileMenu = ({
           />
           <aside className="service-mobile-menu-drawer" aria-label={`${title} navigation`}>
             <header>
-              <strong>{title}</strong>
+              <strong>{icon}{title}</strong>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close service menu">
                 <CloseRoundedIcon />
               </button>

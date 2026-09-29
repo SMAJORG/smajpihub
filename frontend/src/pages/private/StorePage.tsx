@@ -18,7 +18,7 @@ import { useAddToCartToast } from "../../hooks/useAddToCartToast";
 import type { Product } from "../../types/marketplace";
 import { heroSlides, promoStripItems } from "../../content/storefront";
 import { getHeroBanners } from "../../lib/heroBanners";
-import logoImage from "/logo.png";
+import logoImage from "/assets/services/store.png";
 import { PI_USDT_RATE } from "../../lib/piPricing";
 
 const STORE_CATEGORIES = ["Deals", "Grocery", "Electronics", "Mobiles", "Laptops", "Fashion", "Beauty", "Home", "Vehicles", "Accessories"];
@@ -367,6 +367,7 @@ const StorePage = () => {
               <span>Services</span>
             </Link>
             <Link to="/store" className="storefront-brand storefront-brand-link">
+              <img className="storefront-brand-logo" src={logoImage} alt="" />
               <strong>SMAJ Store</strong>
               <span className="environment-badge storefront-environment-badge" aria-label="Testnet beta environment">Testnet / Beta</span>
             </Link>

@@ -5189,3 +5189,5 @@
   .jobs-payment-actions { justify-content: stretch; }
   .jobs-payment-actions button { flex: 1 1 130px; }
 }
+
+.jobs-brand{display:inline-flex;align-items:center;gap:8px}.jobs-brand img{width:36px;height:36px;display:block;object-fit:contain}.jobs-brand span{color:var(--ink);font-size:21px;vertical-align:initial}@media(max-width:700px){.jobs-brand img{width:32px;height:32px}.jobs-brand span{font-size:18px}}

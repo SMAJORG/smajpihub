@@ -64,7 +64,8 @@ const JobsHeader = ({
         ← Hub
       </Link>
       <NavLink end to="/services/jobs" className="jobs-brand" onClick={() => setMenuOpen(false)}>
-        Jobs
+        <img src="/assets/services/jobs.png" alt="" />
+        <span>SMAJ Jobs</span>
       </NavLink>
       <nav className={menuOpen ? "open" : ""} aria-label="Jobs navigation">
         <div className="jobs-workspace-switch" aria-label="Choose Jobs workspace">

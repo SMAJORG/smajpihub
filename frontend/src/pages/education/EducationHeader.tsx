@@ -51,7 +51,8 @@ const EducationHeader = ({
         <span>Hub</span>
       </Link>
       <Link to="/services/education" className="education-brand">
-        <b>Education</b>
+        <img src="/assets/services/education.png" alt="" />
+        <b>SMAJ Education</b>
       </Link>
       <nav className={menuOpen ? "open" : ""} aria-label="Education navigation">
         {primaryLinks.map(([to, label]) => (

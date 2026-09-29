@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import ServiceMobileMenu from "../../components/ServiceMobileMenu";
+import ServiceArt from "../../components/ServiceArt";
 
 const links = [
   ["", "Home"],
@@ -19,7 +20,8 @@ const SportsHeader = ({ query, onQueryChange }: { query: string; onQueryChange: 
       ← Hub
     </NavLink>
     <NavLink to="/services/sports" className="sports-brand">
-      <b>Sports</b>
+      <ServiceArt index={13} className="sports-brand-logo" />
+      <b>SMAJ Sports</b>
     </NavLink>
     <nav aria-label="Sports navigation">
       {links.map(([path, label]) => (
@@ -41,6 +43,7 @@ const SportsHeader = ({ query, onQueryChange }: { query: string; onQueryChange: 
     </NavLink>
     <ServiceMobileMenu
       title="SMAJ Sports"
+      icon={<ServiceArt index={13} className="sports-brand-logo" />}
       accent="#1d64d8"
       tone="dark"
       showHubLink={false}
