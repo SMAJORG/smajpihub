@@ -124,15 +124,21 @@ const AutomaticPageTranslator = () => {
       targets.forEach((target) => bySource.set(target.source, [...(bySource.get(target.source) || []), target]));
       const missing = [...bySource.keys()].filter((source) => !runCache[source]);
 
-      for (let index = 0; index < missing.length && !disposed; index += 40) {
-        const texts = missing.slice(index, index + 40);
+      for (let index = 0; index < missing.length && !disposed; index += 15) {
+        const texts = missing.slice(index, index + 15);
         try {
           const response = await apiFetch("/translations/batch", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ texts, target: language }),
           });
-          if (!response.ok) continue;
+          if (!response.ok) {
+            if (response.status === 429 || response.status === 503) {
+              window.clearTimeout(retryTimer);
+              retryTimer = window.setTimeout(() => schedule(document.body), 3_000);
+            }
+            continue;
+          }
           const data = (await response.json()) as { translations?: string[] };
           texts.forEach((source, offset) => { runCache[source] = data.translations?.[offset] || source; });
           saveCache(language, runCache);

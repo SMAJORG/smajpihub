@@ -36,8 +36,12 @@ services:
       - key: LT_DISABLE_WEB_UI
         value: "true"
       - key: LT_BATCH_LIMIT
-        value: "50"
+        value: "20"
       - key: LT_CHAR_LIMIT
-        value: "100000"
+        value: "20000"
       - key: LT_REQ_LIMIT
-        value: "120"
+        value: "60"
+      - key: LT_THREADS
+        value: "1"
+      - key: LT_DISABLE_FILES_TRANSLATION
+        value: "true"

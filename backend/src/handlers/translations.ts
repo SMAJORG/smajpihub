@@ -4,9 +4,13 @@ import env from "../environments";
 
 const translationCache = new Map<string, string>();
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
-const MAX_TEXTS = 50;
-const MAX_TEXT_LENGTH = 2_000;
-const MAX_REQUESTS_PER_MINUTE = 120;
+const MAX_TEXTS = 20;
+const MAX_TEXT_LENGTH = 1_000;
+const MAX_REQUESTS_PER_MINUTE = 60;
+const MAX_CACHE_ENTRIES = 3_000;
+const REQUEST_WINDOW_TTL_MS = 2 * 60_000;
+let providerRequestActive = false;
+let lastWindowCleanupAt = 0;
 
 const getProviderBaseUrl = () => {
   const configured = env.translation_api_url.replace(/\/+$/, "");
@@ -17,6 +21,12 @@ const mountTranslationEndpoints = (router: Router) => {
   router.post("/batch", async (req, res) => {
     const client = req.ip || req.socket.remoteAddress || "unknown";
     const now = Date.now();
+    if (now - lastWindowCleanupAt >= REQUEST_WINDOW_TTL_MS) {
+      for (const [key, value] of requestWindows) {
+        if (now - value.startedAt >= REQUEST_WINDOW_TTL_MS) requestWindows.delete(key);
+      }
+      lastWindowCleanupAt = now;
+    }
     const window = requestWindows.get(client);
     const usage = !window || now - window.startedAt >= 60_000 ? { startedAt: now, count: 1 } : { ...window, count: window.count + 1 };
     requestWindows.set(client, usage);
@@ -29,7 +39,7 @@ const mountTranslationEndpoints = (router: Router) => {
     const target = String(req.body?.target || "").toLowerCase();
 
     if (!/^[a-z]{2,3}$/.test(target) || target === "en" || !texts.length || texts.length > MAX_TEXTS) {
-      res.status(400).json({ message: "Provide 1-50 texts and a valid non-English target language code." });
+      res.status(400).json({ message: `Provide 1-${MAX_TEXTS} texts and a valid non-English target language code.` });
       return;
     }
 
@@ -41,8 +51,15 @@ const mountTranslationEndpoints = (router: Router) => {
 
     const missing = [...new Set(normalized.filter((text: string) => !translationCache.has(`${target}:${text}`)))];
 
+    if (missing.length && providerRequestActive) {
+      res.setHeader("Retry-After", "2");
+      res.status(503).json({ message: "Translation service is busy. Please retry shortly." });
+      return;
+    }
+
     try {
       if (missing.length) {
+        providerRequestActive = true;
         const response = await axios.post(
           `${getProviderBaseUrl()}/translate`,
           {
@@ -58,7 +75,7 @@ const mountTranslationEndpoints = (router: Router) => {
         missing.forEach((text, index) => {
           const translated = String(results[index]?.translatedText || text).trim();
           translationCache.set(`${target}:${text}`, translated || text);
-          if (translationCache.size > 10_000) translationCache.delete(translationCache.keys().next().value as string);
+          if (translationCache.size > MAX_CACHE_ENTRIES) translationCache.delete(translationCache.keys().next().value as string);
         });
       }
 
@@ -66,6 +83,8 @@ const mountTranslationEndpoints = (router: Router) => {
     } catch (error) {
       console.error("[translation] provider request failed", axios.isAxiosError(error) ? error.message : error);
       res.status(502).json({ message: "Automatic translation is temporarily unavailable." });
+    } finally {
+      if (missing.length) providerRequestActive = false;
     }
   });
 };
