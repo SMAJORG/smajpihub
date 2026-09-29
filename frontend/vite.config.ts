@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
   const isPublicBuild = mode === "public";
   const isLegacyBuild = mode === "legacy";
   const isCapacitorBuild = mode === "capacitor";
+  const isSoloHostBuild = mode === "solohost";
   const build = {
     ...(isCapacitorBuild ? { outDir: "dist-capacitor", assetsDir: "assets", emptyOutDir: true } : {}),
     ...(isPublicBuild
@@ -56,11 +57,15 @@ export default defineConfig(({ mode }) => {
       {
         name: "html-env-replace",
         transformIndexHtml(html) {
+          if (isSoloHostBuild) return html;
           const apiBaseURL = env.VITE_API_BASE_URL || env.VITE_BACKEND_URL || productionApiBaseURL;
           return html
             .replace(/\$\$BACKEND_URL\$\$/g, () => apiBaseURL)
             .replace(/\$\$API_BASE_URL\$\$/g, () => apiBaseURL)
-            .replace(/\$\$SANDBOX_SDK\$\$/g, env.VITE_SANDBOX_SDK || "true");
+            .replace(/\$\$SANDBOX_SDK\$\$/g, env.VITE_SANDBOX_SDK || "true")
+            .replace(/\$\$SOLOHOST_MODE\$\$/g, "false")
+            .replace(/\$\$PI_OAUTH_CLIENT_ID\$\$/g, env.VITE_PI_OAUTH_CLIENT_ID || "")
+            .replace(/\$\$PI_OAUTH_REDIRECT_URI\$\$/g, env.VITE_PI_OAUTH_REDIRECT_URI || "");
         },
       },
       {

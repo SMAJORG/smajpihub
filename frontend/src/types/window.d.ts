@@ -6,6 +6,9 @@ declare global {
       apiBaseURL?: string;
       backendURL?: string;
       sandbox?: string;
+      soloHost?: string;
+      piOAuthClientId?: string;
+      piOAuthRedirectUri?: string;
     };
     Pi?: {
       init(config: { version: string; sandbox: boolean }): void;

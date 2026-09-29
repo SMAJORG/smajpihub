@@ -14,6 +14,7 @@ import {
 } from "../../lib/coursesApi";
 import type { Course, Enrollment, CoursePayment } from "../../types/courses";
 import { formatPiAmount } from "../../lib/formatters";
+import { isPiPaymentAvailable } from "../../lib/soloHost";
 import "../../pages/EducationPage.css";
 import "../../components/education/courses.css";
 
@@ -87,13 +88,13 @@ const CourseDetailPage = () => {
   const handlePayment = async () => {
     if (!course || !payment) return;
     setMessage("");
-    if (!window.Pi) {
+    if (!isPiPaymentAvailable()) {
       setMessage("Open this course in Pi Browser to complete payment.");
       return;
     }
     try {
-      await window.Pi.authenticate(["payments"]);
-      await window.Pi.createPayment(
+      await window.Pi!.authenticate(["payments"]);
+      await window.Pi!.createPayment(
         {
           amount: payment.amount_pi,
           memo: `Enrollment: ${course.title}`,

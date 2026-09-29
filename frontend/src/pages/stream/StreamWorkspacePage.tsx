@@ -69,6 +69,7 @@ import {
   type StreamSubscription,
 } from "../../lib/streamSubscription";
 import { requestPiBrowserHandoff } from "../../lib/piBrowserHandoff";
+import { isPiPaymentAvailable } from "../../lib/soloHost";
 import { axiosClient } from "../../lib/axiosClient";
 
 import { publishCloudflareMovie, uploadCloudflareMovie, type CloudflareUploadStage } from "../../lib/streamCloudflare";
@@ -1369,11 +1370,11 @@ const StreamPlansPanel = () => {
         setState("ready");
         return;
       }
-      if (!window.Pi) {
+      if (!isPiPaymentAvailable()) {
         requestPiBrowserHandoff("Pi payment required");
         throw new Error("Open SMAJ PI HUB in Pi Browser to pay with Pi.");
       }
-      await window.Pi.authenticate(["payments"], payment => {
+      await window.Pi!.authenticate(["payments"], payment => {
         const incompletePlan =
           payment.metadata?.service === "stream" && ["plus", "family"].includes(String(payment.metadata?.plan))
             ? (payment.metadata.plan as StreamPlanId)
@@ -1397,7 +1398,7 @@ const StreamPlansPanel = () => {
           }
         })();
       });
-      await window.Pi.createPayment(
+      await window.Pi!.createPayment(
         {
           amount: result.checkout.amountPi,
           memo: result.checkout.memo,

@@ -69,7 +69,7 @@ const maskMongoUri = (uri: string) =>
 const app: express.Application = express();
 const serviceStartedAt = new Date();
 const isProduction = env.is_production;
-const crossSiteSession = isProduction;
+const crossSiteSession = isProduction && !env.is_solohost;
 const sessionTtlSeconds = 60 * 60 * 24 * 7;
 const sessionCookieOptions = {
   httpOnly: true,
@@ -85,6 +85,7 @@ if (isProduction) {
 console.info("[session-config]", {
   nodeEnv: env.node_env,
   renderDetected: env.is_render,
+  soloHost: env.is_solohost,
   production: isProduction,
   secure: sessionCookieOptions.secure,
   sameSite: sessionCookieOptions.sameSite,
@@ -117,18 +118,20 @@ const configuredFrontendOrigins = (env.frontend_url || "")
   .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
-const corsAllowlist = [
-  "https://smaj.org",
-  "https://www.smaj.org",
-  "https://smajpihub.com",
-  "https://www.smajpihub.com",
-  "https://sandbox.minepi.com",
-  "https://smajpihub.onrender.com",
-  "http://localhost:3000",
-  "http://localhost:3314",
-  "http://localhost:5173",
-  ...configuredFrontendOrigins,
-];
+const corsAllowlist = env.is_solohost
+  ? configuredFrontendOrigins
+  : [
+      "https://smaj.org",
+      "https://www.smaj.org",
+      "https://smajpihub.com",
+      "https://www.smajpihub.com",
+      "https://sandbox.minepi.com",
+      "https://smajpihub.onrender.com",
+      "http://localhost:3000",
+      "http://localhost:3314",
+      "http://localhost:5173",
+      ...configuredFrontendOrigins,
+    ];
 
 const allowedOrigins = new Set(corsAllowlist);
 

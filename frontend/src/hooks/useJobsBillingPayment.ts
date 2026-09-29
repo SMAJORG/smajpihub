@@ -6,6 +6,7 @@ import {
   type JobsApiJob,
 } from "../lib/jobsApi";
 import { requestPiBrowserHandoff } from "../lib/piBrowserHandoff";
+import { isPiPaymentAvailable, isSoloHostRuntime } from "../lib/soloHost";
 
 type BillingPaymentCallbacks = {
   onReady?: () => void;
@@ -23,15 +24,19 @@ export const useJobsBillingPayment = () => {
 
   const payBilling = useCallback(
     async (billingId: string, amount: number, memo: string, callbacks?: BillingPaymentCallbacks) => {
-      if (!window.Pi) {
+      if (!isPiPaymentAvailable()) {
+        if (isSoloHostRuntime()) {
+          callbacks?.onError?.("Pi payments are not yet available in SMAJ PI HUB SoloHost.");
+          return;
+        }
         requestPiBrowserHandoff("Pi payment required");
         return;
       }
 
       setIsPaying(true);
       try {
-        await window.Pi.authenticate(["payments"], onIncompletePaymentFound);
-        await window.Pi.createPayment(
+        await window.Pi!.authenticate(["payments"], onIncompletePaymentFound);
+        await window.Pi!.createPayment(
           {
             amount,
             memo,

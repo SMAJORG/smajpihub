@@ -1,0 +1,46 @@
+title: SMAJ PI HUB SoloHost
+eyebrow: Pi Desktop SoloHost App
+description: Install an isolated SMAJ PI HUB instance with a local persistent MongoDB database. Pi payments are disabled pending SoloHost compatibility confirmation.
+footer_hint: Register the exact Pi OAuth redirect URI http://127.0.0.1:18443/signin/callback before using Pi Sign-In.
+output_file: .env
+after_save: >
+  Configuration saved. Install or reinstall the app to apply it. This installation does not connect to the SMAJ PI HUB production database.
+fixed_values:
+  - name: SOLOHOST_VERSION
+    value: "0.1.0"
+fields:
+  - name: SESSION_SECRET
+    label: Session secret
+    type: password
+    required: true
+    preserve_if_blank: true
+    help: Use a unique, high-entropy value for this installation.
+    env_comment: Never reuse the production SMAJ PI HUB session secret.
+  - name: MONGODB_USERNAME
+    label: Local MongoDB administrator
+    type: text
+    required: true
+    default: smaj_solohost
+    help: Used only by this installation's private MongoDB container.
+  - name: MONGODB_PASSWORD
+    label: Local MongoDB password
+    type: password
+    required: true
+    preserve_if_blank: true
+    help: Use a unique password. The local database persists in a Docker named volume.
+  - name: PI_OAUTH_CLIENT_ID
+    label: Pi OAuth client ID
+    type: text
+    required: true
+    help: Public OAuth client identifier configured for the exact SoloHost loopback redirect URI.
+  - name: CLOUDINARY_CLOUD_NAME
+    label: Cloudinary cloud name
+    type: text
+    required: false
+    help: Optional. Image and PDF uploads remain unavailable when omitted.
+  - name: CLOUDINARY_UPLOAD_PRESET
+    label: Cloudinary upload preset
+    type: password
+    required: false
+    preserve_if_blank: true
+    help: Optional. Use a restricted preset dedicated to this SoloHost installation.

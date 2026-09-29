@@ -34,4 +34,11 @@ export const platformAPIKeyClient = axios.create({
   headers: { Authorization: `Key ${env.pi_api_key}` },
 });
 
+platformAPIKeyClient.interceptors.request.use(config => {
+  if (!env.pi_payments_enabled) {
+    return Promise.reject(new Error("Pi payments are disabled for this deployment."));
+  }
+  return config;
+});
+
 export default platformAPIClient;

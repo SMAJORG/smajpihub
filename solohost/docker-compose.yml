@@ -1,0 +1,74 @@
+services:
+  web:
+    image: ghcr.io/smajorg/smajpihub-web:${SOLOHOST_VERSION}
+    restart: unless-stopped
+    labels:
+      pi.ui.primary: "true"
+    ports:
+      - "127.0.0.1:18443:8080"
+    environment:
+      API_BASE_URL: /api
+      BACKEND_URL: /api
+      SANDBOX_SDK: "false"
+      SOLOHOST_MODE: "true"
+      PI_OAUTH_CLIENT_ID: ${PI_OAUTH_CLIENT_ID}
+      PI_OAUTH_REDIRECT_URI: http://127.0.0.1:18443/signin/callback
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    image: ghcr.io/smajorg/smajpihub-backend:${SOLOHOST_VERSION}
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      NODE_ENV: production
+      PORT: "8000"
+      RUNNING_IN_CONTAINER: "true"
+      SOLOHOST_MODE: "true"
+      PI_PAYMENTS_ENABLED: "false"
+      PLATFORM_API_URL: https://api.minepi.com
+      SESSION_SECRET: ${SESSION_SECRET}
+      FRONTEND_URL: http://127.0.0.1:18443
+      MONGO_HOST: mongo:27017
+      MONGODB_DATABASE_NAME: smajpihub_solohost
+      MONGODB_USERNAME: ${MONGODB_USERNAME}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+      USE_MEMORY_DB: "false"
+      DEV_AUTH: "false"
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_UPLOAD_PRESET: ${CLOUDINARY_UPLOAD_PRESET}
+      CLOUDINARY_FOLDER: smajpihub-solohost
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - backend_logs:/usr/src/app/log
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  mongo:
+    image: mongo:7.0.15
+    restart: unless-stopped
+    expose:
+      - "27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  mongo_data:
+  backend_logs:

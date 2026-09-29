@@ -10,3 +10,4 @@ frontend/android/app/src/main/assets/public/
 frontend/android/app/src/main/assets/capacitor.config.json
 frontend/android/app/*.keystore
 frontend/android/app/*.jks
+solohost/.env

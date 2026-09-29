@@ -13,7 +13,7 @@ type VerifiedPiUser = {
   username?: string;
 };
 
-const crossSiteSession = env.is_production;
+const crossSiteSession = env.is_production && !env.is_solohost;
 const sessionCookieOptions = {
   httpOnly: true,
   sameSite: crossSiteSession ? "none" as const : "lax" as const,

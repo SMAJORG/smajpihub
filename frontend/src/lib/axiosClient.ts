@@ -2,7 +2,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import { showFeedback } from "./feedback";
 import { buildResponseCacheKey, isCacheableApiRead, readCachedResponse, storeCachedResponse } from "./offlineCache";
 
-const PRODUCTION_API_BASE_URL = "https://smajpihub.onrender.com";
+const PRODUCTION_API_BASE_URL = import.meta.env.MODE === "solohost" ? "/api" : "https://smajpihub.onrender.com";
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
 const MAX_READ_RETRIES = 2;
 const RETRY_DELAYS_MS = [1_500, 3_000] as const;

@@ -13,6 +13,7 @@ import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import AirlineSeatReclineNormalRoundedIcon from "@mui/icons-material/AirlineSeatReclineNormalRounded";
 import { transportApi, type FlightBooking } from "../../lib/transportApi";
 import { requestPiBrowserHandoff } from "../../lib/piBrowserHandoff";
+import { isPiPaymentAvailable } from "../../lib/soloHost";
 import { formatServicePrice, piFromUsdt } from "../../lib/piPricing";
 import "./FlightsPage.css";
 
@@ -140,7 +141,7 @@ const FlightsPage = () => {
       setError("Accept the booking conditions to continue.");
       return;
     }
-    if (!window.Pi) {
+    if (!isPiPaymentAvailable()) {
       setError("Open SMAJ PI HUB in Pi Browser to pay and issue your ticket.");
       requestPiBrowserHandoff("Pi payment required for flight ticket");
       return;
@@ -166,8 +167,8 @@ const FlightsPage = () => {
         fareUsd: total,
       });
       setPendingBooking(booking);
-      await window.Pi.authenticate(["payments"], () => setError("An incomplete Pi payment was found. Finish or cancel it before retrying."));
-      await window.Pi.createPayment(
+      await window.Pi!.authenticate(["payments"], () => setError("An incomplete Pi payment was found. Finish or cancel it before retrying."));
+      await window.Pi!.createPayment(
         {
           amount: booking.farePi,
           memo: `SMAJ flight ${booking.flightCode} (${booking.bookingId})`,

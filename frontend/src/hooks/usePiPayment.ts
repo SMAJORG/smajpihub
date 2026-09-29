@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { axiosClient } from "../lib/axiosClient";
 import { requestPiBrowserHandoff } from "../lib/piBrowserHandoff";
+import { isPiPaymentAvailable, isSoloHostRuntime } from "../lib/soloHost";
 
 type PaymentCallbacks = {
   onReady?: () => void;
@@ -17,15 +18,19 @@ export const usePiPayment = () => {
   const [isPaying, setIsPaying] = useState(false);
 
   const payOrder = useCallback(async (orderId: string, amount: number, callbacks?: PaymentCallbacks) => {
-    if (!window.Pi) {
+    if (!isPiPaymentAvailable()) {
+      if (isSoloHostRuntime()) {
+        callbacks?.onError?.("Pi payments are not yet available in SMAJ PI HUB SoloHost.");
+        return;
+      }
       requestPiBrowserHandoff("Pi payment required");
       return;
     }
 
     setIsPaying(true);
     try {
-      await window.Pi.authenticate(["payments"], onIncompletePaymentFound);
-      await window.Pi.createPayment(
+      await window.Pi!.authenticate(["payments"], onIncompletePaymentFound);
+      await window.Pi!.createPayment(
         {
           amount,
           memo: `SMAJ Store order ${orderId}`,

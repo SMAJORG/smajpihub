@@ -8,6 +8,7 @@
     "dev": "node node_modules/vite/bin/vite.js",
     "build": "tsc -b && node node_modules/vite/bin/vite.js build",
     "build:public": "tsc -b && node node_modules/vite/bin/vite.js build --mode public",
+    "build:solohost": "tsc -b && node node_modules/vite/bin/vite.js build --mode solohost",
     "build:legacy": "tsc -b && node node_modules/vite/bin/vite.js build --mode legacy",
     "build:android-web": "tsc -b && node node_modules/vite/bin/vite.js build --mode capacitor",
     "android:add": "cap add android",

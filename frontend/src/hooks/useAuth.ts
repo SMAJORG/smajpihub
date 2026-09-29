@@ -4,6 +4,8 @@ import { axiosClient, getBaseURL } from "../lib/axiosClient";
 import type { AuthResult, User } from "../types/pi";
 import { requestPiBrowserHandoff } from "../lib/piBrowserHandoff";
 import { authenticateWithCapacitorPi, isCapacitorNative, type CapacitorPiAuthStage } from "../lib/capacitorPiAuth";
+import { isSoloHostRuntime } from "../lib/soloHost";
+import { authenticateWithSoloHostPi } from "../lib/soloHostPiAuth";
 
 type AuthFeedback = { type: "success" | "error"; message: string };
 type BackendErrorBody = { error?: string; message?: string };
@@ -285,6 +287,23 @@ export const useAuth = () => {
         return true;
       } catch (err) {
         setAuthFeedback({ type: "error", message: (err as Error)?.message || "Pi login failed." });
+        return false;
+      } finally {
+        loginInProgressRef.current = false;
+        setIsPiLoginPending(false);
+        setPiLoginStage(null);
+        setIsLoading(false);
+      }
+    }
+    if (isSoloHostRuntime()) {
+      try {
+        setAuthFeedback({ type: "success", message: "Opening Pi Sign-In…" });
+        const authResult = await authenticateWithSoloHostPi();
+        await signInUser(authResult);
+        await redirectToDashboard();
+        return true;
+      } catch (err) {
+        setAuthFeedback({ type: "error", message: (err as Error)?.message || "Pi Sign-In failed." });
         return false;
       } finally {
         loginInProgressRef.current = false;

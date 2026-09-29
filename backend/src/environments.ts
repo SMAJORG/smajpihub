@@ -21,6 +21,8 @@ interface Environment {
   node_env: string;
   is_production: boolean;
   is_render: boolean;
+  is_solohost: boolean;
+  pi_payments_enabled: boolean;
   port: number;
   session_secret: string;
   pi_api_key: string;
@@ -65,6 +67,7 @@ const isRender = Boolean(
   process.env.RENDER_EXTERNAL_URL,
 );
 const isProduction = nodeEnv === "production" || isRender;
+const isSoloHost = String(process.env.SOLOHOST_MODE || "false").toLowerCase() === "true";
 const defaultSessionSecret = "This is my session secret";
 const productionPiPlatformAPIURL = "https://api.minepi.com";
 const normalizePiUsername = (username: string) =>
@@ -77,6 +80,8 @@ const env: Environment = {
   node_env: nodeEnv,
   is_production: isProduction,
   is_render: isRender,
+  is_solohost: isSoloHost,
+  pi_payments_enabled: String(process.env.PI_PAYMENTS_ENABLED ?? (isSoloHost ? "false" : "true")).toLowerCase() === "true",
   port: parseInt(process.env.PORT || "8000"),
   session_secret: process.env.SESSION_SECRET || defaultSessionSecret,
   pi_api_key: process.env.PI_API_KEY || "",
@@ -152,15 +157,15 @@ if (isProduction) {
     env.session_secret === defaultSessionSecret
   )
     missing.push("SESSION_SECRET");
-  if (!env.pi_api_key) missing.push("PI_API_KEY");
+  if (env.pi_payments_enabled && !env.pi_api_key) missing.push("PI_API_KEY");
   if (!process.env.FRONTEND_URL) missing.push("FRONTEND_URL");
   if (env.use_memory_db) missing.push("USE_MEMORY_DB=false");
   if (!env.mongodb_uri && !process.env.MONGO_HOST)
     missing.push("MONGODB_URI or MONGO_HOST");
   if (!env.mongodb_uri && !process.env.MONGODB_DATABASE_NAME)
     missing.push("MONGODB_DATABASE_NAME");
-  if (!env.cloudinary_cloud_name) missing.push("CLOUDINARY_CLOUD_NAME");
-  if (!env.cloudinary_upload_preset) missing.push("CLOUDINARY_UPLOAD_PRESET");
+  if (!env.is_solohost && !env.cloudinary_cloud_name) missing.push("CLOUDINARY_CLOUD_NAME");
+  if (!env.is_solohost && !env.cloudinary_upload_preset) missing.push("CLOUDINARY_UPLOAD_PRESET");
 
   if (missing.length) {
     throw new Error(
