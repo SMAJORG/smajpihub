@@ -120,6 +120,10 @@ const ContactPage = () => {
                 <dd><a href={`mailto:${companyEmail}`}>{companyEmail}</a></dd>
               </div>
               <div>
+                <dt>Quick Support</dt>
+                <dd><a href={`mailto:${quickSupportEmail}`}>{quickSupportEmail}</a></dd>
+              </div>
+              <div>
                 <dt>Office Hours</dt>
                 <dd>Monday to Saturday, 9:00 AM to 6:00 PM</dd>
               </div>
