@@ -2889,3 +2889,4 @@ html:not([data-native-app="android"]) .sw-detail-web-player .sw-player-screen-ac
   box-shadow: none !important;
   backdrop-filter: none !important;
 }
+.sw-eligibility-panel ol{margin:16px 0;padding:0;display:grid;gap:9px;list-style:none}.sw-eligibility-panel li{padding:11px 13px;display:flex;align-items:center;gap:10px;border:1px solid var(--stream-border);border-radius:10px;color:var(--stream-muted);background:var(--stream-surface)}.sw-eligibility-panel li b{font-size:18px}.sw-eligibility-panel li.complete{color:#48d391;border-color:#297a58;background:#173a2d}.sw-eligibility-panel>p{color:var(--stream-muted);font-size:12px}

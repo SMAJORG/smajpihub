@@ -9,7 +9,17 @@ const StreamCreatorOverview = ({ mode }: { mode: "overview" | "analytics" | "ear
   const [error, setError] = useState(false);
   useEffect(() => { void getCreatorOverview().then(setData).catch(() => setError(true)); }, []);
   if (!data) return <div className={`sw-catalog-status${error ? " warning" : ""}`}>{error ? "Creator statistics could not be loaded." : "Loading real creator statistics..."}</div>;
-  if (mode === "earnings") return <div className="sw-balance sw-monetization-disabled"><span><PaymentsRoundedIcon /></span><div><small>Creator monetization</small><strong>Not enabled</strong><p>{data.monetization.reason}</p></div></div>;
+  if (mode === "earnings") {
+    const steps = [
+      ["Complete your creator channel profile", data.monetization.eligibility.channelProfile],
+      ["Confirm distribution rights on an upload", data.monetization.eligibility.rightsConfirmed],
+      ["Publish at least one approved public video", data.monetization.eligibility.publishedVideo],
+      ["Reach 1,000 recorded views", data.monetization.eligibility.minimumViews],
+      ["Reach 10 hours of recorded watch time", data.monetization.eligibility.minimumWatchSeconds],
+      ["Keep the channel in good standing", data.monetization.eligibility.goodStanding],
+    ] as const;
+    return <><div className="sw-balance sw-monetization-disabled"><span><PaymentsRoundedIcon /></span><div><small>Creator Pi eligibility</small><strong>{data.monetization.eligible ? "Eligibility steps complete" : `${steps.filter(([, complete]) => complete).length} of ${steps.length} steps complete`}</strong><p>{data.monetization.reason}</p></div></div><section className="sw-panel sw-eligibility-panel"><h2>Steps to become eligible</h2><ol>{steps.map(([label, complete]) => <li className={complete ? "complete" : ""} key={label}><b>{complete ? "✓" : "○"}</b><span>{label}</span></li>)}</ol><p>Completing these steps does not guarantee payment. Pi payouts begin only after SMAJ publishes the creator reward terms and enables a compliant funded payout system.</p></section></>;
+  }
   const metrics = mode === "analytics" ? [
     ["Views", data.stats.totalViews.toLocaleString(), "Recorded"],
     ["Watch time", duration(data.stats.watchSeconds), "Recorded"],

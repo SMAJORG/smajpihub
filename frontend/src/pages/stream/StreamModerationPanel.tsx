@@ -35,7 +35,9 @@ const StreamModerationPanel = () => {
       const action = String(body.action || "update");
       setMessageType("success");
       setMessage(
-        action === "approve"
+        action === "publish"
+          ? `"${video.title}" is approved, public, and ready for playback.`
+          : action === "approve"
           ? `"${video.title}" is approved.`
           : action === "reject"
             ? `"${video.title}" was rejected.`
@@ -113,15 +115,21 @@ const StreamModerationPanel = () => {
             </div>
             <div className="sw-moderation-actions">
               <button
-                className={video.moderationStatus === "approved" ? "approved" : ""}
-                disabled={busy === video.cloudflareUid || video.moderationStatus === "approved"}
-                onClick={() => void act(video, { action: "approve" })}
+                className={video.moderationStatus === "approved" && video.visibility === "public" && video.playbackAllowed ? "approved" : ""}
+                disabled={
+                  busy === video.cloudflareUid ||
+                  video.processingStatus !== "ready" ||
+                  (video.moderationStatus === "approved" && video.visibility === "public" && video.playbackAllowed)
+                }
+                onClick={() => void act(video, { action: "publish" })}
               >
                 {busy === video.cloudflareUid
                   ? "Saving..."
-                  : video.moderationStatus === "approved"
-                    ? "Approved"
-                    : "Approve"}
+                  : video.processingStatus !== "ready"
+                    ? "Processing..."
+                    : video.moderationStatus === "approved" && video.visibility === "public" && video.playbackAllowed
+                      ? "Published"
+                      : "Approve & Publish"}
               </button>
               <button
                 disabled={busy === video.cloudflareUid || video.moderationStatus === "rejected"}

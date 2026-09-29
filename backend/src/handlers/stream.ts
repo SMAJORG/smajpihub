@@ -702,7 +702,17 @@ const mountStreamEndpoints = (router: Router) => {
     const count = (predicate: (video: Record<string, any>) => boolean) => videos.filter(predicate).length;
     const totalViews = videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.views) || 0), 0);
     const watchSeconds = videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.watchSeconds) || 0), 0);
-    return res.json({ stats: { totalVideos: videos.length, publishedVideos: count(video => video.visibility === "public" && video.moderationStatus === "approved" && video.playbackAllowed === true), pendingVideos: count(video => !video.moderationStatus || video.moderationStatus === "pending"), rejectedVideos: count(video => video.moderationStatus === "rejected"), liveStreams: count(video => video.contentType === "live"), totalViews, watchSeconds, averageViewSeconds: totalViews > 0 ? Math.round(watchSeconds / totalViews) : 0, latestUploadAt: videos[0]?.createdAt || null }, monetization: { enabled: false, reason: "Creator monetization and Pi payouts are not enabled yet." } });
+    const publishedVideos = count(video => video.visibility === "public" && video.moderationStatus === "approved" && video.playbackAllowed === true);
+    const rejectedVideos = count(video => video.moderationStatus === "rejected");
+    const eligibility = {
+      channelProfile: Boolean(user.streamProfile?.channelName && user.streamProfile?.channelHandle),
+      rightsConfirmed: videos.some(video => video.rightsConfirmed === true),
+      publishedVideo: publishedVideos > 0,
+      minimumViews: totalViews >= 1_000,
+      minimumWatchSeconds: watchSeconds >= 36_000,
+      goodStanding: rejectedVideos === 0,
+    };
+    return res.json({ stats: { totalVideos: videos.length, publishedVideos, pendingVideos: count(video => !video.moderationStatus || video.moderationStatus === "pending"), rejectedVideos, liveStreams: count(video => video.contentType === "live"), totalViews, watchSeconds, averageViewSeconds: totalViews > 0 ? Math.round(watchSeconds / totalViews) : 0, latestUploadAt: videos[0]?.createdAt || null }, monetization: { enabled: false, eligible: Object.values(eligibility).every(Boolean), eligibility, reason: "Creator Pi payouts are not live yet. Complete the eligibility steps now so the channel is ready when compliant payouts launch." } });
   });
 
   router.post("/creator/posts", async (req, res) => {
@@ -1185,7 +1195,11 @@ const mountStreamEndpoints = (router: Router) => {
     if (!video) return res.status(404).json({ error: "not_found", message: "Stream video was not found." });
     const action = String(req.body?.action || "");
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (action === "approve") {
+    if (action === "publish") {
+      if (video.rightsConfirmed !== true) return res.status(409).json({ error: "rights_missing", message: "The creator has not confirmed distribution rights." });
+      if (video.processingStatus !== "ready") return res.status(409).json({ error: "processing_not_ready", message: "Wait for video processing to finish before publishing." });
+      updates.moderationStatus = "approved"; updates.moderationReason = ""; updates.visibility = "public"; updates.playbackAllowed = true; updates.publishedAt = new Date();
+    } else if (action === "approve") {
       if (video.rightsConfirmed !== true) return res.status(409).json({ error: "rights_missing", message: "The creator has not confirmed distribution rights." });
       updates.moderationStatus = "approved"; updates.moderationReason = "";
     } else if (action === "reject") {

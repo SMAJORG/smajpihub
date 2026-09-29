@@ -39,7 +39,35 @@ export const getCreatorVideos = async () => {
   return response.data.videos;
 };
 
-export type CreatorOverview = { stats: { totalVideos: number; publishedVideos: number; pendingVideos: number; rejectedVideos: number; liveStreams: number; totalViews: number; watchSeconds: number; averageViewSeconds: number; latestUploadAt: string | null }; monetization: { enabled: boolean; reason: string } };
+export const refreshCreatorVideoStatus = async (uid: string) =>
+  (await axiosClient.get<{ video: CreatorVideo }>(`/stream/creator/videos/${encodeURIComponent(uid)}/status`)).data.video;
+
+export type CreatorOverview = {
+  stats: {
+    totalVideos: number;
+    publishedVideos: number;
+    pendingVideos: number;
+    rejectedVideos: number;
+    liveStreams: number;
+    totalViews: number;
+    watchSeconds: number;
+    averageViewSeconds: number;
+    latestUploadAt: string | null;
+  };
+  monetization: {
+    enabled: boolean;
+    eligible: boolean;
+    eligibility: {
+      channelProfile: boolean;
+      rightsConfirmed: boolean;
+      publishedVideo: boolean;
+      minimumViews: boolean;
+      minimumWatchSeconds: boolean;
+      goodStanding: boolean;
+    };
+    reason: string;
+  };
+};
 export const getCreatorOverview = async () => (await axiosClient.get<CreatorOverview>("/stream/creator/overview")).data;
 
 export const getPublishedCreatorVideos = async () => {
