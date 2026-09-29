@@ -41,7 +41,7 @@ const ServiceLaunchGate = () => {
     return (
       <div className="service-progress-warning" role="dialog" aria-modal="true" aria-labelledby="service-progress-title">
         <section className="service-progress-warning-panel">
-          <img src="/assets/services/in-progress-warning.jfif" alt="" />
+          <img src="/assets/services/in-progress-warning.png" alt="" />
           <div>
             <span>IN PROGRESS</span>
             <h2 id="service-progress-title">{serviceName} is still being prepared</h2>
