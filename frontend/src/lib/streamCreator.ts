@@ -56,8 +56,8 @@ export type CreatorOverview = {
   };
   monetization: {
     enabled: boolean;
-    eligible: boolean;
-    eligibility: {
+    eligible?: boolean;
+    eligibility?: {
       channelProfile: boolean;
       rightsConfirmed: boolean;
       publishedVideo: boolean;
