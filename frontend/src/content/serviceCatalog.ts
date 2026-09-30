@@ -45,6 +45,7 @@ export const serviceRoute = (slug: string) => `/services/${slug}`;
 
 export const serviceAppPath = (slug: string) => {
   if (slug === "store") return "/store";
+  if (slug === "stream") return "/app/services/stream";
   if (slug === "food") return "/services/food-delivery";
   return `/services/${slug}`;
 };

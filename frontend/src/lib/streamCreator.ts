@@ -16,12 +16,26 @@ export type CreatorVideo = {
   youtubeVideoId?: string;
 };
 
-export const publishCreatorYoutubeVideo = async (metadata: { youtubeUrl: string; title: string; description: string; category: string; visibility: string; rightsConfirmed: boolean }) => {
+export type CreatorVideoMetadata = {
+  title: string;
+  description: string;
+  category: string;
+  visibility: string;
+  rightsConfirmed: boolean;
+  uploadedBy?: string;
+  tmdbId?: number;
+  mediaType?: "movie" | "tv";
+  tmdbTitle?: string;
+  posterUrl?: string | null;
+  backdropUrl?: string | null;
+};
+
+export const publishCreatorYoutubeVideo = async (metadata: CreatorVideoMetadata & { youtubeUrl: string }) => {
   const response = await axiosClient.post<{ video: CreatorVideo }>("/stream/creator/youtube", metadata);
   return response.data.video;
 };
 
-export const uploadCreatorVideo = async (file: File, metadata: { title: string; description: string; category: string; visibility: string; rightsConfirmed: boolean }, onProgress?: (progress: number) => void) => {
+export const uploadCreatorVideo = async (file: File, metadata: CreatorVideoMetadata, onProgress?: (progress: number) => void) => {
   const session = await axiosClient.post<{ upload: { uid: string; uploadURL: string } }>("/stream/creator/uploads", { ...metadata, fileName: file.name, fileSize: file.size, maxDurationSeconds: 3600 });
   const form = new FormData();
   form.append("file", file);

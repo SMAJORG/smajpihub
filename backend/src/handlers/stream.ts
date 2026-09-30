@@ -580,6 +580,16 @@ const mountStreamEndpoints = (router: Router) => {
       const description = String(req.body?.description || "").trim().slice(0, 3000);
       const category = String(req.body?.category || "Entertainment").trim().slice(0, 60);
       const visibility = ["public", "unlisted", "private"].includes(req.body?.visibility) ? req.body.visibility : "private";
+      const accountCreatorName = user.displayName || user.username || user.piUsername || "Creator";
+      const uploadedBy = String(req.body?.uploadedBy || accountCreatorName).trim().slice(0, 80) || accountCreatorName;
+      const tmdbId = Number(req.body?.tmdbId);
+      const mediaType = req.body?.mediaType === "tv" ? "tv" : req.body?.mediaType === "movie" ? "movie" : null;
+      const tmdbTitle = String(req.body?.tmdbTitle || "").trim().slice(0, 140);
+      const posterUrl = String(req.body?.posterUrl || "").trim().slice(0, 500) || null;
+      const backdropUrl = String(req.body?.backdropUrl || "").trim().slice(0, 500) || null;
+      const catalogAttachment = Number.isFinite(tmdbId) && tmdbId > 0 && mediaType
+        ? { tmdbId, mediaType, title: tmdbTitle || title, attachedAt: new Date(), attachedBy: String(user._id), attachedByRole: "creator" }
+        : null;
       const fileName = String(req.body?.fileName || "video.mp4").trim().slice(0, 180);
       const fileSize = Number(req.body?.fileSize || 0);
       const maxDurationSeconds = Math.max(1, Math.min(14_400, Number(req.body?.maxDurationSeconds) || 3600));
@@ -599,7 +609,7 @@ const mountStreamEndpoints = (router: Router) => {
       const uploadURL = response.data.result?.uploadURL;
       if (!response.data.success || !uid || !uploadURL) throw new Error(response.data.errors?.[0]?.message || "Cloudflare did not create an upload URL.");
       const now = new Date();
-      const record = { cloudflareUid: uid, creatorId, creatorName: user.displayName || user.username || user.piUsername || "Creator", title, description, category, visibility, fileName, fileSize, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "awaiting_upload", moderationStatus: "pending", playbackAllowed: false, createdAt: now, updatedAt: now };
+      const record = { cloudflareUid: uid, creatorId, creatorName: uploadedBy, accountCreatorName, title, description, category, visibility, fileName, fileSize, posterUrl, backdropUrl, thumbnailUrl: posterUrl, catalogAttachment, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "awaiting_upload", moderationStatus: "pending", playbackAllowed: false, createdAt: now, updatedAt: now };
       const result = await req.app.locals.streamContentCollection.insertOne(record);
       return res.status(201).json({ upload: { id: String(result.insertedId), uid, uploadURL, expiresAt: expiry, status: record.processingStatus } });
     } catch (error) {
@@ -619,6 +629,16 @@ const mountStreamEndpoints = (router: Router) => {
       const description = String(req.body?.description || "").trim().slice(0, 3000);
       const category = String(req.body?.category || "Entertainment").trim().slice(0, 60);
       const visibility = ["public", "unlisted", "private"].includes(req.body?.visibility) ? req.body.visibility : "private";
+      const accountCreatorName = user.displayName || user.username || user.piUsername || "Creator";
+      const uploadedBy = String(req.body?.uploadedBy || accountCreatorName).trim().slice(0, 80) || accountCreatorName;
+      const tmdbId = Number(req.body?.tmdbId);
+      const mediaType = req.body?.mediaType === "tv" ? "tv" : req.body?.mediaType === "movie" ? "movie" : null;
+      const tmdbTitle = String(req.body?.tmdbTitle || "").trim().slice(0, 140);
+      const posterUrl = String(req.body?.posterUrl || "").trim().slice(0, 500) || null;
+      const backdropUrl = String(req.body?.backdropUrl || "").trim().slice(0, 500) || null;
+      const catalogAttachment = Number.isFinite(tmdbId) && tmdbId > 0 && mediaType
+        ? { tmdbId, mediaType, title: tmdbTitle || title, attachedAt: new Date(), attachedBy: String(user._id), attachedByRole: "creator" }
+        : null;
       if (!videoId) return res.status(400).json({ error: "invalid_youtube_url", message: "Enter a valid YouTube video, Short or embed URL." });
       if (!title || description.length < 20) return res.status(400).json({ error: "bad_request", message: "Add a title and a description of at least 20 characters." });
       if (req.body?.rightsConfirmed !== true) return res.status(400).json({ error: "rights_required", message: "Confirm that you own the video or have permission to publish it here." });
@@ -626,7 +646,7 @@ const mountStreamEndpoints = (router: Router) => {
       const existing = await req.app.locals.streamContentCollection.findOne({ creatorId, youtubeVideoId: videoId });
       if (existing) return res.status(409).json({ error: "already_submitted", message: "This YouTube video is already in your content manager." });
       const now = new Date();
-      const record = { cloudflareUid: `youtube-${creatorId}-${videoId}`, contentSource: "youtube", youtubeVideoId: videoId, creatorId, creatorName: user.displayName || user.username || user.piUsername || "Creator", title, description, category, visibility, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "ready", moderationStatus: "pending", playbackAllowed: false, thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, createdAt: now, updatedAt: now };
+      const record = { cloudflareUid: `youtube-${creatorId}-${videoId}`, contentSource: "youtube", youtubeVideoId: videoId, creatorId, creatorName: uploadedBy, accountCreatorName, title, description, category, visibility, posterUrl, backdropUrl, catalogAttachment, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "ready", moderationStatus: "pending", playbackAllowed: false, thumbnailUrl: posterUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, createdAt: now, updatedAt: now };
       const result = await req.app.locals.streamContentCollection.insertOne(record);
       return res.status(201).json({ video: { ...record, _id: String(result.insertedId) } });
     } catch (error) {
