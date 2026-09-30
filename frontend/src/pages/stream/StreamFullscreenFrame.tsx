@@ -95,21 +95,36 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
     const element = frameRef.current as FullscreenElement | null;
     if (!element) return;
     if (Capacitor.isNativePlatform()) {
+      let landscapeEntered = false;
       try {
         await SmajMedia.enterLandscape();
+        landscapeEntered = true;
       } catch {
-        await ScreenOrientation.lock({ orientation: "landscape" });
+        try {
+          await ScreenOrientation.lock({ orientation: "landscape" });
+          landscapeEntered = true;
+        } catch {
+          // Keep the full-viewport fallback active when Android rejects orientation lock.
+        }
       }
-      await StatusBar.hide();
-      nativeFullscreenRef.current = true;
+      await Promise.allSettled([StatusBar.hide()]);
+      nativeFullscreenRef.current = landscapeEntered;
       setFullscreen(true);
       setControlsVisible(true);
       document.documentElement.classList.add("sw-player-is-fullscreen");
     } else {
-      if (element.requestFullscreen) await element.requestFullscreen();
-      else if (element.webkitRequestFullscreen) await element.webkitRequestFullscreen();
-      else if (element.msRequestFullscreen) await element.msRequestFullscreen();
-      else throw new Error("Fullscreen is not supported by this browser.");
+      // Pi Browser and embedded mini-app frames may reject the Fullscreen API.
+      // Enter the CSS full-viewport mode first so the control always responds.
+      setFullscreen(true);
+      setControlsVisible(true);
+      document.documentElement.classList.add("sw-player-is-fullscreen");
+      try {
+        if (element.requestFullscreen) await element.requestFullscreen();
+        else if (element.webkitRequestFullscreen) await element.webkitRequestFullscreen();
+        else if (element.msRequestFullscreen) await element.msRequestFullscreen();
+      } catch {
+        // The CSS fallback remains active inside the current app viewport.
+      }
       await (screen.orientation as LockableOrientation).lock?.("landscape").catch(() => undefined);
     }
   }, []);
@@ -206,6 +221,11 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
       ref={frameRef}
       className={`${className} sw-player-stage fit-${fit}${fullscreen ? " is-fullscreen" : ""}`}
       onPointerMove={fullscreen ? showControls : undefined}
+      onDoubleClick={event => {
+        if (!mediaRef?.current || (event.target as Element).closest("button, input")) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        seek(event.clientX < bounds.left + bounds.width / 2 ? -10 : 10);
+      }}
       onClick={fullscreen ? toggleControls : undefined}
     >
       {children}

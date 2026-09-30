@@ -2937,3 +2937,9 @@ html:not([data-native-app="android"]) .sw-detail-web-player .sw-player-screen-ac
   .sw-tmdb-selected { grid-template-columns: 52px minmax(0, 1fr); }
   .sw-tmdb-selected button { grid-column: 1 / -1; }
 }
+/* Keep uploader credit and genres on one compact metadata line. */
+.sw-detail-copy .sw-detail-uploader,
+.sw-detail-copy .sw-detail-genres { display: inline-flex; vertical-align: middle; }
+.sw-detail-copy .sw-detail-uploader { margin: 10px 10px 10px 0; white-space: nowrap; }
+.sw-detail-copy .sw-detail-genres { max-width: 100%; margin: 6px 0 10px; flex-wrap: wrap; gap: 6px; }
+.sw-player-stage { touch-action: manipulation; }
