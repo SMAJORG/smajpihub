@@ -62,8 +62,7 @@ const CreatorUploadForm = () => {
 
   return <form className="sw-form" onSubmit={(event) => void submit(event)}>
     <div className="sw-source-tabs"><button className={source === "youtube" ? "active" : ""} type="button" onClick={() => setSource("youtube")}><YouTubeIcon /> YouTube link</button><button className={source === "upload" ? "active" : ""} type="button" onClick={() => setSource("upload")}><CloudUploadRoundedIcon /> Upload file</button></div>
-    {source === "youtube" ? <label className="sw-youtube-field"><YouTubeIcon /><span><b>YouTube video URL</b><input name="youtubeUrl" required placeholder="https://www.youtube.com/watch?v=..." /><small>Use your own Public or Unlisted video with embedding enabled.</small></span></label> : <label className={`sw-drop ${file ? "selected" : ""}`}><CloudUploadRoundedIcon /><b>{file ? file.name : "Choose a video to upload"}</b><span>MP4, WebM or MOV - initial limit 200 MB</span><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => { setFile(event.target.files?.[0] || null); setProgress(0); setStatus("idle"); setMessage(""); }} /></label>}
-    {source === "upload" && file && file.size > 200 * 1024 * 1024 ? <p className="sw-upload-message error">This file is over 200 MB. Large resumable uploads will be added later.</p> : null}
+    {source === "youtube" ? <label className="sw-youtube-field"><YouTubeIcon /><span><b>YouTube video URL</b><input name="youtubeUrl" required placeholder="https://www.youtube.com/watch?v=..." /><small>Use your own Public or Unlisted video with embedding enabled.</small></span></label> : <label className={`sw-drop ${file ? "selected" : ""}`}><CloudUploadRoundedIcon /><b>{file ? file.name : "Choose a video to upload"}</b><span>MP4, WebM or MOV - resumable upload up to 30 GB</span><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => { setFile(event.target.files?.[0] || null); setProgress(0); setStatus("idle"); setMessage(""); }} /></label>}
 
     <section className="sw-tmdb-picker">
       <label>Match a TMDB movie or series <small>Optional - search and select the official title and poster.</small></label>
@@ -79,7 +78,7 @@ const CreatorUploadForm = () => {
     <label className="sw-rights-confirm"><input name="rightsConfirmed" type="checkbox" required /><span><b>I own this video or have permission to publish it</b><small>I authorize SMAJ Stream to display this video according to the selected visibility and platform terms. A YouTube link does not transfer ownership to SMAJ.</small></span></label>
     {status === "uploading" && source === "upload" ? <div className="sw-upload-progress"><i style={{ width: `${progress}%` }} /><span>{progress}% uploaded</span></div> : null}
     {message ? <p className={`sw-upload-message ${status === "error" ? "error" : "success"}`}>{status === "processing" ? <CheckCircleRoundedIcon /> : null}{message}</p> : null}
-    <button type="submit" disabled={status === "uploading" || (source === "upload" && (!file || Boolean(file && file.size > 200 * 1024 * 1024)))}>{status === "uploading" ? "Publishing..." : source === "youtube" ? "Add YouTube video" : "Upload for review"}</button>
+    <button type="submit" disabled={status === "uploading" || (source === "upload" && (!file))}>{status === "uploading" ? "Publishing..." : source === "youtube" ? "Add YouTube video" : "Upload for review"}</button>
   </form>;
 };
 

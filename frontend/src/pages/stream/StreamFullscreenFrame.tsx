@@ -37,6 +37,8 @@ type Props = {
   children: ReactNode;
   mediaRef?: RefObject<HTMLVideoElement | null>;
   castSupported?: boolean;
+  seekBy?: (offset: number) => void;
+  autoFullscreen?: boolean;
 };
 
 const formatTime = (value: number) => {
@@ -49,7 +51,7 @@ const formatTime = (value: number) => {
   return hours ? `${hours}:${minutes.toString().padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
 };
 
-const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSupported = false }: Props) => {
+const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSupported = false, seekBy, autoFullscreen = false }: Props) => {
   const frameRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | null>(null);
   const nativeFullscreenRef = useRef(false);
@@ -130,6 +132,12 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
   }, []);
 
   useEffect(() => {
+    if (!autoFullscreen || !Capacitor.isNativePlatform()) return;
+    const timer = window.setTimeout(() => void enterFullscreen(), 50);
+    return () => window.clearTimeout(timer);
+  }, [autoFullscreen, enterFullscreen]);
+
+  useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const routeNativeFullscreen = () => void enterFullscreen();
     window.addEventListener("smaj:native-fullscreen-request", routeNativeFullscreen);
@@ -186,6 +194,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
   const seek = (offset: number) => {
     const media = mediaRef?.current;
     if (media) media.currentTime = Math.max(0, Math.min(media.duration || Infinity, media.currentTime + offset));
+    else seekBy?.(offset);
     showControls();
   };
   const togglePlayback = () => {
@@ -222,7 +231,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
       className={`${className} sw-player-stage fit-${fit}${fullscreen ? " is-fullscreen" : ""}`}
       onPointerMove={fullscreen ? showControls : undefined}
       onDoubleClick={event => {
-        if (!mediaRef?.current || (event.target as Element).closest("button, input")) return;
+        if ((!mediaRef?.current && !seekBy) || (event.target as Element).closest("button, input")) return;
         const bounds = event.currentTarget.getBoundingClientRect();
         seek(event.clientX < bounds.left + bounds.width / 2 ? -10 : 10);
       }}
@@ -265,7 +274,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
               <SettingsRoundedIcon />
             </button>
           </div> : null}
-          {mediaRef ? (
+          {mediaRef || seekBy ? (
             <div className="sw-player-controls-center">
               <button type="button" onClick={() => seek(-10)} aria-label="Rewind 10 seconds">
                 <Replay10RoundedIcon />

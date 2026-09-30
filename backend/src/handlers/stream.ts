@@ -592,26 +592,31 @@ const mountStreamEndpoints = (router: Router) => {
         : null;
       const fileName = String(req.body?.fileName || "video.mp4").trim().slice(0, 180);
       const fileSize = Number(req.body?.fileSize || 0);
-      const maxDurationSeconds = Math.max(1, Math.min(14_400, Number(req.body?.maxDurationSeconds) || 3600));
+      const maxDurationSeconds = Math.max(60, Math.min(28_800, Number(req.body?.maxDurationSeconds) || 14_400));
       if (!title || description.length < 20) return res.status(400).json({ error: "bad_request", message: "Add a title and a description of at least 20 characters." });
-      if (fileSize <= 0 || fileSize > 200 * 1024 * 1024) return res.status(400).json({ error: "file_size", message: "This upload flow supports video files up to 200 MB." });
+      if (!Number.isSafeInteger(fileSize) || fileSize < 1 || fileSize > 30 * 1024 * 1024 * 1024) return res.status(400).json({ error: "file_size", message: "Choose a video file smaller than 30 GB." });
       if (req.body?.rightsConfirmed !== true) return res.status(400).json({ error: "rights_required", message: "Confirm that you own or control the rights to distribute this video." });
       const creatorId = String(user._id);
-      const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      const response = await axios.post<{ success: boolean; result?: { uid?: string; uploadURL?: string }; errors?: Array<{ message?: string }> }>(`https://api.cloudflare.com/client/v4/accounts/${env.cloudflare_stream_account_id}/stream/direct_upload`, {
-        maxDurationSeconds,
-        expiry,
-        creator: creatorId.slice(0, 64),
-        requireSignedURLs: false,
-        meta: { name: fileName, smajTitle: title },
-      }, { headers: { Authorization: `Bearer ${env.cloudflare_stream_api_token}`, "Content-Type": "application/json" }, timeout: 15_000 });
-      const uid = response.data.result?.uid;
-      const uploadURL = response.data.result?.uploadURL;
-      if (!response.data.success || !uid || !uploadURL) throw new Error(response.data.errors?.[0]?.message || "Cloudflare did not create an upload URL.");
-      const now = new Date();
-      const record = { cloudflareUid: uid, creatorId, creatorName: uploadedBy, accountCreatorName, title, description, category, visibility, fileName, fileSize, posterUrl, backdropUrl, thumbnailUrl: posterUrl, catalogAttachment, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "awaiting_upload", moderationStatus: "pending", playbackAllowed: false, createdAt: now, updatedAt: now };
+      const uploadMetadata = [["name", fileName], ["maxdurationseconds", String(maxDurationSeconds)], ["requiresignedurls", "false"]]
+        .map(([key, value]) => `${key} ${Buffer.from(value).toString("base64")}`)
+        .join(",");
+      const response = await axios.post(`https://api.cloudflare.com/client/v4/accounts/${env.cloudflare_stream_account_id}/stream?direct_user=true`, null, {
+        headers: {
+          Authorization: `Bearer ${env.cloudflare_stream_api_token}`,
+          "Tus-Resumable": "1.0.0",
+          "Upload-Length": String(fileSize),
+          "Upload-Metadata": uploadMetadata,
+        },
+        timeout: 15_000,
+        maxRedirects: 0,
+        validateStatus: status => status === 201,
+      });
+      const uploadURL = String(response.headers.location || "");
+      const uid = String(response.headers["stream-media-id"] || "");
+      if (!uid || !uploadURL) throw new Error("Cloudflare created no resumable upload location or Stream UID.");      const now = new Date();
+      const record = { cloudflareUid: uid, creatorId, creatorName: uploadedBy, accountCreatorName, title, description, category, visibility, fileName, fileSize, uploadProtocol: "tus", posterUrl, backdropUrl, thumbnailUrl: posterUrl, catalogAttachment, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "preparing", moderationStatus: "pending", playbackAllowed: false, createdAt: now, updatedAt: now };
       const result = await req.app.locals.streamContentCollection.insertOne(record);
-      return res.status(201).json({ upload: { id: String(result.insertedId), uid, uploadURL, expiresAt: expiry, status: record.processingStatus } });
+      return res.status(201).json({ upload: { id: String(result.insertedId), uid, uploadURL, protocol: "tus", status: record.processingStatus } });
     } catch (error) {
       console.error("Failed to create Stream upload:", error);
       const message = axios.isAxiosError(error) ? String(error.response?.data?.errors?.[0]?.message || error.message) : error instanceof Error ? error.message : "Unable to create upload";

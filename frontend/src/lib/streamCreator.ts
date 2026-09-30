@@ -1,4 +1,4 @@
-import axios from "axios";
+import { Upload } from "tus-js-client";
 import { axiosClient } from "./axiosClient";
 
 export type CreatorVideo = {
@@ -36,18 +36,24 @@ export const publishCreatorYoutubeVideo = async (metadata: CreatorVideoMetadata 
 };
 
 export const uploadCreatorVideo = async (file: File, metadata: CreatorVideoMetadata, onProgress?: (progress: number) => void) => {
-  const session = await axiosClient.post<{ upload: { uid: string; uploadURL: string } }>("/stream/creator/uploads", { ...metadata, fileName: file.name, fileSize: file.size, maxDurationSeconds: 3600 });
-  const form = new FormData();
-  form.append("file", file);
-  await axios.post(session.data.upload.uploadURL, form, {
-    withCredentials: false,
-    timeout: 30 * 60 * 1000,
-    onUploadProgress: (event) => onProgress?.(event.total ? Math.round((event.loaded / event.total) * 100) : 0),
+  const session = await axiosClient.post<{ upload: { uid: string; uploadURL: string; protocol: "tus" } }>("/stream/creator/uploads", { ...metadata, fileName: file.name, fileSize: file.size, maxDurationSeconds: 14_400 });
+  await new Promise<void>((resolve, reject) => {
+    const upload = new Upload(file, {
+      uploadUrl: session.data.upload.uploadURL,
+      chunkSize: 50 * 1024 * 1024,
+      retryDelays: [0, 3_000, 5_000, 10_000, 20_000],
+      removeFingerprintOnSuccess: true,
+      metadata: { filename: file.name, filetype: file.type || "application/octet-stream" },
+      onError: error => reject(error),
+      onProgress: (uploaded, total) => onProgress?.(total ? Math.round((uploaded / total) * 100) : 0),
+      onSuccess: () => resolve(),
+    });
+    upload.start();
   });
+  onProgress?.(100);
   await axiosClient.post(`/stream/creator/videos/${session.data.upload.uid}/complete`);
   return session.data.upload;
 };
-
 export const getCreatorVideos = async () => {
   const response = await axiosClient.get<{ videos: CreatorVideo[] }>("/stream/creator/videos");
   return response.data.videos;

@@ -1311,10 +1311,10 @@ const Player = ({ live = false }: { live?: boolean }) => {
   const navigate = useNavigate();
   return (
     <div className="sw-fullscreen-player-shell">
-      <button className="sw-player-close" type="button" onClick={() => navigate(-1)} aria-label="Close player">
-        <CloseRoundedIcon />
+      <button className="sw-player-close" type="button" onClick={() => navigate(-1)} aria-label="Back">
+        <ArrowBackRoundedIcon />
       </button>
-      {live ? <StreamLivePlayer id={id || ""} /> : <StreamVideoPlayer id={id || ""} />}
+      {live ? <StreamLivePlayer id={id || ""} /> : <StreamVideoPlayer id={id || ""} autoFullscreen />}
     </div>
   );
 };

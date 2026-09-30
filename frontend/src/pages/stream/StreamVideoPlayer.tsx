@@ -32,6 +32,22 @@ type YouTubeApi = {
   PlayerState: { ENDED: number; PLAYING: number; PAUSED: number };
 };
 
+type CloudflarePlayer = { currentTime: number; duration: number };
+type CloudflareStreamFactory = (element: HTMLIFrameElement) => CloudflarePlayer;
+let cloudflareApiPromise: Promise<CloudflareStreamFactory> | null = null;
+const loadCloudflarePlayerApi = () => {
+  if (cloudflareApiPromise) return cloudflareApiPromise;
+  cloudflareApiPromise = new Promise<CloudflareStreamFactory>((resolve, reject) => {
+    const streamWindow = window as typeof window & { Stream?: CloudflareStreamFactory };
+    if (streamWindow.Stream) { resolve(streamWindow.Stream); return; }
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://embed.cloudflarestream.com/embed/sdk.latest.js"]');
+    const script = existing || document.createElement("script");
+    script.addEventListener("load", () => streamWindow.Stream ? resolve(streamWindow.Stream) : reject(new Error("Cloudflare player API did not initialize.")), { once: true });
+    script.addEventListener("error", () => reject(new Error("Cloudflare player API could not load.")), { once: true });
+    if (!existing) { script.src = "https://embed.cloudflarestream.com/embed/sdk.latest.js"; script.async = true; document.head.appendChild(script); }
+  });
+  return cloudflareApiPromise;
+};
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
 const loadYouTubeApi = () => {
   if (youtubeApiPromise) return youtubeApiPromise;
@@ -58,9 +74,12 @@ const loadYouTubeApi = () => {
   return youtubeApiPromise;
 };
 
-const StreamVideoPlayer = ({ id }: { id: string }) => {
+const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFullscreen?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const youtubeRef = useRef<HTMLDivElement>(null);
+  const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
+  const cloudflareIframeRef = useRef<HTMLIFrameElement>(null);
+  const cloudflarePlayerRef = useRef<CloudflarePlayer | null>(null);
   const lastSavedRef = useRef(0);
   const [video, setVideo] = useState<StreamPlaybackVideo | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -169,6 +188,7 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
           events: {
             onReady: event => {
               player = event.target;
+              youtubePlayerRef.current = event.target;
               if (typeof player.getCurrentTime !== "function" || typeof player.getDuration !== "function") {
                 setMessage("The YouTube player is not ready yet. Please reload the video.");
                 return;
@@ -184,6 +204,7 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
             },
             onStateChange: event => {
               player = event.target;
+              youtubePlayerRef.current = event.target;
               if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) save(true);
               if (event.data === YT.PlayerState.ENDED) save(true, true);
             },
@@ -196,9 +217,30 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
       active = false;
       if (timer !== null) window.clearInterval(timer);
       if (player && typeof player.destroy === "function") player.destroy();
+      youtubePlayerRef.current = null;
     };
   }, [id, video]);
 
+  useEffect(() => {
+    const iframe = cloudflareIframeRef.current;
+    if (!iframe || video?.sourceType !== "cloudflare") return;
+    let active = true;
+    void loadCloudflarePlayerApi()
+      .then(Stream => { if (active) cloudflarePlayerRef.current = Stream(iframe); })
+      .catch(() => active && setMessage("Cloudflare advanced controls could not initialize; standard player controls remain available."));
+    return () => { active = false; cloudflarePlayerRef.current = null; };
+  }, [video]);
+
+  const seekEmbedded = (offset: number) => {
+    const cloudflare = cloudflarePlayerRef.current;
+    if (cloudflare) {
+      const duration = Number(cloudflare.duration) || Number.POSITIVE_INFINITY;
+      cloudflare.currentTime = Math.max(0, Math.min(duration, (Number(cloudflare.currentTime) || 0) + offset));
+      return;
+    }
+    const youtube = youtubePlayerRef.current;
+    if (youtube) youtube.seekTo(Math.max(0, Math.min(youtube.getDuration() || Number.POSITIVE_INFINITY, youtube.getCurrentTime() + offset)), true);
+  };
   const enterPictureInPicture = async () => {
     const element = videoRef.current;
     if (!element) return;
@@ -250,7 +292,7 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
   if (video.sourceType === "youtube" && video.youtubeVideoId)
     return (
       <section className="sw-watch real">
-        <StreamFullscreenFrame className="sw-youtube-player" title={video.title}>
+        <StreamFullscreenFrame className="sw-youtube-player" title={video.title} seekBy={seekEmbedded} autoFullscreen={autoFullscreen}>
           <div ref={youtubeRef} title={video.title} />
         </StreamFullscreenFrame>
         {message ? <p className="sw-player-warning">{message}</p> : null}
@@ -266,8 +308,9 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
   if (video.sourceType === "cloudflare" && video.iframeUrl)
     return (
       <section className="sw-watch real">
-        <StreamFullscreenFrame className="sw-real-player sw-cloudflare-player" title={video.title}>
+        <StreamFullscreenFrame className="sw-real-player sw-cloudflare-player" title={video.title} seekBy={seekEmbedded} autoFullscreen={autoFullscreen}>
           <iframe
+            ref={cloudflareIframeRef}
             src={video.iframeUrl}
             title={video.title}
             allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
@@ -288,7 +331,7 @@ const StreamVideoPlayer = ({ id }: { id: string }) => {
     );
   return (
     <section className="sw-watch real">
-      <StreamFullscreenFrame className="sw-real-player" title={video.title} mediaRef={videoRef}>
+      <StreamFullscreenFrame className="sw-real-player" title={video.title} mediaRef={videoRef} autoFullscreen={autoFullscreen}>
         <video
           ref={videoRef}
           autoPlay
