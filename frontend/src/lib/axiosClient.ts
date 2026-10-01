@@ -11,7 +11,6 @@ let lastStartupNoticeAt = 0;
 
 type RetryableRequestConfig = AxiosRequestConfig & {
   __smajRetryCount?: number;
-  __smajSilent?: boolean;
 };
 const API_CREDENTIALS_CONFIG: Pick<AxiosRequestConfig, "withCredentials"> = {
   withCredentials: true,
@@ -119,7 +118,8 @@ axiosClient.interceptors.response.use(
       return axiosClient.request(config);
     }
 
-    if (typeof window !== "undefined" && !config?.__smajSilent) {
+    const suppressGlobalFeedback = String((config?.headers as Record<string, unknown> | undefined)?.["X-SMAJ-Silent"] || "") === "true";
+    if (typeof window !== "undefined" && !suppressGlobalFeedback) {
       const backendMessage = error?.response?.data?.message;
       const message =
         typeof backendMessage === "string" && backendMessage.trim()
