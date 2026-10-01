@@ -11,6 +11,7 @@ let lastStartupNoticeAt = 0;
 
 type RetryableRequestConfig = AxiosRequestConfig & {
   __smajRetryCount?: number;
+  __smajSilent?: boolean;
 };
 const API_CREDENTIALS_CONFIG: Pick<AxiosRequestConfig, "withCredentials"> = {
   withCredentials: true,
@@ -118,7 +119,7 @@ axiosClient.interceptors.response.use(
       return axiosClient.request(config);
     }
 
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !config?.__smajSilent) {
       const backendMessage = error?.response?.data?.message;
       const message =
         typeof backendMessage === "string" && backendMessage.trim()

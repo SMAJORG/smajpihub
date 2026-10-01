@@ -11,6 +11,7 @@ export type CreatorVideo = {
   processingStatus: string;
   moderationStatus: string;
   thumbnailUrl?: string | null;
+  posterUrl?: string | null;
   createdAt: string;
   contentSource?: "youtube" | "cloudflare";
   youtubeVideoId?: string;
@@ -31,12 +32,12 @@ export type CreatorVideoMetadata = {
 };
 
 export const publishCreatorYoutubeVideo = async (metadata: CreatorVideoMetadata & { youtubeUrl: string }) => {
-  const response = await axiosClient.post<{ video: CreatorVideo }>("/stream/creator/youtube", metadata);
+  const response = await axiosClient.post<{ video: CreatorVideo }>("/stream/creator/youtube", metadata, { __smajSilent: true });
   return response.data.video;
 };
 
 export const uploadCreatorVideo = async (file: File, metadata: CreatorVideoMetadata, onProgress?: (progress: number) => void) => {
-  const session = await axiosClient.post<{ upload: { uid: string; uploadURL: string; protocol: "tus" } }>("/stream/creator/uploads", { ...metadata, fileName: file.name, fileSize: file.size, maxDurationSeconds: 14_400 });
+  const session = await axiosClient.post<{ upload: { uid: string; uploadURL: string; protocol: "tus" } }>("/stream/creator/uploads", { ...metadata, fileName: file.name, fileSize: file.size, maxDurationSeconds: 14_400 }, { __smajSilent: true });
   await new Promise<void>((resolve, reject) => {
     const upload = new Upload(file, {
       uploadUrl: session.data.upload.uploadURL,
@@ -51,7 +52,7 @@ export const uploadCreatorVideo = async (file: File, metadata: CreatorVideoMetad
     upload.start();
   });
   onProgress?.(100);
-  await axiosClient.post(`/stream/creator/videos/${session.data.upload.uid}/complete`);
+  await axiosClient.post(`/stream/creator/videos/${session.data.upload.uid}/complete`, undefined, { __smajSilent: true });
   return session.data.upload;
 };
 export const getCreatorVideos = async () => {
@@ -60,7 +61,7 @@ export const getCreatorVideos = async () => {
 };
 
 export const refreshCreatorVideoStatus = async (uid: string) =>
-  (await axiosClient.get<{ video: CreatorVideo }>(`/stream/creator/videos/${encodeURIComponent(uid)}/status`)).data.video;
+  (await axiosClient.get<{ video: CreatorVideo }>(`/stream/creator/videos/${encodeURIComponent(uid)}/status`, { __smajSilent: true })).data.video;
 
 export type CreatorOverview = {
   stats: {

@@ -78,6 +78,7 @@ const NativeRuntimeBridge = () => {
           title: notification.title || "SMAJ PI HUB",
           body: notification.body || "You have a new notification.",
           channelId: "smaj_notifications",
+          smallIcon: "ic_launcher",
           extra: notification.data || {},
         }],
       }).catch(() => undefined);

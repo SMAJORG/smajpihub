@@ -16,7 +16,7 @@ const feedbackSelector = [
   ".smaj-toast.success",
   ".smaj-toast.error",
   ".sw-profile-message",
-  ".sw-upload-message",
+
   ".stream-download-error",
 ].join(",");
 

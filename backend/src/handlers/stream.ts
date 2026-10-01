@@ -594,7 +594,7 @@ const mountStreamEndpoints = (router: Router) => {
       const fileName = String(req.body?.fileName || "video.mp4").trim().slice(0, 180);
       const fileSize = Number(req.body?.fileSize || 0);
       const maxDurationSeconds = Math.max(60, Math.min(28_800, Number(req.body?.maxDurationSeconds) || 14_400));
-      if (!title || description.length < 20) return res.status(400).json({ error: "bad_request", message: "Add a title and a description of at least 20 characters." });
+      if (!title) return res.status(400).json({ error: "bad_request", message: "Add a title." });
       if (!Number.isSafeInteger(fileSize) || fileSize < 1 || fileSize > 30 * 1024 * 1024 * 1024) return res.status(400).json({ error: "file_size", message: "Choose a video file smaller than 30 GB." });
       if (req.body?.rightsConfirmed !== true) return res.status(400).json({ error: "rights_required", message: "Confirm that you own or control the rights to distribute this video." });
       const creatorId = String(user._id);
@@ -646,7 +646,7 @@ const mountStreamEndpoints = (router: Router) => {
         ? { tmdbId, mediaType, title: tmdbTitle || title, attachedAt: new Date(), attachedBy: String(user._id), attachedByRole: "creator" }
         : null;
       if (!videoId) return res.status(400).json({ error: "invalid_youtube_url", message: "Enter a valid YouTube video, Short or embed URL." });
-      if (!title || description.length < 20) return res.status(400).json({ error: "bad_request", message: "Add a title and a description of at least 20 characters." });
+      if (!title) return res.status(400).json({ error: "bad_request", message: "Add a title." });
       if (req.body?.rightsConfirmed !== true) return res.status(400).json({ error: "rights_required", message: "Confirm that you own the video or have permission to publish it here." });
       const creatorId = String(user._id);
       const existing = await req.app.locals.streamContentCollection.findOne({ creatorId, youtubeVideoId: videoId });
@@ -1022,8 +1022,9 @@ const mountStreamEndpoints = (router: Router) => {
       const response = await axios.get<{ success: boolean; result?: { readyToStream?: boolean; status?: { state?: string; errorReasonText?: string }; playback?: { hls?: string; dash?: string }; thumbnail?: string; duration?: number } }>(`https://api.cloudflare.com/client/v4/accounts/${env.cloudflare_stream_account_id}/stream/${uid}`, { headers: { Authorization: `Bearer ${env.cloudflare_stream_api_token}` }, timeout: 12_000 });
       const remote = response.data.result;
       const processingStatus = remote?.readyToStream ? "ready" : remote?.status?.state || "processing";
-      await req.app.locals.streamContentCollection.updateOne({ cloudflareUid: uid }, { $set: { processingStatus, playback: remote?.playback || null, thumbnailUrl: remote?.thumbnail || null, duration: remote?.duration || null, processingError: remote?.status?.errorReasonText || null, updatedAt: new Date() } });
-      return res.json({ video: { ...video, processingStatus, playback: remote?.playback || null, thumbnailUrl: remote?.thumbnail || null, duration: remote?.duration || null } });
+      const thumbnailUrl = remote?.thumbnail || video.thumbnailUrl || video.posterUrl || null;
+      await req.app.locals.streamContentCollection.updateOne({ cloudflareUid: uid }, { $set: { processingStatus, playback: remote?.playback || null, thumbnailUrl, duration: remote?.duration || null, processingError: remote?.status?.errorReasonText || null, updatedAt: new Date() } });
+      return res.json({ video: { ...video, processingStatus, playback: remote?.playback || null, thumbnailUrl, duration: remote?.duration || null } });
     } catch (error) {
       return res.status(502).json({ error: "status_failed", message: error instanceof Error ? error.message : "Unable to refresh video status" });
     }
