@@ -118,6 +118,7 @@ type Title = {
   posterUrl?: string | null;
   mediaType?: "movie" | "tv";
   overview?: string;
+  downloadStatus?: "pending" | "downloading" | "ready" | "failed";
 };
 
 const titles: Title[] = [
@@ -497,6 +498,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
                   posterUrl: item.posterUrl,
                   mediaType: item.mediaType,
                   overview: item.overview,
+                  downloadStatus: ("downloadStatus" in item ? item.downloadStatus : undefined) as Title["downloadStatus"],
                 }))
               );
               setCatalogState("ready");
@@ -665,7 +667,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
       ) : null}
       <div className={`sw-title-grid${kind === "downloads" ? " sw-downloads-grid" : ""}`}>
         {filtered.map(item => kind === "downloads" ? (
-          <article className="sw-downloaded-item" key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><button type="button" onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>
+          <article className={`sw-downloaded-item ${item.downloadStatus || "ready"}`} key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><span className="sw-download-item-status">{item.downloadStatus === "downloading" ? "Downloading..." : item.downloadStatus === "failed" ? "Download failed" : "Ready offline"}</span><button type="button" disabled={item.downloadStatus === "downloading" || item.downloadStatus === "failed"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>
         ) : <Tile title={item} key={`${item.mediaType || "local"}-${item.id}`} />)}
       </div>
       {saveTarget ? <div className="sw-save-overlay" role="dialog" aria-modal="true" aria-label="Save movie to phone"><section className="sw-save-sheet"><header><h2>Save to...</h2><button type="button" onClick={() => setSaveTarget(null)} aria-label="Close">×</button></header>{saveProgress !== null ? <div className="sw-save-copy-progress"><div style={{ "--save-progress": `${saveProgress * 3.6}deg` } as CSSProperties}><strong>{saveProgress}%</strong></div><h3>{saveProgress === 100 ? "Saved to phone" : "Saving movie..."}</h3><p>{saveMessage || "Keep SMAJ open while the file is copied."}</p></div> : <><button type="button" className={`sw-save-choice ${saveLocation === "phone" ? "selected" : ""}`} onClick={() => setSaveLocation("phone")}><span>▣</span><div><strong>Phone storage</strong><small>Movies/SMAJ</small></div><i /></button><button type="button" className="sw-save-choice" disabled><span>▤</span><div><strong>SD card</strong><small>Not available on this device</small></div><i /></button>{saveMessage ? <p className="sw-save-error">{saveMessage}</p> : null}<button type="button" className="sw-save-confirm" disabled={saveLocation !== "phone"} onClick={() => void saveCompletedMovie()}>Confirm</button></>}</section></div> : null}
@@ -873,12 +875,21 @@ const Detail = ({ series = false }: { series?: boolean }) => {
         await removeStreamDownload(type, id);
         setDownloaded(false);
       } else {
-        const result = await requestStreamDownload(playbackId);
-        if (result.status === "processing" || !result.downloadUrl) {
-          setPlaybackUnavailableMessage(result.message || "Cloudflare is preparing the download. Try again shortly.");
-          return;
+        setDownloadStage("downloading");
+        setDownloadProgress(0);
+        setPlaybackUnavailableMessage("");
+        let result = await requestStreamDownload(playbackId);
+        for (let attempt = 0; (result.status === "processing" || !result.downloadUrl) && attempt < 120; attempt += 1) {
+          const preparationProgress = Math.max(1, Math.min(10, Math.round((Number(result.percentComplete) || 0) / 10)));
+          setDownloadProgress(preparationProgress);
+          await new Promise(resolve => window.setTimeout(resolve, 5_000));
+          result = await requestStreamDownload(playbackId);
         }
+        if (result.status !== "ready" || !result.downloadUrl)
+          throw new Error(result.message || "Cloudflare is still preparing this movie. Please try again later.");
         if (Capacitor.isNativePlatform()) {
+          await saveStreamDownload(detail, "downloading");
+          setDownloaded(true);
           setDownloadStage("downloading");
           setDownloadProgress(0);
           const extension = new URL(result.downloadUrl).pathname.split(".").pop()?.toLowerCase();
@@ -906,10 +917,13 @@ const Detail = ({ series = false }: { series?: boolean }) => {
         setDownloaded(true);
       }
     } catch (error) {
-      if (Capacitor.isNativePlatform()) setDownloadStage("failed");
-      const failure = error as { response?: { data?: { message?: string } } };
+      if (Capacitor.isNativePlatform()) {
+        setDownloadStage("failed");
+        void saveStreamDownload(detail, "failed").catch(() => undefined);
+      }
+      const failure = error as { message?: string; response?: { data?: { message?: string } } };
       setPlaybackUnavailableMessage(
-        failure.response?.data?.message || "The download could not start. Please try again."
+        failure.response?.data?.message || failure.message || "The download could not start. Please try again."
       );
     } finally {
       setDownloading(false);

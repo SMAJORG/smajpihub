@@ -90,12 +90,11 @@ export const getStreamDownloadStatus = async (type: "movie" | "tv", id: string) 
   return response.data.downloaded;
 };
 
-export const saveStreamDownload = async (title: StreamCatalogTitle) => {
-  const response = await axiosClient.post<{ downloaded: true; item: StreamDownloadTitle }>("/stream/downloads", title);
+export const saveStreamDownload = async (title: StreamCatalogTitle, downloadStatus: "downloading" | "ready" | "failed" = "ready") => {
+  const response = await axiosClient.post<{ downloaded: true; item: StreamDownloadTitle }>("/stream/downloads", { ...title, downloadStatus });
   notifyDownloadsChanged();
   return response.data;
 };
-
 export const removeStreamDownload = async (type: "movie" | "tv", id: string) => {
   const response = await axiosClient.delete<{ downloaded: false }>(`/stream/downloads/${type}/${id}`);
   notifyDownloadsChanged();

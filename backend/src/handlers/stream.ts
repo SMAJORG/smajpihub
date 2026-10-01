@@ -413,7 +413,8 @@ const mountStreamEndpoints = (router: Router) => {
     if (!Number.isInteger(tmdbId) || tmdbId <= 0 || !mediaType || !title) return res.status(400).json({ error: "bad_request", message: "A valid TMDB title is required." });
     const licensedVideo = await req.app.locals.streamContentCollection?.findOne({ "catalogAttachment.tmdbId": tmdbId, "catalogAttachment.mediaType": mediaType, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", downloadAllowed: true });
     if (!licensedVideo) return res.status(403).json({ error: "download_not_permitted", message: "This title is not licensed for download." });
-    const item = { tmdbId, id: String(tmdbId), mediaType, title, overview: String(req.body?.overview || "").slice(0, 1200), posterUrl: req.body?.posterUrl ? String(req.body.posterUrl).slice(0, 500) : null, backdropUrl: req.body?.backdropUrl ? String(req.body.backdropUrl).slice(0, 500) : null, releaseDate: req.body?.releaseDate ? String(req.body.releaseDate).slice(0, 20) : null, rating: Number.isFinite(Number(req.body?.rating)) ? Number(req.body.rating) : null, downloadStatus: "ready", downloadedAt: new Date() };
+    const downloadStatus = ["downloading", "ready", "failed"].includes(req.body?.downloadStatus) ? req.body.downloadStatus : "ready";
+    const item = { tmdbId, id: String(tmdbId), mediaType, title, overview: String(req.body?.overview || "").slice(0, 1200), posterUrl: req.body?.posterUrl ? String(req.body.posterUrl).slice(0, 500) : null, backdropUrl: req.body?.backdropUrl ? String(req.body.backdropUrl).slice(0, 500) : null, releaseDate: req.body?.releaseDate ? String(req.body.releaseDate).slice(0, 20) : null, rating: Number.isFinite(Number(req.body?.rating)) ? Number(req.body.rating) : null, downloadStatus, downloadedAt: downloadStatus === "ready" ? new Date() : null, updatedAt: new Date() };
     await req.app.locals.userCollection.updateOne({ _id: user._id }, { $pull: { streamDownloads: { tmdbId, mediaType } } });
     await req.app.locals.userCollection.updateOne({ _id: user._id }, { $addToSet: { streamDownloads: item } });
     return res.status(201).json({ downloaded: true, item });
@@ -1411,14 +1412,13 @@ const mountStreamEndpoints = (router: Router) => {
       const generated = downloads.data.result?.default;
       if (generated?.status !== "ready" || !generated.url)
         return res.status(202).json({ status: "processing", percentComplete: Number(generated?.percentComplete) || 0, message: "Cloudflare is preparing the MP4. Try again shortly." });
-      const tokenResponse = await axios.post<{ success: boolean; result?: { token?: string }; errors?: Array<{ message?: string }> }>(`${apiUrl}/token`, { exp: Math.floor(Date.now() / 1000) + 60 * 60, downloadable: true }, { headers, timeout: 12_000 });
-      const token = String(tokenResponse.data.result?.token || "");
-      if (!tokenResponse.data.success || !token) throw new Error(tokenResponse.data.errors?.[0]?.message || "Cloudflare returned no download token.");
       const remoteUrl = new URL(generated.url);
+      if (remoteUrl.protocol !== "https:") throw new Error("Cloudflare returned an insecure download URL.");
       const safeName = String(video.title || "SMAJ-movie").replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100) || "SMAJ-movie";
-      const downloadUrl = `${remoteUrl.origin}/${encodeURIComponent(token)}/downloads/default.mp4?filename=${encodeURIComponent(safeName)}`;
+      remoteUrl.searchParams.set("filename", `${safeName}.mp4`);
+      const downloadUrl = remoteUrl.toString();
       await req.app.locals.streamContentCollection.updateOne({ cloudflareUid: uid }, { $set: { downloadAllowed: true, downloadStatus: "ready", updatedAt: new Date() } });
-      return res.json({ status: "ready", downloadUrl, expiresIn: 3600 });
+      return res.json({ status: "ready", downloadUrl });
     } catch (error) {
       const response = axios.isAxiosError(error) ? error.response : undefined;
       const data = response?.data as { errors?: unknown[]; messages?: unknown[] } | undefined;

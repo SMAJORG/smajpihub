@@ -2943,3 +2943,4 @@ html:not([data-native-app="android"]) .sw-detail-web-player .sw-player-screen-ac
 .sw-detail-copy .sw-detail-uploader { margin: 10px 10px 10px 0; white-space: nowrap; }
 .sw-detail-copy .sw-detail-genres { max-width: 100%; margin: 6px 0 10px; flex-wrap: wrap; gap: 6px; }
 .sw-player-stage { touch-action: manipulation; }
+.sw-download-item-status{display:block;margin:8px 0 2px;color:#a99fb2;font-size:11px;font-weight:800}.sw-downloaded-item.downloading .sw-download-item-status{color:#d5a5ff}.sw-downloaded-item.failed .sw-download-item-status{color:#ff929f}.sw-downloaded-item>button:disabled{opacity:.45;cursor:not-allowed}
