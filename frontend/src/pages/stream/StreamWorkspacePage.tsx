@@ -617,7 +617,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const filtered =
     kind === "search" ? list : list.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
   const saveCompletedMovie = async () => {
-    if (!saveTarget || saveLocation !== "phone" || !Capacitor.isNativePlatform()) return;
+    if (!saveTarget || !saveTarget.mediaType || saveLocation !== "phone" || !Capacitor.isNativePlatform()) return;
     const record = readNativeDownload(saveTarget.mediaType, saveTarget.id);
     if (!record || record.status !== "complete" || record.downloadId < 1) { setSaveMessage("Download this movie on this phone before saving it to storage."); return; }
     setSaveProgress(0);
