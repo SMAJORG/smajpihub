@@ -119,6 +119,21 @@ type Title = {
   mediaType?: "movie" | "tv";
   overview?: string;
   downloadStatus?: "pending" | "downloading" | "ready" | "failed";
+  downloadProgress?: number;
+};
+type NativeDownloadRecord = { downloadId: number; fileName: string; title: string; status: "preparing" | "downloading" | "complete" | "failed"; progress: number };
+const nativeDownloadKey = (type: "movie" | "tv", id: string) => `smaj:stream-download:${type}:${id}`;
+const readNativeDownload = (type: "movie" | "tv", id: string): NativeDownloadRecord | null => {
+  try { return JSON.parse(window.localStorage.getItem(nativeDownloadKey(type, id)) || "null") as NativeDownloadRecord | null; }
+  catch { return null; }
+};
+const writeNativeDownload = (type: "movie" | "tv", id: string, record: NativeDownloadRecord) => window.localStorage.setItem(nativeDownloadKey(type, id), JSON.stringify(record));
+const visibleDownloadStatus = (type: "movie" | "tv", id: string, serverStatus?: Title["downloadStatus"]): Title["downloadStatus"] => {
+  if (!Capacitor.isNativePlatform()) return serverStatus;
+  const local = readNativeDownload(type, id);
+  if (local?.status === "complete") return "ready";
+  if (local?.status === "preparing" || local?.status === "downloading") return "downloading";
+  return "failed";
 };
 
 const titles: Title[] = [
@@ -498,7 +513,8 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
                   posterUrl: item.posterUrl,
                   mediaType: item.mediaType,
                   overview: item.overview,
-                  downloadStatus: ("downloadStatus" in item ? item.downloadStatus : undefined) as Title["downloadStatus"],
+                  downloadStatus: visibleDownloadStatus(item.mediaType, item.id, ("downloadStatus" in item ? item.downloadStatus : undefined) as Title["downloadStatus"]),
+                  downloadProgress: readNativeDownload(item.mediaType, item.id)?.progress || 0,
                 }))
               );
               setCatalogState("ready");
@@ -581,7 +597,17 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
       })
       .catch(() => setChannelResults([]));
   }, [kind, query]);
-  const localList =
+  useEffect(() => {
+    if (kind !== "downloads" || !Capacitor.isNativePlatform()) return;
+    const timer = window.setInterval(() => {
+      setRemoteTitles(current => current?.map(item => ({
+        ...item,
+        downloadStatus: visibleDownloadStatus(item.mediaType || "movie", item.id, item.downloadStatus),
+        downloadProgress: readNativeDownload(item.mediaType || "movie", item.id)?.progress || 0,
+      })) || current);
+    }, 800);
+    return () => window.clearInterval(timer);
+  }, [kind]);  const localList =
     kind === "history"
       ? titles.filter(item => item.progress)
       : kind === "my-list" || kind === "downloads"
@@ -592,9 +618,8 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
     kind === "search" ? list : list.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
   const saveCompletedMovie = async () => {
     if (!saveTarget || saveLocation !== "phone" || !Capacitor.isNativePlatform()) return;
-    const stored = window.localStorage.getItem(`smaj:stream-download:${saveTarget.mediaType}:${saveTarget.id}`);
-    if (!stored) { setSaveMessage("The downloaded file is not available on this device."); return; }
-    const record = JSON.parse(stored) as { downloadId: number; fileName: string };
+    const record = readNativeDownload(saveTarget.mediaType, saveTarget.id);
+    if (!record || record.status !== "complete" || record.downloadId < 1) { setSaveMessage("Download this movie on this phone before saving it to storage."); return; }
     setSaveProgress(0);
     setSaveMessage("");
     const listener = await SmajMedia.addListener("saveProgress", event => setSaveProgress(event.progress));
@@ -667,7 +692,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
       ) : null}
       <div className={`sw-title-grid${kind === "downloads" ? " sw-downloads-grid" : ""}`}>
         {filtered.map(item => kind === "downloads" ? (
-          <article className={`sw-downloaded-item ${item.downloadStatus || "ready"}`} key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><span className="sw-download-item-status">{item.downloadStatus === "downloading" ? "Downloading..." : item.downloadStatus === "failed" ? "Download failed" : "Ready offline"}</span><button type="button" disabled={item.downloadStatus === "downloading" || item.downloadStatus === "failed"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>
+          <article className={`sw-downloaded-item ${item.downloadStatus || "ready"}`} key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><span className="sw-download-item-status">{item.downloadStatus === "downloading" ? `Downloading ${item.downloadProgress || 0}%` : item.downloadStatus === "failed" ? "Download failed" : "Ready offline"}</span><button type="button" disabled={item.downloadStatus === "downloading" || item.downloadStatus === "failed"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>
         ) : <Tile title={item} key={`${item.mediaType || "local"}-${item.id}`} />)}
       </div>
       {saveTarget ? <div className="sw-save-overlay" role="dialog" aria-modal="true" aria-label="Save movie to phone"><section className="sw-save-sheet"><header><h2>Save to...</h2><button type="button" onClick={() => setSaveTarget(null)} aria-label="Close">×</button></header>{saveProgress !== null ? <div className="sw-save-copy-progress"><div style={{ "--save-progress": `${saveProgress * 3.6}deg` } as CSSProperties}><strong>{saveProgress}%</strong></div><h3>{saveProgress === 100 ? "Saved to phone" : "Saving movie..."}</h3><p>{saveMessage || "Keep SMAJ open while the file is copied."}</p></div> : <><button type="button" className={`sw-save-choice ${saveLocation === "phone" ? "selected" : ""}`} onClick={() => setSaveLocation("phone")}><span>▣</span><div><strong>Phone storage</strong><small>Movies/SMAJ</small></div><i /></button><button type="button" className="sw-save-choice" disabled><span>▤</span><div><strong>SD card</strong><small>Not available on this device</small></div><i /></button>{saveMessage ? <p className="sw-save-error">{saveMessage}</p> : null}<button type="button" className="sw-save-confirm" disabled={saveLocation !== "phone"} onClick={() => void saveCompletedMovie()}>Confirm</button></>}</section></div> : null}
@@ -740,7 +765,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
       .then(([titleData, savedStatus, downloadStatus, availability]) => {
         setDetail(titleData as typeof detail);
         setSaved(savedStatus);
-        setDownloaded(downloadStatus);
+        setDownloaded(downloadStatus && (!Capacitor.isNativePlatform() || readNativeDownload(type, id)?.status === "complete"));
         setPlaybackId(availability.available ? availability.playbackId || "" : "");
         setPlaybackUnavailableMessage(availability.available ? "" : availability.message || "");
         setDownloadAllowed(availability.available && availability.downloadAllowed === true);
@@ -878,17 +903,19 @@ const Detail = ({ series = false }: { series?: boolean }) => {
         setDownloadStage("downloading");
         setDownloadProgress(0);
         setPlaybackUnavailableMessage("");
+        if (Capacitor.isNativePlatform()) writeNativeDownload(type, id, { downloadId: 0, fileName: "", title: detail.title, status: "preparing", progress: 0 });
+        await saveStreamDownload(detail, "downloading");
         let result = await requestStreamDownload(playbackId);
         for (let attempt = 0; (result.status === "processing" || !result.downloadUrl) && attempt < 120; attempt += 1) {
           const preparationProgress = Math.max(1, Math.min(10, Math.round((Number(result.percentComplete) || 0) / 10)));
           setDownloadProgress(preparationProgress);
+          if (Capacitor.isNativePlatform()) writeNativeDownload(type, id, { downloadId: 0, fileName: "", title: detail.title, status: "preparing", progress: preparationProgress });
           await new Promise(resolve => window.setTimeout(resolve, 5_000));
           result = await requestStreamDownload(playbackId);
         }
         if (result.status !== "ready" || !result.downloadUrl)
           throw new Error(result.message || "Cloudflare is still preparing this movie. Please try again later.");
         if (Capacitor.isNativePlatform()) {
-          await saveStreamDownload(detail, "downloading");
           setDownloaded(true);
           setDownloadStage("downloading");
           setDownloadProgress(0);
@@ -896,15 +923,17 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           const safeExtension = extension && /^[a-z0-9]{2,5}$/.test(extension) ? extension : "mp4";
           const fileName = `${detail.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 80) || "smaj-video"}.${safeExtension}`;
           const { downloadId } = await SmajMedia.startDownload({ url: result.downloadUrl, fileName, title: detail.title, location: "app" });
+          writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, status: "downloading", progress: 0 });
           for (;;) {
             await new Promise(resolve => window.setTimeout(resolve, 800));
             const progress = await SmajMedia.getDownloadStatus({ downloadId });
             setDownloadProgress(progress.progress);
+            writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, status: "downloading", progress: progress.progress });
             if (progress.status === "complete") break;
             if (progress.status === "failed") throw new Error(`Android download failed (${progress.reason || "unknown"}).`);
           }
           setDownloadProgress(100);
-          window.localStorage.setItem(`smaj:stream-download:${type}:${id}`, JSON.stringify({ downloadId, fileName, title: detail.title }));
+          writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, status: "complete", progress: 100 });
           setDownloadStage("complete");
         } else {
           const anchor = document.createElement("a");
@@ -918,6 +947,8 @@ const Detail = ({ series = false }: { series?: boolean }) => {
       }
     } catch (error) {
       if (Capacitor.isNativePlatform()) {
+        const previous = readNativeDownload(type, id);
+        writeNativeDownload(type, id, { downloadId: previous?.downloadId || 0, fileName: previous?.fileName || "", title: detail.title, status: "failed", progress: previous?.progress || 0 });
         setDownloadStage("failed");
         void saveStreamDownload(detail, "failed").catch(() => undefined);
       }

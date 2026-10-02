@@ -22418,3 +22418,9 @@ svg {
   .service-progress-warning-actions { grid-template-columns: 1fr; }
 }
 .storefront-brand-logo{width:38px;height:38px;display:block;object-fit:contain}.storefront-mobile-logo img,.storefront-mobile-drawer header img{filter:none!important}
+
+/* Compact native-style language dropdown. */
+.language-choice-dialog{min-height:0}
+.language-choice-dialog h2{margin-bottom:28px}
+.language-choice-actions{margin-top:28px}
+@media (min-width:768px){.language-choice-dialog{min-height:0}}

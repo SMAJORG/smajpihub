@@ -131,7 +131,7 @@ void i18n
   .init({
     resources,
     fallbackLng: "en",
-    supportedLngs: ["en", "fr", "sw", "ar", "zh"],
+    supportedLngs: ["en", "af", "ar", "bn", "zh", "cs", "nl", "fr", "de", "ha", "hi", "id", "it", "ja", "ko", "ms", "pt", "ru", "es", "sw", "tr", "ur", "vi", "yo"],
     nonExplicitSupportedLngs: true,
     load: "languageOnly",
     interpolation: { escapeValue: false },

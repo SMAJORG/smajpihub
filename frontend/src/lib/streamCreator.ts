@@ -1,4 +1,3 @@
-import { Upload } from "tus-js-client";
 import { axiosClient } from "./axiosClient";
 
 export type CreatorVideo = {
@@ -38,19 +37,33 @@ export const publishCreatorYoutubeVideo = async (metadata: CreatorVideoMetadata 
 
 export const uploadCreatorVideo = async (file: File, metadata: CreatorVideoMetadata, onProgress?: (progress: number) => void) => {
   const session = await axiosClient.post<{ upload: { uid: string; uploadURL: string; protocol: "tus" } }>("/stream/creator/uploads", { ...metadata, fileName: file.name, fileSize: file.size, maxDurationSeconds: 14_400 }, { headers: { "X-SMAJ-Silent": "true" } });
-  await new Promise<void>((resolve, reject) => {
-    const upload = new Upload(file, {
-      uploadUrl: session.data.upload.uploadURL,
-      chunkSize: 50 * 1024 * 1024,
-      retryDelays: [0, 3_000, 5_000, 10_000, 20_000],
-      removeFingerprintOnSuccess: true,
-      metadata: { filename: file.name, filetype: file.type || "application/octet-stream" },
-      onError: error => reject(error),
-      onProgress: (uploaded, total) => onProgress?.(total ? Math.round((uploaded / total) * 100) : 0),
-      onSuccess: () => resolve(),
+  const chunkSize = 25 * 1024 * 1024;
+  let offset = 0;
+  while (offset < file.size) {
+    const chunk = file.slice(offset, Math.min(file.size, offset + chunkSize));
+    const nextOffset = await new Promise<number>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open("PATCH", session.data.upload.uploadURL);
+      request.setRequestHeader("Tus-Resumable", "1.0.0");
+      request.setRequestHeader("Upload-Offset", String(offset));
+      request.setRequestHeader("Content-Type", "application/offset+octet-stream");
+      request.upload.onprogress = event => {
+        if (event.lengthComputable) onProgress?.(Math.min(99, Math.round(((offset + event.loaded) / file.size) * 100)));
+      };
+      request.onerror = () => reject(new Error("The upload connection was interrupted. Please try again."));
+      request.onload = () => {
+        if (request.status !== 204) {
+          reject(new Error(`Cloudflare rejected this upload chunk (${request.status}). Please start the upload again.`));
+          return;
+        }
+        const returnedOffset = Number(request.getResponseHeader("Upload-Offset"));
+        resolve(Number.isFinite(returnedOffset) && returnedOffset > offset ? returnedOffset : offset + chunk.size);
+      };
+      request.send(chunk);
     });
-    upload.start();
-  });
+    offset = nextOffset;
+    onProgress?.(Math.min(99, Math.round((offset / file.size) * 100)));
+  }
   onProgress?.(100);
   await axiosClient.post(`/stream/creator/videos/${session.data.upload.uid}/complete`, undefined, { headers: { "X-SMAJ-Silent": "true" } });
   return session.data.upload;
