@@ -7,7 +7,7 @@ export type CloudflareUploadStage = "preparing" | "uploading" | "processing" | "
 
 const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
 
-const uploadWithTus = (file: File, uploadURL: string, onProgress: (percent: number) => void) => new Promise<void>((resolve, reject) => {
+export const uploadWithTus = (file: File, uploadURL: string, onProgress: (percent: number) => void) => new Promise<void>((resolve, reject) => {
   const upload = new Upload(file, {
     uploadUrl: uploadURL,
     chunkSize: 50 * 1024 * 1024,

@@ -1,4 +1,5 @@
 import { axiosClient } from "./axiosClient";
+import { uploadWithTus } from "./streamCloudflare";
 
 export type CreatorVideo = {
   _id: string;
@@ -37,33 +38,7 @@ export const publishCreatorYoutubeVideo = async (metadata: CreatorVideoMetadata 
 
 export const uploadCreatorVideo = async (file: File, metadata: CreatorVideoMetadata, onProgress?: (progress: number) => void) => {
   const session = await axiosClient.post<{ upload: { uid: string; uploadURL: string; protocol: "tus" } }>("/stream/creator/uploads", { ...metadata, fileName: file.name, fileSize: file.size, maxDurationSeconds: 14_400 }, { headers: { "X-SMAJ-Silent": "true" } });
-  const chunkSize = 25 * 1024 * 1024;
-  let offset = 0;
-  while (offset < file.size) {
-    const chunk = file.slice(offset, Math.min(file.size, offset + chunkSize));
-    const nextOffset = await new Promise<number>((resolve, reject) => {
-      const request = new XMLHttpRequest();
-      request.open("PATCH", session.data.upload.uploadURL);
-      request.setRequestHeader("Tus-Resumable", "1.0.0");
-      request.setRequestHeader("Upload-Offset", String(offset));
-      request.setRequestHeader("Content-Type", "application/offset+octet-stream");
-      request.upload.onprogress = event => {
-        if (event.lengthComputable) onProgress?.(Math.min(99, Math.round(((offset + event.loaded) / file.size) * 100)));
-      };
-      request.onerror = () => reject(new Error("The upload connection was interrupted. Please try again."));
-      request.onload = () => {
-        if (request.status !== 204) {
-          reject(new Error(`Cloudflare rejected this upload chunk (${request.status}). Please start the upload again.`));
-          return;
-        }
-        const returnedOffset = Number(request.getResponseHeader("Upload-Offset"));
-        resolve(Number.isFinite(returnedOffset) && returnedOffset > offset ? returnedOffset : offset + chunk.size);
-      };
-      request.send(chunk);
-    });
-    offset = nextOffset;
-    onProgress?.(Math.min(99, Math.round((offset / file.size) * 100)));
-  }
+  await uploadWithTus(file, session.data.upload.uploadURL, progress => onProgress?.(progress));
   onProgress?.(100);
   await axiosClient.post(`/stream/creator/videos/${session.data.upload.uid}/complete`, undefined, { headers: { "X-SMAJ-Silent": "true" } });
   return session.data.upload;

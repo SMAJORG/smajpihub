@@ -615,7 +615,7 @@ const mountStreamEndpoints = (router: Router) => {
       const uploadURL = String(response.headers.location || "");
       const uid = String(response.headers["stream-media-id"] || "");
       if (!uid || !uploadURL) throw new Error("Cloudflare created no resumable upload location or Stream UID.");      const now = new Date();
-      const record = { cloudflareUid: uid, creatorId, creatorName: uploadedBy, accountCreatorName, title, description, category, visibility, fileName, fileSize, uploadProtocol: "tus", posterUrl, backdropUrl, thumbnailUrl: posterUrl, catalogAttachment, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "preparing", moderationStatus: "pending", playbackAllowed: false, createdAt: now, updatedAt: now };
+      const record = { cloudflareUid: uid, contentSource: "cloudflare_stream", contentType: mediaType === "tv" ? "series" : "movie", creatorId, creatorName: uploadedBy, accountCreatorName, title, description, category, visibility, fileName, fileSize, uploadProtocol: "tus", posterUrl, backdropUrl, thumbnailUrl: posterUrl, catalogAttachment, rightsConfirmed: true, rightsConfirmedAt: now, processingStatus: "preparing", moderationStatus: "pending", playbackAllowed: false, createdAt: now, updatedAt: now };
       const result = await req.app.locals.streamContentCollection.insertOne(record);
       return res.status(201).json({ upload: { id: String(result.insertedId), uid, uploadURL, protocol: "tus", status: record.processingStatus } });
     } catch (error) {
