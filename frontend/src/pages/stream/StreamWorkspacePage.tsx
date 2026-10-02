@@ -922,7 +922,9 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           const extension = new URL(result.downloadUrl).pathname.split(".").pop()?.toLowerCase();
           const safeExtension = extension && /^[a-z0-9]{2,5}$/.test(extension) ? extension : "mp4";
           const fileName = `${detail.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 80) || "smaj-video"}.${safeExtension}`;
-          const { downloadId } = await SmajMedia.startDownload({ url: result.downloadUrl, fileName, title: detail.title, location: "app" });
+          const started = await SmajMedia.startDownload({ url: result.downloadUrl, fileName, title: detail.title, location: "app" });
+          const downloadId = Number(started.downloadId);
+          if (!Number.isSafeInteger(downloadId) || downloadId < 1) throw new Error("Android did not return a valid download id.");
           writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, status: "downloading", progress: 0 });
           for (;;) {
             await new Promise(resolve => window.setTimeout(resolve, 800));

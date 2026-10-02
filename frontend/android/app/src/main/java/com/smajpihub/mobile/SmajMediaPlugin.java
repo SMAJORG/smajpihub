@@ -59,7 +59,7 @@ public class SmajMediaPlugin extends Plugin {
         } catch (Exception error) { call.reject("The Android download could not start.", error); }
     }
     @PluginMethod public void getDownloadStatus(PluginCall call) {
-        Long id = call.getLong("downloadId");
+        Long id = readDownloadId(call);
         if (id == null) { call.reject("Download id is required."); return; }
         DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
         try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(id))) {
@@ -75,7 +75,7 @@ public class SmajMediaPlugin extends Plugin {
         } catch (Exception error) { call.reject("Download progress is unavailable.", error); }
     }
     @PluginMethod public void saveDownloadToPhone(PluginCall call) {
-        Long id = call.getLong("downloadId");
+        Long id = readDownloadId(call);
         String fileName = call.getString("fileName", "smaj-video.mp4").replaceAll("[^a-zA-Z0-9._-]", "_");
         if (id == null) { call.reject("Download id is required."); return; }
         new Thread(() -> {
@@ -103,7 +103,15 @@ public class SmajMediaPlugin extends Plugin {
             } catch (Exception error) { call.reject("The movie could not be saved to phone storage.", error); }
         }).start();
     }
-    private void hideSystemBars() {
+    private Long readDownloadId(PluginCall call) {
+        Object raw = call.getData().opt("downloadId");
+        if (raw instanceof Number) return ((Number) raw).longValue();
+        if (raw instanceof String) {
+            try { return Long.parseLong((String) raw); }
+            catch (NumberFormatException ignored) { return null; }
+        }
+        return null;
+    }    private void hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsetsController controller = getActivity().getWindow().getInsetsController();
             if (controller != null) { controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars()); controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE); }
