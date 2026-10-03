@@ -57,6 +57,7 @@ import {
   searchStreamCatalog,
   type StreamCatalogTitle,
   type StreamTrailer,
+  STREAM_DOWNLOADS_CHANGED_EVENT,
 } from "../../lib/streamCatalog";
 import { getStreamProfile, saveStreamProfile, type StreamProfile } from "../../lib/streamProfile";
 import {
@@ -121,13 +122,36 @@ type Title = {
   downloadStatus?: "pending" | "downloading" | "ready" | "failed";
   downloadProgress?: number;
 };
-type NativeDownloadRecord = { downloadId: number; fileName: string; title: string; status: "preparing" | "downloading" | "complete" | "failed"; progress: number };
-const nativeDownloadKey = (type: "movie" | "tv", id: string) => `smaj:stream-download:${type}:${id}`;
+type NativeDownloadRecord = { downloadId: number; fileName: string; title: string; status: "preparing" | "downloading" | "complete" | "failed"; progress: number; id?: string; mediaType?: "movie" | "tv"; posterUrl?: string | null; downloadedBytes?: number; totalBytes?: number; updatedAt?: number };
+const nativeDownloadPrefix = "smaj:stream-download:";
+const nativeDownloadKey = (type: "movie" | "tv", id: string) => `${nativeDownloadPrefix}${type}:${id}`;
 const readNativeDownload = (type: "movie" | "tv", id: string): NativeDownloadRecord | null => {
   try { return JSON.parse(window.localStorage.getItem(nativeDownloadKey(type, id)) || "null") as NativeDownloadRecord | null; }
   catch { return null; }
 };
-const writeNativeDownload = (type: "movie" | "tv", id: string, record: NativeDownloadRecord) => window.localStorage.setItem(nativeDownloadKey(type, id), JSON.stringify(record));
+const writeNativeDownload = (type: "movie" | "tv", id: string, record: NativeDownloadRecord) => {
+  const current = readNativeDownload(type, id);
+  window.localStorage.setItem(nativeDownloadKey(type, id), JSON.stringify({ ...current, ...record, id, mediaType: type, updatedAt: Date.now() }));
+  window.dispatchEvent(new Event(STREAM_DOWNLOADS_CHANGED_EVENT));
+};
+const readAllNativeDownloads = () => {
+  const records: NativeDownloadRecord[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key?.startsWith(nativeDownloadPrefix)) continue;
+    try {
+      const record = JSON.parse(window.localStorage.getItem(key) || "null") as NativeDownloadRecord | null;
+      const [, , type, id] = key.split(":");
+      if (record && (type === "movie" || type === "tv") && id) records.push({ ...record, mediaType: type, id });
+    } catch { /* Ignore damaged legacy records. */ }
+  }
+  return records.sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
+};
+const formatDownloadBytes = (value?: number) => {
+  if (!value || value < 1) return "";
+  if (value >= 1024 * 1024 * 1024) return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+};
 const visibleDownloadStatus = (type: "movie" | "tv", id: string, serverStatus?: Title["downloadStatus"]): Title["downloadStatus"] => {
   if (!Capacitor.isNativePlatform()) return serverStatus;
   const local = readNativeDownload(type, id);
@@ -504,19 +528,38 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
         if (kind === "my-list" || kind === "downloads") {
           void (kind === "downloads" ? getStreamDownloads() : getStreamMyList())
             .then(items => {
-              setRemoteTitles(
-                items.map((item, index) => ({
-                  id: item.id,
-                  name: item.title,
-                  meta: `${item.mediaType === "tv" ? "Series" : "Movie"}${item.releaseDate ? ` - ${item.releaseDate.slice(0, 4)}` : ""}${item.rating ? ` - Rating ${item.rating}` : ""}`,
-                  tone: ["purple", "amber", "green", "blue", "coral", "indigo", "rose", "teal"][index % 8],
-                  posterUrl: item.posterUrl,
-                  mediaType: item.mediaType,
-                  overview: item.overview,
-                  downloadStatus: visibleDownloadStatus(item.mediaType, item.id, ("downloadStatus" in item ? item.downloadStatus : undefined) as Title["downloadStatus"]),
-                  downloadProgress: readNativeDownload(item.mediaType, item.id)?.progress || 0,
-                }))
-              );
+              const serverTitles: Title[] = items.map((item, index) => ({
+                id: item.id,
+                name: item.title,
+                meta: `${item.mediaType === "tv" ? "Series" : "Movie"}${item.releaseDate ? ` - ${item.releaseDate.slice(0, 4)}` : ""}${item.rating ? ` - Rating ${item.rating}` : ""}`,
+                tone: ["purple", "amber", "green", "blue", "coral", "indigo", "rose", "teal"][index % 8] || "purple",
+                posterUrl: item.posterUrl,
+                mediaType: item.mediaType,
+                overview: item.overview,
+                downloadStatus: visibleDownloadStatus(item.mediaType, item.id, ("downloadStatus" in item ? item.downloadStatus : undefined) as Title["downloadStatus"]),
+                downloadProgress: readNativeDownload(item.mediaType, item.id)?.progress || 0,
+              }));
+              if (kind === "downloads" && Capacitor.isNativePlatform()) {
+                const merged = new Map(serverTitles.map(item => [`${item.mediaType}:${item.id}`, item]));
+                readAllNativeDownloads().forEach((record, index) => {
+                  const mediaType = record.mediaType || "movie";
+                  const id = record.id || "";
+                  const key = `${mediaType}:${id}`;
+                  const server = merged.get(key);
+                  merged.set(key, {
+                    id,
+                    name: record.title || server?.name || "Downloaded movie",
+                    meta: server?.meta || (mediaType === "tv" ? "Series" : "Movie"),
+                    tone: server?.tone || ["purple", "amber", "green", "blue"][index % 4] || "purple",
+                    posterUrl: record.posterUrl || server?.posterUrl || null,
+                    mediaType,
+                    overview: server?.overview,
+                    downloadStatus: record.status === "complete" ? "ready" : record.status === "failed" ? "failed" : "downloading",
+                    downloadProgress: record.progress || 0,
+                  });
+                });
+                setRemoteTitles([...merged.values()]);
+              } else setRemoteTitles(serverTitles);
               setCatalogState("ready");
             })
             .catch(() => {
@@ -599,15 +642,59 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   }, [kind, query]);
   useEffect(() => {
     if (kind !== "downloads" || !Capacitor.isNativePlatform()) return;
-    const timer = window.setInterval(() => {
-      setRemoteTitles(current => current?.map(item => ({
-        ...item,
-        downloadStatus: visibleDownloadStatus(item.mediaType || "movie", item.id, item.downloadStatus),
-        downloadProgress: readNativeDownload(item.mediaType || "movie", item.id)?.progress || 0,
-      })) || current);
-    }, 800);
-    return () => window.clearInterval(timer);
-  }, [kind]);  const localList =
+    let checking = false;
+    const refreshNativeDownloads = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const records = readAllNativeDownloads();
+        await Promise.all(records.map(async record => {
+          if (!record.id || !record.mediaType || record.downloadId < 1 || (record.status !== "downloading" && record.status !== "preparing")) return;
+          try {
+            const status = await SmajMedia.getDownloadStatus({ downloadId: record.downloadId });
+            writeNativeDownload(record.mediaType, record.id, {
+              ...record,
+              status: status.status === "complete" ? "complete" : status.status === "failed" ? "failed" : "downloading",
+              progress: status.progress,
+              downloadedBytes: status.downloadedBytes,
+              totalBytes: status.totalBytes,
+            });
+          } catch { /* Keep the last known progress during temporary native query errors. */ }
+        }));
+        const latest = readAllNativeDownloads();
+        setRemoteTitles(current => {
+          const merged = new Map((current || []).map(item => [`${item.mediaType || "movie"}:${item.id}`, item]));
+          latest.forEach((record, index) => {
+            const mediaType = record.mediaType || "movie";
+            const id = record.id || "";
+            const key = `${mediaType}:${id}`;
+            const existing = merged.get(key);
+            merged.set(key, {
+              id,
+              name: record.title || existing?.name || "Downloaded movie",
+              meta: existing?.meta || (mediaType === "tv" ? "Series" : "Movie"),
+              tone: existing?.tone || ["purple", "amber", "green", "blue"][index % 4] || "purple",
+              posterUrl: record.posterUrl || existing?.posterUrl || null,
+              mediaType,
+              overview: existing?.overview,
+              downloadStatus: record.status === "complete" ? "ready" : record.status === "failed" ? "failed" : "downloading",
+              downloadProgress: record.progress || 0,
+            });
+          });
+          return [...merged.values()];
+        });
+      } finally { checking = false; }
+    };
+    const onDownloadsChanged = () => void refreshNativeDownloads();
+    void refreshNativeDownloads();
+    const timer = window.setInterval(() => void refreshNativeDownloads(), 800);
+    window.addEventListener(STREAM_DOWNLOADS_CHANGED_EVENT, onDownloadsChanged);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(STREAM_DOWNLOADS_CHANGED_EVENT, onDownloadsChanged);
+    };
+  }, [kind]);
+  const localList =
     kind === "history"
       ? titles.filter(item => item.progress)
       : kind === "my-list" || kind === "downloads"
@@ -616,6 +703,8 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const list = remoteTitles ?? localList;
   const filtered =
     kind === "search" ? list : list.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
+  const downloadingItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus === "downloading") : [];
+  const completedDownloadItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus !== "downloading") : [];
   const saveCompletedMovie = async () => {
     if (!saveTarget || !saveTarget.mediaType || saveLocation !== "phone" || !Capacitor.isNativePlatform()) return;
     const record = readNativeDownload(saveTarget.mediaType, saveTarget.id);
@@ -690,11 +779,23 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
           </div>
         </section>
       ) : null}
-      <div className={`sw-title-grid${kind === "downloads" ? " sw-downloads-grid" : ""}`}>
-        {filtered.map(item => kind === "downloads" ? (
-          <article className={`sw-downloaded-item ${item.downloadStatus || "ready"}`} key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><span className="sw-download-item-status">{item.downloadStatus === "downloading" ? `Downloading ${item.downloadProgress || 0}%` : item.downloadStatus === "failed" ? "Download failed" : "Ready offline"}</span><button type="button" disabled={item.downloadStatus === "downloading" || item.downloadStatus === "failed"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>
-        ) : <Tile title={item} key={`${item.mediaType || "local"}-${item.id}`} />)}
-      </div>
+      {kind === "downloads" ? (
+        <div className="sw-download-manager">
+          {downloadingItems.length ? <section className="sw-active-downloads">
+            <header><h2>Downloading ({downloadingItems.length})</h2><span>Active on this phone</span></header>
+            {downloadingItems.map(item => {
+              const record = readNativeDownload(item.mediaType || "movie", item.id);
+              const progress = item.downloadProgress || record?.progress || 0;
+              return <article key={`${item.mediaType || "movie"}-${item.id}`}>
+                <Link className="sw-active-download-poster" to={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`} style={item.posterUrl ? { backgroundImage: `url(${item.posterUrl})` } : undefined}>{!item.posterUrl ? item.name.slice(0, 2).toUpperCase() : null}<PlayArrowRoundedIcon /></Link>
+                <div className="sw-active-download-copy"><strong>{item.name}</strong><div className="sw-active-download-track"><i style={{ width: `${progress}%` }} /></div><small>{record?.status === "preparing" ? "Preparing secure download" : `${formatDownloadBytes(record?.downloadedBytes)}${record?.downloadedBytes && record?.totalBytes ? " of " : ""}${formatDownloadBytes(record?.totalBytes)}` || "Downloading"}</small></div>
+                <b>{progress}%</b>
+              </article>;
+            })}
+          </section> : null}
+          {completedDownloadItems.length ? <section className="sw-completed-downloads"><header><h2>Downloaded</h2><span>{completedDownloadItems.length} saved</span></header><div className="sw-title-grid sw-downloads-grid">{completedDownloadItems.map(item => <article className={`sw-downloaded-item ${item.downloadStatus || "ready"}`} key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><span className="sw-download-item-status">{item.downloadStatus === "failed" ? "Download failed" : "Ready offline"}</span><button type="button" disabled={item.downloadStatus === "failed"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>)}</div></section> : null}
+        </div>
+      ) : <div className="sw-title-grid">{filtered.map(item => <Tile title={item} key={`${item.mediaType || "local"}-${item.id}`} />)}</div>}
       {saveTarget ? <div className="sw-save-overlay" role="dialog" aria-modal="true" aria-label="Save movie to phone"><section className="sw-save-sheet"><header><h2>Save to...</h2><button type="button" onClick={() => setSaveTarget(null)} aria-label="Close">×</button></header>{saveProgress !== null ? <div className="sw-save-copy-progress"><div style={{ "--save-progress": `${saveProgress * 3.6}deg` } as CSSProperties}><strong>{saveProgress}%</strong></div><h3>{saveProgress === 100 ? "Saved to phone" : "Saving movie..."}</h3><p>{saveMessage || "Keep SMAJ open while the file is copied."}</p></div> : <><button type="button" className={`sw-save-choice ${saveLocation === "phone" ? "selected" : ""}`} onClick={() => setSaveLocation("phone")}><span>▣</span><div><strong>Phone storage</strong><small>Movies/SMAJ</small></div><i /></button><button type="button" className="sw-save-choice" disabled><span>▤</span><div><strong>SD card</strong><small>Not available on this device</small></div><i /></button>{saveMessage ? <p className="sw-save-error">{saveMessage}</p> : null}<button type="button" className="sw-save-confirm" disabled={saveLocation !== "phone"} onClick={() => void saveCompletedMovie()}>Confirm</button></>}</section></div> : null}
       {catalogState === "ready" && kind !== "my-list" && kind !== "downloads" ? (
         <div className="sw-load-more" ref={loadMoreRef}>
@@ -903,13 +1004,13 @@ const Detail = ({ series = false }: { series?: boolean }) => {
         setDownloadStage("downloading");
         setDownloadProgress(0);
         setPlaybackUnavailableMessage("");
-        if (Capacitor.isNativePlatform()) writeNativeDownload(type, id, { downloadId: 0, fileName: "", title: detail.title, status: "preparing", progress: 0 });
+        if (Capacitor.isNativePlatform()) writeNativeDownload(type, id, { downloadId: 0, fileName: "", title: detail.title, posterUrl: detail.posterUrl, status: "preparing", progress: 0 });
         await saveStreamDownload(detail, "downloading");
         let result = await requestStreamDownload(playbackId);
         for (let attempt = 0; (result.status === "processing" || !result.downloadUrl) && attempt < 120; attempt += 1) {
           const preparationProgress = Math.max(1, Math.min(10, Math.round((Number(result.percentComplete) || 0) / 10)));
           setDownloadProgress(preparationProgress);
-          if (Capacitor.isNativePlatform()) writeNativeDownload(type, id, { downloadId: 0, fileName: "", title: detail.title, status: "preparing", progress: preparationProgress });
+          if (Capacitor.isNativePlatform()) writeNativeDownload(type, id, { downloadId: 0, fileName: "", title: detail.title, posterUrl: detail.posterUrl, status: "preparing", progress: preparationProgress });
           await new Promise(resolve => window.setTimeout(resolve, 5_000));
           result = await requestStreamDownload(playbackId);
         }
@@ -925,17 +1026,17 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           const started = await SmajMedia.startDownload({ url: result.downloadUrl, fileName, title: detail.title, location: "app" });
           const downloadId = Number(started.downloadId);
           if (!Number.isSafeInteger(downloadId) || downloadId < 1) throw new Error("Android did not return a valid download id.");
-          writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, status: "downloading", progress: 0 });
+          writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, posterUrl: detail.posterUrl, status: "downloading", progress: 0 });
           for (;;) {
             await new Promise(resolve => window.setTimeout(resolve, 800));
             const progress = await SmajMedia.getDownloadStatus({ downloadId });
             setDownloadProgress(progress.progress);
-            writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, status: "downloading", progress: progress.progress });
+            writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, posterUrl: detail.posterUrl, status: "downloading", progress: progress.progress });
             if (progress.status === "complete") break;
             if (progress.status === "failed") throw new Error(`Android download failed (${progress.reason || "unknown"}).`);
           }
           setDownloadProgress(100);
-          writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, status: "complete", progress: 100 });
+          writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, posterUrl: detail.posterUrl, status: "complete", progress: 100 });
           setDownloadStage("complete");
         } else {
           const anchor = document.createElement("a");
@@ -950,7 +1051,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
     } catch (error) {
       if (Capacitor.isNativePlatform()) {
         const previous = readNativeDownload(type, id);
-        writeNativeDownload(type, id, { downloadId: previous?.downloadId || 0, fileName: previous?.fileName || "", title: detail.title, status: "failed", progress: previous?.progress || 0 });
+        writeNativeDownload(type, id, { downloadId: previous?.downloadId || 0, fileName: previous?.fileName || "", title: detail.title, posterUrl: detail.posterUrl, status: "failed", progress: previous?.progress || 0 });
         setDownloadStage("failed");
         void saveStreamDownload(detail, "failed").catch(() => undefined);
       }
