@@ -566,7 +566,10 @@ const mountStreamEndpoints = (router: Router) => {
     if (channelBannerUrl && !/^https:\/\//i.test(channelBannerUrl)) return res.status(400).json({ error: "invalid_banner", message: "Channel banner must use a secure HTTPS URL." });
     const profile = { displayName: String(req.body?.displayName || "").trim().slice(0, 80), avatarUrl, country: String(req.body?.country || "").trim().toUpperCase().slice(0, 2), language: String(req.body?.language || "en").trim().slice(0, 10), subtitleLanguage: String(req.body?.subtitleLanguage || "en").trim().slice(0, 10), favoriteGenres: Array.isArray(req.body?.favoriteGenres) ? [...new Set(req.body.favoriteGenres.map(String).filter((item: string) => genres.includes(item)))].slice(0, 8) : [], preferredRegions: Array.isArray(req.body?.preferredRegions) ? [...new Set(req.body.preferredRegions.map(String).filter((item: string) => regions.includes(item)))].slice(0, 7) : [], maturityLevel: ["kids", "13", "16", "18"].includes(req.body?.maturityLevel) ? req.body.maturityLevel : "16", videoQuality: ["auto", "data-saver", "hd", "full-hd"].includes(req.body?.videoQuality) ? req.body.videoQuality : "auto", autoplay: req.body?.autoplay === true, dataSaver: req.body?.dataSaver === true, showActivity: req.body?.showActivity === true, emailNotifications: req.body?.emailNotifications === true, channelName: String(req.body?.channelName || req.body?.displayName || "").trim().slice(0, 80), channelHandle: String(req.body?.channelHandle || "").trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 40), channelDescription: String(req.body?.channelDescription || "").trim().slice(0, 500), channelBannerUrl, updatedAt: new Date() };
     if (profile.displayName.length < 2) return res.status(400).json({ error: "invalid_name", message: "Display name must contain at least two characters." });
-    await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { streamProfile: profile } });
+    await Promise.all([
+      req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { streamProfile: profile, avatar: avatarUrl } }),
+      req.app.locals.productCollection?.updateMany({ sellerId: user.uid }, { $set: { sellerAvatar: avatarUrl } }),
+    ]);
     return res.json({ profile, completion: streamProfileCompletion(profile) });
   });
 
@@ -806,7 +809,7 @@ const mountStreamEndpoints = (router: Router) => {
             name: profile.channelName || user?.displayName || user?.username || "SMAJ Creator",
             handle,
             description: profile.channelDescription || "",
-            avatarUrl: profile.avatarUrl || user?.avatarUrl || "",
+            avatarUrl: profile.avatarUrl || user?.avatar || "",
             bannerUrl: profile.channelBannerUrl || "",
           },
           stats: {
@@ -840,7 +843,7 @@ const mountStreamEndpoints = (router: Router) => {
         name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator",
         handle,
         description: profile.channelDescription || "",
-        avatarUrl: profile.avatarUrl || creator.avatarUrl || "",
+        avatarUrl: profile.avatarUrl || creator.avatar || "",
         bannerUrl: profile.channelBannerUrl || "",
       },
       posts: posts.map(publicPost),
@@ -867,7 +870,7 @@ const mountStreamEndpoints = (router: Router) => {
       return {
         creatorId,
         subscribedAt: subscription.subscribedAt || null,
-        channel: { name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator", handle, avatarUrl: profile.avatarUrl || creator.avatarUrl || "" },
+        channel: { name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator", handle, avatarUrl: profile.avatarUrl || creator.avatar || "" },
         posts: posts.map(publicPost),
         videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentType: video.contentType, liveInputUid: video.liveInputUid, processingStatus: video.processingStatus, createdAt: video.createdAt })),
       };

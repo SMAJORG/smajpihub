@@ -359,10 +359,16 @@ export default function mountUserEndpoints(router: Router) {
 
     const profileUpdates = { displayName, country, contactPhone, avatar, coverImage, bio, language, sellerActive, role, roles: [role], verificationLevel: nextVerificationLevel, verificationStatus: currentUser.verificationStatus || "none", lastSeenAt: new Date() };
     assertNoBase64Images(profileUpdates, "user");
-    await userCollection.updateOne(
-      { uid: currentUser.uid },
-      { $set: profileUpdates },
-    );
+    await Promise.all([
+      userCollection.updateOne(
+        { uid: currentUser.uid },
+        { $set: { ...profileUpdates, "streamProfile.avatarUrl": avatar } },
+      ),
+      req.app.locals.productCollection?.updateMany(
+        { sellerId: currentUser.uid },
+        { $set: { sellerAvatar: avatar } },
+      ),
+    ]);
 
     const updatedUser = await userCollection.findOne({ uid: currentUser.uid });
     await refreshExistingAuthSession(req, updatedUser);

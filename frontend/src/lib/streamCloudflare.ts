@@ -1,4 +1,3 @@
-import { Upload } from "tus-js-client";
 import { axiosClient } from "./axiosClient";
 
 type CloudflareUploadSession = { uid: string; uploadURL: string; protocol: "tus"; status: string };
@@ -7,23 +6,53 @@ export type CloudflareUploadStage = "preparing" | "uploading" | "processing" | "
 
 const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
 
-export const uploadWithTus = (file: File, uploadURL: string, onProgress: (percent: number) => void) => new Promise<void>((resolve, reject) => {
-  const upload = new Upload(file, {
-    uploadUrl: uploadURL,
-    chunkSize: 50 * 1024 * 1024,
-    retryDelays: [0, 3_000, 5_000, 10_000, 20_000],
-    removeFingerprintOnSuccess: true,
-    metadata: { filename: file.name, filetype: file.type || "application/octet-stream" },
-    onError: error => {
-      const response = (error as unknown as { originalResponse?: { getBody?: () => string } }).originalResponse;
-      const detail = response?.getBody?.();
-      reject(new Error(detail ? `${error.message}: ${detail}` : error.message));
-    },
-    onProgress: (uploaded, total) => onProgress(total ? Math.round((uploaded / total) * 100) : 0),
-    onSuccess: () => resolve(),
+const uploadChunk = (uploadURL: string, chunk: Blob, offset: number, total: number, onProgress: (percent: number) => void) =>
+  new Promise<number>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PATCH", uploadURL);
+    request.setRequestHeader("Tus-Resumable", "1.0.0");
+    request.setRequestHeader("Upload-Offset", String(offset));
+    request.setRequestHeader("Content-Type", "application/offset+octet-stream");
+    request.upload.onprogress = event => {
+      if (event.lengthComputable) onProgress(Math.min(99, Math.round(((offset + event.loaded) / total) * 100)));
+    };
+    request.onerror = () => reject(new Error("The upload connection was interrupted."));
+    request.ontimeout = () => reject(new Error("The upload connection timed out."));
+    request.onload = () => {
+      if (request.status < 200 || request.status >= 300) {
+        reject(new Error(`Cloudflare rejected the upload chunk (${request.status}).`));
+        return;
+      }
+      const returnedOffset = Number(request.getResponseHeader("Upload-Offset"));
+      resolve(Number.isFinite(returnedOffset) && returnedOffset > offset ? returnedOffset : offset + chunk.size);
+    };
+    request.send(chunk);
   });
-  upload.start();
-});
+
+export const uploadWithTus = async (file: File, uploadURL: string, onProgress: (percent: number) => void) => {
+  const chunkSize = 25 * 1024 * 1024;
+  const retryDelays = [0, 3_000, 5_000, 10_000, 20_000];
+  let offset = 0;
+  while (offset < file.size) {
+    const chunk = file.slice(offset, Math.min(file.size, offset + chunkSize));
+    let lastError: unknown;
+    let nextOffset = offset;
+    for (const delay of retryDelays) {
+      if (delay) await wait(delay);
+      try {
+        nextOffset = await uploadChunk(uploadURL, chunk, offset, file.size, onProgress);
+        lastError = undefined;
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) throw new Error(`${lastError instanceof Error ? lastError.message : "Upload failed"} Please try again.`);
+    offset = nextOffset;
+    onProgress(Math.min(99, Math.round((offset / file.size) * 100)));
+  }
+  onProgress(100);
+};
 
 export const uploadCloudflareMovie = async (
   tmdbId: number,
