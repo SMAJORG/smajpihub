@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { useAuthContext } from "../contexts/AuthContext";
-import { isCapacitorNative } from "../lib/capacitorPiAuth";
+import { isCapacitorNative, PI_BROWSER_REQUIRED_MESSAGE, PI_BROWSER_LAUNCH_FAILED_MESSAGE } from "../lib/capacitorPiAuth";
+import { Browser } from "@capacitor/browser";
 import "./NativeWelcomeGate.css";
 
 const slides = [
@@ -49,6 +50,16 @@ const slides = [
 const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading, isPiLoginPending, piLoginStage, loginWithPi, authFeedback } = useAuthContext();
   const [activeSlide, setActiveSlide] = useState(0);
+  const [installError, setInstallError] = useState("");
+  const needsPiBrowser = authFeedback?.type === "error" && [PI_BROWSER_REQUIRED_MESSAGE, PI_BROWSER_LAUNCH_FAILED_MESSAGE].includes(authFeedback.message);
+  const openPiBrowserInstall = async () => {
+    setInstallError("");
+    try {
+      await Browser.open({ url: "https://play.google.com/store/apps/details?id=pi.browser" });
+    } catch {
+      setInstallError("Open Google Play and search for Pi Browser to install it.");
+    }
+  };
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
@@ -122,7 +133,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
           <button
             type="button"
             className="native-welcome__button"
-            onClick={() => void loginWithPi()}
+            onClick={() => { setInstallError(""); void loginWithPi(); }}
             disabled={isLoading}
           >
             {isPiLoginPending ? (
@@ -132,6 +143,12 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
           {authFeedback?.type === "error" ? (
             <p className="native-welcome__error" role="alert">{authFeedback.message}</p>
           ) : null}
+          {needsPiBrowser ? (
+            <button type="button" className="native-welcome__button native-welcome__install" onClick={() => void openPiBrowserInstall()}>
+              Install Pi Browser
+            </button>
+          ) : null}
+          {needsPiBrowser && installError ? <p className="native-welcome__error" role="alert">{installError}</p> : null}
           <div className="native-welcome__trust">
             <span>Powered by Pi</span><i aria-hidden="true" /><span>PART OF THE SMAJ ECOSYSTEM</span>
           </div>

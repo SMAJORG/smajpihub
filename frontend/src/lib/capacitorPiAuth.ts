@@ -7,6 +7,8 @@ import type { AuthResult } from "../types/pi";
 const STATE_KEY = "smaj_pi_oauth_state";
 const BRIDGE_URL = "pi://smajpihub.com/signin/android";
 const SIGN_IN_TIMEOUT_MS = 120000;
+export const PI_BROWSER_REQUIRED_MESSAGE = "Install Pi Browser to continue with Pi. After installation, return here and tap Continue with Pi again.";
+export const PI_BROWSER_LAUNCH_FAILED_MESSAGE = "Pi Browser could not open. Install or update Pi Browser, then tap Continue with Pi again.";
 
 export const isCapacitorNative = () => Capacitor.isNativePlatform();
 
@@ -21,6 +23,8 @@ export type CapacitorPiAuthStage = "opening" | "verifying";
 export async function authenticateWithCapacitorPi(
   onStageChange?: (stage: CapacitorPiAuthStage) => void
 ): Promise<AuthResult> {
+  const available = await AppLauncher.canOpenUrl({ url: BRIDGE_URL });
+  if (!available.value) throw new Error(PI_BROWSER_REQUIRED_MESSAGE);
   const state = randomState();
   await Preferences.set({ key: STATE_KEY, value: state });
 
@@ -81,8 +85,12 @@ export async function authenticateWithCapacitorPi(
       try {
         await listenerPromise;
         onStageChange?.("opening");
-        const launch = await AppLauncher.openUrl({ url: bridgeUrl.toString() });
-        if (!launch.completed) throw new Error("Pi Browser could not be opened.");
+        try {
+          const launch = await AppLauncher.openUrl({ url: bridgeUrl.toString() });
+          if (!launch.completed) throw new Error(PI_BROWSER_LAUNCH_FAILED_MESSAGE);
+        } catch {
+          throw new Error(PI_BROWSER_LAUNCH_FAILED_MESSAGE);
+        }
       } catch (error) {
         await finish(error);
       }
