@@ -146,14 +146,14 @@ const MessagesPage = () => {
   const selectedId = params.get("conversation");
   const [chatFullscreen, setChatFullscreen] = useState(false);
   useEffect(() => {
-    if (!chatFullscreen) return;
+    if (!chatFullscreen && !selectedId) return;
     const viewport = window.visualViewport;
     const updateChatViewport = () => {
       document.documentElement.style.setProperty("--chat-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
       document.documentElement.style.setProperty("--chat-viewport-top", `${viewport?.offsetTop ?? 0}px`);
       window.requestAnimationFrame(() => {
         const messages = chatMessagesRef.current;
-        if (messages) messages.scrollTop = messages.scrollHeight;
+        if (messages && nearBottomRef.current) messages.scrollTop = messages.scrollHeight;
       });
     };
     updateChatViewport();
@@ -167,7 +167,7 @@ const MessagesPage = () => {
       document.documentElement.style.removeProperty("--chat-viewport-height");
       document.documentElement.style.removeProperty("--chat-viewport-top");
     };
-  }, [chatFullscreen]);
+  }, [chatFullscreen, selectedId]);
   const filteredConversations = useMemo(() => {
     const query = conversationSearch.trim().toLowerCase();
     return conversations.filter((item) => inboxFilter === "archived" ? item.archived : !item.archived).filter((item) => !query || [

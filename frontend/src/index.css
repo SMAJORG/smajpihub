@@ -22424,3 +22424,34 @@ svg {
 .language-choice-dialog h2{margin-bottom:28px}
 .language-choice-actions{margin-top:28px}
 @media (min-width:768px){.language-choice-dialog{min-height:0}}
+
+/* The regular mobile conversation follows the visible viewport too. */
+@media (max-width: 1023px) {
+  .messages-page.conversation-selected {
+    position: fixed;
+    top: var(--chat-viewport-top, 0px);
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: var(--chat-viewport-height, 100dvh);
+    max-height: var(--chat-viewport-height, 100dvh);
+    background: var(--smaj-bg);
+  }
+  .messages-page.conversation-selected .chat-panel > header { flex-shrink: 0; }
+  .messages-page.conversation-selected .chat-panel > form,
+  .chat-panel-fullscreen > form {
+    position: relative;
+    inset: auto;
+    flex: 0 0 auto;
+    margin: 0;
+    border-radius: 0;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+  .messages-page.conversation-selected .chat-messages { padding-bottom: 12px; }
+}
+.chat-panel-fullscreen { min-height: 0; }
+.chat-panel-fullscreen > header { flex-shrink: 0; }
+
+@media (max-width: 1023px) {
+  .messages-page.conversation-selected .chat-panel { min-height: 0; }
+}
