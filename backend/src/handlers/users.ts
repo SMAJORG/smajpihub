@@ -1,3 +1,4 @@
+import { synchronizeAvatarSnapshots } from "../services/profileAvatars";
 import { Router, Request, Response } from "express";
 
 import { ObjectId } from "mongodb";
@@ -364,10 +365,7 @@ export default function mountUserEndpoints(router: Router) {
         { uid: currentUser.uid },
         { $set: { ...profileUpdates, "streamProfile.avatarUrl": avatar } },
       ),
-      req.app.locals.productCollection?.updateMany(
-        { sellerId: currentUser.uid },
-        { $set: { sellerAvatar: avatar } },
-      ),
+      synchronizeAvatarSnapshots(req, currentUser, avatar),
     ]);
 
     const updatedUser = await userCollection.findOne({ uid: currentUser.uid });

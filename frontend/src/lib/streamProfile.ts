@@ -4,4 +4,8 @@ export type StreamProfile = { displayName: string; avatarUrl: string; country: s
 export type StreamProfileResponse = { profile: StreamProfile; completion: number; username?: string };
 
 export const getStreamProfile = async () => (await axiosClient.get<StreamProfileResponse>("/stream/profile")).data;
-export const saveStreamProfile = async (profile: StreamProfile) => (await axiosClient.put<StreamProfileResponse>("/stream/profile", profile)).data;
+export const saveStreamProfile = async (profile: StreamProfile) => {
+  const { data } = await axiosClient.put<StreamProfileResponse>("/stream/profile", profile);
+  window.dispatchEvent(new CustomEvent("smaj:profile-avatar-updated", { detail: { avatar: data.profile.avatarUrl } }));
+  return data;
+};

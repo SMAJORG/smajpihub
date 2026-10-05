@@ -1,3 +1,4 @@
+import { enrichProfileAvatars, synchronizeAvatarSnapshots } from "../services/profileAvatars";
 import type { Request, Response, Router } from "express";
 import axios from "axios";
 import { ObjectId } from "mongodb";
@@ -552,7 +553,7 @@ const mountStreamEndpoints = (router: Router) => {
   router.get("/profile", async (req, res) => {
     const user = await requireViewer(req, res); if (!user) return;
     const stored = await req.app.locals.userCollection.findOne({ _id: user._id });
-    const profile = { displayName: stored?.streamProfile?.displayName || stored?.displayName || stored?.username || stored?.piUsername || "", avatarUrl: stored?.streamProfile?.avatarUrl || stored?.avatarUrl || "", country: stored?.streamProfile?.country || stored?.country || "", language: stored?.streamProfile?.language || "en", subtitleLanguage: stored?.streamProfile?.subtitleLanguage || "en", favoriteGenres: stored?.streamProfile?.favoriteGenres || [], preferredRegions: stored?.streamProfile?.preferredRegions || [], maturityLevel: stored?.streamProfile?.maturityLevel || "16", videoQuality: stored?.streamProfile?.videoQuality || "auto", autoplay: stored?.streamProfile?.autoplay ?? true, dataSaver: stored?.streamProfile?.dataSaver ?? false, showActivity: stored?.streamProfile?.showActivity ?? false, emailNotifications: stored?.streamProfile?.emailNotifications ?? false, channelName: stored?.streamProfile?.channelName || stored?.displayName || stored?.username || "My channel", channelHandle: stored?.streamProfile?.channelHandle || stored?.piUsername || stored?.username || "", channelDescription: stored?.streamProfile?.channelDescription || "", channelBannerUrl: stored?.streamProfile?.channelBannerUrl || "" };
+    const profile = { displayName: stored?.streamProfile?.displayName || stored?.displayName || stored?.username || stored?.piUsername || "", avatarUrl: stored?.avatar ?? stored?.streamProfile?.avatarUrl ?? stored?.avatarUrl ?? "", country: stored?.streamProfile?.country || stored?.country || "", language: stored?.streamProfile?.language || "en", subtitleLanguage: stored?.streamProfile?.subtitleLanguage || "en", favoriteGenres: stored?.streamProfile?.favoriteGenres || [], preferredRegions: stored?.streamProfile?.preferredRegions || [], maturityLevel: stored?.streamProfile?.maturityLevel || "16", videoQuality: stored?.streamProfile?.videoQuality || "auto", autoplay: stored?.streamProfile?.autoplay ?? true, dataSaver: stored?.streamProfile?.dataSaver ?? false, showActivity: stored?.streamProfile?.showActivity ?? false, emailNotifications: stored?.streamProfile?.emailNotifications ?? false, channelName: stored?.streamProfile?.channelName || stored?.displayName || stored?.username || "My channel", channelHandle: stored?.streamProfile?.channelHandle || stored?.piUsername || stored?.username || "", channelDescription: stored?.streamProfile?.channelDescription || "", channelBannerUrl: stored?.streamProfile?.channelBannerUrl || "" };
     return res.json({ profile, completion: streamProfileCompletion(profile), username: stored?.piUsername || stored?.username || "" });
   });
 
@@ -568,7 +569,7 @@ const mountStreamEndpoints = (router: Router) => {
     if (profile.displayName.length < 2) return res.status(400).json({ error: "invalid_name", message: "Display name must contain at least two characters." });
     await Promise.all([
       req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { streamProfile: profile, avatar: avatarUrl } }),
-      req.app.locals.productCollection?.updateMany({ sellerId: user.uid }, { $set: { sellerAvatar: avatarUrl } }),
+      synchronizeAvatarSnapshots(req, user, avatarUrl),
     ]);
     return res.json({ profile, completion: streamProfileCompletion(profile) });
   });
@@ -809,7 +810,7 @@ const mountStreamEndpoints = (router: Router) => {
             name: profile.channelName || user?.displayName || user?.username || "SMAJ Creator",
             handle,
             description: profile.channelDescription || "",
-            avatarUrl: profile.avatarUrl || user?.avatar || "",
+            avatarUrl: user?.avatar ?? profile.avatarUrl ?? "",
             bannerUrl: profile.channelBannerUrl || "",
           },
           stats: {
@@ -843,7 +844,7 @@ const mountStreamEndpoints = (router: Router) => {
         name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator",
         handle,
         description: profile.channelDescription || "",
-        avatarUrl: profile.avatarUrl || creator.avatar || "",
+        avatarUrl: creator.avatar ?? profile.avatarUrl ?? "",
         bannerUrl: profile.channelBannerUrl || "",
       },
       posts: posts.map(publicPost),
@@ -870,7 +871,7 @@ const mountStreamEndpoints = (router: Router) => {
       return {
         creatorId,
         subscribedAt: subscription.subscribedAt || null,
-        channel: { name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator", handle, avatarUrl: profile.avatarUrl || creator.avatar || "" },
+        channel: { name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator", handle, avatarUrl: creator.avatar ?? profile.avatarUrl ?? "" },
         posts: posts.map(publicPost),
         videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentType: video.contentType, liveInputUid: video.liveInputUid, processingStatus: video.processingStatus, createdAt: video.createdAt })),
       };
@@ -928,7 +929,7 @@ const mountStreamEndpoints = (router: Router) => {
       .sort({ popularityScore: -1, createdAt: -1 })
       .limit(limit)
       .toArray();
-    return res.json({ reviews: reviews.map(publicReview) });
+    return res.json({ reviews: (await enrichProfileAvatars(req, reviews, "review")).map(publicReview) });
   });
 
   router.get("/reviews/title/:type/:id", async (req, res) => {
@@ -941,7 +942,7 @@ const mountStreamEndpoints = (router: Router) => {
       .sort({ popularityScore: -1, createdAt: -1 })
       .limit(50)
       .toArray();
-    return res.json({ reviews: reviews.map(publicReview) });
+    return res.json({ reviews: (await enrichProfileAvatars(req, reviews, "review")).map(publicReview) });
   });
 
   router.post("/reviews/title/:type/:id", async (req, res) => {
