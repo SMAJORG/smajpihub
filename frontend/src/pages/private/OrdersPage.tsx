@@ -148,7 +148,7 @@ const OrdersPage = () => {
             </button>
           ) : null}
           {mode === "buyer" && order.status === "pending" ? (
-            <span className="order-note">Payment pending. Open the product checkout to complete payment.</span>
+            <button className="secondary" onClick={() => navigate(`/orders/${order._id}/track`)}>Continue Payment</button>
           ) : null}
           {order.status === "pending" ? (
             <button

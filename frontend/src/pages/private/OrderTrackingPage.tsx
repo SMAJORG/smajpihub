@@ -4,6 +4,7 @@ import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import { isAxiosError } from "axios";
+import { usePiPayment } from "../../hooks/usePiPayment";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { axiosClient } from "../../lib/axiosClient";
@@ -21,6 +22,18 @@ const OrderTrackingPage = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
+  const { isPaying, payOrder } = usePiPayment();
+  const continuePayment = async () => {
+    if (!order || order.buyerId !== user?.uid || order.status !== "pending") return;
+    setError("");
+    setMessage("");
+    await payOrder(order._id, order.pricePi, {
+      onReady: () => { setMessage("Payment approved. Complete payment in Pi Wallet."); void loadOrder(); },
+      onComplete: () => { setMessage("Payment completed successfully."); void loadOrder(); },
+      onCancel: () => setMessage("Payment cancelled. You can continue payment when ready."),
+      onError: setError,
+    });
+  };
 
   const loadOrder = useCallback(async () => {
     try {
@@ -45,7 +58,7 @@ const OrderTrackingPage = () => {
   const activeIndex = useMemo(() => {
     if (!order) return 0;
     const currentStep =
-      order.status === "pending" && order.paymentStatus === "pending"
+      order.status === "pending" && order.paymentStatus !== "paid"
         ? "payment_pending"
         : order.status;
     return Math.max(0, timelineOrder.indexOf(currentStep as (typeof timelineOrder)[number]));
@@ -119,7 +132,7 @@ const OrderTrackingPage = () => {
           </div>
           <div className="tracking-actions">
             {isBuyer && order.status === "pending" ? (
-              <div className="private-alert">Open SMAJ PI HUB in Pi Browser and use the checkout page to complete payment.</div>
+              <button type="button" className="private-primary-button" disabled={isPaying} onClick={() => void continuePayment()}>{isPaying ? "Completing Payment..." : "Continue Payment"}</button>
             ) : null}
             {isSeller && order.status === "paid" ? (
               <button type="button" className="private-primary-button" disabled={updating} onClick={() => void updateStatus("processing")}>
@@ -164,6 +177,7 @@ const OrderTrackingPage = () => {
                   <div>
                     <strong>{step.label}</strong>
                     <p>{step.note}</p>
+                    {step.key === "payment_pending" && isBuyer && order.status === "pending" ? <button type="button" className="private-primary-button" disabled={isPaying} onClick={() => void continuePayment()}>{isPaying ? "Completing Payment..." : "Continue Payment"}</button> : null}
                   </div>
                 </div>
               );

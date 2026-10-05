@@ -123,8 +123,21 @@ export default function mountPaymentsEndpoints(router: Router) {
 
     const order = await findBuyerOrder(req, res, String(orderId));
     if (!order) return;
+    if (order.paymentStatus === "paid" && order.paymentId === paymentId && order.paymentTxid === txid) {
+      return res.status(200).json({ message: "Payment already completed.", paymentId, txid });
+    }
     if (order.status !== "pending") {
       return res.status(400).json({ error: "bad_request", message: "Only pending orders can be completed with payment." });
+    }
+    const { data: payment } = await platformAPIKeyClient.get(`/v2/payments/${paymentId}`);
+    if (
+      payment.user_uid !== order.buyerId ||
+      String(payment.metadata?.orderId || "") !== order._id.toString() ||
+      Number(payment.amount) !== Number(order.pricePi) ||
+      payment.transaction?.txid !== txid ||
+      payment.status?.cancelled || payment.status?.user_cancelled
+    ) {
+      return res.status(400).json({ error: "bad_request", message: "Pi payment does not match this order and transaction." });
     }
 
     await platformAPIKeyClient.post(`/v2/payments/${paymentId}/complete`, { txid });

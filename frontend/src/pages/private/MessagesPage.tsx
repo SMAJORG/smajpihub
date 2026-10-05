@@ -885,7 +885,7 @@ const MessagesPage = () => {
                     <PrivateSkeleton variant="chat" count={6} />
                   ) : (
                     <>
-                      {messages.map((item, index) => (
+                      {messages.map((item) => (
                         <article
                           className={`${item.senderId === user?.uid ? "mine" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
@@ -896,7 +896,7 @@ const MessagesPage = () => {
                           onTouchCancel={clearLongPressTimer}
                           onTouchEnd={(event) => handleMessageTouchEnd(item, event)}
                         >
-                          {!item.deletedForEveryone && item.productId && item.productTitle && item.productId !== messages[index - 1]?.productId ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
+                          {!item.deletedForEveryone && item.productId && item.productTitle ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
                             {item.productImage ? <img src={item.productImage} alt="" /> : <ImageOutlinedIcon />}
                             <span><small>About this product</small><strong>{item.productTitle}</strong></span>
                           </Link> : null}
@@ -1043,7 +1043,7 @@ const MessagesPage = () => {
                     <PrivateSkeleton variant="chat" count={6} />
                   ) : (
                     <>
-                      {messages.map((item, index) => (
+                      {messages.map((item) => (
                         <article
                           className={`${item.senderId === user?.uid ? "mine" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
@@ -1054,7 +1054,7 @@ const MessagesPage = () => {
                           onTouchCancel={clearLongPressTimer}
                           onTouchEnd={(event) => handleMessageTouchEnd(item, event)}
                         >
-                          {!item.deletedForEveryone && item.productId && item.productTitle && item.productId !== messages[index - 1]?.productId ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
+                          {!item.deletedForEveryone && item.productId && item.productTitle ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
                             {item.productImage ? <img src={item.productImage} alt="" /> : <ImageOutlinedIcon />}
                             <span><small>About this product</small><strong>{item.productTitle}</strong></span>
                           </Link> : null}
