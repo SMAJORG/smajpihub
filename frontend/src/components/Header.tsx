@@ -41,6 +41,7 @@ const publicSearchItems = [
   { label: "Help / FAQ", to: "/faq", keywords: ["help", "faq", "support"] },
   { label: "Apply to Join", to: "/onboarding", keywords: ["seller", "provider", "partner", "join", "apply"] },
   { label: "White Paper Topics", to: "/white-paper", keywords: ["white paper", "token", "roadmap", "ecosystem"] },
+  { label: "Documentation", to: "/docs", keywords: ["docs", "guide", "help", "account", "payments", "stream", "android"] },
 ];
 
 const rotatingSearchPhrases = [
@@ -317,6 +318,7 @@ const Header = () => {
               {t(["nav.whitePaper", "nav.howItWorks", "nav.join", "nav.contact"][index])}
             </NavLink>
           ))}
+          <NavLink to="/docs" onClick={() => setIsMobileMenuOpen(false)}>Documentation</NavLink>
           <NavLink to="/download" onClick={() => setIsMobileMenuOpen(false)}>Download App</NavLink>
           <div className="smaj-mobile-auth-sheet">
             <div className="smaj-mobile-pref-list" aria-label="Mobile preferences">

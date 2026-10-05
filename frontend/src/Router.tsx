@@ -13,6 +13,7 @@ import FaqPage from "./pages/FaqPage.tsx";
 import ContactPage from "./pages/ContactPage.tsx";
 import DownloadPage from "./pages/DownloadPage.tsx";
 import WhitePaperPage from "./pages/WhitePaperPage.tsx";
+import DocumentationPage from "./pages/DocumentationPage.tsx";
 import TrustPage from "./pages/TrustPage.tsx";
 import CompanyPage from "./pages/CompanyPage.tsx";
 import CommunityPage from "./pages/CommunityPage.tsx";
@@ -278,6 +279,10 @@ export const router = createBrowserRouter([
   {
     path: "/white-paper",
     element: <WhitePaperPage />,
+  },
+  {
+    path: "/docs",
+    element: <DocumentationPage />,
   },
   {
     path: "/how-it-works",

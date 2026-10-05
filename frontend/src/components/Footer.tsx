@@ -51,6 +51,7 @@ const Footer = () => {
           <Link to="/about">{t("nav.about")}</Link>
           <Link to="/services">{t("nav.services")}</Link>
           <Link to="/white-paper">{t("nav.whitePaper")}</Link>
+          <Link to="/docs">Documentation</Link>
           <Link to="/trust">{t("footer.trust")}</Link>
           <Link to="/company">{t("footer.company")}</Link>
           <Link to="/contact">{t("nav.contact")}</Link>
