@@ -127,7 +127,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
 
         <div className="native-welcome__actions">
           <div className="native-welcome__signin-label">
-            <span className="native-welcome__pi" aria-hidden="true">π</span>
+            <span className="native-welcome__pi" aria-hidden="true"><img src="/assets/pi-network-logo.png" alt="" width="44" height="44" /></span>
             <div><strong>Continue with Pi</strong><small>Secure sign-in with your Pi identity</small></div>
           </div>
           <button
