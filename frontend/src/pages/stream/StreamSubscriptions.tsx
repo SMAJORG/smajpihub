@@ -1,3 +1,4 @@
+import StreamVideoActions from "./StreamVideoActions";
 import StreamSkeleton from "./StreamSkeleton";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -69,7 +70,7 @@ const StreamSubscriptions = () => {
                           ? `/app/services/stream/live/${video.liveInputUid}`
                           : `/app/services/stream/watch/${video.youtubeVideoId ? `yt-${video.youtubeVideoId}` : video.cloudflareUid}`;
                       return (
-                        <Link key={video._id} to={target}>
+                        <article className="sw-channel-video-card" key={video._id}><Link to={target}>
                           <div
                             style={video.thumbnailUrl ? { backgroundImage: `url("${video.thumbnailUrl}")` } : undefined}
                           >
@@ -81,7 +82,7 @@ const StreamSubscriptions = () => {
                               ? "Live now"
                               : video.category || "Entertainment"}
                           </p>
-                        </Link>
+                        </Link><StreamVideoActions video={video} watchPath={target} /></article>
                       );
                     })}
                   </div>

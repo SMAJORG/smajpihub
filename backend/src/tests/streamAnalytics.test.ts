@@ -18,6 +18,8 @@ const main = async () => {
   await recordStreamPlayback(collection, { ...event, creatorId: "other", videoId: "other-video" }, start);
   assert.deepEqual(await getStreamPlaybackTotals(collection, "creator"), { views: 2, watchSeconds: 15 });
   assert.deepEqual(await getStreamPlaybackTotals(collection, "other"), { views: 1, watchSeconds: 0 });
+  assert.deepEqual(await getStreamPlaybackTotals(collection, "creator", "video"), { views: 2, watchSeconds: 15 });
+  assert.deepEqual(await getStreamPlaybackTotals(collection, "creator", "other-video"), { views: 0, watchSeconds: 0 }, "Per-video analytics must not include another creator's content");
   console.log("Stream analytics regression checks passed");
 };
 void main().catch(error => { console.error(error); process.exitCode = 1; });

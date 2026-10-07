@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import StreamSkeleton from "./StreamSkeleton";
 import { STREAM_ACTIVITY_EVENT } from "../../lib/streamPlaybackTracking";
 import { useEffect, useState } from "react";
@@ -7,11 +8,15 @@ import { getCreatorOverview, type CreatorOverview } from "../../lib/streamCreato
 const duration = (seconds: number) => seconds < 60 ? `${Math.floor(seconds)}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s` : `${(seconds / 3600).toFixed(1)}h`;
 
 const StreamCreatorOverview = ({ mode }: { mode: "overview" | "analytics" | "earnings" }) => {
+  const [searchParams] = useSearchParams();
+  const videoUid = mode === "analytics" ? searchParams.get("video") || undefined : undefined;
   const [data, setData] = useState<CreatorOverview | null>(null);
   const [error, setError] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
+    setData(null);
+    setError(false);
     let active = true;
     let running = false;
     const controller = new AbortController();
@@ -19,7 +24,7 @@ const StreamCreatorOverview = ({ mode }: { mode: "overview" | "analytics" | "ear
       if (running || document.visibilityState === "hidden") return;
       running = true;
       try {
-        const result = await getCreatorOverview(controller.signal);
+        const result = await getCreatorOverview(controller.signal, videoUid);
         if (active) { setData(result); setError(false); setUpdatedAt(new Date()); }
       } catch { if (active) setError(true); }
       finally { running = false; }
@@ -37,7 +42,7 @@ const StreamCreatorOverview = ({ mode }: { mode: "overview" | "analytics" | "ear
       window.removeEventListener(STREAM_ACTIVITY_EVENT, refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [retry]);
+  }, [retry, videoUid]);
   if (!data) return error ? <div className="sw-catalog-status warning">Creator statistics could not be loaded. <button type="button" onClick={() => setRetry(value => value + 1)}>Retry</button></div> : <StreamSkeleton variant="metrics" label="Loading creator statistics" />;
   if (mode === "earnings") {
     const eligibility = data.monetization?.eligibility ?? {
@@ -63,8 +68,7 @@ const StreamCreatorOverview = ({ mode }: { mode: "overview" | "analytics" | "ear
     ["Watch time", duration(data.stats.watchSeconds), "Recorded"],
     ["Average view", duration(data.stats.averageViewSeconds), "Per view"],
     ["Published", String(data.stats.publishedVideos), "Videos"],
-    ["Followers", String(data.stats.followers ?? 0), "Current followers"],
-    ["Posts", String(data.stats.posts ?? 0), "Channel posts"],
+    ...(!videoUid ? [["Followers", String(data.stats.followers ?? 0), "Current followers"], ["Posts", String(data.stats.posts ?? 0), "Channel posts"]] : []),
     ["Live streams", String(data.stats.liveStreams), "Created"],
     ["Pending review", String(data.stats.pendingVideos), "Uploads"],
   ] : [
@@ -73,7 +77,7 @@ const StreamCreatorOverview = ({ mode }: { mode: "overview" | "analytics" | "ear
     ["Pending review", String(data.stats.pendingVideos), "Moderation"],
     ["Live streams", String(data.stats.liveStreams), "Created"],
   ];
-  return <><div className="sw-metrics">{metrics.map(([label,value,note]) => <article key={label}><small>{label}</small><strong>{value}</strong><span>{note}</span></article>)}</div><div className="sw-panel"><h2>{mode === "analytics" ? "Live analytics" : "Channel status"}</h2>{error ? <p role="status">Updates are temporarily unavailable. Showing the last synchronized totals.</p> : updatedAt ? <small>Updated {updatedAt.toLocaleTimeString()} - Refreshes every 5 seconds</small> : null}<p>{mode === "analytics" ? data.stats.totalViews ? "Views and watch time update as viewers play your videos. Followers, uploads and posts use current channel activity." : "No playback events have been recorded yet." : data.stats.latestUploadAt ? `Latest upload: ${new Date(data.stats.latestUploadAt).toLocaleDateString()}` : "No uploads yet."}</p>{mode === "overview" ? <p>{data.stats.rejectedVideos} rejected  -  {data.stats.totalViews.toLocaleString()} recorded views</p> : null}</div></>;
+  return <>{data.videoTitle ? <p className="sw-video-analytics-title">{data.videoTitle}</p> : null}<div className="sw-metrics">{metrics.map(([label,value,note]) => <article key={label}><small>{label}</small><strong>{value}</strong><span>{note}</span></article>)}</div><div className="sw-panel"><h2>{mode === "analytics" ? "Live analytics" : "Channel status"}</h2>{error ? <p role="status">Updates are temporarily unavailable. Showing the last synchronized totals.</p> : updatedAt ? <small>Updated {updatedAt.toLocaleTimeString()} - Refreshes every 5 seconds</small> : null}<p>{mode === "analytics" ? data.stats.totalViews ? "Views and watch time update as viewers play your videos. Followers, uploads and posts use current channel activity." : "No playback events have been recorded yet." : data.stats.latestUploadAt ? `Latest upload: ${new Date(data.stats.latestUploadAt).toLocaleDateString()}` : "No uploads yet."}</p>{mode === "overview" ? <p>{data.stats.rejectedVideos} rejected  -  {data.stats.totalViews.toLocaleString()} recorded views</p> : null}</div></>;
 };
 
 export default StreamCreatorOverview;

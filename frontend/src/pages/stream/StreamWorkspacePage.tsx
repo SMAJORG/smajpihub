@@ -1,3 +1,4 @@
+import StreamVideoActions from "./StreamVideoActions";
 import StreamSkeleton from "./StreamSkeleton";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -187,7 +188,7 @@ const pageMeta: Partial<Record<StreamPageKind, [string, string]>> = {
 };
 
 const Tile = ({ title, compact = false }: { title: Title; compact?: boolean }) => (
-  <Link
+  <article className="sw-catalog-video-card"><Link
     className={`sw-title-card ${title.tone} ${compact ? "compact" : ""}`}
     to={`/app/services/stream/${title.mediaType === "tv" ? "series" : "title"}/${title.id}`}
   >
@@ -219,7 +220,7 @@ const Tile = ({ title, compact = false }: { title: Title; compact?: boolean }) =
     </div>
     <h3>{title.name}</h3>
     <p>{title.meta}</p>
-  </Link>
+  </Link><StreamVideoActions video={{ title: title.name, cloudflareUid: title.id }} watchPath={`/app/services/stream/${title.mediaType === "tv" ? "series" : "title"}/${title.id}`} /></article>
 );
 
 const CategoryDirectory = () => (
@@ -827,7 +828,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
                   <small>{formatDownloadBytes(record?.totalBytes || record?.downloadedBytes) || (item.mediaType === "tv" ? "Series" : "Movie")}</small>
                   <span className={item.downloadStatus === "failed" ? "failed" : ""}>{item.downloadStatus === "failed" ? "Download failed" : item.downloadStatus === "pending" ? "Preparing download" : record?.status === "complete" ? "Ready offline" : "Saved to account"}</span>
                 </div>
-                <button className="sw-download-save" type="button" disabled={item.downloadStatus === "failed" || item.downloadStatus === "pending" || record?.status !== "complete"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}><DownloadRoundedIcon />Save</button>
+                <div className="sw-download-row-actions"><StreamVideoActions video={{ title: item.name, cloudflareUid: item.id }} watchPath={path} /><button className="sw-download-save" type="button" disabled={item.downloadStatus === "failed" || item.downloadStatus === "pending" || record?.status !== "complete"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}><DownloadRoundedIcon />Save</button></div>
               </article>;
             })}</div>
           </section> : null}
@@ -837,9 +838,9 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
             {recommendationsError ? <p role="alert">Could not load new recommendations. Please try refreshing.</p> : null}
             {!recommendationsLoading && !recommendationsError && !recommendations.length ? <p>No recommendations available yet.</p> : null}
             <div className="sw-download-recommendations" aria-busy={recommendationsLoading}>{recommendations.filter(item => !list.some(saved => saved.id === item.id && saved.mediaType === item.mediaType)).slice(0, 12).map(item => (
-              <Link to={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`} key={`${item.mediaType}-${item.id}`}>
+              <article className="sw-recommendation-video-card" key={`${item.mediaType}-${item.id}`}><Link to={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`}>
                 <img src={item.posterUrl || ""} alt="" loading="lazy" /><span>{item.title}</span>
-              </Link>
+              </Link><StreamVideoActions video={{ title: item.title, cloudflareUid: item.id }} watchPath={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`} /></article>
             ))}</div>
             <button className="sw-download-refresh" type="button" disabled={recommendationsLoading} onClick={() => setRecommendationPage(current => current + 1)}><RefreshRoundedIcon />{recommendationsLoading ? "Refreshing..." : "Refresh new content"}</button>
           </section>
@@ -1834,7 +1835,7 @@ const Studio = ({ kind }: { kind: StreamPageKind }) => {
       <section>
         <header className="sw-manage-head">
           <div>
-            <span>CREATOR FIRST</span>
+            {kind !== "content" ? <span>CREATOR FIRST</span> : null}
             <h1>{title}</h1>
           </div>
           {kind === "studio" ? (

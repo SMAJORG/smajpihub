@@ -1,0 +1,35 @@
+﻿import assert from "node:assert/strict";
+import { createMemoryCollections } from "../services/memoryDatabase";
+import { deleteCreatorContent, editCreatorContent, parseCreatorContentPatch } from "../services/streamCreatorContent";
+
+const main = async () => {
+  const collection = createMemoryCollections().streamContentCollection;
+  const original = { cloudflareUid: "video-owner", creatorId: "owner", title: "Original", description: "Description", category: "Film", visibility: "public", moderationStatus: "approved", playbackAllowed: true, downloadAllowed: true };
+  const { insertedId } = await collection.insertOne(original);
+  const patch = parseCreatorContentPatch({ title: " New title ", description: "Updated", category: "Film", visibility: "private", creatorId: "intruder", playbackAllowed: false });
+  assert.ok(patch);
+  assert.equal(patch.title, "New title");
+  assert.equal("creatorId" in patch, false);
+  assert.equal("playbackAllowed" in patch, false);
+  assert.equal(parseCreatorContentPatch({ ...patch, title: " " }), null);
+  assert.equal(parseCreatorContentPatch({ ...patch, visibility: "unknown" }), null);
+  assert.equal(parseCreatorContentPatch({ ...patch, title: "x".repeat(141) }), null);
+  assert.equal(await editCreatorContent(collection, "intruder", "video-owner", patch), null);
+  assert.equal(await deleteCreatorContent(collection, "intruder", "video-owner"), false);
+  assert.equal((await collection.findOne({ _id: insertedId }))?.title, "Original");
+  const updated = await editCreatorContent(collection, "owner", "video-owner", patch);
+  assert.equal(updated?.title, "New title");
+  assert.equal(updated?.creatorId, "owner");
+  assert.equal(updated?.moderationStatus, "approved");
+  assert.equal(await deleteCreatorContent(collection, "owner", "video-owner"), true);
+  const deleted = await collection.findOne({ _id: insertedId });
+  assert.ok(deleted?.deletedAt);
+  assert.equal(deleted?.playbackAllowed, false);
+  assert.equal(deleted?.downloadAllowed, false);
+  assert.equal(deleted?.visibility, "private");
+  assert.equal(await collection.countDocuments({ creatorId: "owner", deletedAt: { $exists: false } }), 0);
+  assert.equal(await editCreatorContent(collection, "owner", "video-owner", patch), null);
+  assert.equal(await deleteCreatorContent(collection, "owner", "video-owner"), false);
+  console.log("Creator content ownership and deletion regression checks passed");
+};
+void main().catch(error => { console.error(error); process.exitCode = 1; });

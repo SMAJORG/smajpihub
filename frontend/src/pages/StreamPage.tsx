@@ -1,3 +1,4 @@
+import StreamVideoActions from "./stream/StreamVideoActions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useNavigationType, useParams } from "react-router-dom";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
@@ -284,6 +285,7 @@ const StreamPage = ({ categorySlug }: StreamPageProps) => {
                       <span className="stream-movie-play"><PlayArrowRoundedIcon /></span>
                     </button>}
                     <div><h3>{item.title}</h3><p>{tmdbItem ? `${item.mediaType === "tv" ? "Series" : "Movie"} · ${item.rating ? `★ ${item.rating}` : item.releaseDate?.slice(0, 4) || "New"}` : index % 2 ? "Series · 8 episodes" : "Movie · SMAJ Original"}</p></div>
+                    {detailUrl ? <StreamVideoActions video={{ title: item.title, cloudflareUid: String(item.id) }} watchPath={detailUrl} /> : null}
                   </article>;
                 })}
               </div>

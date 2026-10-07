@@ -14,8 +14,8 @@ export const recordStreamPlayback = async (collection: any, input: { creatorId: 
   await collection.updateOne({ _id, watchSeconds: { $lt: watchSeconds } }, { $set: { watchSeconds, updatedAt: now } });
 };
 
-export const getStreamPlaybackTotals = async (collection: any, creatorId: string) => {
+export const getStreamPlaybackTotals = async (collection: any, creatorId: string, videoId?: string) => {
   if (!collection) return { views: 0, watchSeconds: 0 };
-  const [totals] = await collection.aggregate([{ $match: { creatorId } }, { $group: { _id: null, views: { $sum: 1 }, watchSeconds: { $sum: "$watchSeconds" } } }]).toArray();
+  const [totals] = await collection.aggregate([{ $match: { creatorId, ...(videoId ? { videoId } : {}) } }, { $group: { _id: null, views: { $sum: 1 }, watchSeconds: { $sum: "$watchSeconds" } } }]).toArray();
   return { views: Number(totals?.views) || 0, watchSeconds: Number(totals?.watchSeconds) || 0 };
 };

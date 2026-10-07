@@ -1,3 +1,5 @@
+import StreamVideoActions from "./StreamVideoActions";
+import type { CreatorVideo } from "../../lib/streamCreator";
 import StreamSkeleton from "./StreamSkeleton";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -42,6 +44,20 @@ const StreamPublicChannel = () => {
     }
   };
 
+  const removeVideo = (id: string) => setData(current => {
+    if (!current) return current;
+    const videos = current.videos.filter(item => item._id !== id);
+    return { ...current, videos, stats: { ...current.stats, videos: videos.length } };
+  });
+  const updateVideo = (updated: CreatorVideo) => {
+    if (updated.visibility !== "public") { removeVideo(updated._id); return; }
+    setData(current => current ? { ...current, videos: current.videos.map(item => item._id === updated._id ? { ...item, ...updated } : item) } : current);
+  };
+  const removeLive = (uid: string) => setData(current => {
+    if (!current) return current;
+    const live = current.live.filter(item => item.liveInputUid !== uid);
+    return { ...current, live, stats: { ...current.stats, live: live.length } };
+  });
   if (state === "loading") return <StreamSkeleton variant="channel" label="Loading creator channel..." />;
   if (state === "error" || !data)
     return (
@@ -113,16 +129,13 @@ const StreamPublicChannel = () => {
         data.videos.length ? (
           <div className="sw-public-channel-grid">
             {data.videos.map(video => (
-              <Link
-                key={video._id}
-                to={`/app/services/stream/watch/${video.youtubeVideoId ? `yt-${video.youtubeVideoId}` : video.cloudflareUid}`}
-              >
-                <div style={video.thumbnailUrl ? { backgroundImage: `url("${video.thumbnailUrl}")` } : undefined}>
-                  <PlayArrowRoundedIcon />
-                </div>
-                <h2>{video.title}</h2>
-                <p>{video.category || "Entertainment"}</p>
-              </Link>
+              <article className="sw-channel-video-card" key={video._id}>
+                <Link to={`/app/services/stream/watch/${video.cloudflareUid || `yt-${video.youtubeVideoId}`}`}>
+                  <div style={video.thumbnailUrl ? { backgroundImage: `url("${video.thumbnailUrl}")` } : undefined}><PlayArrowRoundedIcon /></div>
+                  <h2>{video.title}</h2><p>{video.category || "Entertainment"}</p>
+                </Link>
+                <StreamVideoActions video={{ ...video, visibility: "public", moderationStatus: "approved", playbackAllowed: true }} owner={data.isOwner} onUpdated={updateVideo} onDeleted={() => removeVideo(video._id)} />
+              </article>
             ))}
           </div>
         ) : (
@@ -133,13 +146,13 @@ const StreamPublicChannel = () => {
         data.live.length ? (
           <div className="sw-public-channel-grid">
             {data.live.map(item => (
-              <Link key={item.liveInputUid} to={`/app/services/stream/live/${item.liveInputUid}`}>
-                <div style={item.thumbnailUrl ? { backgroundImage: `url("${item.thumbnailUrl}")` } : undefined}>
-                  <PlayArrowRoundedIcon />
-                </div>
-                <h2>{item.title}</h2>
-                <p>{item.processingStatus === "live" ? "Live now" : "Scheduled"}</p>
-              </Link>
+              <article className="sw-channel-video-card" key={item.liveInputUid}>
+                <Link to={`/app/services/stream/live/${item.liveInputUid}`}>
+                  <div style={item.thumbnailUrl ? { backgroundImage: `url("${item.thumbnailUrl}")` } : undefined}><PlayArrowRoundedIcon /></div>
+                  <h2>{item.title}</h2><p>{item.processingStatus === "live" ? "Live now" : "Scheduled"}</p>
+                </Link>
+                <StreamVideoActions video={{ ...item, cloudflareUid: item.liveInputUid, contentType: "live", visibility: "public", moderationStatus: "approved", playbackAllowed: true }} owner={data.isOwner} watchPath={`/app/services/stream/live/${item.liveInputUid}`} onUpdated={updated => { if (updated.visibility !== "public") removeLive(item.liveInputUid); else setData(current => current ? { ...current, live: current.live.map(live => live.liveInputUid === item.liveInputUid ? { ...live, title: updated.title } : live) } : current); }} onDeleted={() => removeLive(item.liveInputUid)} />
+              </article>
             ))}
           </div>
         ) : (

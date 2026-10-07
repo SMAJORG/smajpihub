@@ -23,6 +23,7 @@ const matchesValue = (value: any, condition: any): boolean => {
   if (!condition || typeof condition !== "object" || condition instanceof ObjectId || condition instanceof Date) {
     return sameValue(value, condition);
   }
+  if ("$exists" in condition && (value !== undefined) !== condition.$exists) return false;
   if ("$ne" in condition && sameValue(value, condition.$ne)) return false;
   if ("$in" in condition && !condition.$in.some((item: any) => sameValue(value, item))) return false;
   if ("$gte" in condition && !(value >= condition.$gte)) return false;

@@ -13,7 +13,11 @@ export type CreatorVideo = {
   thumbnailUrl?: string | null;
   posterUrl?: string | null;
   createdAt: string;
-  contentSource?: "youtube" | "cloudflare";
+  contentSource?: string;
+  playbackAllowed?: boolean;
+  downloadAllowed?: boolean;
+  contentType?: string;
+  liveInputUid?: string;
   youtubeVideoId?: string;
 };
 
@@ -52,6 +56,7 @@ export const refreshCreatorVideoStatus = async (uid: string) =>
   (await axiosClient.get<{ video: CreatorVideo }>(`/stream/creator/videos/${encodeURIComponent(uid)}/status`, { headers: { "X-SMAJ-Silent": "true" } })).data.video;
 
 export type CreatorOverview = {
+  videoTitle?: string | null;
   stats: {
     followers?: number;
     posts?: number;
@@ -79,9 +84,14 @@ export type CreatorOverview = {
     reason: string;
   };
 };
-export const getCreatorOverview = async (signal?: AbortSignal) => (await axiosClient.get<CreatorOverview>("/stream/creator/overview", { signal, headers: { "X-SMAJ-Silent": "true", "Cache-Control": "no-cache" } })).data;
+export const getCreatorOverview = async (signal?: AbortSignal, video?: string) => (await axiosClient.get<CreatorOverview>("/stream/creator/overview", { signal, params: video ? { video } : undefined, headers: { "X-SMAJ-Silent": "true", "Cache-Control": "no-cache" } })).data;
 
 export const getPublishedCreatorVideos = async () => {
   const response = await axiosClient.get<{ videos: Array<Pick<CreatorVideo, "_id" | "title" | "thumbnailUrl" | "youtubeVideoId" | "cloudflareUid" | "contentSource"> & { creatorName?: string; category?: string }> }>("/stream/creator-content");
   return response.data.videos;
 };
+
+export const editCreatorVideo = async (uid: string, patch: Pick<CreatorVideo, "title" | "description" | "category" | "visibility">) =>
+  (await axiosClient.patch<{ video: CreatorVideo }>(`/stream/creator/videos/${encodeURIComponent(uid)}`, patch, { headers: { "X-SMAJ-Silent": "true" } })).data.video;
+export const deleteCreatorVideo = async (uid: string) =>
+  (await axiosClient.delete(`/stream/creator/videos/${encodeURIComponent(uid)}`, { headers: { "X-SMAJ-Silent": "true" } })).data;

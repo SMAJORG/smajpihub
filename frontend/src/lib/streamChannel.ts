@@ -5,6 +5,7 @@ export type PublicChannelVideo = {
   title: string;
   description?: string;
   category?: string;
+  downloadAllowed?: boolean;
   thumbnailUrl?: string | null;
   youtubeVideoId?: string;
   cloudflareUid: string;
@@ -12,6 +13,8 @@ export type PublicChannelVideo = {
   createdAt?: string;
 };
 export type PublicChannelLive = {
+  description?: string;
+  category?: string;
   liveInputUid: string;
   title: string;
   thumbnailUrl?: string | null;
@@ -25,6 +28,7 @@ export type PublicChannelPost = {
   updatedAt?: string;
 };
 export type PublicStreamChannel = {
+  isOwner?: boolean;
   channel: { name: string; handle: string; description: string; avatarUrl: string; bannerUrl: string };
   posts: PublicChannelPost[];
   videos: PublicChannelVideo[];
@@ -39,6 +43,7 @@ export type StreamSubscription = {
   videos: Array<PublicChannelVideo & { contentType?: string; liveInputUid?: string; processingStatus?: string }>;
 };
 export type StreamCreatorDirectoryItem = {
+  isOwner?: boolean;
   creatorId: string;
   channel: { name: string; handle: string; description: string; avatarUrl: string; bannerUrl: string };
   stats: { videos: number; live: number; followers: number; latestAt: string | null };

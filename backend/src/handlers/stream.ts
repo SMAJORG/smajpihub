@@ -1,3 +1,4 @@
+import { deleteCreatorContent, editCreatorContent, parseCreatorContentPatch } from "../services/streamCreatorContent";
 import { getStreamPlaybackTotals, recordStreamPlayback } from "../services/streamAnalytics";
 import { enrichProfileAvatars, synchronizeAvatarSnapshots } from "../services/profileAvatars";
 import type { Request, Response, Router } from "express";
@@ -694,7 +695,7 @@ const mountStreamEndpoints = (router: Router) => {
 
   router.get("/creator/live-inputs", async (req, res) => {
     const user = await requireCreator(req, res); if (!user) return;
-    const live = await req.app.locals.streamContentCollection.find({ creatorId: String(user._id), contentType: "live" }).sort({ createdAt: -1 }).limit(50).toArray();
+    const live = await req.app.locals.streamContentCollection.find({ creatorId: String(user._id), contentType: "live", deletedAt: { $exists: false } }).sort({ createdAt: -1 }).limit(50).toArray();
     return res.json({ live: live.map((item: Record<string, unknown>) => ({ ...item, _id: String(item._id) })) });
   });
 
@@ -702,7 +703,7 @@ const mountStreamEndpoints = (router: Router) => {
     try {
       const user = await requireCreator(req, res); if (!user) return;
       const uid = String(req.params.uid || "");
-      const live = await req.app.locals.streamContentCollection.findOne({ liveInputUid: uid, creatorId: String(user._id) });
+      const live = await req.app.locals.streamContentCollection.findOne({ liveInputUid: uid, creatorId: String(user._id), deletedAt: { $exists: false } });
       if (!live) return res.status(404).json({ error: "not_found", message: "Live input not found." });
       if (!env.cloudflare_stream_account_id || !env.cloudflare_stream_api_token) return res.status(503).json({ error: "cloudflare_stream_not_configured" });
       const response = await axios.get<{ success: boolean; result?: Array<{ uid?: string; status?: { state?: string }; playback?: { hls?: string; dash?: string }; preview?: string; thumbnail?: string }> }>(`https://api.cloudflare.com/client/v4/accounts/${env.cloudflare_stream_account_id}/stream/live_inputs/${encodeURIComponent(uid)}/videos`, { headers: { Authorization: `Bearer ${env.cloudflare_stream_api_token}` }, timeout: 12_000 });
@@ -721,17 +722,34 @@ const mountStreamEndpoints = (router: Router) => {
     return res.json({ uid, status: "processing", moderationStatus: "pending" });
   });
 
+  router.patch("/creator/videos/:uid", async (req, res) => {
+    const user = await requireCreator(req, res); if (!user) return;
+    const patch = parseCreatorContentPatch(req.body || {});
+    if (!patch) return res.status(400).json({ error: "invalid_content", message: "Enter a title, category and valid visibility." });
+    const video = await editCreatorContent(req.app.locals.streamContentCollection, String(user._id), String(req.params.uid), patch);
+    if (!video) return res.status(404).json({ error: "not_found", message: "Content not found." });
+    return res.json({ video: { ...video, _id: String(video._id) } });
+  });
+  router.delete("/creator/videos/:uid", async (req, res) => {
+    const user = await requireCreator(req, res); if (!user) return;
+    const deleted = await deleteCreatorContent(req.app.locals.streamContentCollection, String(user._id), String(req.params.uid));
+    if (!deleted) return res.status(404).json({ error: "not_found", message: "Content not found." });
+    return res.json({ deleted: true });
+  });
+
   router.get("/creator/videos", async (req, res) => {
     const user = await requireCreator(req, res); if (!user) return;
-    const videos = await req.app.locals.streamContentCollection.find({ creatorId: String(user._id) }).sort({ createdAt: -1 }).limit(100).toArray();
+    const videos = await req.app.locals.streamContentCollection.find({ creatorId: String(user._id), deletedAt: { $exists: false } }).sort({ createdAt: -1 }).limit(100).toArray();
     return res.json({ videos: videos.map((video: Record<string, unknown>) => ({ ...video, _id: String(video._id) })) });
   });
 
   router.get("/creator/overview", async (req, res) => {
     const user = await requireCreator(req, res); if (!user) return;
-    const videos = await req.app.locals.streamContentCollection.find({ creatorId: String(user._id) }).sort({ createdAt: -1 }).limit(1000).toArray();
+    const videoUid = typeof req.query.video === "string" ? req.query.video.slice(0, 180) : "";
+    const videos = await req.app.locals.streamContentCollection.find({ creatorId: String(user._id), deletedAt: { $exists: false }, ...(videoUid ? { cloudflareUid: videoUid } : {}) }).sort({ createdAt: -1 }).limit(1000).toArray();
+    if (videoUid && !videos.length) return res.status(404).json({ error: "not_found", message: "Content not found." });
     const count = (predicate: (video: Record<string, any>) => boolean) => videos.filter(predicate).length;
-    const playbackTotals = await getStreamPlaybackTotals(req.app.locals.streamPlaybackSessionCollection, String(user._id));
+    const playbackTotals = await getStreamPlaybackTotals(req.app.locals.streamPlaybackSessionCollection, String(user._id), videoUid || undefined);
     const totalViews = playbackTotals.views + videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.views) || 0), 0);
     const watchSeconds = playbackTotals.watchSeconds + videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.watchSeconds) || 0), 0);
     const publishedVideos = count(video => video.visibility === "public" && video.moderationStatus === "approved" && video.playbackAllowed === true);
@@ -748,7 +766,7 @@ const mountStreamEndpoints = (router: Router) => {
       goodStanding: rejectedVideos === 0,
     };
     res.setHeader("Cache-Control", "no-store");
-    return res.json({ stats: { followers, posts, totalVideos: videos.length, publishedVideos, pendingVideos: count(video => !video.moderationStatus || video.moderationStatus === "pending"), rejectedVideos, liveStreams: count(video => video.contentType === "live"), totalViews, watchSeconds, averageViewSeconds: totalViews > 0 ? Math.round(watchSeconds / totalViews) : 0, latestUploadAt: videos[0]?.createdAt || null }, monetization: { enabled: false, eligible: Object.values(eligibility).every(Boolean), eligibility, reason: "Creator Pi payouts are not live yet. Complete the eligibility steps now so the channel is ready when compliant payouts launch." } });
+    return res.json({ videoTitle: videoUid ? videos[0]?.title : null, stats: { followers, posts, totalVideos: videos.length, publishedVideos, pendingVideos: count(video => !video.moderationStatus || video.moderationStatus === "pending"), rejectedVideos, liveStreams: count(video => video.contentType === "live"), totalViews, watchSeconds, averageViewSeconds: totalViews > 0 ? Math.round(watchSeconds / totalViews) : 0, latestUploadAt: videos[0]?.createdAt || null }, monetization: { enabled: false, eligible: Object.values(eligibility).every(Boolean), eligibility, reason: "Creator Pi payouts are not live yet. Complete the eligibility steps now so the channel is ready when compliant payouts launch." } });
   });
 
   router.post("/creator/posts", async (req, res) => {
@@ -789,6 +807,7 @@ const mountStreamEndpoints = (router: Router) => {
   });
 
   router.get("/creators", async (req, res) => {
+    const viewer = await resolveCurrentUser(req);
     const users = await req.app.locals.userCollection
       .find({ "streamProfile.channelHandle": { $regex: ".+" } })
       .sort({ updatedAt: -1, createdAt: -1 })
@@ -811,6 +830,7 @@ const mountStreamEndpoints = (router: Router) => {
         const followers = await req.app.locals.userCollection.countDocuments({ "streamSubscriptions.handle": handle });
         return {
           creatorId,
+          isOwner: String(viewer?._id || "") === creatorId,
           channel: {
             name: profile.channelName || user?.displayName || user?.username || "SMAJ Creator",
             handle,
@@ -824,7 +844,7 @@ const mountStreamEndpoints = (router: Router) => {
             latestAt: videos[0]?.createdAt || null,
             followers,
           },
-          latestVideos: publicVideos.slice(0, 3).map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, createdAt: video.createdAt })),
+          latestVideos: publicVideos.slice(0, 3).map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, description: video.description, visibility: video.visibility, moderationStatus: video.moderationStatus, playbackAllowed: video.playbackAllowed, downloadAllowed: video.downloadAllowed === true, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, createdAt: video.createdAt })),
         };
       })
     );
@@ -837,6 +857,8 @@ const mountStreamEndpoints = (router: Router) => {
     if (!handle) return res.status(400).json({ error: "invalid_handle", message: "A channel handle is required." });
     const creator = await req.app.locals.userCollection.findOne({ "streamProfile.channelHandle": handle });
     if (!creator) return res.status(404).json({ error: "channel_not_found", message: "This creator channel does not exist." });
+    const viewer = await resolveCurrentUser(req);
+    const isOwner = String(viewer?._id || "") === String(creator._id);
     const creatorId = String(creator._id);
     const videos = await req.app.locals.streamContentCollection.find({ creatorId, visibility: "public", moderationStatus: "approved", playbackAllowed: true }).sort({ createdAt: -1 }).limit(60).toArray();
     const posts = req.app.locals.streamPostCollection
@@ -845,6 +867,7 @@ const mountStreamEndpoints = (router: Router) => {
     const profile = creator.streamProfile || {};
     const followers = await req.app.locals.userCollection.countDocuments({ "streamSubscriptions.handle": handle });
     return res.json({
+      isOwner,
       channel: {
         name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator",
         handle,
@@ -853,8 +876,8 @@ const mountStreamEndpoints = (router: Router) => {
         bannerUrl: profile.channelBannerUrl || "",
       },
       posts: posts.map(publicPost),
-      videos: videos.filter((video: Record<string, unknown>) => video.contentType !== "live").map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, description: video.description, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentSource: video.contentSource, createdAt: video.createdAt })),
-      live: videos.filter((video: Record<string, unknown>) => video.contentType === "live").map((video: Record<string, unknown>) => ({ liveInputUid: video.liveInputUid, title: video.title, thumbnailUrl: video.thumbnailUrl || null, processingStatus: video.processingStatus })),
+      videos: videos.filter((video: Record<string, unknown>) => video.contentType !== "live").map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, description: video.description, visibility: video.visibility, moderationStatus: video.moderationStatus, playbackAllowed: video.playbackAllowed, downloadAllowed: video.downloadAllowed === true, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentSource: video.contentSource, createdAt: video.createdAt })),
+      live: videos.filter((video: Record<string, unknown>) => video.contentType === "live").map((video: Record<string, unknown>) => ({ liveInputUid: video.liveInputUid, title: video.title, description: video.description, category: video.category, thumbnailUrl: video.thumbnailUrl || null, processingStatus: video.processingStatus })),
       stats: { followers, videos: videos.filter((video: Record<string, unknown>) => video.contentType !== "live").length, live: videos.filter((video: Record<string, unknown>) => video.contentType === "live").length, joinedAt: creator.createdAt || null },
     });
   });
@@ -878,7 +901,7 @@ const mountStreamEndpoints = (router: Router) => {
         subscribedAt: subscription.subscribedAt || null,
         channel: { name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator", handle, avatarUrl: creator.avatar ?? profile.avatarUrl ?? "" },
         posts: posts.map(publicPost),
-        videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentType: video.contentType, liveInputUid: video.liveInputUid, processingStatus: video.processingStatus, createdAt: video.createdAt })),
+        videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, description: video.description, visibility: video.visibility, moderationStatus: video.moderationStatus, playbackAllowed: video.playbackAllowed, downloadAllowed: video.downloadAllowed === true, category: video.category, thumbnailUrl: video.thumbnailUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentType: video.contentType, liveInputUid: video.liveInputUid, processingStatus: video.processingStatus, createdAt: video.createdAt })),
       };
     }))).filter(Boolean);
     return res.json({ channels });
@@ -1025,14 +1048,14 @@ const mountStreamEndpoints = (router: Router) => {
     try {
       const user = await requireCreator(req, res); if (!user) return;
       const uid = String(req.params.uid || "");
-      const video = await req.app.locals.streamContentCollection.findOne({ cloudflareUid: uid, creatorId: String(user._id) });
+      const video = await req.app.locals.streamContentCollection.findOne({ cloudflareUid: uid, creatorId: String(user._id), deletedAt: { $exists: false } });
       if (!video) return res.status(404).json({ error: "not_found", message: "Video not found." });
       if (!env.cloudflare_stream_account_id || !env.cloudflare_stream_api_token) return res.json({ video });
       const response = await axios.get<{ success: boolean; result?: { readyToStream?: boolean; status?: { state?: string; errorReasonText?: string }; playback?: { hls?: string; dash?: string }; thumbnail?: string; duration?: number } }>(`https://api.cloudflare.com/client/v4/accounts/${env.cloudflare_stream_account_id}/stream/${uid}`, { headers: { Authorization: `Bearer ${env.cloudflare_stream_api_token}` }, timeout: 12_000 });
       const remote = response.data.result;
       const processingStatus = remote?.readyToStream ? "ready" : remote?.status?.state || "processing";
       const thumbnailUrl = remote?.thumbnail || video.thumbnailUrl || video.posterUrl || null;
-      await req.app.locals.streamContentCollection.updateOne({ cloudflareUid: uid }, { $set: { processingStatus, playback: remote?.playback || null, thumbnailUrl, duration: remote?.duration || null, processingError: remote?.status?.errorReasonText || null, updatedAt: new Date() } });
+      await req.app.locals.streamContentCollection.updateOne({ cloudflareUid: uid, creatorId: String(user._id), deletedAt: { $exists: false } }, { $set: { processingStatus, playback: remote?.playback || null, thumbnailUrl, duration: remote?.duration || null, processingError: remote?.status?.errorReasonText || null, updatedAt: new Date() } });
       return res.json({ video: { ...video, processingStatus, playback: remote?.playback || null, thumbnailUrl, duration: remote?.duration || null } });
     } catch (error) {
       return res.status(502).json({ error: "status_failed", message: error instanceof Error ? error.message : "Unable to refresh video status" });
@@ -1042,7 +1065,7 @@ const mountStreamEndpoints = (router: Router) => {
   router.get("/admin/videos", async (req, res) => {
     const admin = await requireStreamAdmin(req, res); if (!admin) return;
     const status = String(req.query.status || "all");
-    const query = status === "all" ? {} : { moderationStatus: status };
+    const query = status === "all" ? { deletedAt: { $exists: false } } : { deletedAt: { $exists: false }, moderationStatus: status };
     const videos = await req.app.locals.streamContentCollection.find(query).sort({ createdAt: -1 }).limit(200).toArray();
     return res.json({ videos: videos.map((video: Record<string, unknown>) => ({ ...video, _id: String(video._id), playback: undefined })) });
   });
