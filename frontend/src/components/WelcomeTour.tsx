@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { App as CapacitorApp } from "@capacitor/app";
-import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
@@ -17,7 +17,7 @@ const GAP=12;
 const ACTIVE_TOUR_KEY="smaj_active_tutorial";
 type Box={top:number;left:number;width:number;height:number;right:number;bottom:number};
 const visibleTarget=(selector?:string)=>selector ? [...document.querySelectorAll<HTMLElement>(selector)].find(el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1}) : undefined;
-const iconFor=(icon:string)=> icon==="home"?<HomeOutlinedIcon/>:icon==="services"?<AppsOutlinedIcon/>:icon==="search"?<SearchOutlinedIcon/>:icon==="messages"?<ChatOutlinedIcon/>:icon==="profile"?<PersonOutlineIcon/>:icon==="done"?<CheckCircleOutlineIcon/>:<LightbulbOutlinedIcon/>;
+const iconFor=(icon:string)=> icon==="home"?<DashboardOutlinedIcon/>:icon==="services"?<AppsOutlinedIcon/>:icon==="search"?<SearchOutlinedIcon/>:icon==="messages"?<ChatOutlinedIcon/>:icon==="profile"?<PersonOutlineIcon/>:icon==="done"?<CheckCircleOutlineIcon/>:<LightbulbOutlinedIcon/>;
 
 const WelcomeTour=()=>{
  const {user,isAuthenticated,isLoading}=useAuthContext(); const navigate=useNavigate(); const location=useLocation();
