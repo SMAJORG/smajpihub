@@ -56,7 +56,8 @@ const StreamHeader = ({ showCategoryNav = true }: StreamHeaderProps) => {
 
   useEffect(() => {
     const active = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
-    active?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    if (active === navRef.current?.firstElementChild) navRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+    else active?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [location.pathname, location.search]);
 
   useEffect(() => {

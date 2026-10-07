@@ -100,3 +100,39 @@ export const removeStreamDownload = async (type: "movie" | "tv", id: string) => 
   notifyDownloadsChanged();
   return response.data;
 };
+
+// Rank fresh catalog results using the viewer's downloaded and saved genres.
+export const getStreamDownloadRecommendations = async (page = 1) => {
+  const [downloadsResult, savedResult] = await Promise.allSettled([getStreamDownloads(), getStreamMyList()]);
+  const downloads = downloadsResult.status === "fulfilled" ? downloadsResult.value : [];
+  const saved = savedResult.status === "fulfilled" ? savedResult.value : [];
+  // Older saved records do not include genres; resolve their catalog metadata.
+  const seeds = [...downloads.slice().reverse(), ...saved.slice().reverse()].filter((item, index, items) => items.findIndex(other => other.mediaType === item.mediaType && other.id === item.id) === index).slice(0, 8);
+  const metadata = new Map<string, number[]>();
+  await Promise.allSettled(seeds.map(async item => {
+    if (item.genreIds?.length) return;
+    const detail = await getStreamTitle(item.mediaType, String(item.tmdbId || item.id));
+    metadata.set(item.mediaType + ":" + item.id, detail.genres.map(genre => genre.id));
+  }));
+  const preferences = new Map<string, { mediaType: "movie" | "tv"; genre: number; weight: number }>();
+  for (const [items, weight] of [[downloads, 3], [saved, 1]] as const) {
+    for (const item of items) for (const genre of item.genreIds?.length ? item.genreIds : metadata.get(item.mediaType + ":" + item.id) || []) {
+      const key = item.mediaType + ":" + genre;
+      const previous = preferences.get(key);
+      preferences.set(key, { mediaType: item.mediaType, genre, weight: (previous?.weight || 0) + weight });
+    }
+  }
+  const top = [...preferences.values()].sort((a, b) => b.weight - a.weight).slice(0, 3);
+  const responses = await Promise.allSettled(top.length
+    ? top.map(item => getStreamCatalog(item.mediaType === "tv" ? "series" : "movies", page, "popularity.desc", item.genre))
+    : [getStreamCatalog("trending", page)]);
+  const downloaded = new Set(downloads.map(item => item.mediaType + ":" + item.id));
+  const candidates = new Map<string, StreamCatalogTitle>();
+  for (const response of responses) if (response.status === "fulfilled") for (const item of response.value.results) {
+    const key = item.mediaType + ":" + item.id;
+    if (item.posterUrl && !downloaded.has(key)) candidates.set(key, item);
+  }
+  if (!responses.some(result => result.status === "fulfilled")) throw new Error("Recommendations unavailable");
+  const score = (item: StreamCatalogTitle) => (item.genreIds || []).reduce((total, genre) => total + (preferences.get(item.mediaType + ":" + genre)?.weight || 0), 0);
+  return [...candidates.values()].sort((a, b) => score(b) - score(a));
+};

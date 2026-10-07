@@ -1,3 +1,4 @@
+import { getStreamDownloadRecommendations } from "../../lib/streamCatalog";
 import StreamVideoActions from "./StreamVideoActions";
 import StreamSkeleton from "./StreamSkeleton";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
@@ -496,8 +497,8 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
     let active = true;
     setRecommendationsLoading(true);
     setRecommendationsError(false);
-    void getStreamCatalog("trending", recommendationPage)
-      .then(data => { if (active) setRecommendations(data.results.filter(item => item.posterUrl)); })
+    void getStreamDownloadRecommendations(recommendationPage)
+      .then(items => { if (active) setRecommendations(items); })
       .catch(() => { if (active) setRecommendationsError(true); })
       .finally(() => { if (active) setRecommendationsLoading(false); });
     return () => { active = false; };
