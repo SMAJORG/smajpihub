@@ -1,3 +1,4 @@
+import mountInstitutionEndpoints from "./handlers/institutions";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -306,6 +307,7 @@ mountAmbassadorEndpoints(ambassadorRouter);
 app.use("/ambassadors", ambassadorRouter);
 
 const educationRouter = express.Router();
+mountInstitutionEndpoints(educationRouter);
 mountEducationEndpoints(educationRouter);
 app.use("/education", educationRouter);
 
@@ -410,6 +412,14 @@ const start = async () => {
       );
       app.locals.teacherApplicationCollection = db.collection("teacher_applications");
       app.locals.tutorLessonRequestCollection = db.collection("tutor_lesson_requests");
+      app.locals.institutionEvidenceCollection = db.collection("institution_evidence");
+      app.locals.institutionCollection = db.collection("institutions");
+      app.locals.institutionAdminCollection = db.collection("institution_admins");
+      app.locals.institutionApplicationCollection = db.collection("institution_applications");
+      app.locals.institutionProgramCollection = db.collection("institution_programs");
+      app.locals.institutionStudentApplicationCollection = db.collection("institution_student_applications");
+      app.locals.institutionAnnouncementCollection = db.collection("institution_announcements");
+      app.locals.institutionAuditCollection = db.collection("institution_audit");
       app.locals.universityCollection = db.collection("universities");
       app.locals.universityProgramCollection = db.collection(
         "university_programs",
@@ -706,6 +716,17 @@ const start = async () => {
           status: 1,
           created_at: -1,
         }),
+        app.locals.enrollmentCollection.createIndex({ user_id: 1, course_id: 1, institutionId: 1 }, { unique: true, partialFilterExpression: { institutionId: { $exists: true }, course_id: { $gt: "" } } }),
+        app.locals.certificateCollection.createIndex({ enrollment_id: 1, institutionId: 1 }, { unique: true, partialFilterExpression: { institutionId: { $exists: true } } }),
+        app.locals.institutionEvidenceCollection.createIndex({ userId: 1, url: 1 }),
+        app.locals.institutionCollection.createIndex({ slug: 1 }, { unique: true }),
+        app.locals.institutionCollection.createIndex({ status: 1, institutionType: 1, country: 1 }),
+        app.locals.institutionAdminCollection.createIndex({ institutionId: 1, userId: 1 }, { unique: true }),
+        app.locals.institutionApplicationCollection.createIndex({ applicantId: 1, status: 1 }),
+        app.locals.institutionProgramCollection.createIndex({ institutionId: 1, status: 1 }),
+        app.locals.institutionStudentApplicationCollection.createIndex({ institutionId: 1, userId: 1 }),
+        app.locals.institutionAuditCollection.createIndex({ institutionId: 1, at: -1 }),
+        app.locals.enrollmentCollection.createIndex({ institutionId: 1, programId: 1, user_id: 1 }, { unique: true, partialFilterExpression: { programId: { $exists: true } } }),
         app.locals.courseCollection.createIndex({ slug: 1 }, { unique: true }),
         app.locals.courseCollection.createIndex({
           status: 1,

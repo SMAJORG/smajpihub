@@ -102,6 +102,9 @@ export interface CourseData {
   discount_price_usdt?: number;
   instructor_id: string;
   provider_id?: string;
+  institutionId?: string;
+  programId?: string;
+  piPaymentsEnabled?: boolean;
   provider_type?: ProviderType;
   language: string;
   level: CourseLevel;
@@ -137,6 +140,8 @@ export interface CourseData {
 export interface EnrollmentData {
   _id: ObjectId;
   enrollment_id: string;
+  institutionId?: string;
+  programId?: string;
   user_id: string;
   course_id: string;
   course_slug: string;
@@ -169,6 +174,8 @@ export interface CertificateData {
   _id: ObjectId;
   certificate_id: string;
   enrollment_id: string;
+  institutionId?: string;
+  programId?: string;
   user_id: string;
   course_id: string;
   course_slug: string;
@@ -201,6 +208,9 @@ export interface CoursePaymentData {
   course_title: string;
   instructor_id: string;
   provider_id?: string;
+  institutionId?: string;
+  programId?: string;
+  piPaymentsEnabled?: boolean;
   amount_pi: number;
   amount_usdt: number;
   pi_payment_identifier?: string;

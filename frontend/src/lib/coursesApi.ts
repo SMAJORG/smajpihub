@@ -181,11 +181,12 @@ export const updateCourse = async (idOrSlug: string, data: Record<string, unknow
 export const uploadCourseVideo = async (
   file: File,
   rightsConfirmed: boolean,
-  onProgress?: (percentage: number) => void
+  onProgress?: (percentage: number) => void,
+  institutionId?: string
 ): Promise<{ uid: string; playbackUrl: string }> => {
   const session = await axiosClient.post<{ uid: string; uploadURL: string; playbackUrl: string }>(
     "/course-video-uploads",
-    { fileSize: file.size, contentType: file.type, rightsConfirmed }
+    { fileSize: file.size, contentType: file.type, rightsConfirmed, institutionId }
   );
   const body = new FormData();
   body.append("file", file);

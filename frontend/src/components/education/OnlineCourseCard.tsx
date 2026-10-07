@@ -7,6 +7,7 @@ import "./courses.css";
 const formatStudents = (count: number) => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(count);
 
 const courseTypeBadge = (course: Course) => {
+  if (course.institutionId && !course.institutionEnrollmentEnabled) return <span className="course-badge">Informational</span>;
   if (course.course_type === "free") {
     return <span className="course-badge free">FREE</span>;
   }
@@ -22,7 +23,7 @@ export const OnlineCourseCard = ({ course }: { course: Course }) => {
         ) : (
           <div className="course-card-image-placeholder">Course</div>
         )}
-        {course.certificate_enabled && <span className="course-card-certificate">Certificate</span>}
+        {course.certificate_enabled && (!course.institutionId || course.institutionCertificateEnabled) && <span className="course-card-certificate">Certificate</span>}
       </div>
       <div className="course-card-body">
         <span className="course-card-category">{course.category}</span>

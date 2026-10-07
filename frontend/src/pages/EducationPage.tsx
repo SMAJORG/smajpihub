@@ -7,6 +7,7 @@ import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import DomainOutlinedIcon from "@mui/icons-material/DomainOutlined";
 import AppLayout from "../layouts/AppLayout";
 import EducationHeader from "./education/EducationHeader";
 import { getEducationCategories, getEducationCourses, getEducationPartners } from "../lib/educationApi";
@@ -62,7 +63,7 @@ const EducationPage = () => {
   }, []);
 
   const secondaryCategories = categories.filter(
-    category => !["Universities", "Online Courses", "Tutors", "Certificates"].includes(category)
+    category => !["Universities", "Institutions", "Courses", "Online Courses", "Tutors", "Certificates"].includes(category)
   );
 
   const filteredCourses = useMemo(() => {
@@ -85,7 +86,7 @@ const EducationPage = () => {
           <div className="education-hero-copy">
             <span className="education-kicker">SMAJ PI EDUCATION</span>
             <h1>Learn, apply and grow with Pi.</h1>
-            <p>Courses, universities, tutors, and verified learning credentials in one place.</p>
+            <p>Courses, universities, institutions, tutors, and verified learning credentials in one place.</p>
             <div className="education-search" role="search">
               <SearchOutlinedIcon />
               <input
@@ -103,6 +104,7 @@ const EducationPage = () => {
                 <SchoolOutlinedIcon />
                 <span>Universities</span>
               </Link>
+              <Link to="/education/institutions"><DomainOutlinedIcon /><span>Institutions</span></Link>
               <Link to="/services/education/courses">
                 <MenuBookOutlinedIcon />
                 <span>Courses</span>

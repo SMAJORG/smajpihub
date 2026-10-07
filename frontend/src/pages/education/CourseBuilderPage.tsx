@@ -39,6 +39,7 @@ const CourseBuilderPage = () => {
   const [uploading, setUploading] = useState(false);
   const [videoUpload, setVideoUpload] = useState<{ key: string; progress: number } | null>(null);
   const [message, setMessage] = useState("");
+  const [institutionId, setInstitutionId] = useState<string>();
   const [createdId, setCreatedId] = useState("");
   const [form, setForm] = useState({
     title: "",
@@ -73,6 +74,7 @@ const CourseBuilderPage = () => {
     getCourse(courseId)
       .then(course => {
         if (!course) return setMessage("Course not found.");
+        setInstitutionId(course.institutionId);
         setForm(current => ({
           ...current,
           title: course.title,
@@ -172,7 +174,7 @@ const CourseBuilderPage = () => {
     setMessage("");
     setVideoUpload({ key, progress: 0 });
     try {
-      const uploaded = await uploadCourseVideo(file, true, progress => setVideoUpload({ key, progress }));
+      const uploaded = await uploadCourseVideo(file, true, progress => setVideoUpload({ key, progress }), institutionId);
       updateLesson(moduleIndex, lessonIndex, {
         video_url: uploaded.playbackUrl,
         video_provider: "cloudflare",

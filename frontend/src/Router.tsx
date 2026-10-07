@@ -83,6 +83,7 @@ import JobsPage, { type JobsPageKind } from "./pages/jobs/JobsPage";
 import CandidateProfilePage from "./pages/jobs/CandidateProfilePage";
 import TransportPage from "./pages/transport/TransportPage";
 import EducationPage from "./pages/EducationPage";
+import { InstitutionsPage, InstitutionProfilePage, InstitutionApplicationPage, InstitutionPortalPage, InstitutionLearningPage, AdminInstitutionsPage } from "./pages/education/InstitutionPages";
 import CourseDetailPage from "./pages/education/CourseDetailPage";
 import EducationCatalogPage from "./pages/education/EducationCatalogPage";
 import CourseCenterPage from "./pages/education/CourseCenterPage";
@@ -744,6 +745,15 @@ export const router = createBrowserRouter([
     ),
 
   },
+  {
+    path: "/education/institutions", element: <InstitutionsPage />,
+  },
+  { path: "/education/institutions/apply", element: <ProtectedRoute><InstitutionApplicationPage /></ProtectedRoute> },
+  { path: "/education/institutions/:institutionId", element: <InstitutionProfilePage /> },
+  { path: "/education/institution-portal", element: <ProtectedRoute><InstitutionPortalPage /></ProtectedRoute> },
+  { path: "/education/institution-learning", element: <ProtectedRoute><InstitutionLearningPage /></ProtectedRoute> },
+  { path: "/services/education/institutions", element: <InstitutionsPage /> },
+  { path: "/admin/education/institutions", element: <ProtectedRoute><AdminLayout><AdminInstitutionsPage /></AdminLayout></ProtectedRoute> },
   {
     path: "/services/education/universities",
     element: <UniversitiesPage />,

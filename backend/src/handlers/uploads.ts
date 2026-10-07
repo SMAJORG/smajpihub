@@ -14,8 +14,14 @@ export default function mountUploadEndpoints(router: Router) {
 
   router.post("/image", async (req: Request, res: Response) => {
     try {
-      const upload = await uploadImageValue(String(req.body?.image || req.body?.dataUrl || ""), safePurpose(req.body?.purpose));
+      const purpose = safePurpose(req.body?.purpose), image = String(req.body?.image || req.body?.dataUrl || "");
+      const institutionEvidence = purpose === "institution-authorization";
+      const user = institutionEvidence ? await resolveCurrentUser(req) : null;
+      if (institutionEvidence && !user) return res.status(401).json({ error: "authentication_required" });
+      if (institutionEvidence && (!/^data:image\/(png|jpeg|webp);base64,/i.test(image) || Buffer.from(image.split(",")[1] || "", "base64").length > 5 * 1024 * 1024)) return res.status(400).json({ message: "Upload a JPG, PNG, or WebP authorization image up to 5 MB." });
+      const upload = await uploadImageValue(image, purpose);
       if (!upload) return res.status(400).json({ error: "bad_request", message: "Upload a valid image file." });
+      if (institutionEvidence && user) await req.app.locals.institutionEvidenceCollection.insertOne({ userId: String(user._id), url: upload.url, createdAt: new Date().toISOString() });
       return res.status(201).json(upload);
     } catch (err: any) {
       if (err?.statusCode === 413) return res.status(413).json({ error: "payload_too_large", message: err.message });
@@ -47,8 +53,11 @@ export default function mountUploadEndpoints(router: Router) {
     try {
       const user = await resolveCurrentUser(req);
       if (!user) return res.status(401).json({ error: "authentication_required" });
+      const institutionEvidence = safePurpose(req.body?.purpose) === "institution-authorization";
+      if (institutionEvidence && Buffer.from(String(req.body?.document || "").split(",")[1] || "", "base64").length > 5 * 1024 * 1024) return res.status(400).json({ message: "Upload authorization evidence up to 5 MB." });
       const name = String(req.body?.name || "document.pdf").slice(0, 120);
       const upload = await uploadPdfToCloudinary(String(req.body?.document || ""), safePurpose(req.body?.purpose), name);
+      if (institutionEvidence) await req.app.locals.institutionEvidenceCollection.insertOne({ userId: String(user._id), url: upload.url, createdAt: new Date().toISOString() });
       return res.status(201).json(upload);
     } catch (err: any) {
       if ([400, 413, 503].includes(err?.statusCode)) return res.status(err.statusCode).json({ error: "document_upload_failed", message: err.message });

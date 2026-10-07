@@ -2,8 +2,8 @@ import { axiosClient } from "./axiosClient";
 import type { EducationCourse, EducationPartner, EducationCategory, University, UniversityProgram, UniversityClaim, UniversityApplication, UniversityPayment, UniversityAuthorization } from "../types/education";
 
 const FALLBACK_CATEGORIES: EducationCategory[] = [
-  "Universities",
-  "Online Courses",
+  "Universities", "Institutions",
+  "Courses",
   "Tech Skills",
   "Business",
   "Exam Prep",

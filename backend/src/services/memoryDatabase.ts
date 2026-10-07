@@ -19,6 +19,7 @@ const matchesObject = (value: any, condition: any) => value && typeof value === 
   && Object.entries(condition).every(([key, expected]) => sameValue(value[key], expected));
 
 const matchesValue = (value: any, condition: any): boolean => {
+  if (Array.isArray(value) && !Array.isArray(condition) && !(condition && typeof condition === "object" && "$elemMatch" in condition)) return value.some(item => matchesValue(item, condition));
   if (condition instanceof RegExp) return condition.test(String(value || ""));
   if (!condition || typeof condition !== "object" || condition instanceof ObjectId || condition instanceof Date) {
     return sameValue(value, condition);
@@ -41,6 +42,7 @@ const matchesValue = (value: any, condition: any): boolean => {
 
 const matchesQuery = (document: Document, query: Query = {}): boolean =>
   Object.entries(query).every(([key, condition]) => {
+    if (key === "$and") return Array.isArray(condition) && condition.every((item: Query) => matchesQuery(document, item));
     if (key === "$or") return Array.isArray(condition) && condition.some((item: Query) => matchesQuery(document, item));
     return matchesValue(getValue(document, key), condition);
   });
@@ -94,6 +96,11 @@ class MemoryCursor {
 
   skip(count: number) {
     this.documents = this.documents.slice(count);
+    return this;
+  }
+
+  project(projection: Record<string, number>) {
+    this.documents = this.documents.map(document => Object.fromEntries(Object.entries(document).filter(([key]) => key === "_id" || projection[key] === 1)));
     return this;
   }
 
@@ -197,6 +204,14 @@ export class MemoryCollection {
 }
 
 export const createMemoryCollections = () => ({
+  institutionEvidenceCollection: new MemoryCollection(),
+  institutionCollection: new MemoryCollection(),
+  institutionAdminCollection: new MemoryCollection(),
+  institutionApplicationCollection: new MemoryCollection(),
+  institutionProgramCollection: new MemoryCollection(),
+  institutionStudentApplicationCollection: new MemoryCollection(),
+  institutionAnnouncementCollection: new MemoryCollection(),
+  institutionAuditCollection: new MemoryCollection(),
   paymentCollection: new MemoryCollection(),
   marketplaceOrderCollection: new MemoryCollection(),
   orderDisputeCollection: new MemoryCollection(),

@@ -21,7 +21,7 @@ const CategoryGrid = ({ categories, selected }: CategoryGridProps) => (
             : category === "Exam Prep"
               ? "Exam Prep"
               : null;
-      const directDestination =
+      const directDestination = category === "Institutions" ? "/education/institutions" : category === "Courses" || category === "Online Courses" ? "/services/education/courses" :
         category === "Tutors"
           ? "/services/education/tutors"
           : category === "Certificates"

@@ -1,3 +1,4 @@
+import { assertInstitutionCourse, assertInstitutionPayment, canManageInstitution, isInstitutionPartner, assertPiPaymentBinding, grantInstitutionProgramCourses } from "../services/institutions";
 import type { Request, Response, Router } from "express";
 import axios from "axios";
 import { ObjectId } from "mongodb";
@@ -413,8 +414,15 @@ export default function mountCourseEndpoints(router: Router) {
         collection.countDocuments(mongoQuery),
       ]);
 
+      const publicCourses = await Promise.all(courses.map(async (course: any) => {
+        if (!course.institutionId) return serialize(course);
+        let institutionEnrollmentEnabled = true, institutionCertificateEnabled = true;
+        try { await assertInstitutionCourse(req, course, "enroll"); if (course.course_type === "paid") await assertInstitutionCourse(req, course, "payment"); } catch { institutionEnrollmentEnabled = false; }
+        try { await assertInstitutionCourse(req, course, "certificates"); } catch { institutionCertificateEnabled = false; }
+        return serialize({ ...course, modules: [], institutionEnrollmentEnabled, institutionCertificateEnabled });
+      }));
       return res.status(200).json({
-        courses: courses.map(serialize),
+        courses: publicCourses,
         total,
         page,
         pageSize,
@@ -450,7 +458,23 @@ export default function mountCourseEndpoints(router: Router) {
           .status(404)
           .json({ error: "not_found", message: "Course not found" });
 
-      return res.status(200).json({ course: serialize(course) });
+      if (course.institutionId) {
+        const viewer = await resolveCurrentUser(req);
+        const manager = viewer && await canManageInstitution(req, viewer, course.institutionId);
+        if (!manager && course.status !== "published") return res.status(404).json({ message: "Course not found." });
+        const institution = await req.app.locals.institutionCollection.findOne({ _id: new ObjectId(course.institutionId) });
+        const enrollment = viewer && await req.app.locals.enrollmentCollection.findOne({ user_id: String(viewer._id), course_id: String(course._id), status: { $in: ["active", "completed"] } });
+        if (!manager && (!enrollment || !isInstitutionPartner(institution))) {
+          course = { ...course, modules: course.modules.map(module => ({ ...module, lessons: module.lessons.map(lesson => lesson.preview ? lesson : { ...lesson, content: "", video_url: "", video_asset_id: "", video_playback_id: "", document_url: "", external_url: "", resources: [] }) })) };
+        }
+      }
+      let institutionEnrollmentEnabled = true;
+      if (course.institutionId) {
+        try { await assertInstitutionCourse(req, course, "enroll"); if (course.course_type === "paid") await assertInstitutionCourse(req, course, "payment"); } catch { institutionEnrollmentEnabled = false; }
+      }
+      let institutionCertificateEnabled = true;
+      try { await assertInstitutionCourse(req, course, "certificates"); } catch { institutionCertificateEnabled = false; }
+      return res.status(200).json({ course: { ...serialize(course), institutionEnrollmentEnabled, institutionCertificateEnabled } });
     } catch (error: any) {
       return res.status(500).json({
         error: "server_error",
@@ -462,8 +486,10 @@ export default function mountCourseEndpoints(router: Router) {
   router.post("/course-video-uploads", async (req, res) => {
     const currentUser = await requireUser(req, res);
     if (!currentUser) return;
-    if (!isInstructor(currentUser)) {
-      return res.status(403).json({ error: "forbidden", message: "An approved instructor or admin account is required." });
+    const uploadInstitutionId = safeString(req.body?.institutionId);
+    const institutionUploader = uploadInstitutionId && await canManageInstitution(req, currentUser, uploadInstitutionId);
+    if (!isInstructor(currentUser) && !institutionUploader) {
+      return res.status(403).json({ error: "forbidden", message: "An approved instructor or institution administrator account is required." });
     }
 
     const { fileSize, contentType, rightsConfirmed } = req.body || {};
@@ -511,7 +537,11 @@ export default function mountCourseEndpoints(router: Router) {
 
     try {
       const body = req.body || {};
-      if (!isInstructor(currentUser)) {
+      const institutionId = safeString(body.institutionId);
+      const institution = institutionId && ObjectId.isValid(institutionId) ? await req.app.locals.institutionCollection.findOne({ _id: new ObjectId(institutionId) }) : null;
+      const institutionManager = institution && isInstitutionPartner(institution) && await canManageInstitution(req, currentUser, institutionId);
+      if (institutionId && !institutionManager) return res.status(403).json({ message: "An active partner institution and authorized institution administrator are required." });
+      if (!isInstructor(currentUser) && !institutionManager) {
         return res.status(403).json({
           error: "forbidden",
           message: "Instructor or admin role required to create courses",
@@ -551,7 +581,8 @@ export default function mountCourseEndpoints(router: Router) {
           ? safeNumber(body.discount_price_usdt)
           : undefined,
         instructor_id: currentUser._id.toString(),
-        provider_id: safeString(body.provider_id) || currentUser._id.toString(),
+        ...(institutionId ? { institutionId, piPaymentsEnabled: currentUser.role === "admin" && body.piPaymentsEnabled === true } : {}),
+        provider_id: institutionId || safeString(body.provider_id) || currentUser._id.toString(),
         provider_type: validProviderTypes.includes(body.provider_type)
           ? body.provider_type
           : "individual",
@@ -688,7 +719,7 @@ export default function mountCourseEndpoints(router: Router) {
           .status(404)
           .json({ error: "not_found", message: "Course not found" });
 
-      const isOwner = course.instructor_id === currentUser._id.toString();
+      const isOwner = course.institutionId ? await canManageInstitution(req, currentUser, course.institutionId) : course.instructor_id === currentUser._id.toString();
       const isAdmin = currentUser.role === "admin";
       if (!isOwner && !isAdmin) {
         return res.status(403).json({
@@ -697,6 +728,8 @@ export default function mountCourseEndpoints(router: Router) {
         });
       }
 
+
+      if (body.piPaymentsEnabled !== undefined && course.institutionId && currentUser.role !== "admin") return res.status(403).json({ message: "Only SMAJ administrators can configure Pi payments." });
       const updates: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
@@ -727,6 +760,7 @@ export default function mountCourseEndpoints(router: Router) {
         "tags",
         "search_keywords",
         "certificate_enabled",
+        "piPaymentsEnabled",
         "completion_rules",
         "modules",
         "review_notes",
@@ -766,7 +800,18 @@ export default function mountCourseEndpoints(router: Router) {
         }
       }
 
+      if (course.institutionId) {
+        updates.provider_id = course.institutionId;
+        const priceUsdt = Number(updates.price_usdt ?? course.price_usdt);
+        if (!Number.isFinite(priceUsdt) || priceUsdt < 0) throw new Error("Enter a valid nonnegative fee.");
+        const type = updates.course_type ?? course.course_type;
+        updates.price_usdt = type === "free" ? 0 : priceUsdt;
+        updates.price_pi = type === "free" ? 0 : piFromUsdt(priceUsdt);
+        if (type === "paid" && updates.price_pi <= 0) throw new Error("Paid courses require a valid price.");
+        if (!isAdmin) { updates.status = "draft"; updates.piPaymentsEnabled = false; }
+      }
       await collection.updateOne({ _id: course._id }, { $set: updates });
+      if (course.institutionId) await req.app.locals.institutionAuditCollection.insertOne({ institutionId: course.institutionId, actorId: String(currentUser._id), action: "course.updated", details: { courseId: String(course._id), status: updates.status, piPaymentsEnabled: updates.piPaymentsEnabled }, at: new Date().toISOString() });
       const updated = await collection.findOne({ _id: course._id });
       return res
         .status(200)
@@ -802,7 +847,7 @@ export default function mountCourseEndpoints(router: Router) {
           .status(404)
           .json({ error: "not_found", message: "Course not found" });
       if (
-        course.instructor_id !== currentUser._id.toString() &&
+        !(course.institutionId ? await canManageInstitution(req, currentUser, course.institutionId) : course.instructor_id === currentUser._id.toString()) &&
         currentUser.role !== "admin"
       ) {
         return res.status(403).json({
@@ -870,6 +915,8 @@ export default function mountCourseEndpoints(router: Router) {
           message: "Course is not available for enrollment",
         });
 
+      await assertInstitutionCourse(req, course, "enroll");
+      if (course.course_type === "paid") await assertInstitutionCourse(req, course, "payment");
       const existing = await enrollmentCollection.findOne({
         user_id: currentUser._id.toString(),
         course_id: course._id.toString(),
@@ -897,6 +944,7 @@ export default function mountCourseEndpoints(router: Router) {
       const enrollment: EnrollmentData = {
         _id: new ObjectId(),
         enrollment_id: generateEnrollmentId(),
+        ...(course.institutionId ? { institutionId: course.institutionId } : {}),
         user_id: currentUser._id.toString(),
         course_id: course._id.toString(),
         course_slug: course.slug,
@@ -916,6 +964,7 @@ export default function mountCourseEndpoints(router: Router) {
         const payment: CoursePaymentData = {
           _id: new ObjectId(),
           payment_id: paymentId,
+          ...(course.institutionId ? { institutionId: course.institutionId } : {}),
           user_id: currentUser._id.toString(),
           course_id: course._id.toString(),
           course_slug: course.slug,
@@ -996,7 +1045,14 @@ export default function mountCourseEndpoints(router: Router) {
         return res
           .status(400)
           .json({ error: "bad_request", message: "Pi payment ID is required" });
-      await platformAPIKeyClient.post(`/v2/payments/${piPaymentId}/approve`);
+      await assertInstitutionPayment(req, payment);
+      if (payment.institutionId) {
+        const { data: remote } = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(piPaymentId)}`);
+        assertPiPaymentBinding(remote, payment, currentUser);
+        const reused = await paymentCollection.findOne({ pi_payment_identifier: piPaymentId, _id: { $ne: payment._id } });
+        if (reused) throw new Error("This Pi payment is already assigned to another enrollment.");
+      }
+      await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(piPaymentId)}/approve`);
       await paymentCollection.updateOne(
         { _id: payment._id },
         {
@@ -1051,8 +1107,15 @@ export default function mountCourseEndpoints(router: Router) {
           message: "Transaction ID is required",
         });
 
+      await assertInstitutionPayment(req, payment);
+      if (payment.institutionId) {
+        if (!payment.pi_payment_identifier || !["processing", "paid"].includes(payment.status)) throw new Error("An approved Pi payment is required.");
+        const payer = await req.app.locals.userCollection.findOne({ _id: new ObjectId(payment.user_id) });
+        const { data: remote } = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(payment.pi_payment_identifier)}`);
+        assertPiPaymentBinding(remote, payment, payer, txid);
+      }
       await platformAPIKeyClient.post(
-        `/v2/payments/${payment.pi_payment_identifier || payment.payment_id}/complete`,
+        `/v2/payments/${encodeURIComponent(payment.pi_payment_identifier || payment.payment_id)}/complete`,
         { txid },
       );
 
@@ -1068,17 +1131,23 @@ export default function mountCourseEndpoints(router: Router) {
         },
       );
 
-      if (payment.course_id) {
+      if (payment.course_id || payment.programId) {
         await enrollmentCollection.updateOne(
           {
             user_id: payment.user_id,
-            course_id: payment.course_id,
+            ...(payment.programId ? { programId: payment.programId, institutionId: payment.institutionId } : { course_id: payment.course_id }),
             payment_id: payment.payment_id,
+            status: "pending_payment",
           },
           { $set: { status: "active", updated_at: new Date().toISOString() } },
         );
       }
 
+      if (payment.programId) {
+        const enrollment = await enrollmentCollection.findOne({ institutionId: payment.institutionId, programId: payment.programId, user_id: payment.user_id });
+        await grantInstitutionProgramCourses(req, enrollment);
+      }
+      if (payment.institutionId) await req.app.locals.institutionAuditCollection.insertOne({ institutionId: payment.institutionId, actorId: String(currentUser._id), action: "payment.confirmed", details: { paymentId: String(payment._id), txid }, at: new Date().toISOString() });
       return res.status(200).json({
         message: "Payment completed. Enrollment activated.",
         payment_id: payment.payment_id,
@@ -1174,6 +1243,10 @@ export default function mountCourseEndpoints(router: Router) {
             .status(404)
             .json({ error: "not_found", message: "Course not found" });
 
+        if (course.institutionId) {
+          await assertInstitutionCourse(req, course, "enroll");
+          if (!["active", "completed"].includes(enrollment.status)) throw new Error("Complete enrollment payment before recording learning progress.");
+        }
         const lessonId = req.params.lessonId;
         const allLessons = course.modules.flatMap((m: CourseModule) =>
           m.lessons.map(
@@ -1192,7 +1265,8 @@ export default function mountCourseEndpoints(router: Router) {
         }
         const shouldAddLesson =
           !enrollment.completed_lesson_ids.includes(actualLessonId);
-        const updates: Record<string, any> = {
+
+      const updates: Record<string, any> = {
           updated_at: new Date().toISOString(),
         };
 
@@ -1396,11 +1470,14 @@ export default function mountCourseEndpoints(router: Router) {
           .status(404)
           .json({ error: "not_found", message: "Course not found" });
 
+      await assertInstitutionCourse(req, course, "certificates");
+      if (course.institutionId && enrollment.status !== "completed") throw new Error("Institution certificates require confirmed completion.");
       const certificateId = generateCertificateId();
       const now = new Date().toISOString();
       const certificate: CertificateData = {
         _id: new ObjectId(),
         certificate_id: certificateId,
+        ...(course.institutionId ? { institutionId: course.institutionId } : {}),
         enrollment_id: enrollment._id.toString(),
         user_id: currentUser._id.toString(),
         course_id: course._id.toString(),
@@ -1473,11 +1550,13 @@ export default function mountCourseEndpoints(router: Router) {
           message: "Certificate not available for this course",
         });
 
+      await assertInstitutionCourse(req, course, "certificates");
       const certificateId = generateCertificateId();
       const verificationUrl = `${req.protocol}://${req.get("host")}/verify/certificate/${certificateId}`;
       const certificate: CertificateData = {
         _id: new ObjectId(),
         certificate_id: certificateId,
+        ...(course.institutionId ? { institutionId: course.institutionId } : {}),
         enrollment_id: enrollment._id.toString(),
         user_id: currentUser._id.toString(),
         course_id: course._id.toString(),
@@ -1508,6 +1587,7 @@ export default function mountCourseEndpoints(router: Router) {
         {
           $set: {
             certificate_id: certificateId,
+        ...(course.institutionId ? { institutionId: course.institutionId } : {}),
             updated_at: new Date().toISOString(),
           },
         },
@@ -1675,6 +1755,7 @@ export default function mountCourseEndpoints(router: Router) {
           .status(404)
           .json({ error: "not_found", message: "Course not found" });
 
+
       const updates: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
@@ -1684,6 +1765,7 @@ export default function mountCourseEndpoints(router: Router) {
         "reviewed_by",
         "reviewed_at",
         "certificate_enabled",
+        "piPaymentsEnabled",
         "featured",
       ];
       for (const key of updatable) {

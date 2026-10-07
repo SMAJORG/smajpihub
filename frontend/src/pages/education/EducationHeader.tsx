@@ -9,6 +9,7 @@ import "./EducationHeader.css";
 const primaryLinks = [
   ["/services/education/my-courses", "My Courses"],
   ["/services/education/universities", "Universities"],
+  ["/education/institutions", "Institutions"],
   ["/services/education/courses", "Online Courses"],
   ["/services/education/tutors", "Tutors"],
   ["/services/education/certificates", "Certificates"],
@@ -23,6 +24,7 @@ const topicLinks = [
 const providerLinks = [
   ["/services/education/partners", "Partners"],
   ["/services/education/teach", "Teach on SMAJ"],
+  ["/education/institution-portal", "Institution portal"],
 ] as const;
 
 const EducationHeader = ({

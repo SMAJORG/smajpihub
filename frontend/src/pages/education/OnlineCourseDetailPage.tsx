@@ -160,7 +160,8 @@ const CourseDetailPage = () => {
 
   const isEnrolled = enrollment?.status === "active" || enrollment?.status === "completed";
   const isPaid = course.course_type === "paid";
-  const needsPayment = isPaid && !isEnrolled && payment && payment.status === "pending";
+  const institutionEnrollmentAllowed = !course.institutionId || course.institutionEnrollmentEnabled === true;
+  const needsPayment = institutionEnrollmentAllowed && isPaid && !isEnrolled && payment && payment.status === "pending";
 
   return (
     <AppLayout showHeader={false} showFooter={false}>
@@ -185,13 +186,13 @@ const CourseDetailPage = () => {
                   <span>Level: {course.level}</span>
                   {course.estimated_duration && <span>Duration: {course.estimated_duration}</span>}
                   <span>Language: {course.language}</span>
-                  {course.certificate_enabled && <span>Certificate Available</span>}
+                  {course.certificate_enabled && (!course.institutionId || course.institutionCertificateEnabled) && <span>Certificate Available</span>}
                 </div>
                 <footer className="course-detail-actions">
                   <strong className={course.course_type === "free" ? "course-price-free" : "course-price-paid"}>
                     {course.course_type === "free" ? "FREE" : `${formatPiAmount(course.price_pi)} Pi`}
                   </strong>
-                  {!isEnrolled && (
+                  {!isEnrolled && institutionEnrollmentAllowed && (
                     <button className="course-primary-btn" onClick={handleEnroll} disabled={enrolling}>
                       {enrolling ? "Enrolling..." : course.course_type === "free" ? "Enroll Free" : "Enroll with Pi"}
                       {isPaid && <AccountBalanceWalletOutlinedIcon />}
@@ -202,7 +203,7 @@ const CourseDetailPage = () => {
                       <Link to={`/services/education/courses/learn/${enrollment.id}`} className="course-primary-btn">
                         Continue Learning
                       </Link>
-                      <button type="button" className="course-secondary-btn" onClick={handleEnrollmentCertificate}>
+                      <button type="button" className="course-secondary-btn" disabled={Boolean(course.institutionId) && (enrollment?.status !== "completed" || !course.institutionCertificateEnabled)} onClick={handleEnrollmentCertificate}>
                         Enrollment Certificate
                       </button>
                     </>

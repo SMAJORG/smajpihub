@@ -79,6 +79,11 @@ export type Course = {
   discount_price_usdt?: number;
   instructor_id: string;
   provider_id?: string;
+  institutionId?: string;
+  institutionEnrollmentEnabled?: boolean;
+  institutionCertificateEnabled?: boolean;
+  programId?: string;
+  piPaymentsEnabled?: boolean;
   provider_type?: ProviderType;
   language: string;
   level: CourseLevel;
@@ -114,6 +119,9 @@ export type Course = {
 export type Enrollment = {
   id: string;
   enrollment_id: string;
+  institutionId?: string;
+  institutionEnrollmentEnabled?: boolean;
+  programId?: string;
   user_id: string;
   course_id: string;
   course_slug: string;
@@ -146,6 +154,9 @@ export type Certificate = {
   id: string;
   certificate_id: string;
   enrollment_id: string;
+  institutionId?: string;
+  institutionEnrollmentEnabled?: boolean;
+  programId?: string;
   user_id: string;
   course_id: string;
   course_slug: string;
@@ -178,6 +189,10 @@ export type CoursePayment = {
   course_title: string;
   instructor_id: string;
   provider_id?: string;
+  institutionId?: string;
+  institutionEnrollmentEnabled?: boolean;
+  programId?: string;
+  piPaymentsEnabled?: boolean;
   amount_pi: number;
   amount_usdt: number;
   pi_payment_identifier?: string;
