@@ -1,3 +1,4 @@
+import StreamSkeleton from "./StreamSkeleton";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
@@ -751,7 +752,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
         </header>
       ) : null}
       {catalogState === "loading" ? (
-        <div className="sw-catalog-status">Loading the entertainment catalogue...</div>
+        <StreamSkeleton variant="cards" label="Loading the entertainment catalogue..." />
       ) : null}
       {catalogState === "fallback" && ["movies", "series", "search", "category"].includes(kind) ? (
         <div className="sw-catalog-status warning">
@@ -832,7 +833,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
           </section> : null}
           <section className="sw-download-for-you" aria-labelledby="sw-download-for-you-title">
             <h2 id="sw-download-for-you-title">For You</h2>
-            {recommendationsLoading && !recommendations.length ? <p role="status">Loading recommendations...</p> : null}
+            {recommendationsLoading && !recommendations.length ? <StreamSkeleton label="Loading recommendations" /> : null}
             {recommendationsError ? <p role="alert">Could not load new recommendations. Please try refreshing.</p> : null}
             {!recommendationsLoading && !recommendationsError && !recommendations.length ? <p>No recommendations available yet.</p> : null}
             <div className="sw-download-recommendations" aria-busy={recommendationsLoading}>{recommendations.filter(item => !list.some(saved => saved.id === item.id && saved.mediaType === item.mediaType)).slice(0, 12).map(item => (
@@ -1648,7 +1649,7 @@ const StreamPlansPanel = () => {
         <h1>Plans & payments</h1>
         <p>Choose a monthly Stream plan and pay with Pi.</p>
       </header>
-      {state === "loading" ? <div className="sw-catalog-status">Loading Stream plans...</div> : null}
+      {state === "loading" ? <StreamSkeleton variant="metrics" label="Loading Stream plans..." /> : null}
       {plans.length ? (
         <section className="sw-settings-card">
           {subscription ? (
@@ -1739,7 +1740,7 @@ const StreamParentalControls = () => {
     }
   };
 
-  if (state === "loading") return <div className="sw-catalog-status">Loading parental controls...</div>;
+  if (state === "loading") return <StreamSkeleton variant="form" label="Loading parental controls..." />;
   if (!profile) return <div className="sw-catalog-status warning">{message}</div>;
 
   return (
@@ -2023,7 +2024,7 @@ const Admin = ({ kind }: { kind: StreamPageKind }) => {
             Stream admin data could not load. Check the backend connection and retry.
           </div>
         ) : null}
-        {status === "loading" ? <div className="sw-catalog-status">Loading Stream operations...</div> : null}
+        {status === "loading" ? <StreamSkeleton variant="metrics" label="Loading Stream operations..." /> : null}
         {kind === "admin" || kind === "admin-analytics" ? (
           <>
             <div className="sw-metrics">
@@ -2299,7 +2300,7 @@ const StreamWorkspacePage = ({ kind }: { kind: StreamPageKind }) => {
       !adminKinds.includes(kind) &&
       !["movie-detail", "series-detail", "search", "player", "live-player", "live-now"].includes(kind) ? (
         <StreamHeader
-          showCategoryNav={!['downloads', 'my-list', 'history', 'subscriptions', 'creator-directory', 'notifications', 'plans', 'parental'].includes(kind)}
+          showCategoryNav={!['public-channel', 'downloads', 'my-list', 'history', 'subscriptions', 'creator-directory', 'notifications', 'plans', 'parental'].includes(kind)}
         />
       ) : null}
       <div className="sw-page-content">{content}</div>

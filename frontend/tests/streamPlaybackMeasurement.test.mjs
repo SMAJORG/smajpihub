@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import ts from "typescript";
+const source = fs.readFileSync(new URL("../src/lib/streamPlaybackMeasurement.ts", import.meta.url), "utf8");
+const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } });
+const { watchedInterval } = await import("data:text/javascript;base64," + Buffer.from(outputText).toString("base64"));
+const previous = { position: 10, playing: true, at: 1000, rate: 1 };
+assert.equal(watchedInterval(null, previous), 0);
+assert.equal(watchedInterval(previous, { ...previous, position: 11, at: 2000 }), 1);
+assert.equal(watchedInterval({ ...previous, playing: false }, { ...previous, position: 11, at: 2000 }), 0, "Paused playback must not accrue time");
+assert.equal(watchedInterval(previous, { ...previous, position: 110, at: 2000 }), 0, "Seeking ahead must not accrue skipped content");
+assert.equal(watchedInterval(previous, { ...previous, position: 1, at: 2000 }), 0, "Rewinding must not accrue skipped content");
+assert.equal(watchedInterval(previous, { ...previous, at: 2000 }), 0, "Buffering must not accrue time");
+assert.equal(watchedInterval(previous, { ...previous, position: 11, seeking: true, at: 2000 }), 0);
+assert.equal(watchedInterval({ ...previous, rate: 2 }, { ...previous, rate: 2, position: 12, at: 2000 }), 1, "Double speed playback counts real time");
+assert.equal(watchedInterval(previous, { ...previous, position: 20, at: 11000 }), 0, "Suspended timers must not invent watch time");
+console.log("Playback measurement regression checks passed");

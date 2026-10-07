@@ -1,3 +1,4 @@
+import StreamSkeleton from "./StreamSkeleton";
 import { useCallback, useEffect, useState } from "react";
 import { getModerationVideos, updateModerationVideo, type ModerationVideo } from "../../lib/streamAdmin";
 import { searchStreamCatalog, type StreamCatalogTitle } from "../../lib/streamCatalog";
@@ -74,7 +75,7 @@ const StreamModerationPanel = () => {
       setMessage("TMDB search is unavailable.");
     }
   };
-  if (!videos) return <div className="sw-catalog-status">Loading moderation queue...</div>;
+  if (!videos) return <StreamSkeleton variant="cards" label="Loading moderation queue..." />;
   return (
     <>
       <div className="sw-moderation-toolbar">

@@ -1,3 +1,4 @@
+import StreamSkeleton from "./StreamSkeleton";
 import CameraAltOutlinedIcon from "@mui/icons-material/CameraAltOutlined";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
 import { Link } from "react-router-dom";
@@ -223,7 +224,7 @@ const StreamChannelPanel = () => {
     }
   };
 
-  if (!profile) return <div className="sw-catalog-status">{status === "loading" ? "Loading your channel..." : message}</div>;
+  if (!profile) return status === "loading" ? <StreamSkeleton variant="channel" label="Loading your channel" /> : <div className="sw-catalog-status warning">{message}</div>;
   const initials = (profile.channelName || profile.displayName || "SC").split(/\s+/).map(word => word[0]).join("").slice(0, 2).toUpperCase();
 
   return <form className="sw-channel-editor" onSubmit={submit}>

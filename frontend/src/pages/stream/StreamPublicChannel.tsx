@@ -1,3 +1,4 @@
+import StreamSkeleton from "./StreamSkeleton";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
@@ -41,7 +42,7 @@ const StreamPublicChannel = () => {
     }
   };
 
-  if (state === "loading") return <div className="sw-catalog-status">Loading creator channel...</div>;
+  if (state === "loading") return <StreamSkeleton variant="channel" label="Loading creator channel..." />;
   if (state === "error" || !data)
     return (
       <section className="sw-detail-error">

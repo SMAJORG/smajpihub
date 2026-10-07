@@ -383,6 +383,7 @@ const start = async () => {
         "ambassador_applications",
       );
       app.locals.streamContentCollection = db.collection("stream_content");
+      app.locals.streamPlaybackSessionCollection = db.collection("stream_playback_sessions");
       app.locals.streamPostCollection = db.collection("stream_posts");
       app.locals.streamReviewCollection = db.collection("stream_reviews");
       app.locals.streamSettingsCollection = db.collection("stream_settings");
@@ -609,6 +610,7 @@ const start = async () => {
           status: 1,
           createdAt: -1,
         }),
+        app.locals.streamPlaybackSessionCollection.createIndex({ creatorId: 1, updatedAt: -1 }),
         app.locals.streamContentCollection.createIndex(
           { cloudflareUid: 1 },
           { unique: true },

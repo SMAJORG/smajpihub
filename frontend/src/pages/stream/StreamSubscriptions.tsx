@@ -1,3 +1,4 @@
+import StreamSkeleton from "./StreamSkeleton";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
@@ -24,7 +25,7 @@ const StreamSubscriptions = () => {
         <h1>Subscriptions</h1>
         <p>New videos and live broadcasts from creators you follow.</p>
       </header>
-      {channels === null ? <div className="sw-catalog-status">Loading subscriptions...</div> : null}
+      {channels === null ? <StreamSkeleton variant="channel" label="Loading subscriptions..." /> : null}
       {error ? <div className="sw-catalog-status warning">{error}</div> : null}
       {channels?.length ? (
         <section className="sw-subscriptions-list">

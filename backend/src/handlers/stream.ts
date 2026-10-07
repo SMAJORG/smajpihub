@@ -1,3 +1,4 @@
+import { getStreamPlaybackTotals, recordStreamPlayback } from "../services/streamAnalytics";
 import { enrichProfileAvatars, synchronizeAvatarSnapshots } from "../services/profileAvatars";
 import type { Request, Response, Router } from "express";
 import axios from "axios";
@@ -730,11 +731,14 @@ const mountStreamEndpoints = (router: Router) => {
     const user = await requireCreator(req, res); if (!user) return;
     const videos = await req.app.locals.streamContentCollection.find({ creatorId: String(user._id) }).sort({ createdAt: -1 }).limit(1000).toArray();
     const count = (predicate: (video: Record<string, any>) => boolean) => videos.filter(predicate).length;
-    const totalViews = videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.views) || 0), 0);
-    const watchSeconds = videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.watchSeconds) || 0), 0);
+    const playbackTotals = await getStreamPlaybackTotals(req.app.locals.streamPlaybackSessionCollection, String(user._id));
+    const totalViews = playbackTotals.views + videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.views) || 0), 0);
+    const watchSeconds = playbackTotals.watchSeconds + videos.reduce((total: number, video: Record<string, any>) => total + Math.max(0, Number(video.watchSeconds) || 0), 0);
     const publishedVideos = count(video => video.visibility === "public" && video.moderationStatus === "approved" && video.playbackAllowed === true);
     const rejectedVideos = count(video => video.moderationStatus === "rejected");
     const creatorProfile = (user as unknown as { streamProfile?: { channelName?: string; channelHandle?: string } }).streamProfile;
+    const followers = creatorProfile?.channelHandle ? await req.app.locals.userCollection.countDocuments({ "streamSubscriptions.handle": creatorProfile.channelHandle }) : 0;
+    const posts = await req.app.locals.streamPostCollection?.countDocuments({ creatorId: String(user._id) }) || 0;
     const eligibility = {
       channelProfile: Boolean(creatorProfile?.channelName && creatorProfile?.channelHandle),
       rightsConfirmed: videos.some((video: Record<string, any>) => video.rightsConfirmed === true),
@@ -743,7 +747,8 @@ const mountStreamEndpoints = (router: Router) => {
       minimumWatchSeconds: watchSeconds >= 36_000,
       goodStanding: rejectedVideos === 0,
     };
-    return res.json({ stats: { totalVideos: videos.length, publishedVideos, pendingVideos: count(video => !video.moderationStatus || video.moderationStatus === "pending"), rejectedVideos, liveStreams: count(video => video.contentType === "live"), totalViews, watchSeconds, averageViewSeconds: totalViews > 0 ? Math.round(watchSeconds / totalViews) : 0, latestUploadAt: videos[0]?.createdAt || null }, monetization: { enabled: false, eligible: Object.values(eligibility).every(Boolean), eligibility, reason: "Creator Pi payouts are not live yet. Complete the eligibility steps now so the channel is ready when compliant payouts launch." } });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ stats: { followers, posts, totalVideos: videos.length, publishedVideos, pendingVideos: count(video => !video.moderationStatus || video.moderationStatus === "pending"), rejectedVideos, liveStreams: count(video => video.contentType === "live"), totalViews, watchSeconds, averageViewSeconds: totalViews > 0 ? Math.round(watchSeconds / totalViews) : 0, latestUploadAt: videos[0]?.createdAt || null }, monetization: { enabled: false, eligible: Object.values(eligibility).every(Boolean), eligibility, reason: "Creator Pi payouts are not live yet. Complete the eligibility steps now so the channel is ready when compliant payouts launch." } });
   });
 
   router.post("/creator/posts", async (req, res) => {
@@ -1431,6 +1436,21 @@ const mountStreamEndpoints = (router: Router) => {
       return res.status(502).json({ error: "cloudflare_download_failed", message: "Cloudflare could not prepare this download. Please try again." });
     }
   });
+  router.post("/playback/:uid/events", async (req, res) => {
+    const user = await requireViewer(req, res); if (!user) return;
+    const uid = String(req.params.uid || "").slice(0, 180).replace(/^yt-/, "");
+    const sessionId = String(req.body?.sessionId || "");
+    const watchSeconds = Number(req.body?.watchSeconds);
+    if (!/^[A-Za-z0-9_-]{8,100}$/.test(sessionId) || !Number.isFinite(watchSeconds) || watchSeconds < 0 || watchSeconds > 86_400)
+      return res.status(400).json({ error: "invalid_playback_event" });
+    if (!req.app.locals.streamPlaybackSessionCollection) return res.status(503).json({ error: "analytics_unavailable" });
+    const video = await req.app.locals.streamContentCollection?.findOne({ $or: [{ cloudflareUid: uid }, { youtubeVideoId: uid }, { liveInputUid: uid }], visibility: "public", moderationStatus: "approved", playbackAllowed: true });
+    // Official external channels have no creator account to attribute analytics to.
+    if (!video?.creatorId) return res.json({ recorded: false });
+    await recordStreamPlayback(req.app.locals.streamPlaybackSessionCollection, { creatorId: String(video.creatorId), videoId: String(video.cloudflareUid || uid), viewerId: String(user._id), sessionId, watchSeconds });
+    return res.json({ recorded: true });
+  });
+
   router.get("/progress/:uid", async (req, res) => {
     const user = await requireViewer(req, res); if (!user) return;
     const uid = String(req.params.uid || "").slice(0, 180);

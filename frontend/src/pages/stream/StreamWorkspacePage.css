@@ -3004,3 +3004,6 @@ html.sw-player-is-fullscreen body { overflow: hidden; }
 .sw-downloads-page :is(a,button):focus-visible{outline:2px solid #c99cff;outline-offset:3px}
 @media(min-width:900px){.sw-download-recommendations{grid-auto-columns:180px}.sw-downloads-page .sw-download-manager{max-width:960px}}
 @media(max-width:600px){.sw-downloads-page .sw-page-content{padding:20px 16px 100px}.sw-downloads-heading{margin-bottom:22px}.sw-downloaded-row{grid-template-columns:28% minmax(0,1fr) auto;gap:10px}.sw-downloaded-copy>a{font-size:16px}.sw-downloaded-copy small{font-size:12px}.sw-downloaded-copy>span{font-size:13px}.sw-download-save{padding:5px 8px;font-size:14px}.sw-download-thumbnail svg{font-size:36px}.sw-download-recommendations{gap:12px;grid-auto-columns:calc((100% - 24px)/3)}.sw-download-recommendations span{font-size:13px}.sw-download-for-you h2{font-size:22px}}
+
+/* Keep creator pages directly below their navigation, including during loading. */
+@media(max-width:1023px){.sw-management{grid-template-rows:auto 1fr;align-content:start}.sw-management>section{align-self:start}}

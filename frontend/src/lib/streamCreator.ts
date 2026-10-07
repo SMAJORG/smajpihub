@@ -53,6 +53,8 @@ export const refreshCreatorVideoStatus = async (uid: string) =>
 
 export type CreatorOverview = {
   stats: {
+    followers?: number;
+    posts?: number;
     totalVideos: number;
     publishedVideos: number;
     pendingVideos: number;
@@ -77,7 +79,7 @@ export type CreatorOverview = {
     reason: string;
   };
 };
-export const getCreatorOverview = async () => (await axiosClient.get<CreatorOverview>("/stream/creator/overview")).data;
+export const getCreatorOverview = async (signal?: AbortSignal) => (await axiosClient.get<CreatorOverview>("/stream/creator/overview", { signal, headers: { "X-SMAJ-Silent": "true", "Cache-Control": "no-cache" } })).data;
 
 export const getPublishedCreatorVideos = async () => {
   const response = await axiosClient.get<{ videos: Array<Pick<CreatorVideo, "_id" | "title" | "thumbnailUrl" | "youtubeVideoId" | "cloudflareUid" | "contentSource"> & { creatorName?: string; category?: string }> }>("/stream/creator-content");

@@ -1,3 +1,5 @@
+import StreamSkeleton from "./StreamSkeleton";
+import { startStreamPlaybackTracking } from "../../lib/streamPlaybackTracking";
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Link } from "react-router-dom";
@@ -17,6 +19,8 @@ type YouTubePlayer = {
   destroy: () => void;
   getCurrentTime: () => number;
   getDuration: () => number;
+  getPlayerState: () => number;
+  getPlaybackRate: () => number;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
 };
 type YouTubePlayerEvent = { target: YouTubePlayer; data: number };
@@ -32,7 +36,7 @@ type YouTubeApi = {
   PlayerState: { ENDED: number; PLAYING: number; PAUSED: number };
 };
 
-type CloudflarePlayer = { currentTime: number; duration: number };
+type CloudflarePlayer = { currentTime: number; duration: number; paused: boolean; seeking: boolean; playbackRate: number };
 type CloudflareStreamFactory = (element: HTMLIFrameElement) => CloudflarePlayer;
 let cloudflareApiPromise: Promise<CloudflareStreamFactory> | null = null;
 const loadCloudflarePlayerApi = () => {
@@ -81,22 +85,28 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
   const cloudflareIframeRef = useRef<HTMLIFrameElement>(null);
   const cloudflarePlayerRef = useRef<CloudflarePlayer | null>(null);
   const lastSavedRef = useRef(0);
+  const loadedIdRef = useRef("");
   const [video, setVideo] = useState<StreamPlaybackVideo | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    let active = true;
     setState("loading");
     void Promise.all([getStreamPlayback(id), getStreamProgress(id).catch(() => null)])
       .then(([playback, progress]) => {
+        if (!active) return;
+        loadedIdRef.current = id;
         setVideo(playback);
         lastSavedRef.current = progress?.position || 0;
         setState("ready");
       })
       .catch(error => {
+        if (!active) return;
         setMessage(error?.response?.data?.message || "This title is not available for playback.");
         setState("error");
       });
+    return () => { active = false; };
   }, [id]);
 
   useEffect(() => {
@@ -231,6 +241,19 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
     return () => { active = false; cloudflarePlayerRef.current = null; };
   }, [video]);
 
+  useEffect(() => {
+    if (!video || state !== "ready" || loadedIdRef.current !== id) return;
+    return startStreamPlaybackTracking(video.id || id, () => {
+      const element = videoRef.current;
+      if (element && ["hls", "mp4"].includes(video.sourceType)) return { position: element.currentTime, playing: !element.paused && !element.ended && element.readyState >= 3, seeking: element.seeking, rate: element.playbackRate };
+      const youtube = youtubePlayerRef.current;
+      if (video.sourceType === "youtube" && youtube && typeof youtube.getPlayerState === "function") return { position: youtube.getCurrentTime(), playing: youtube.getPlayerState() === 1, rate: youtube.getPlaybackRate() };
+      const cloudflare = cloudflarePlayerRef.current;
+      if (video.sourceType === "cloudflare" && cloudflare) return { position: Number(cloudflare.currentTime), playing: cloudflare.paused === false, seeking: cloudflare.seeking, rate: cloudflare.playbackRate };
+      return null;
+    });
+  }, [id, video, state]);
+
   const seekEmbedded = (offset: number) => {
     const cloudflare = cloudflarePlayerRef.current;
     if (cloudflare) {
@@ -273,14 +296,7 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
     }).catch(() => setMessage("Watch progress could not synchronize. Check your connection and sign-in."));
   };
 
-  if (state === "loading")
-    return (
-      <section className="sw-player-state">
-        <i />
-        <h1>Preparing your video...</h1>
-        <p>Checking playback rights and loading the stream.</p>
-      </section>
-    );
+  if (state === "loading") return <StreamSkeleton variant="player" label="Loading video" />;
   if (state === "error" || !video)
     return (
       <section className="sw-player-state error">

@@ -177,6 +177,15 @@ export class MemoryCollection {
   aggregate(pipeline: Document[]) {
     const match = pipeline.find((stage) => stage.$match)?.$match || {};
     const group = pipeline.find((stage) => stage.$group)?.$group;
+    if (group && group._id === null) {
+      const documents = this.documents.filter(document => matchesQuery(document, match));
+      const totals: Document = { _id: null };
+      for (const [key, expression] of Object.entries(group) as Array<[string, any]>) {
+        if (key === "_id" || expression?.$sum === undefined) continue;
+        totals[key] = documents.reduce((sum, document) => sum + (typeof expression.$sum === "number" ? expression.$sum : Number(document[String(expression.$sum).slice(1)]) || 0), 0);
+      }
+      return new MemoryCursor(documents.length ? [totals] : []);
+    }
     if (!group?._id || group._id !== "$category") return new MemoryCursor([]);
     const counts = new Map<string, number>();
     this.documents.filter((document) => matchesQuery(document, match)).forEach((document) => {
@@ -206,6 +215,7 @@ export const createMemoryCollections = () => ({
   heroBannerCollection: new MemoryCollection(),
   ambassadorCollection: new MemoryCollection(),
   streamContentCollection: new MemoryCollection(),
+  streamPlaybackSessionCollection: new MemoryCollection(),
   streamPostCollection: new MemoryCollection(),
   streamReviewCollection: new MemoryCollection(),
   streamSettingsCollection: new MemoryCollection(),

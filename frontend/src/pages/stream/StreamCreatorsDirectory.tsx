@@ -1,3 +1,4 @@
+import StreamSkeleton from "./StreamSkeleton";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
@@ -88,7 +89,7 @@ const StreamCreatorsDirectory = () => {
         <p>Find channels, follow creators, and watch their latest videos and live broadcasts.</p>
         <Link to="/app/services/stream/studio">Become a Creator</Link>
       </header>
-      {creators === null ? <div className="sw-catalog-status">Loading creator channels...</div> : null}
+      {creators === null ? <StreamSkeleton variant="channel" label="Loading creator channels..." /> : null}
       {error ? <div className="sw-catalog-status warning">{error}</div> : null}
       {creators?.length ? (
         <div className="sw-creator-discovery-tools">
