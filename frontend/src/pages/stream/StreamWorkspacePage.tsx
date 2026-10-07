@@ -14,6 +14,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import "./StreamWorkspacePage.css";
 import StreamHeader from "./StreamHeader";
 import CreatorUploadForm from "./CreatorUploadForm";
@@ -117,6 +118,7 @@ type Title = {
   tone: string;
   progress?: number;
   posterUrl?: string | null;
+  backdropUrl?: string | null;
   mediaType?: "movie" | "tv";
   overview?: string;
   downloadStatus?: "pending" | "downloading" | "ready" | "failed";
@@ -483,6 +485,21 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const [saveLocation, setSaveLocation] = useState<"phone" | "sd" | "">("");
   const [saveProgress, setSaveProgress] = useState<number | null>(null);
   const [saveMessage, setSaveMessage] = useState("");
+  const [recommendations, setRecommendations] = useState<StreamCatalogTitle[]>([]);
+  const [recommendationPage, setRecommendationPage] = useState(1);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState(false);
+  useEffect(() => {
+    if (kind !== "downloads") return;
+    let active = true;
+    setRecommendationsLoading(true);
+    setRecommendationsError(false);
+    void getStreamCatalog("trending", recommendationPage)
+      .then(data => { if (active) setRecommendations(data.results.filter(item => item.posterUrl)); })
+      .catch(() => { if (active) setRecommendationsError(true); })
+      .finally(() => { if (active) setRecommendationsLoading(false); });
+    return () => { active = false; };
+  }, [kind, recommendationPage]);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const categoryName = slug
     .split("-")
@@ -534,6 +551,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
                 meta: `${item.mediaType === "tv" ? "Series" : "Movie"}${item.releaseDate ? ` - ${item.releaseDate.slice(0, 4)}` : ""}${item.rating ? ` - Rating ${item.rating}` : ""}`,
                 tone: ["purple", "amber", "green", "blue", "coral", "indigo", "rose", "teal"][index % 8] || "purple",
                 posterUrl: item.posterUrl,
+                backdropUrl: item.backdropUrl,
                 mediaType: item.mediaType,
                 overview: item.overview,
                 downloadStatus: visibleDownloadStatus(item.mediaType, item.id, ("downloadStatus" in item ? item.downloadStatus : undefined) as Title["downloadStatus"]),
@@ -675,6 +693,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
               meta: existing?.meta || (mediaType === "tv" ? "Series" : "Movie"),
               tone: existing?.tone || ["purple", "amber", "green", "blue"][index % 4] || "purple",
               posterUrl: record.posterUrl || existing?.posterUrl || null,
+              backdropUrl: existing?.backdropUrl,
               mediaType,
               overview: existing?.overview,
               downloadStatus: record.status === "complete" ? "ready" : record.status === "failed" ? "failed" : "downloading",
@@ -726,9 +745,9 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   return (
     <>
       {kind !== "category" ? (
-        <header className="sw-page-head">
+        <header className={`sw-page-head ${kind === "downloads" ? "sw-downloads-heading" : ""}`}>
           <h1>{heading}</h1>
-          <p>{description}</p>
+          {kind !== "downloads" ? <p>{description}</p> : null}
         </header>
       ) : null}
       {catalogState === "loading" ? (
@@ -750,7 +769,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
           <h2>{kind === "downloads" ? "No downloads yet" : "Your list is empty"}</h2>
           <p>
             {kind === "downloads"
-              ? "Downloads are saved to your account. Offline file storage is coming later."
+              ? "Download a movie or series to find it here."
               : "Save a movie or series to My List and it will appear here on every signed-in device."}
           </p>
           <Link to="/app/services/stream/movies">Explore movies</Link>
@@ -793,7 +812,36 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
               </article>;
             })}
           </section> : null}
-          {completedDownloadItems.length ? <section className="sw-completed-downloads"><header><h2>Downloaded</h2><span>{completedDownloadItems.length} saved</span></header><div className="sw-title-grid sw-downloads-grid">{completedDownloadItems.map(item => <article className={`sw-downloaded-item ${item.downloadStatus || "ready"}`} key={`${item.mediaType || "local"}-${item.id}`}><Tile title={item} /><span className="sw-download-item-status">{item.downloadStatus === "failed" ? "Download failed" : "Ready offline"}</span><button type="button" disabled={item.downloadStatus === "failed"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}>Save</button></article>)}</div></section> : null}
+          {completedDownloadItems.length ? <section className="sw-completed-downloads">
+            <header><h2>Downloaded</h2><span>{completedDownloadItems.length} saved</span></header>
+            <div className="sw-downloaded-rows">{completedDownloadItems.map(item => {
+              const record = readNativeDownload(item.mediaType || "movie", item.id);
+              const path = `/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`;
+              return <article className="sw-downloaded-row" key={`${item.mediaType || "local"}-${item.id}`}>
+                <Link className="sw-download-thumbnail" to={path} aria-label={`Play ${item.name}`} style={item.backdropUrl || item.posterUrl ? { backgroundImage: `url(${item.backdropUrl || item.posterUrl})` } : undefined}>
+                  {!item.posterUrl && !item.backdropUrl ? <span>{item.name.slice(0, 2).toUpperCase()}</span> : null}<PlayArrowRoundedIcon />
+                </Link>
+                <div className="sw-downloaded-copy">
+                  <Link to={path}>{item.name}</Link>
+                  <small>{formatDownloadBytes(record?.totalBytes || record?.downloadedBytes) || (item.mediaType === "tv" ? "Series" : "Movie")}</small>
+                  <span className={item.downloadStatus === "failed" ? "failed" : ""}>{item.downloadStatus === "failed" ? "Download failed" : item.downloadStatus === "pending" ? "Preparing download" : record?.status === "complete" ? "Ready offline" : "Saved to account"}</span>
+                </div>
+                <button className="sw-download-save" type="button" disabled={item.downloadStatus === "failed" || item.downloadStatus === "pending" || record?.status !== "complete"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}><DownloadRoundedIcon />Save</button>
+              </article>;
+            })}</div>
+          </section> : null}
+          <section className="sw-download-for-you" aria-labelledby="sw-download-for-you-title">
+            <h2 id="sw-download-for-you-title">For You</h2>
+            {recommendationsLoading && !recommendations.length ? <p role="status">Loading recommendations...</p> : null}
+            {recommendationsError ? <p role="alert">Could not load new recommendations. Please try refreshing.</p> : null}
+            {!recommendationsLoading && !recommendationsError && !recommendations.length ? <p>No recommendations available yet.</p> : null}
+            <div className="sw-download-recommendations" aria-busy={recommendationsLoading}>{recommendations.filter(item => !list.some(saved => saved.id === item.id && saved.mediaType === item.mediaType)).slice(0, 12).map(item => (
+              <Link to={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`} key={`${item.mediaType}-${item.id}`}>
+                <img src={item.posterUrl || ""} alt="" loading="lazy" /><span>{item.title}</span>
+              </Link>
+            ))}</div>
+            <button className="sw-download-refresh" type="button" disabled={recommendationsLoading} onClick={() => setRecommendationPage(current => current + 1)}><RefreshRoundedIcon />{recommendationsLoading ? "Refreshing..." : "Refresh new content"}</button>
+          </section>
         </div>
       ) : <div className="sw-title-grid">{filtered.map(item => <Tile title={item} key={`${item.mediaType || "local"}-${item.id}`} />)}</div>}
       {saveTarget ? <div className="sw-save-overlay" role="dialog" aria-modal="true" aria-label="Save movie to phone"><section className="sw-save-sheet"><header><h2>Save to...</h2><button type="button" onClick={() => setSaveTarget(null)} aria-label="Close">×</button></header>{saveProgress !== null ? <div className="sw-save-copy-progress"><div style={{ "--save-progress": `${saveProgress * 3.6}deg` } as CSSProperties}><strong>{saveProgress}%</strong></div><h3>{saveProgress === 100 ? "Saved to phone" : "Saving movie..."}</h3><p>{saveMessage || "Keep SMAJ open while the file is copied."}</p></div> : <><button type="button" className={`sw-save-choice ${saveLocation === "phone" ? "selected" : ""}`} onClick={() => setSaveLocation("phone")}><span>▣</span><div><strong>Phone storage</strong><small>Movies/SMAJ</small></div><i /></button><button type="button" className="sw-save-choice" disabled><span>▤</span><div><strong>SD card</strong><small>Not available on this device</small></div><i /></button>{saveMessage ? <p className="sw-save-error">{saveMessage}</p> : null}<button type="button" className="sw-save-confirm" disabled={saveLocation !== "phone"} onClick={() => void saveCompletedMovie()}>Confirm</button></>}</section></div> : null}
@@ -2245,13 +2293,13 @@ const StreamWorkspacePage = ({ kind }: { kind: StreamPageKind }) => {
   })();
   return (
     <main
-      className={`sw-page ${["movie-detail", "series-detail"].includes(kind) ? "sw-detail-page" : ""} ${kind === "search" ? "sw-search-page" : ""} ${["player", "live-player"].includes(kind) ? "sw-player-page" : ""} ${kind === "live-now" ? "sw-live-now-shell" : ""}`}
+      className={`sw-page ${kind === "downloads" ? "sw-downloads-page" : ""} ${["movie-detail", "series-detail"].includes(kind) ? "sw-detail-page" : ""} ${kind === "search" ? "sw-search-page" : ""} ${["player", "live-player"].includes(kind) ? "sw-player-page" : ""} ${kind === "live-now" ? "sw-live-now-shell" : ""}`}
     >
       {!managementKinds.includes(kind) &&
       !adminKinds.includes(kind) &&
       !["movie-detail", "series-detail", "search", "player", "live-player", "live-now"].includes(kind) ? (
         <StreamHeader
-          showCategoryNav={!['my-list', 'history', 'subscriptions', 'creator-directory', 'notifications', 'plans', 'parental'].includes(kind)}
+          showCategoryNav={!['downloads', 'my-list', 'history', 'subscriptions', 'creator-directory', 'notifications', 'plans', 'parental'].includes(kind)}
         />
       ) : null}
       <div className="sw-page-content">{content}</div>
