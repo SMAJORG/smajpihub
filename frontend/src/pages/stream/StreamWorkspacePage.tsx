@@ -1041,7 +1041,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
     }
   };
   const toggleDownloaded = async () => {
-    if (!id || !playbackId) return;
+    if (!id || !playbackId || downloading) return;
     if (!downloadAllowed) {
       navigate("/app/services/stream/plans");
       return;
@@ -1098,8 +1098,11 @@ const Detail = ({ series = false }: { series?: boolean }) => {
         }
         await saveStreamDownload(detail);
         setDownloaded(true);
+        if (!Capacitor.isNativePlatform()) setDownloadStage("idle");
       }
     } catch (error) {
+      setDownloaded(false);
+      setDownloadStage("failed");
       if (Capacitor.isNativePlatform()) {
         const previous = readNativeDownload(type, id);
         writeNativeDownload(type, id, { downloadId: previous?.downloadId || 0, fileName: previous?.fileName || "", title: detail.title, posterUrl: detail.posterUrl, status: "failed", progress: previous?.progress || 0 });
@@ -1285,7 +1288,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
         </div>
       </section>
 ) : null}
-      {downloadStage !== "idle" ? <div className={`sw-download-progress-sheet ${downloadStage}`} role="status" aria-live="polite"><button className="sw-download-dismiss" type="button" onClick={() => setDownloadStage("idle")} aria-label="Close download status">×</button><div className="sw-download-progress-title"><DownloadRoundedIcon /><strong>{downloadStage === "complete" ? "Download complete" : downloadStage === "failed" ? "Download failed" : `Downloading ${downloadProgress}%`}</strong></div><div className="sw-download-progress-track"><i style={{ width: `${downloadProgress}%` }} /></div><p>{downloadStage === "complete" ? `${detail.title} is saved in the app.` : "You can keep watching while SMAJ downloads the movie."}</p><div><button type="button" onClick={() => navigate("/app/services/stream/downloads")}>View downloads</button><button type="button" className="primary" onClick={() => navigate(`/app/services/stream/watch/${playbackId}`)}>Watch now</button></div></div> : null}
+      {downloadStage !== "idle" ? <div className={`sw-download-progress-sheet ${downloadStage}`} role="status" aria-live="polite"><button className="sw-download-dismiss" type="button" onClick={() => setDownloadStage("idle")} aria-label="Close download status">×</button><div className="sw-download-progress-title"><DownloadRoundedIcon /><strong>{downloadStage === "complete" ? "Download complete" : downloadStage === "failed" ? "Download interrupted" : `Downloading ${downloadProgress}%`}</strong></div><div className="sw-download-progress-track"><i style={{ width: `${downloadProgress}%` }} /></div><p>{downloadStage === "complete" ? `${detail.title} is saved in the app.` : downloadStage === "failed" ? playbackUnavailableMessage || "The download could not finish. Try again when your connection is available." : "You can keep watching while SMAJ downloads the movie."}</p><div><button type="button" onClick={() => downloadStage === "failed" ? void toggleDownloaded() : navigate("/app/services/stream/downloads")}>{downloadStage === "failed" ? "Retry download" : "View downloads"}</button><button type="button" className="primary" onClick={() => navigate(`/app/services/stream/watch/${playbackId}`)}>Watch now</button></div></div> : null}
       {infoOpen ? (
         <div className="sw-feedback-overlay" role="dialog" aria-modal="true" aria-label="Title information and feedback">
           <form className="sw-feedback-panel" onSubmit={event => void submitTitleFeedback(event)}>

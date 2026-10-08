@@ -404,8 +404,9 @@ const mountStreamEndpoints = (router: Router) => {
   router.get("/downloads/:type(movie|tv)/:id", async (req, res) => {
     const user = await requireViewer(req, res); if (!user) return;
     const tmdbId = Number(req.params.id);
-    const stored = await req.app.locals.userCollection.findOne({ _id: user._id, streamDownloads: { $elemMatch: { tmdbId, mediaType: req.params.type } } });
-    return res.json({ downloaded: Boolean(stored) });
+    const stored = await req.app.locals.userCollection.findOne({ _id: user._id });
+    const downloaded = (Array.isArray(stored?.streamDownloads) ? stored.streamDownloads : []).some((item: { tmdbId: number; mediaType: string; downloadStatus?: string }) => item.tmdbId === tmdbId && item.mediaType === req.params.type && item.downloadStatus !== "failed");
+    return res.json({ downloaded });
   });
 
   router.post("/downloads", async (req, res) => {
@@ -1430,8 +1431,14 @@ const mountStreamEndpoints = (router: Router) => {
     const subscription = normalizeStreamSubscription(storedViewer?.streamSubscription);
     if (subscription.status !== "active" || (subscription.plan !== "plus" && subscription.plan !== "family"))
       return res.status(403).json({ error: "download_plan_required", message: "Downloads require an active Plus or Family plan." });
-    const video = await req.app.locals.streamContentCollection?.findOne({ cloudflareUid: uid, contentSource: "cloudflare_stream", visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready" });
+    const video = await req.app.locals.streamContentCollection?.findOne({ cloudflareUid: uid, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", downloadAllowed: true });
     if (!video) return res.status(404).json({ error: "download_not_available", message: "This movie is not available for download." });
+    if (video.contentSource === "internet_archive") {
+      const downloadUrl = String(video.downloadUrl || video.playback?.mp4 || "");
+      if (!/^https:\/\/archive\.org\/download\//i.test(downloadUrl)) return res.status(404).json({ error: "download_not_available", message: "A valid downloadable video source is unavailable." });
+      return res.json({ status: "ready", downloadUrl });
+    }
+    if (video.contentSource !== "cloudflare_stream") return res.status(404).json({ error: "download_not_available", message: "This source does not support downloads." });
     if (!env.cloudflare_stream_account_id || !env.cloudflare_stream_api_token)
       return res.status(503).json({ error: "cloudflare_download_not_configured", message: "Movie downloads are temporarily unavailable." });
     const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${env.cloudflare_stream_account_id}/stream/${encodeURIComponent(uid)}`;

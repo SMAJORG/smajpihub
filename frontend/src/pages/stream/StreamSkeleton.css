@@ -8,3 +8,12 @@
 @keyframes sw-skeleton-shimmer{to{background-position:-250% 0}}
 @media(min-width:900px){.sw-skeleton-cards{grid-template-columns:repeat(6,minmax(0,1fr))}.sw-skeleton-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.sw-skeleton *{animation:none!important}}
+
+/* Keep placeholder geometry independent of global icon and bold text rules. */
+.sw-page .sw-skeleton{display:block;width:100%;min-width:0}
+.sw-page .sw-skeleton .sw-skeleton-cards{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+.sw-page .sw-skeleton .sw-skeleton-cards>div{min-width:0;width:100%}
+.sw-page .sw-skeleton .sw-skeleton-cards i{width:100%;height:auto;min-height:110px;aspect-ratio:2/3;border-radius:10px}
+.sw-page .sw-skeleton b{display:block;height:14px;min-height:14px;max-width:100%;border-radius:5px}
+.sw-skeleton-rows{display:grid;gap:18px;width:100%}.sw-skeleton-rows>div{display:grid;grid-template-columns:100px minmax(0,1fr);gap:16px;align-items:center}.sw-skeleton-rows i{width:100%;height:64px;aspect-ratio:16/9}.sw-skeleton-rows span{min-width:0}
+@media(min-width:900px){.sw-page .sw-skeleton .sw-skeleton-cards{grid-template-columns:repeat(6,minmax(0,1fr))}}

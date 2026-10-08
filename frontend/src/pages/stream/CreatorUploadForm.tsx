@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -7,6 +7,7 @@ import { publishCreatorYoutubeVideo, uploadCreatorVideo } from "../../lib/stream
 import { searchStreamCatalog, type StreamCatalogTitle } from "../../lib/streamCatalog";
 
 const CreatorUploadForm = () => {
+  const submitting = useRef(false);
   const [source, setSource] = useState<"youtube" | "upload">("youtube");
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
@@ -38,6 +39,7 @@ const CreatorUploadForm = () => {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting.current || status === "processing") return;
     if (source === "upload" && !file) { setStatus("error"); setMessage("Choose a video file first."); return; }
     const data = new FormData(event.currentTarget);
     const metadata = {
@@ -48,6 +50,7 @@ const CreatorUploadForm = () => {
       posterUrl: selectedTitle?.posterUrl, backdropUrl: selectedTitle?.backdropUrl,
     };
     try {
+      submitting.current = true;
       setStatus("uploading"); setMessage("");
       if (source === "youtube") await publishCreatorYoutubeVideo({ ...metadata, youtubeUrl: String(data.get("youtubeUrl") || "") });
       else await uploadCreatorVideo(file!, metadata, setProgress);
@@ -57,7 +60,7 @@ const CreatorUploadForm = () => {
       setStatus("error");
       const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
       setMessage(responseMessage || (error instanceof Error ? error.message : "Video publishing failed."));
-    }
+    } finally { submitting.current = false; }
   };
 
   return <form className="sw-form" onSubmit={(event) => void submit(event)}>
@@ -78,7 +81,8 @@ const CreatorUploadForm = () => {
     <label className="sw-rights-confirm"><input name="rightsConfirmed" type="checkbox" required /><span><b>I own this video or have permission to publish it</b><small>I authorize SMAJ Stream to display this video according to the selected visibility and platform terms. A YouTube link does not transfer ownership to SMAJ.</small></span></label>
     {status === "uploading" && source === "upload" ? <div className="sw-upload-progress"><i style={{ width: `${progress}%` }} /><span>{progress}% uploaded</span></div> : null}
     {message ? <p className={`sw-upload-message ${status === "error" ? "error" : "success"}`}>{status === "processing" ? <CheckCircleRoundedIcon /> : null}{message}</p> : null}
-    <button type="submit" disabled={status === "uploading" || (source === "upload" && (!file))}>{status === "uploading" ? "Publishing..." : source === "youtube" ? "Add YouTube video" : "Upload for review"}</button>
+    {status === "processing" ? <a className="sw-upload-view-content" href="/app/services/stream/studio/content">View uploaded content</a> : null}
+    <button type="submit" disabled={status === "processing" || status === "uploading" || (source === "upload" && (!file))}>{status === "processing" ? "Uploaded" : status === "uploading" ? "Publishing..." : source === "youtube" ? "Add YouTube video" : "Upload for review"}</button>
   </form>;
 };
 

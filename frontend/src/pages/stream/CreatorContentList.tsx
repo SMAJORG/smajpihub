@@ -24,6 +24,9 @@ const CreatorContentList = () => {
     const request = ++revision.current;
     try {
       const items = await getCreatorVideos();
+      if (!mounted.current || request !== revision.current) return;
+      setVideos(items);
+      setState("ready");
       const refreshed = await Promise.all(items.map(async video => {
         if (video.contentSource === "youtube" || ["ready", "error"].includes(video.processingStatus)) return video;
         try { return await refreshCreatorVideoStatus(video.cloudflareUid); } catch { return video; }
@@ -49,7 +52,7 @@ const CreatorContentList = () => {
     revision.current += 1;
     setVideos(current => current.filter(item => item._id !== id));
   };
-  if (state === "loading") return <StreamSkeleton variant="cards" label="Loading your videos" />;
+  if (state === "loading") return <StreamSkeleton variant="rows" label="Loading your videos" />;
   if (state === "error" && !videos.length) return <div className="sw-catalog-status warning">Content could not load. <button type="button" onClick={() => void load()}>Retry</button></div>;
   return <section className="sw-content-manager" aria-label="Your content">
     <header className="sw-content-list-head"><span>{videos.length} {videos.length === 1 ? "video" : "videos"}</span><Link to="/app/services/stream/studio/upload">Upload video</Link></header>

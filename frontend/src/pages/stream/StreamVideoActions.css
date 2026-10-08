@@ -30,3 +30,6 @@
 .stream-movie-tile{position:relative}.stream-movie-tile>.sw-video-more{position:absolute;inset:auto 0 0 auto;display:grid;place-items:center;aspect-ratio:auto;min-height:0;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:transparent;color:#c8bdd5;z-index:2}.stream-movie-tile>div>h3,.stream-movie-tile>div>p{padding-right:32px}
 .sw-download-row-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;align-self:stretch;justify-content:space-between}.sw-download-row-actions>.sw-video-more{height:26px;width:28px}
 .sw-recommendation-video-card{position:relative;min-width:0;overflow:hidden;border-radius:5px;background:#25262a;scroll-snap-align:start}.sw-recommendation-video-card>a{display:block;color:#fff;text-decoration:none}.sw-download-recommendations .sw-recommendation-video-card span{padding-right:30px}.sw-recommendation-video-card>.sw-video-more{position:absolute;right:0;bottom:0;width:28px;height:32px}
+
+.sw-video-modal-layer{z-index:2147483230}
+.sw-channel-video-card>.sw-video-more{inset:auto 0 8px auto!important;display:grid!important;opacity:1;visibility:visible}
