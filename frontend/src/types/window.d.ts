@@ -11,7 +11,7 @@ declare global {
       piOAuthRedirectUri?: string;
     };
     Pi?: {
-      init(config: { version: string; sandbox: boolean }): void;
+      init(config: { version: string; sandbox: boolean }): void | Promise<void>;
 
       authenticate(scopes: string[], onIncompletePaymentFound?: (payment: PaymentDTO) => void): Promise<AuthResult>;
 

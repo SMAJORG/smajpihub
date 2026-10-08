@@ -77,18 +77,12 @@
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
     <meta name="google-adsense-account" content="ca-pub-5794291397799733">
-<script>
-      const runSDKInSandboxMode =
-        window.__ENV.sandbox === "true" ||
-        window.location.hostname === "sandbox.minepi.com" ||
-        document.referrer.includes("sandbox.minepi.com");
-      if (window.Pi?.init) {
-        window.Pi.init({
-          version: "2.0",
-          sandbox: runSDKInSandboxMode,
+<script type="module">
+      import { ensurePiInitialized } from "/src/lib/piSdk.ts";
+      if (window.Pi) {
+        void ensurePiInitialized().catch(error => {
+          console.warn("Pi SDK initialization will be retried when signing in or paying.", error);
         });
-      } else {
-        console.warn("Pi SDK not available at startup; app will continue without immediate Pi init.");
       }
     </script>
 

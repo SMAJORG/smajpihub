@@ -1,3 +1,4 @@
+import { ensurePiInitialized, isPiSandboxMode } from "../lib/piSdk";
 import { AxiosError, isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient, getBaseURL } from "../lib/axiosClient";
@@ -28,18 +29,6 @@ const PI_USER_STORAGE_KEY = "smaj_pi_user";
 const PI_AUTH_SCOPES = ["username"];
 const AUTH_REQUEST_CONFIG = { withCredentials: true };
 
-const getRuntimeSandboxSetting = () => {
-  const runtimeSandbox = window.__ENV?.sandbox;
-  return runtimeSandbox && runtimeSandbox !== "$$SANDBOX_SDK$$"
-    ? runtimeSandbox
-    : import.meta.env.VITE_SANDBOX_SDK;
-};
-
-const isPiSandboxMode = () =>
-  typeof window !== "undefined" &&
-  (getRuntimeSandboxSetting() === "true" ||
-    window.location.hostname === "sandbox.minepi.com" ||
-    document.referrer.includes("sandbox.minepi.com"));
 
 const onIncompletePaymentFound = () => {
   console.info("Pi incomplete payment handling is disabled.");
@@ -390,11 +379,7 @@ export const useAuth = () => {
       return false;
     }
     try {
-      window.Pi.init({ version: "2.0", sandbox: isPiSandboxMode() });
-    } catch (err) {
-      console.warn("[auth] Pi SDK was already initialized or could not be reinitialized.", err);
-    }
-    try {
+      await ensurePiInitialized();
       const authResult = await authenticateWithTimeout(PI_AUTH_SCOPES);
       console.log("[auth] Pi authenticate success", {
         uid: authResult.user.uid,

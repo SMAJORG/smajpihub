@@ -1,3 +1,4 @@
+import { ensurePiInitialized, withPiTimeout } from "../lib/piSdk";
 import { useCallback, useRef, useState } from "react";
 import { axiosClient } from "../lib/axiosClient";
 import { requestPiBrowserHandoff } from "../lib/piBrowserHandoff";
@@ -30,8 +31,9 @@ export const usePiPayment = () => {
     payingRef.current = true;
     setIsPaying(true);
     try {
+      const pi = await ensurePiInitialized();
       const recoveries: Promise<{ orderId: string; error?: unknown }>[] = [];
-      await window.Pi!.authenticate(["payments"], (payment: PaymentDTO) => {
+      await withPiTimeout(pi.authenticate(["payments"], (payment: PaymentDTO) => {
         const pendingOrderId = String(payment.metadata?.orderId || "");
         const recovery = async () => {
           if (!pendingOrderId || !payment.transaction?.txid)
@@ -47,7 +49,7 @@ export const usePiPayment = () => {
           () => ({ orderId: pendingOrderId }),
           error => ({ orderId: pendingOrderId, error })
         ));
-      });
+      }), 30000, "Pi authorization timed out. Check Pi Browser and try again.");
       const recovered = await Promise.all(recoveries);
       const failed = recovered.find(result => result.error);
       if (failed) throw failed.error;
@@ -64,8 +66,8 @@ export const usePiPayment = () => {
       if (data.order.pricePi !== amount) throw new Error("The order amount changed. Refresh the order before paying.");
 
       // The SDK returns before the wallet closes; keep the action busy until a terminal callback.
-      await new Promise<void>((resolve, reject) => {
-        const result = window.Pi!.createPayment(
+      await withPiTimeout(new Promise<void>((resolve, reject) => {
+        const result = pi.createPayment(
           { amount: data.order.pricePi, memo: `SMAJ Store order ${orderId}`, metadata: { orderId } },
           {
             onReadyForServerApproval: async paymentId => {
@@ -86,7 +88,7 @@ export const usePiPayment = () => {
           }
         );
         Promise.resolve(result).catch(reject);
-      });
+      }), 180000, "Payment is taking longer than expected. Check Pi Wallet and this order before trying again.");
     } catch (error) {
       callbacks?.onError?.(error instanceof Error ? error.message : "Payment could not complete. Please try again.");
     } finally {
