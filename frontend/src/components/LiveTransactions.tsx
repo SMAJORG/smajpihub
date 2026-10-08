@@ -97,8 +97,8 @@ export default function LiveTransactions() {
         <div className="live-transactions-table-wrap">
           <table>
             <caption className="live-transactions-caption">
-              Latest 10 verified Test-Pi app payments. Time is recorded completion time, or payment creation time when
-              completion time is unavailable.
+              Up to 10 latest verified Test-Pi app payments. Time is recorded completion time, or payment creation time
+              when completion time is unavailable.
             </caption>
             <thead>
               <tr>

@@ -174,6 +174,8 @@ const HomePage = () => {
           </ol>
         </section>
 
+        <LiveTransactions />
+
         <section className="home-section public-home-section" aria-labelledby="trust-title">
           <div className="home-section-head public-home-section-head">
             <span className="home-kicker">{t("home.trustKicker")}</span>
@@ -258,8 +260,6 @@ const HomePage = () => {
             </div>
           </div>
         </section>
-
-        <LiveTransactions />
 
         <section className="home-section public-home-section public-home-partner-cta" aria-labelledby="partner-title">
           <div>
