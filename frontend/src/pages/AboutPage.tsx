@@ -17,12 +17,12 @@ const steps = [
   {
     label: "Step 01",
     title: "Mission",
-    text: "Transform Pi from only a digital currency into a practical utility layer for buying, selling, working, learning, accessing services, and participating in digital commerce.",
+    text: "Contribute to Pi's real utility economy by building a trusted platform where verified people and businesses can buy, sell, work, and access real-world services using Pi.",
   },
   {
     label: "Step 02",
     title: "Vision",
-    text: "Build a leading Pi-powered digital super platform where one verified identity and one Pi wallet connect people to trusted real-world services.",
+    text: "Build a global economic platform connecting verified people and businesses to trusted commerce, work, and real-world services through one Pi identity and one Pi wallet.",
   },
   {
     label: "Step 03",
@@ -50,39 +50,68 @@ const services = [
 ];
 
 const companyFacts = [
-  ["Company Focus", "Pi-powered super platform for marketplace, services, and digital utility."],
-  ["Launch Layer", "SMAJ Store marketplace with Pi login, listings, chat, payments, reviews, and safety flows."],
+  ["Company Focus", "A trusted economic utility layer for the Pi ecosystem."],
+  ["Launch Layer", "SMAJ Store and SMAJ PI Jobs form the initial commerce and work foundation."],
   ["User Access", "One Pi identity and one Pi wallet across connected services."],
   ["Operating Model", "Digital marketplace and service platform. Not a bank or financial institution."],
 ] as const;
 
 const platformLayers = [
   ["Identity Layer", "Pi login and account signals help reduce fake participation.", VerifiedUserOutlinedIcon],
-  ["Wallet Layer", "Pi wallet access supports native Pi payments and transparent service pricing.", AccountBalanceWalletOutlinedIcon],
-  ["Marketplace Layer", "SMAJ Store starts the ecosystem with product discovery, seller profiles, chat, reviews, and dispute support.", StorefrontOutlinedIcon],
-  ["Service Layer", "Fifteen connected service categories expand the hub from commerce into daily life.", AppsOutlinedIcon],
-  ["AI Guidance", "SMAJ AI Assistant helps users find services, understand flows, and move faster inside the platform.", AutoAwesomeOutlinedIcon],
-  ["Trust Layer", "Verification, provider checks, dispute support, fraud prevention, and clear service status shape safer participation.", SecurityOutlinedIcon],
+  [
+    "Wallet Layer",
+    "Pi wallet access supports native Pi payments and transparent service pricing.",
+    AccountBalanceWalletOutlinedIcon,
+  ],
+  [
+    "Marketplace Layer",
+    "SMAJ Store and SMAJ PI Jobs connect product discovery and work opportunities. Enhanced reputation and dispute workflows are planned.",
+    StorefrontOutlinedIcon,
+  ],
+  [
+    "Service Layer",
+    "A long-term modular service architecture expands as demand, trust, and operating capacity support it.",
+    AppsOutlinedIcon,
+  ],
+  [
+    "AI Guidance",
+    "Platform-focused AI assistance is planned to help users discover services and navigate available features.",
+    AutoAwesomeOutlinedIcon,
+  ],
+  [
+    "Trust Layer",
+    "Pi access and clear service status support participation today. Enhanced provider checks, reputation, fraud prevention, and dispute workflows are planned.",
+    SecurityOutlinedIcon,
+  ],
 ] as const;
 
 const audiences = [
   ["Pioneers", "Use one Pi-powered account to discover services, products, opportunities, and support tools."],
   ["Sellers", "List products, build trust, communicate with buyers, and prepare for Pi-powered commerce flows."],
-  ["Service Providers", "Bring jobs, health, education, transport, housing, events, and other services into one verified hub."],
-  ["Partners", "Collaborate on infrastructure, merchant onboarding, community growth, compliance, and service expansion."],
+  [
+    "Service Providers",
+    "Bring jobs, health, education, transport, housing, events, and other services into one verified hub.",
+  ],
+  [
+    "Partners",
+    "Collaborate on infrastructure, merchant onboarding, community growth, compliance, and service expansion.",
+  ],
 ] as const;
 
 const operatingPrinciples = [
   ["Real Utility First", "Every major feature should help people do something useful, not just decorate the product."],
-  ["Trust Before Scale", "Growth must include verification, marketplace safety, provider accountability, and user protection."],
+  [
+    "Trust Before Scale",
+    "Growth must include verification, marketplace safety, provider accountability, and user protection.",
+  ],
   ["Clear Service Status", "Live, coming soon, and experimental features should be labeled honestly."],
   ["Local to Global", "The hub starts with practical marketplace needs, then expands into broader global Pi utility."],
 ] as const;
 
 const trustItems = [
-  ["Verified Users", VerifiedUserOutlinedIcon],
+  ["Pi Identity Access", VerifiedUserOutlinedIcon],
   ["Pi Wallet Flow", AccountBalanceWalletOutlinedIcon],
-  ["Trusted Services", CheckCircleOutlineOutlinedIcon],
+  ["Clear Service Status", CheckCircleOutlineOutlinedIcon],
   ["One Connected Hub", HubOutlinedIcon],
 ] as const;
 
@@ -93,10 +122,10 @@ const AboutPage = () => {
         <section className="home-hero about-hero about-clean-hero">
           <div>
             <span className="home-kicker">ABOUT SMAJ PI HUB</span>
-            <h1>A real company building practical Pi utility.</h1>
+            <h1>Building the economic utility layer for the Pi ecosystem.</h1>
             <p>
-              SMAJ PI HUB is a Pi-powered digital service company building a unified hub for marketplace, services,
-              opportunities, and daily digital tools through one Pi identity and one Pi wallet.
+              SMAJ PI HUB is building a trusted economic utility layer connecting verified people and businesses to
+              commerce, work, and real-world services through one Pi identity and one Pi wallet.
             </p>
             <div className="home-hero-cta">
               <Link to="/services" className="home-hero-primary-btn">
@@ -109,7 +138,7 @@ const AboutPage = () => {
           </div>
           <aside className="about-clean-snapshot">
             <HubOutlinedIcon />
-            <strong>One Company. One Hub.</strong>
+            <strong>Commerce, Work, and Real Pi Utility.</strong>
             <span>Marketplace, services, identity, wallet access, and trust systems built around real Pi utility.</span>
           </aside>
         </section>
@@ -119,9 +148,8 @@ const AboutPage = () => {
             <span className="home-kicker">WHO WE ARE</span>
             <h2>A digital infrastructure company for the Pi economy.</h2>
             <p>
-              SMAJ PI HUB is not only a crypto page, finance app, or product directory. It is a service platform that
-              brings identity, wallet access, marketplace activity, trusted providers, and service discovery into one
-              connected ecosystem.
+              SMAJ PI HUB brings discovery, Pi payments, and marketplace participation into a shared experience. Store
+              and Jobs are the initial economic foundation; additional services follow as the model is validated.
             </p>
           </div>
           <div className="about-fact-grid">
@@ -137,10 +165,10 @@ const AboutPage = () => {
         <section className="home-section about-clean-section">
           <div className="home-section-head">
             <span className="home-kicker">OUR SIMPLE PLAN</span>
-            <h2>Mission, vision, promise. Three steps, no long lecture.</h2>
+            <h2>Our mission, vision, and commitment.</h2>
           </div>
           <div className="about-step-grid">
-            {steps.map((step) => (
+            {steps.map(step => (
               <article key={step.title} className="about-step-card">
                 <span>{step.label}</span>
                 <h3>{step.title}</h3>
@@ -153,7 +181,7 @@ const AboutPage = () => {
         <section className="home-section about-clean-section">
           <div className="home-section-head">
             <span className="home-kicker">HOW THE COMPANY WORKS</span>
-            <h2>Six layers that make the hub more than a landing page.</h2>
+            <h2>A modular foundation for practical economic activity.</h2>
             <p>
               The company is building a modular ecosystem. Each service can grow independently, but users still move
               through one familiar SMAJ PI HUB experience.
@@ -176,7 +204,7 @@ const AboutPage = () => {
             <h2>Because real utility needs trust, access, and useful services.</h2>
           </div>
           <div className="about-reason-list">
-            {reasons.map((reason) => (
+            {reasons.map(reason => (
               <article key={reason}>
                 <CheckCircleOutlineOutlinedIcon />
                 <p>{reason}</p>
@@ -207,7 +235,7 @@ const AboutPage = () => {
             <h2>A growing set of connected services.</h2>
           </div>
           <div className="about-service-strip">
-            {services.map((service) => (
+            {services.map(service => (
               <span key={service}>
                 {service === "Marketplace" ? <StorefrontOutlinedIcon /> : <AppsOutlinedIcon />}
                 {service}
@@ -237,7 +265,7 @@ const AboutPage = () => {
         <section className="home-section about-clean-section">
           <div className="home-section-head">
             <span className="home-kicker">TRUST AND SAFETY</span>
-            <h2>Simple access should still feel safe.</h2>
+            <h2>Built for Trusted Pi Commerce</h2>
             <p>
               The platform direction is built around verified participation, clearer service flow, and trusted
               marketplace behavior.
@@ -258,15 +286,15 @@ const AboutPage = () => {
             <span className="home-kicker">COMPANY STATUS</span>
             <h2>Focused rollout, honest status.</h2>
             <p>
-              SMAJ PI HUB is under active development. The first major company focus is SMAJ Store, followed by staged
-              service expansion, stronger verification systems, AI guidance, and broader partner onboarding.
+              SMAJ PI HUB is under active development. Store and Jobs form the initial economic foundation. Expansion
+              follows validated demand, stronger trust, country readiness, and partner participation.
             </p>
           </div>
           <div className="about-status-grid">
             <article>
               <StorefrontOutlinedIcon />
-              <strong>MVP Marketplace</strong>
-              <span>Store, listings, chat, payments, reviews, support.</span>
+              <strong>Commerce and Work</strong>
+              <span>Store and Jobs connect buyers, sellers, talent, and employers.</span>
             </article>
             <article>
               <PaymentsOutlinedIcon />
@@ -288,7 +316,7 @@ const AboutPage = () => {
 
         <section className="home-section about-clean-section about-final-cta">
           <span className="home-kicker">SMAJ PI HUB</span>
-          <h2>One Pi Identity. One Wallet. Multiple Services. Real Utility.</h2>
+          <h2>Take Part in the Pi Utility Economy</h2>
           <div className="home-hero-cta">
             <Link to="/services" className="home-hero-primary-btn">
               Explore Services

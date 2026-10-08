@@ -46,7 +46,7 @@ const LegalPanel = ({ title, items }: { title: string; items: string[] }) => (
   <article className="legal-policy-panel">
     <h2>{title}</h2>
     <ul>
-      {items.map((item) => (
+      {items.map(item => (
         <li key={item}>
           <ShieldOutlinedIcon />
           {item}
@@ -67,15 +67,24 @@ const LegalTextDocument = ({
     <div className="legal-text-intro">
       <span className="home-kicker">TEXT DOCUMENT</span>
       <h2>{title}</h2>
-      <p>Effective Date: July 1, 2026. Read the policy directly on this page for clear user understanding across mobile and desktop.</p>
+      <p>
+        Effective Date: July 1, 2026. Read the policy directly on this page for clear user understanding across mobile
+        and desktop.
+      </p>
     </div>
     {sections.map((section, index) => (
       <article className="legal-text-section" key={section.heading}>
-        <h3>{index + 1}. {section.heading}</h3>
-        {section.paragraphs?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+        <h3>
+          {index + 1}. {section.heading}
+        </h3>
+        {section.paragraphs?.map(paragraph => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
         {section.items?.length ? (
           <ul>
-            {section.items.map((item) => <li key={item}>{item}</li>)}
+            {section.items.map(item => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         ) : null}
       </article>
@@ -115,16 +124,14 @@ export const PrivacyPage = () => (
         {
           heading: "Introduction",
           paragraphs: [
-            "This Privacy Policy describes how SMAJ PI HUB (\"we,\" \"us,\" or \"our\"), operating the digital super platform accessible at smajpihub.com, collects, uses, processes, and shares your information. We are committed to protecting your privacy and ensuring the security of your personal data. By accessing or using SMAJ PI HUB, you agree to the terms of this Privacy Policy.",
-            "SMAJ PI HUB is a comprehensive digital super platform powered by the Pi Network, offering 15 integrated services including a marketplace, food delivery, jobs, health, education, transport, agriculture, energy, charity, housing, events, swap, streaming, sports, and a utility token.",
+            'This Privacy Policy describes how SMAJ PI HUB ("we," "us," or "our"), operating the digital marketplace and service platform accessible at smajpihub.com, collects, uses, processes, and shares your information. We are committed to protecting your privacy and ensuring the security of your personal data. By accessing or using SMAJ PI HUB, you agree to the terms of this Privacy Policy.',
+            "SMAJ PI HUB is building a trusted economic utility layer for the Pi ecosystem. Store and Jobs form the initial commerce and work foundation. Additional services are part of a long-term modular architecture, with availability determined by rollout readiness. A potential SMAJ token is deferred and is not part of the current launch plan.",
             "Our platform is designed to provide a seamless and secure experience, utilizing Pi cryptocurrency for payments and a single verified identity across all services. This policy outlines our practices regarding data collection, usage, and protection, in compliance with global data protection regulations such as the General Data Protection Regulation (GDPR) and the California Consumer Privacy Act (CCPA).",
           ],
         },
         {
           heading: "Data Collection",
-          paragraphs: [
-            "We collect various types of information to provide and improve our services. This includes:",
-          ],
+          paragraphs: ["We collect various types of information to provide and improve our services. This includes:"],
         },
         {
           heading: "Personal Information",
@@ -140,17 +147,17 @@ export const PrivacyPage = () => (
           items: [
             "Given our integration with the Pi Network, we collect specific data related to your Pi wallet.",
             "Pi Wallet Address: Your unique identifier on the Pi blockchain, necessary for transactions and identity verification within the SMAJ PI HUB ecosystem.",
-            "Transaction History: Details of transactions conducted using Pi cryptocurrency on our platform, including amounts, dates, and parties involved. This data is essential for escrow protection, dispute resolution, and maintaining a transparent marketplace.",
+            "Transaction History: Details of transactions conducted using Pi cryptocurrency on our platform, including amounts, dates, and parties involved. This data supports payment confirmation, marketplace records, and support; planned protections may require additional transaction records when introduced.",
             "Pi Network Authentication Data: Information related to your login and authentication via your Pi wallet, which serves as your verified identity across all SMAJ PI HUB services.",
           ],
         },
         {
           heading: "Transaction Data",
           items: [
-            "When you engage in transactions across our 15 integrated services, we collect data related to these activities.",
+            "When you engage in transactions across available platform services, we collect data related to these activities.",
             "Service-Specific Transaction Details: For example, marketplace purchases, food delivery orders, job applications, health consultations, educational course enrollments, transport bookings, agricultural product transactions, energy service usage, charity donations, housing rentals, event ticket purchases, swap agreements, streaming subscriptions, and sports-related transactions.",
             "Payment Information: While payments are primarily made with Pi cryptocurrency, we may collect information related to payment processing and confirmations.",
-            "Escrow and Dispute Resolution Data: Information pertinent to transactions under escrow, including communications, evidence submitted, and resolution outcomes.",
+            "Support and Planned Dispute Features: Communications and evidence provided for support. Additional records may be collected if escrow-related or dispute workflows become available.",
           ],
         },
         {
@@ -160,18 +167,18 @@ export const PrivacyPage = () => (
             "Device Information: IP address, device type, operating system, browser type, and unique device identifiers.",
             "Log Data: Details of how you use our services, such as pages viewed, features accessed, search queries, and timestamps of your activities.",
             "Location Data: Depending on your device settings and service requirements, such as food delivery or transport, we may collect precise or approximate location data.",
-            "AI Assistant Interactions: Records of your interactions with our AI assistant, including queries and responses, to improve service quality and personalization.",
+            "Planned AI Assistance: If introduced, records of assistant interactions may be processed to improve platform navigation and support, subject to applicable privacy practices.",
           ],
         },
         {
           heading: "How Data is Used",
           items: [
-            "Service Provision: To operate and deliver the 15 integrated services, process transactions, and fulfill your requests.",
+            "Service Provision: To operate and deliver available platform services, process transactions, and fulfill your requests.",
             "Account Management: To create, maintain, and secure your account, and to authenticate your identity via your Pi wallet.",
             "Personalization: To customize your experience, recommend relevant services, and provide tailored content based on your usage and preferences.",
             "Communication: To send you service-related notifications, updates, security alerts, and promotional messages where permitted.",
             "Security and Fraud Prevention: To detect and prevent fraudulent activities, unauthorized access, and other illegal activities, including leveraging Pi Network's security features.",
-            "Escrow and Dispute Resolution: To facilitate secure transactions, manage escrow services, and resolve disputes between users.",
+            "Support and Planned Transaction Protections: To provide transaction support and, if introduced, operate escrow-related and dispute workflows under their applicable terms.",
             "Platform Improvement: To analyze usage patterns, conduct research, and develop new features and services.",
             "Compliance and Legal Obligations: To comply with applicable laws, regulations, legal processes, and governmental requests, including KYC requirements.",
             "AI Assistant Enhancement: To train and improve the performance and accuracy of our AI assistant.",
@@ -193,7 +200,7 @@ export const PrivacyPage = () => (
           heading: "Pi Network Integration and Wallet Data",
           items: [
             "SMAJ PI HUB's core functionality relies on its deep integration with the Pi Network. Your Pi wallet serves as your primary authentication method and payment instrument.",
-            "Unified Identity: Your verified Pi Network identity is used across all 15 services on SMAJ PI HUB.",
+            "Unified Identity: Your Pi account supports shared access across available SMAJ PI HUB services. Sign-in alone does not guarantee seller or provider reliability.",
             "Secure Transactions: All cryptocurrency payments are processed via the Pi blockchain, leveraging its inherent security features.",
             "Data Interoperability: Certain wallet-related data is necessary for the seamless operation of services and may be shared with the Pi Network infrastructure as required for authentication, transaction validation, and ecosystem integrity. We adhere to the Pi Network's privacy standards in handling such data.",
           ],
@@ -281,7 +288,7 @@ export const TermsPage = () => (
           "Users must provide accurate information and must not impersonate others, abuse listings, or attempt fraud.",
           "Sellers and providers are responsible for truthful listings, service delivery, legal compliance, and customer support.",
           "SMAJ PI HUB may restrict access when users abuse the platform, bypass safety systems, or harm other participants.",
-          "Service availability, roadmap timing, payment flows, and token utility may change as the platform develops.",
+          "Service availability, roadmap timing, and payment flows may change as the platform develops. A potential SMAJ token is deferred and is outside the current launch plan.",
         ]}
       />
       <LegalPanel
@@ -300,7 +307,7 @@ export const TermsPage = () => (
         {
           heading: "Acceptance of Terms",
           paragraphs: [
-            "These Terms & Conditions (\"Terms\") govern your access to and use of the SMAJ PI HUB digital super platform (\"Platform\"), located at smajpihub.com, operated by SMAJ PI HUB (\"we,\" \"us,\" or \"our\"). By accessing, browsing, or using the Platform, you signify your agreement to be bound by these Terms, our Privacy Policy, Cookie Policy, and Report Abuse Policy.",
+            'These Terms & Conditions ("Terms") govern your access to and use of the SMAJ PI HUB digital marketplace and service platform ("Platform"), located at smajpihub.com, operated by SMAJ PI HUB ("we," "us," or "our"). By accessing, browsing, or using the Platform, you signify your agreement to be bound by these Terms, our Privacy Policy, Cookie Policy, and Report Abuse Policy.',
             "If you do not agree to these Terms, you may not access or use the Platform.",
             "By creating an account, authenticating with your Pi wallet, or otherwise using any part of the SMAJ PI HUB Platform, you acknowledge that you have read, understood, and agree to be bound by these Terms, as well as any additional terms and conditions that are referenced herein or that may apply to specific services or features.",
             "These Terms constitute a legally binding agreement between you and SMAJ PI HUB.",
@@ -317,7 +324,7 @@ export const TermsPage = () => (
         {
           heading: "Pi Wallet Authentication",
           items: [
-            "SMAJ PI HUB leverages the Pi Network for user authentication. Your Pi wallet serves as your primary login credential and verified identity across all 15 integrated services.",
+            "SMAJ PI HUB leverages the Pi Network for user authentication. Your Pi wallet serves as your primary login credential and verified identity across available platform services.",
             "By authenticating with your Pi wallet, you authorize SMAJ PI HUB to access necessary information from your Pi Network profile for identity verification and service provision.",
             "You agree that your Pi wallet will be used for all cryptocurrency transactions within the Platform.",
             "You acknowledge that the security of your Pi wallet is your sole responsibility, and SMAJ PI HUB is not liable for any loss or damage arising from unauthorized access to your Pi wallet.",
@@ -326,7 +333,7 @@ export const TermsPage = () => (
         {
           heading: "Platform Services Description",
           items: [
-            "SMAJ PI HUB is a comprehensive digital super platform integrating 15 distinct services into a single ecosystem.",
+            "SMAJ PI HUB is a digital marketplace and service platform connecting commerce, work, and real-world services through Pi. Its wider service portfolio is a long-term architecture, not a commitment to simultaneous availability.",
             "Marketplace: For buying and selling goods and services.",
             "Food Delivery: For ordering and delivering meals.",
             "Jobs: For job seekers and employers.",
@@ -341,7 +348,7 @@ export const TermsPage = () => (
             "Swap: For exchanging goods and services.",
             "Streaming: For digital content streaming.",
             "Sports: For sports-related activities, news, and services.",
-            "Utility Token: The SMAJ Token, which may offer additional functionalities and benefits within the ecosystem.",
+            "Deferred Token Concept: A potential SMAJ token is outside the current core strategy and launch plan. Any future token requires a separate decision and specific terms.",
             "Each service may have specific guidelines or supplementary terms, which you agree to abide by when using that particular service.",
           ],
         },
@@ -379,9 +386,9 @@ export const TermsPage = () => (
         {
           heading: "Escrow and Dispute Resolution",
           paragraphs: [
-            "To enhance trust and security, SMAJ PI HUB provides escrow protection for eligible transactions and a robust dispute resolution mechanism.",
-            "Escrow Protection: Funds for certain transactions may be held in escrow until the service or delivery is confirmed. The specific terms of escrow will be detailed for each relevant service.",
-            "Dispute Resolution: In the event of a dispute between users, SMAJ PI HUB will provide a mechanism for resolution. Users agree to participate in good faith in the dispute resolution process. Our decision in resolving disputes will be final and binding.",
+            "Escrow-related protections and enhanced in-platform dispute workflows are planned capabilities. They are not represented as currently available guarantees. Any escrow implementation must be consistent with the intended non-custodial marketplace model.",
+            "Planned Escrow Protections: Any future escrow-related feature will require a defined implementation and service-specific terms before availability. SMAJ PI HUB does not currently promise custodial holding of user funds.",
+            "Planned Dispute Resolution: Enhanced in-platform workflows are under development. Current support is available through the contact channels. Any future resolution mechanism will have service-specific terms describing participation and outcomes.",
           ],
         },
         {
@@ -394,7 +401,7 @@ export const TermsPage = () => (
         {
           heading: "AI Assistant Usage",
           items: [
-            "SMAJ PI HUB includes an AI assistant designed to enhance user experience and provide support.",
+            "Platform-focused AI assistance is a planned capability intended to improve navigation and user support within SMAJ PI HUB.",
             "The AI assistant provides information and assistance based on available data and algorithms. Its responses are for informational purposes only and should not be considered professional advice, including medical, legal, or financial advice.",
             "SMAJ PI HUB is not responsible for any decisions made or actions taken based on the AI assistant's output.",
             "You will not use the AI assistant to generate or disseminate harmful, unlawful, or inappropriate content.",
@@ -402,9 +409,9 @@ export const TermsPage = () => (
           ],
         },
         {
-          heading: "SMAJ Token Terms",
+          heading: "Deferred SMAJ Token Concept",
           paragraphs: [
-            "If and when the SMAJ Token is launched and integrated, its use will be subject to specific terms and conditions, which will be made available separately.",
+            "A potential SMAJ token is deferred and is not part of the current core strategy or launch plan. Any future token requires a clear user need, credible purpose, safeguards, feasibility, and a separate decision. If introduced, specific terms will be provided separately.",
             "These terms will govern the acquisition, holding, transfer, and utility of the SMAJ Token within the ecosystem. Users are advised to review these terms carefully before engaging with the SMAJ Token.",
           ],
         },
@@ -496,7 +503,7 @@ export const CookiesPage = () => (
         {
           heading: "What Cookies Are",
           paragraphs: [
-            "This Cookie Policy explains how SMAJ PI HUB (\"we,\" \"us,\" or \"our\"), operating the digital super platform accessible at smajpihub.com, uses cookies and similar technologies to recognize you when you visit our website.",
+            'This Cookie Policy explains how SMAJ PI HUB ("we," "us," or "our"), operating the digital marketplace and service platform accessible at smajpihub.com, uses cookies and similar technologies to recognize you when you visit our website.',
             "It explains what these technologies are and why we use them, as well as your rights to control our use of them.",
             "Cookies are small data files that are placed on your computer or mobile device when you visit a website. Cookies are widely used by website owners to make their websites work, or to work more efficiently, as well as to provide reporting information.",
             "They allow the website to remember your actions and preferences, such as login, language, font size, and other display preferences, over a period of time, so you do not have to keep re-entering them whenever you come back to the site or browse from one page to another.",
@@ -815,7 +822,9 @@ export const ReportAbusePage = () => {
           <label htmlFor="report-type">
             <span>Report Type</span>
             <select id="report-type" name="type" required defaultValue="">
-              <option value="" disabled>Select report type</option>
+              <option value="" disabled>
+                Select report type
+              </option>
               <option>Fake seller or provider</option>
               <option>Scam or suspicious payment request</option>
               <option>Impersonation</option>
@@ -828,7 +837,9 @@ export const ReportAbusePage = () => {
             <textarea id="report-details" name="details" rows={6} placeholder="Describe what happened..." required />
           </label>
           <button type="submit">Submit Report</button>
-          {submitted ? <p className="contact-form-success">Thank you. Your report has been recorded for review.</p> : null}
+          {submitted ? (
+            <p className="contact-form-success">Thank you. Your report has been recorded for review.</p>
+          ) : null}
           {error ? <p className="contact-form-success error">{error}</p> : null}
         </form>
       </section>

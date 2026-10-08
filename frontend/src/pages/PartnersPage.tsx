@@ -7,10 +7,26 @@ import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 
 const partnerTypes = [
-  ["Sellers & Merchants", "Product sellers, store operators, and local merchants preparing for Pi-powered marketplace access.", StorefrontOutlinedIcon],
-  ["Service Providers", "Health, education, transport, housing, events, agriculture, utility, and digital service providers.", BusinessCenterOutlinedIcon],
-  ["Community Partners", "Pi communities, ambassadors, local growth teams, and ecosystem organizers.", HandshakeOutlinedIcon],
-  ["Infrastructure Partners", "Technology, compliance, logistics, support, and integration partners.", VerifiedUserOutlinedIcon],
+  [
+    "Sellers & Merchants",
+    "Product sellers, store operators, and local merchants preparing for Pi-powered marketplace access.",
+    StorefrontOutlinedIcon,
+  ],
+  [
+    "Service Providers",
+    "Health, education, transport, housing, events, agriculture, utility, and digital service providers.",
+    BusinessCenterOutlinedIcon,
+  ],
+  [
+    "Community Partners",
+    "Pi communities, ambassadors, local growth teams, and ecosystem organizers.",
+    HandshakeOutlinedIcon,
+  ],
+  [
+    "Infrastructure Partners",
+    "Technology, compliance, logistics, support, and integration partners.",
+    VerifiedUserOutlinedIcon,
+  ],
 ] as const;
 
 const onboardingSteps = [
@@ -29,18 +45,22 @@ const PartnersPage = () => {
             <span className="home-kicker">PARTNERS & PROVIDERS</span>
             <h1>Help build real Pi utility with SMAJ PI HUB.</h1>
             <p>
-              SMAJ PI HUB is preparing a verified service ecosystem for sellers, providers, operators, communities,
-              and infrastructure partners who can support real-world utility.
+              Help build a trusted economic utility layer for the Pi ecosystem. Merchants, employers, providers, and
+              infrastructure partners can support commerce, work, and country-by-country service expansion.
             </p>
             <div className="home-hero-cta">
-              <Link to="/contact" className="home-hero-primary-btn">Apply / Contact</Link>
-              <Link to="/services" className="home-hero-secondary-btn">View Services</Link>
+              <Link to="/contact" className="home-hero-primary-btn">
+                Apply / Contact
+              </Link>
+              <Link to="/services" className="home-hero-secondary-btn">
+                View Services
+              </Link>
             </div>
           </div>
           <aside className="partner-hero-card">
             <HandshakeOutlinedIcon />
             <strong>Partner-ready ecosystem</strong>
-            <span>Marketplace, providers, services, communities, and support layers.</span>
+            <span>Commerce and work first, followed by services as demand and readiness grow.</span>
           </aside>
         </section>
 
@@ -70,7 +90,7 @@ const PartnersPage = () => {
             </p>
           </div>
           <ol>
-            {onboardingSteps.map((step) => (
+            {onboardingSteps.map(step => (
               <li key={step}>
                 <CheckCircleOutlineOutlinedIcon />
                 {step}

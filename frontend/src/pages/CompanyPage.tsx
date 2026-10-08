@@ -16,8 +16,8 @@ const officialLinks = [
 ] as const;
 
 const profileFacts = [
-  ["Company Focus", "Pi-powered marketplace and service infrastructure.", HubOutlinedIcon],
-  ["MVP", "SMAJ Store with listings, chat, Pi payments, reviews, payment confirmation, and support.", RocketLaunchOutlinedIcon],
+  ["Company Focus", "A trusted economic utility layer for the Pi ecosystem.", HubOutlinedIcon],
+  ["Economic Foundation", "SMAJ Store and SMAJ PI Jobs connect commerce and work.", RocketLaunchOutlinedIcon],
   ["Audience", "Pi users, sellers, service providers, partners, and ecosystem communities.", PublicOutlinedIcon],
   ["Position", "Digital marketplace and service platform, not a financial institution.", VerifiedOutlinedIcon],
 ] as const;
@@ -30,18 +30,22 @@ const CompanyPage = () => (
           <span className="home-kicker">COMPANY PROFILE</span>
           <h1>SMAJ PI HUB official company overview.</h1>
           <p>
-            SMAJ PI HUB is building a Pi-powered super platform for real-world services, marketplace access,
-            verified participation, and practical digital utility.
+            SMAJ PI HUB is building a trusted economic utility layer connecting verified people and businesses to
+            commerce, work, and real-world services through one Pi identity and one Pi wallet.
           </p>
           <div className="home-hero-cta">
-            <Link to="/about" className="home-hero-primary-btn">About SMAJ</Link>
-            <Link to="/white-paper" className="home-hero-secondary-btn">White Paper</Link>
+            <Link to="/about" className="home-hero-primary-btn">
+              About SMAJ
+            </Link>
+            <Link to="/white-paper" className="home-hero-secondary-btn">
+              White Paper
+            </Link>
           </div>
         </div>
         <aside className="company-profile-card">
           <BusinessCenterOutlinedIcon />
           <strong>SMAJ PI HUB</strong>
-          <span>One Pi Identity. One Wallet. Multiple Services. Real Utility.</span>
+          <span>The Economic Utility Layer for the Pi Ecosystem</span>
         </aside>
       </section>
 
@@ -65,7 +69,12 @@ const CompanyPage = () => (
         </div>
         <div>
           {officialLinks.map(([label, value, href]) => (
-            <a key={label} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined}>
+            <a
+              key={label}
+              href={href}
+              target={href.startsWith("http") ? "_blank" : undefined}
+              rel={href.startsWith("http") ? "noreferrer" : undefined}
+            >
               <MailOutlineOutlinedIcon />
               <span>{label}</span>
               <strong>{value}</strong>

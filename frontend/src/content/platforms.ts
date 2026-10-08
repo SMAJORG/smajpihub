@@ -88,12 +88,13 @@ export const platformDefinitions: PlatformDefinition[] = [
   {
     name: "SMAJ Token",
     routeSegment: "token",
-    description: "Token utility layer for rewards, payments, and growth.",
+    description:
+      "Deferred concept, outside the current core strategy and launch plan. Any future token requires a clear use case and a separate decision.",
     status: "Coming Soon",
   },
 ];
 
-const launchPriority = ["store", "stream", "sports"];
+const launchPriority = ["store", "jobs"];
 
 export const orderedPlatformDefinitions = [...platformDefinitions].sort((left, right) => {
   const leftIndex = launchPriority.indexOf(left.routeSegment);

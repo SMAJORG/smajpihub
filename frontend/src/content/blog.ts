@@ -21,8 +21,8 @@ export type BlogPost = {
 export const blogPosts: BlogPost[] = [
   {
     slug: "how-smaj-connects-pi-projects",
-    title: "How SMAJ PI HUB Connects Multiple Pi Projects in One Experience",
-    snippet: "Discover the wallet-connected flow that helps users access services from one trusted hub.",
+    title: "Building the Economic Utility Layer for the Pi Ecosystem",
+    snippet: "How commerce, work, and trusted participation support practical Pi utility.",
     author: "SMAJ Team",
     date: "2026-01-18",
     readTime: "8 min read",
@@ -30,10 +30,10 @@ export const blogPosts: BlogPost[] = [
     tags: ["Ecosystem", "Platform", "Guides"],
     featured: true,
     content: [
-      { type: "heading", text: "Why an All-in-One Pi Hub Matters" },
+      { type: "heading", text: "Why Commerce and Work Come First" },
       {
         type: "paragraph",
-        text: "Many users face a fragmented journey when each service lives in a separate system with different onboarding rules. SMAJ PI HUB solves this by introducing a single front door where users can understand the ecosystem quickly and then access the exact service they need.",
+        text: "SMAJ PI HUB aims to connect verified people and businesses to commerce, work, and real-world services through one Pi identity and one Pi wallet. Store and Jobs form the initial economic foundation; additional modules follow validated demand and readiness.",
       },
       {
         type: "paragraph",
@@ -54,8 +54,8 @@ export const blogPosts: BlogPost[] = [
   },
   {
     slug: "building-trusted-pi-commerce",
-    title: "Building Trusted Pi Commerce Through Verified Sellers and Escrow Flow",
-    snippet: "How SMAJ marketplace creates transparent ordering and delivery through Pi wallet flow and evolving token utility.",
+    title: "Building Trusted Pi Commerce Through Marketplace Participation",
+    snippet: "How Pi payments and planned marketplace protections can support more accountable exchanges.",
     author: "Marketplace Ops",
     date: "2026-01-10",
     readTime: "6 min read",
@@ -65,12 +65,12 @@ export const blogPosts: BlogPost[] = [
       { type: "heading", text: "Trust by Design" },
       {
         type: "paragraph",
-        text: "A healthy marketplace depends on reliable identity checks, clear merchant profiles, and strong dispute handling. SMAJ PI HUB includes these controls as default layers for every listing.",
+        text: "A healthy marketplace needs clear merchant information and accountable exchanges. Enhanced seller verification, reputation, fraud monitoring, and dispute workflows are planned; Pi sign-in alone does not guarantee seller reliability.",
       },
-      { type: "heading", text: "Escrow-Based Purchase Journey" },
+      { type: "heading", text: "Planned Transaction Protections" },
       {
         type: "paragraph",
-        text: "Escrow reduces payment risk by protecting both buyer and seller until the order reaches a verified completion state.",
+        text: "Escrow-related protections remain planned capabilities. Any implementation must be consistent with the intended non-custodial marketplace model. A potential SMAJ token is deferred and is not part of the launch plan.",
       },
     ],
   },
@@ -93,4 +93,4 @@ export const blogPosts: BlogPost[] = [
   },
 ];
 
-export const featuredBlogPost = blogPosts.find((post) => post.featured) ?? blogPosts[0];
+export const featuredBlogPost = blogPosts.find(post => post.featured) ?? blogPosts[0];

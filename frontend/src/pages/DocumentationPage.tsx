@@ -18,23 +18,295 @@ type DocArticle = {
 };
 
 const articles: DocArticle[] = [
-  { id: "introduction", group: "Start here", title: "What is SMAJ PI HUB?", summary: "Understand the super-app, its services, and the difference between public previews and signed-in features.", paragraphs: ["SMAJ PI HUB is a Pi-powered super app that brings commerce, jobs, entertainment, education, health, transport, sports, food delivery, housing, events, agriculture, energy, charity, and exchange services into one connected experience.", "Public pages let anyone explore the platform. Actions involving an account, personal data, publishing, orders, applications, or Pi payments require Pi sign-in. Service availability can differ by country and rollout stage."], links: [{ label: "Explore all services", to: "/services" }, { label: "Read the White Paper", to: "/white-paper" }] },
-  { id: "quick-start", group: "Start here", title: "Quick start", summary: "Go from your first visit to using a service.", paragraphs: ["Use the web app in Pi Browser for the complete Pi authentication and payment experience. The Android app provides native convenience and selected device features while payments remain subject to Pi platform support."], steps: ["Open SMAJ PI HUB and select Explore Services.", "Choose a live service such as Store, Jobs, or Stream.", "Select Login with Pi when a protected action requires your identity.", "Complete your SMAJ profile so sellers, employers, and creators can identify you correctly.", "Review every amount and item before approving a Pi payment."], links: [{ label: "How it works", to: "/how-it-works" }, { label: "Download the test app", to: "/download" }] },
-  { id: "pi-sign-in", group: "Account & identity", title: "Pi sign-in", summary: "How authentication works on the web and Android app.", paragraphs: ["Pi sign-in connects your verified Pi identity to one SMAJ account. SMAJ does not ask for your wallet passphrase and should never request it through chat, forms, or support messages.", "If sign-in is unavailable in a regular browser, open the same page inside Pi Browser. On Android, follow the in-app handoff and return to SMAJ after authorization."], steps: ["Tap Login with Pi.", "Review the requested permissions in Pi Browser.", "Approve the sign-in request.", "Return to the original SMAJ page; your intended action will continue."], note: "Never share a Pi wallet passphrase or verification code with a seller, provider, creator, or SMAJ support representative." },
-  { id: "profile", group: "Account & identity", title: "Profile and language", summary: "Manage your identity, profile photo, country, contact details, and language.", paragraphs: ["Your main SMAJ profile is shared across supported services. Updating the account photo also updates connected seller and Stream identities. Some professional services may request additional role-specific details.", "The website and Android app can detect the browser or phone language. You can override it from the language selector; translated pages retain the same routes and actions."], steps: ["Open You or Account.", "Choose Profile or Settings.", "Update your name, photo, country, contact information, biography, and language.", "Save and reload any already-open service page if it still displays cached information."] },
-  { id: "store", group: "Services", title: "SMAJ Store", summary: "Browse products, contact sellers, list products, order, and pay with Pi.", paragraphs: ["Store connects buyers with independent sellers. Check product photos, price, seller verification, location, stock, delivery details, and reviews before ordering.", "Sellers can create listings, manage stock, receive buyer messages, and process orders. Listing approval and seller verification may be required before public publication."], steps: ["Search or browse a category.", "Open a product and verify the seller and delivery details.", "Add the product to cart or contact the seller.", "Confirm the final order and approve Pi payment only when shown by the official payment flow.", "Track the order and use Messages for documented communication."], links: [{ label: "Open Store", to: "/services/store" }, { label: "Seller agreement", to: "/seller-agreement" }] },
-  { id: "jobs", group: "Services", title: "SMAJ Jobs", summary: "Find work, hire talent, manage applications, and handle agreed compensation.", paragraphs: ["Job seekers can create a professional profile, set preferences, search roles, save jobs, apply, message employers, and review earnings. Employers can create a company profile, post jobs, review candidates, hire, and manage eligible payment records.", "A hired status does not itself prove that payment has been completed. Both sides should use the documented payment record and retain clear agreement details."], steps: ["Choose Find work or Hire talent.", "Complete the relevant personal or employer profile.", "Apply to a job or review a candidate.", "Use Messages to confirm scope, schedule, and compensation.", "Use Payments & Billing or My Earnings to review supported payment records."], links: [{ label: "Open Jobs", to: "/services/jobs" }] },
-  { id: "stream", group: "Services", title: "SMAJ Stream", summary: "Watch, follow creators, upload licensed video, download movies, and understand creator eligibility.", paragraphs: ["Stream provides movies, series, channels, creator uploads, live broadcasting, lists, history, and supported offline downloads. Content availability and download rights are controlled per title.", "Creators may upload files or eligible YouTube links only when they own or control publishing rights. Uploaded files are processed, matched to optional TMDB metadata, reviewed, and published after approval."], steps: ["Open Stream and select a title or creator channel.", "Use fullscreen, casting, subtitles, playback speed, and supported Android picture-in-picture controls.", "For uploads, open Creator Dashboard → Upload, add a title and uploader credit, optionally match TMDB, confirm rights, and submit.", "For offline viewing, tap Download on an eligible title, then open Downloads to watch progress from 0–100%.", "After completion, use Save to copy the downloaded file to supported phone storage."], links: [{ label: "Open Stream", to: "/services/stream" }], note: "Uploading copyrighted material without authorization can lead to rejection, account restrictions, and rights-holder reports." },
-  { id: "education", group: "Services", title: "Education", summary: "Discover courses, instructors, tutors, certificates, and teaching opportunities.", paragraphs: ["Education supports course discovery, learning progress, tutor profiles, lesson requests, certificates, and provider applications. Availability depends on course publication and instructor approval."], steps: ["Browse courses, programs, tutors, or universities.", "Open a detail page and review delivery format, level, instructor, and price.", "Enroll or request a lesson using the available action.", "Track learning and certificates from your Education account.", "Qualified educators can use Teach on SMAJ to submit an application."], links: [{ label: "Open Education", to: "/services/education" }] },
-  { id: "other-services", group: "Services", title: "Health, Transport, Sports and other services", summary: "Understand live, beta, in-progress, and coming-soon service states.", paragraphs: ["Each service card shows its rollout status. Live services are available for normal use. Beta or testing services may contain incomplete flows. In-progress and coming-soon services can show previews or warnings but should not be treated as fully released.", "Health information does not replace emergency services or professional medical diagnosis. Transport, food, housing, events, agriculture, energy, charity, and swap transactions require users to check provider details and local availability."], links: [{ label: "View service directory", to: "/services" }] },
-  { id: "payments", group: "Payments", title: "Pay with Pi", summary: "Understand payment approval, pending payments, completion, cancellation, and safety.", paragraphs: ["A Pi payment begins only after you intentionally choose a paid action. The official Pi flow displays the amount and asks you to approve it. SMAJ records the payment lifecycle so the related order or service can be completed after blockchain confirmation.", "A pending payment may still be waiting for user approval, server completion, or blockchain confirmation. Do not create repeated payments without first checking the related order and payment history."], steps: ["Review the item, provider, amount, and refund terms.", "Start Pay with Pi from the relevant SMAJ page.", "Approve the request inside the official Pi interface.", "Return to SMAJ and wait for completion confirmation.", "If it remains pending, keep the payment reference and contact support instead of paying again."], note: "SMAJ PI HUB is a digital marketplace and service platform, not a bank or custodian. Never send Pi to an address received through an unverified chat message." },
-  { id: "android", group: "Apps & devices", title: "Android test app", summary: "Install updates, use native capabilities, and understand current payment limitations.", paragraphs: ["The Android APK is a testing build for users who want native sign-in experiments, notifications, downloads, fullscreen playback, picture-in-picture, language detection, and other device features.", "For the most reliable Pay with Pi experience, use the SMAJ web app inside Pi Browser. Payment behavior in the Android test app depends on Pi platform capabilities and is not represented as an independently released Pi Core payment product."], steps: ["Download the latest APK only from the official SMAJ download page or GitHub release.", "Allow installation from the selected trusted source when Android asks.", "Install the new version over the existing app to preserve supported app data.", "Check the app version in Settings or Account after installation."], links: [{ label: "Android download guide", to: "/download" }] },
-  { id: "downloads", group: "Apps & devices", title: "Stream downloads and phone storage", summary: "Follow download progress, watch offline, and save completed files.", paragraphs: ["Eligible Stream titles can download inside the Android app. The Downloads page reads the Android DownloadManager directly, shows active progress, and moves completed items into the Downloaded section.", "The in-app file and a copy saved to phone storage are separate. Use Save only after progress reaches 100%. Removing the app or clearing its storage can remove app-private downloads."], steps: ["Tap Download on an eligible movie.", "Choose View downloads to see the poster, title, progress, and size.", "Keep sufficient storage and a stable connection while it downloads.", "When it reaches 100%, watch offline or tap Save.", "Choose Phone storage and confirm; wait for the copy progress to finish."] },
-  { id: "security", group: "Trust & safety", title: "Security and account safety", summary: "Protect your Pi identity, account, messages, files, and transactions.", paragraphs: ["Use only official SMAJ domains, apps, and social links. Review verification badges as additional information—not an absolute guarantee. Keep communications inside the platform when possible and report suspicious listings, users, or content.", "SMAJ support does not need your wallet passphrase. Screenshots sent to support should hide private identifiers, wallet information, and one-time codes."], steps: ["Use Pi Browser for Pi authorization and payment approval.", "Enable available app lock and device-session controls.", "Review signed-in devices and revoke unknown sessions.", "Report abuse from the relevant content page or support center.", "Keep the Android app updated."], links: [{ label: "Trust center", to: "/trust" }, { label: "Report abuse", to: "/report-abuse" }] },
-  { id: "troubleshooting", group: "Help", title: "Troubleshooting", summary: "Resolve common sign-in, loading, upload, playback, download, and translation issues.", paragraphs: ["First confirm that you are online, signed in with the intended account, and using the newest website or APK version. Temporary service errors can also occur while a video is processing or a backend instance is starting."], steps: ["Refresh the page once and retry the exact action.", "For Pi sign-in or payments, open the site in Pi Browser.", "For Android problems, install the latest APK and fully reopen the app.", "For uploads, keep the app open, use a stable connection, and do not submit the same file repeatedly while processing.", "For downloads, check phone storage and the Downloads page before starting again.", "If the problem continues, capture the page, time, action, and visible error message for support."], links: [{ label: "Frequently asked questions", to: "/faq" }] },
-  { id: "support", group: "Help", title: "Contact and support", summary: "Know what information to provide and where to ask for help.", paragraphs: ["Use info@smajpihub.com for company enquiries and smajpihub@gmail.com for quick support. Include enough detail to reproduce the issue without sending sensitive credentials.", "For account-specific help, provide your Pi username, service name, approximate time, device/app version, and a screenshot with private information hidden."], links: [{ label: "Contact SMAJ", to: "/contact" }, { label: "Quick support email", to: "mailto:smajpihub@gmail.com" }] },
-  { id: "developers", group: "Reference", title: "Developers and partners", summary: "Find integration, partnership, and ecosystem information.", paragraphs: ["SMAJ PI HUB is organized as a shared identity and service ecosystem. Public partnership and developer information explains the platform direction; private APIs, credentials, administrative routes, and internal infrastructure are not public documentation.", "Organizations interested in listing services, becoming verified providers, collaborating, or developing integrations should use the appropriate application channel."], links: [{ label: "Developer information", to: "/developers" }, { label: "Partner with SMAJ", to: "/partners" }, { label: "Apply to join", to: "/onboarding" }] },
-  { id: "policies", group: "Reference", title: "Policies and legal documents", summary: "Review terms, privacy, cookies, seller rules, and abuse reporting.", paragraphs: ["The documentation explains product behavior but does not replace the governing legal documents. Terms, privacy rules, seller obligations, and service-specific notices apply to activity on the platform."], links: [{ label: "Terms of service", to: "/terms" }, { label: "Privacy policy", to: "/privacy" }, { label: "Cookie policy", to: "/cookies" }, { label: "Seller agreement", to: "/seller-agreement" }] },
+  {
+    id: "introduction",
+    group: "Start here",
+    title: "What is SMAJ PI HUB?",
+    summary:
+      "Understand the economic utility layer, phased services, and the difference between public previews and signed-in features.",
+    paragraphs: [
+      "SMAJ PI HUB is building a trusted economic utility layer for the Pi ecosystem. Store and Jobs form the initial commerce and work foundation. The wider service architecture expands as demand, trust, and operational readiness support it. A potential SMAJ token is deferred, outside the current launch plan.",
+      "Public pages let anyone explore the platform. Actions involving an account, personal data, publishing, orders, applications, or Pi payments require Pi sign-in. Service availability can differ by country and rollout stage.",
+    ],
+    links: [
+      { label: "Explore all services", to: "/services" },
+      { label: "Read the White Paper", to: "/white-paper" },
+    ],
+  },
+  {
+    id: "quick-start",
+    group: "Start here",
+    title: "Quick start",
+    summary: "Go from your first visit to using a service.",
+    paragraphs: [
+      "Use the web app in Pi Browser for the complete Pi authentication and payment experience. The Android app provides native convenience and selected device features while payments remain subject to Pi platform support.",
+    ],
+    steps: [
+      "Open SMAJ PI HUB and select Explore Services.",
+      "Choose a live service such as Store, Jobs, or Stream.",
+      "Select Login with Pi when a protected action requires your identity.",
+      "Complete your SMAJ profile so sellers, employers, and creators can identify you correctly.",
+      "Review every amount and item before approving a Pi payment.",
+    ],
+    links: [
+      { label: "How it works", to: "/how-it-works" },
+      { label: "Download the test app", to: "/download" },
+    ],
+  },
+  {
+    id: "pi-sign-in",
+    group: "Account & identity",
+    title: "Pi sign-in",
+    summary: "How authentication works on the web and Android app.",
+    paragraphs: [
+      "Pi sign-in connects your verified Pi identity to one SMAJ account. SMAJ does not ask for your wallet passphrase and should never request it through chat, forms, or support messages.",
+      "If sign-in is unavailable in a regular browser, open the same page inside Pi Browser. On Android, follow the in-app handoff and return to SMAJ after authorization.",
+    ],
+    steps: [
+      "Tap Login with Pi.",
+      "Review the requested permissions in Pi Browser.",
+      "Approve the sign-in request.",
+      "Return to the original SMAJ page; your intended action will continue.",
+    ],
+    note: "Never share a Pi wallet passphrase or verification code with a seller, provider, creator, or SMAJ support representative.",
+  },
+  {
+    id: "profile",
+    group: "Account & identity",
+    title: "Profile and language",
+    summary: "Manage your identity, profile photo, country, contact details, and language.",
+    paragraphs: [
+      "Your main SMAJ profile is shared across supported services. Updating the account photo also updates connected seller and Stream identities. Some professional services may request additional role-specific details.",
+      "The website and Android app can detect the browser or phone language. You can override it from the language selector; translated pages retain the same routes and actions.",
+    ],
+    steps: [
+      "Open You or Account.",
+      "Choose Profile or Settings.",
+      "Update your name, photo, country, contact information, biography, and language.",
+      "Save and reload any already-open service page if it still displays cached information.",
+    ],
+  },
+  {
+    id: "store",
+    group: "Services",
+    title: "SMAJ Store",
+    summary: "Browse products, contact sellers, list products, order, and pay with Pi.",
+    paragraphs: [
+      "Store connects buyers with independent sellers. Check product photos, price, seller verification, location, stock, delivery details, and reviews before ordering.",
+      "Sellers can create listings, manage stock, receive buyer messages, and process orders. Listing approval and seller verification may be required before public publication.",
+    ],
+    steps: [
+      "Search or browse a category.",
+      "Open a product and verify the seller and delivery details.",
+      "Add the product to cart or contact the seller.",
+      "Confirm the final order and approve Pi payment only when shown by the official payment flow.",
+      "Track the order and use Messages for documented communication.",
+    ],
+    links: [
+      { label: "Open Store", to: "/services/store" },
+      { label: "Seller agreement", to: "/seller-agreement" },
+    ],
+  },
+  {
+    id: "jobs",
+    group: "Services",
+    title: "SMAJ Jobs",
+    summary: "Find work, hire talent, manage applications, and handle agreed compensation.",
+    paragraphs: [
+      "Job seekers can create a professional profile, set preferences, search roles, save jobs, apply, message employers, and review earnings. Employers can create a company profile, post jobs, review candidates, hire, and manage eligible payment records.",
+      "A hired status does not itself prove that payment has been completed. Both sides should use the documented payment record and retain clear agreement details.",
+    ],
+    steps: [
+      "Choose Find work or Hire talent.",
+      "Complete the relevant personal or employer profile.",
+      "Apply to a job or review a candidate.",
+      "Use Messages to confirm scope, schedule, and compensation.",
+      "Use Payments & Billing or My Earnings to review supported payment records.",
+    ],
+    links: [{ label: "Open Jobs", to: "/services/jobs" }],
+  },
+  {
+    id: "stream",
+    group: "Services",
+    title: "SMAJ Stream",
+    summary: "Watch, follow creators, upload licensed video, download movies, and understand creator eligibility.",
+    paragraphs: [
+      "Stream provides movies, series, channels, creator uploads, live broadcasting, lists, history, and supported offline downloads. Content availability and download rights are controlled per title.",
+      "Creators may upload files or eligible YouTube links only when they own or control publishing rights. Uploaded files are processed, matched to optional TMDB metadata, reviewed, and published after approval.",
+    ],
+    steps: [
+      "Open Stream and select a title or creator channel.",
+      "Use fullscreen, casting, subtitles, playback speed, and supported Android picture-in-picture controls.",
+      "For uploads, open Creator Dashboard → Upload, add a title and uploader credit, optionally match TMDB, confirm rights, and submit.",
+      "For offline viewing, tap Download on an eligible title, then open Downloads to watch progress from 0–100%.",
+      "After completion, use Save to copy the downloaded file to supported phone storage.",
+    ],
+    links: [{ label: "Open Stream", to: "/services/stream" }],
+    note: "Uploading copyrighted material without authorization can lead to rejection, account restrictions, and rights-holder reports.",
+  },
+  {
+    id: "education",
+    group: "Services",
+    title: "Education",
+    summary: "Discover courses, instructors, tutors, certificates, and teaching opportunities.",
+    paragraphs: [
+      "Education supports course discovery, learning progress, tutor profiles, lesson requests, certificates, and provider applications. Availability depends on course publication and instructor approval.",
+    ],
+    steps: [
+      "Browse courses, programs, tutors, or universities.",
+      "Open a detail page and review delivery format, level, instructor, and price.",
+      "Enroll or request a lesson using the available action.",
+      "Track learning and certificates from your Education account.",
+      "Qualified educators can use Teach on SMAJ to submit an application.",
+    ],
+    links: [{ label: "Open Education", to: "/services/education" }],
+  },
+  {
+    id: "other-services",
+    group: "Services",
+    title: "Health, Transport, Sports and other services",
+    summary: "Understand live, beta, in-progress, and coming-soon service states.",
+    paragraphs: [
+      "Each service card shows its rollout status. Live services are available for normal use. Beta or testing services may contain incomplete flows. In-progress and coming-soon services can show previews or warnings but should not be treated as fully released.",
+      "Health information does not replace emergency services or professional medical diagnosis. Transport, food, housing, events, agriculture, energy, charity, and swap transactions require users to check provider details and local availability.",
+    ],
+    links: [{ label: "View service directory", to: "/services" }],
+  },
+  {
+    id: "payments",
+    group: "Payments",
+    title: "Pay with Pi",
+    summary: "Understand payment approval, pending payments, completion, cancellation, and safety.",
+    paragraphs: [
+      "A Pi payment begins only after you intentionally choose a paid action. The official Pi flow displays the amount and asks you to approve it. SMAJ records the payment lifecycle so the related order or service can be completed after blockchain confirmation.",
+      "A pending payment may still be waiting for user approval, server completion, or blockchain confirmation. Do not create repeated payments without first checking the related order and payment history.",
+    ],
+    steps: [
+      "Review the item, provider, amount, and refund terms.",
+      "Start Pay with Pi from the relevant SMAJ page.",
+      "Approve the request inside the official Pi interface.",
+      "Return to SMAJ and wait for completion confirmation.",
+      "If it remains pending, keep the payment reference and contact support instead of paying again.",
+    ],
+    note: "SMAJ PI HUB is a digital marketplace and service platform, not a bank or custodian. Never send Pi to an address received through an unverified chat message.",
+  },
+  {
+    id: "android",
+    group: "Apps & devices",
+    title: "Android test app",
+    summary: "Install updates, use native capabilities, and understand current payment limitations.",
+    paragraphs: [
+      "The Android APK is a testing build for users who want native sign-in experiments, notifications, downloads, fullscreen playback, picture-in-picture, language detection, and other device features.",
+      "For the most reliable Pay with Pi experience, use the SMAJ web app inside Pi Browser. Payment behavior in the Android test app depends on Pi platform capabilities and is not represented as an independently released Pi Core payment product.",
+    ],
+    steps: [
+      "Download the latest APK only from the official SMAJ download page or GitHub release.",
+      "Allow installation from the selected trusted source when Android asks.",
+      "Install the new version over the existing app to preserve supported app data.",
+      "Check the app version in Settings or Account after installation.",
+    ],
+    links: [{ label: "Android download guide", to: "/download" }],
+  },
+  {
+    id: "downloads",
+    group: "Apps & devices",
+    title: "Stream downloads and phone storage",
+    summary: "Follow download progress, watch offline, and save completed files.",
+    paragraphs: [
+      "Eligible Stream titles can download inside the Android app. The Downloads page reads the Android DownloadManager directly, shows active progress, and moves completed items into the Downloaded section.",
+      "The in-app file and a copy saved to phone storage are separate. Use Save only after progress reaches 100%. Removing the app or clearing its storage can remove app-private downloads.",
+    ],
+    steps: [
+      "Tap Download on an eligible movie.",
+      "Choose View downloads to see the poster, title, progress, and size.",
+      "Keep sufficient storage and a stable connection while it downloads.",
+      "When it reaches 100%, watch offline or tap Save.",
+      "Choose Phone storage and confirm; wait for the copy progress to finish.",
+    ],
+  },
+  {
+    id: "security",
+    group: "Trust & safety",
+    title: "Security and account safety",
+    summary: "Protect your Pi identity, account, messages, files, and transactions.",
+    paragraphs: [
+      "Use only official SMAJ domains, apps, and social links. Review verification badges as additional information—not an absolute guarantee. Keep communications inside the platform when possible and report suspicious listings, users, or content.",
+      "SMAJ support does not need your wallet passphrase. Screenshots sent to support should hide private identifiers, wallet information, and one-time codes.",
+    ],
+    steps: [
+      "Use Pi Browser for Pi authorization and payment approval.",
+      "Enable available app lock and device-session controls.",
+      "Review signed-in devices and revoke unknown sessions.",
+      "Report abuse from the relevant content page or support center.",
+      "Keep the Android app updated.",
+    ],
+    links: [
+      { label: "Trust center", to: "/trust" },
+      { label: "Report abuse", to: "/report-abuse" },
+    ],
+  },
+  {
+    id: "troubleshooting",
+    group: "Help",
+    title: "Troubleshooting",
+    summary: "Resolve common sign-in, loading, upload, playback, download, and translation issues.",
+    paragraphs: [
+      "First confirm that you are online, signed in with the intended account, and using the newest website or APK version. Temporary service errors can also occur while a video is processing or a backend instance is starting.",
+    ],
+    steps: [
+      "Refresh the page once and retry the exact action.",
+      "For Pi sign-in or payments, open the site in Pi Browser.",
+      "For Android problems, install the latest APK and fully reopen the app.",
+      "For uploads, keep the app open, use a stable connection, and do not submit the same file repeatedly while processing.",
+      "For downloads, check phone storage and the Downloads page before starting again.",
+      "If the problem continues, capture the page, time, action, and visible error message for support.",
+    ],
+    links: [{ label: "Frequently asked questions", to: "/faq" }],
+  },
+  {
+    id: "support",
+    group: "Help",
+    title: "Contact and support",
+    summary: "Know what information to provide and where to ask for help.",
+    paragraphs: [
+      "Use info@smajpihub.com for company enquiries and smajpihub@gmail.com for quick support. Include enough detail to reproduce the issue without sending sensitive credentials.",
+      "For account-specific help, provide your Pi username, service name, approximate time, device/app version, and a screenshot with private information hidden.",
+    ],
+    links: [
+      { label: "Contact SMAJ", to: "/contact" },
+      { label: "Quick support email", to: "mailto:smajpihub@gmail.com" },
+    ],
+  },
+  {
+    id: "developers",
+    group: "Reference",
+    title: "Developers and partners",
+    summary: "Find integration, partnership, and ecosystem information.",
+    paragraphs: [
+      "SMAJ PI HUB is organized as a shared identity and service ecosystem. Public partnership and developer information explains the platform direction; private APIs, credentials, administrative routes, and internal infrastructure are not public documentation.",
+      "Organizations interested in listing services, becoming verified providers, collaborating, or developing integrations should use the appropriate application channel.",
+    ],
+    links: [
+      { label: "Developer information", to: "/developers" },
+      { label: "Partner with SMAJ", to: "/partners" },
+      { label: "Apply to join", to: "/onboarding" },
+    ],
+  },
+  {
+    id: "policies",
+    group: "Reference",
+    title: "Policies and legal documents",
+    summary: "Review terms, privacy, cookies, seller rules, and abuse reporting.",
+    paragraphs: [
+      "The documentation explains product behavior but does not replace the governing legal documents. Terms, privacy rules, seller obligations, and service-specific notices apply to activity on the platform.",
+    ],
+    links: [
+      { label: "Terms of service", to: "/terms" },
+      { label: "Privacy policy", to: "/privacy" },
+      { label: "Cookie policy", to: "/cookies" },
+      { label: "Seller agreement", to: "/seller-agreement" },
+    ],
+  },
 ];
 
 const DocumentationPage = () => {
@@ -43,42 +315,127 @@ const DocumentationPage = () => {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return articles;
-    return articles.filter(article => [article.title, article.summary, article.group, ...article.paragraphs, ...(article.steps || [])].join(" ").toLowerCase().includes(needle));
+    return articles.filter(article =>
+      [article.title, article.summary, article.group, ...article.paragraphs, ...(article.steps || [])]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle)
+    );
   }, [query]);
 
-  return <AppLayout>
-    <main className="docs-page" id="documentation-top">
-      <section className="docs-hero">
-        <span><MenuBookRoundedIcon /> SMAJ PI HUB DOCUMENTATION</span>
-        <h1>Everything you need to use SMAJ PI HUB.</h1>
-        <p>Practical guides for accounts, Pi payments, services, Stream creators, Android features, safety, and support.</p>
-        <label><SearchRoundedIcon /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search documentation" aria-label="Search documentation" />{query ? <button type="button" onClick={() => setQuery("")}>Clear</button> : null}</label>
-        <div><a href="#quick-start">Get started</a><a href="#troubleshooting">Troubleshooting</a><Link to="/contact">Contact support</Link></div>
-      </section>
+  return (
+    <AppLayout>
+      <main className="docs-page" id="documentation-top">
+        <section className="docs-hero">
+          <span>
+            <MenuBookRoundedIcon /> SMAJ PI HUB DOCUMENTATION
+          </span>
+          <h1>Everything you need to use SMAJ PI HUB.</h1>
+          <p>
+            Practical guides for accounts, Pi payments, services, Stream creators, Android features, safety, and
+            support.
+          </p>
+          <label>
+            <SearchRoundedIcon />
+            <input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Search documentation"
+              aria-label="Search documentation"
+            />
+            {query ? (
+              <button type="button" onClick={() => setQuery("")}>
+                Clear
+              </button>
+            ) : null}
+          </label>
+          <div>
+            <a href="#quick-start">Get started</a>
+            <a href="#troubleshooting">Troubleshooting</a>
+            <Link to="/contact">Contact support</Link>
+          </div>
+        </section>
 
-      <div className="docs-shell">
-        <aside className="docs-sidebar">
-          <strong>On this page</strong>
-          {groups.map(group => <section key={group}><h2>{group}</h2>{articles.filter(article => article.group === group).map(article => <a href={`#${article.id}`} key={article.id}>{article.title}</a>)}</section>)}
-        </aside>
+        <div className="docs-shell">
+          <aside className="docs-sidebar">
+            <strong>On this page</strong>
+            {groups.map(group => (
+              <section key={group}>
+                <h2>{group}</h2>
+                {articles
+                  .filter(article => article.group === group)
+                  .map(article => (
+                    <a href={`#${article.id}`} key={article.id}>
+                      {article.title}
+                    </a>
+                  ))}
+              </section>
+            ))}
+          </aside>
 
-        <article className="docs-content">
-          {query && <p className="docs-result-count">{filtered.length} documentation {filtered.length === 1 ? "result" : "results"} for “{query}”</p>}
-          {!filtered.length ? <section className="docs-empty"><h2>No documentation matched</h2><p>Try a service name, payment, upload, download, sign-in, or Android.</p><button type="button" onClick={() => setQuery("")}>Show all documentation</button></section> : null}
-          {filtered.map(article => <section className="docs-article" id={article.id} key={article.id}>
-            <span>{article.group}</span>
-            <h2>{article.title}</h2>
-            <p className="docs-summary">{article.summary}</p>
-            {article.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}
-            {article.steps ? <ol>{article.steps.map(step => <li key={step}>{step}</li>)}</ol> : null}
-            {article.note ? <aside><strong>Important</strong><p>{article.note}</p></aside> : null}
-            {article.links?.length ? <nav>{article.links.map(link => link.to.startsWith("mailto:") ? <a href={link.to} key={link.to}>{link.label}<ArrowForwardRoundedIcon /></a> : <Link to={link.to} key={link.to}>{link.label}<ArrowForwardRoundedIcon /></Link>)}</nav> : null}
-            <a className="docs-back-top" href="#documentation-top">Back to top</a>
-          </section>)}
-        </article>
-      </div>
-    </main>
-  </AppLayout>;
+          <article className="docs-content">
+            {query && (
+              <p className="docs-result-count">
+                {filtered.length} documentation {filtered.length === 1 ? "result" : "results"} for “{query}”
+              </p>
+            )}
+            {!filtered.length ? (
+              <section className="docs-empty">
+                <h2>No documentation matched</h2>
+                <p>Try a service name, payment, upload, download, sign-in, or Android.</p>
+                <button type="button" onClick={() => setQuery("")}>
+                  Show all documentation
+                </button>
+              </section>
+            ) : null}
+            {filtered.map(article => (
+              <section className="docs-article" id={article.id} key={article.id}>
+                <span>{article.group}</span>
+                <h2>{article.title}</h2>
+                <p className="docs-summary">{article.summary}</p>
+                {article.paragraphs.map(paragraph => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+                {article.steps ? (
+                  <ol>
+                    {article.steps.map(step => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                ) : null}
+                {article.note ? (
+                  <aside>
+                    <strong>Important</strong>
+                    <p>{article.note}</p>
+                  </aside>
+                ) : null}
+                {article.links?.length ? (
+                  <nav>
+                    {article.links.map(link =>
+                      link.to.startsWith("mailto:") ? (
+                        <a href={link.to} key={link.to}>
+                          {link.label}
+                          <ArrowForwardRoundedIcon />
+                        </a>
+                      ) : (
+                        <Link to={link.to} key={link.to}>
+                          {link.label}
+                          <ArrowForwardRoundedIcon />
+                        </Link>
+                      )
+                    )}
+                  </nav>
+                ) : null}
+                <a className="docs-back-top" href="#documentation-top">
+                  Back to top
+                </a>
+              </section>
+            ))}
+          </article>
+        </div>
+      </main>
+    </AppLayout>
+  );
 };
 
 export default DocumentationPage;

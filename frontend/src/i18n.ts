@@ -198,7 +198,7 @@ const pageTranslations = {
 
 const footerTranslations = {
   en: {
-    description: "Built for Pi wallet access, with SMAJ Token utility expanding across the ecosystem.",
+    description: "Building a trusted economic utility layer for Pi commerce, work, and real-world services.",
     platform: "Platform",
     trust: "Trust & Safety",
     company: "Company",
@@ -221,7 +221,8 @@ const footerTranslations = {
     scrollTop: "Scroll to top",
   },
   fr: {
-    description: "Conçu pour le portefeuille Pi et l’utilité croissante du SMAJ Token.",
+    description:
+      "Une couche d’utilité économique de confiance pour le commerce, le travail et les services concrets avec Pi.",
     platform: "Plateforme",
     trust: "Confiance et sécurité",
     company: "Entreprise",

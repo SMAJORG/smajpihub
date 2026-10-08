@@ -13,7 +13,11 @@ const quickSupportEmail = "smajpihub@gmail.com";
 
 const contactRoutes = [
   ["Support", "Questions about using SMAJ PI HUB, account access, or service navigation.", SupportAgentOutlinedIcon],
-  ["Providers", "Sellers, service providers, merchants, and local operators who want to join.", VerifiedUserOutlinedIcon],
+  [
+    "Providers",
+    "Sellers, service providers, merchants, and local operators who want to join.",
+    VerifiedUserOutlinedIcon,
+  ],
   ["Partnerships", "Ecosystem, community, infrastructure, and business collaboration requests.", HandshakeOutlinedIcon],
   ["Company", "Media, legal, compliance, product, and general company inquiries.", BusinessCenterOutlinedIcon],
 ] as const;
@@ -35,7 +39,10 @@ const ContactPage = () => {
       event.currentTarget.reset();
       showFeedback?.({ type: "success", message: "Thanks. Your message has been recorded for the SMAJ PI HUB team." });
     } catch {
-      showFeedback?.({ type: "error", message: `Could not send your message. For quick support, email ${quickSupportEmail}.` });
+      showFeedback?.({
+        type: "error",
+        message: `Could not send your message. For quick support, email ${quickSupportEmail}.`,
+      });
     }
   };
 
@@ -94,7 +101,9 @@ const ContactPage = () => {
             <label htmlFor="topic">
               <span>Topic</span>
               <select id="topic" name="topic" required defaultValue="">
-                <option value="" disabled>Select a topic</option>
+                <option value="" disabled>
+                  Select a topic
+                </option>
                 <option>Support</option>
                 <option>Seller / Provider onboarding</option>
                 <option>Partnership</option>
@@ -103,25 +112,32 @@ const ContactPage = () => {
             </label>
             <label htmlFor="contact-message">
               <span>Message</span>
-              <textarea id="contact-message" name="message" rows={6} placeholder="Write your message here..." required />
+              <textarea
+                id="contact-message"
+                name="message"
+                rows={6}
+                placeholder="Write your message here..."
+                required
+              />
             </label>
             <button type="submit">Send Message</button>
           </form>
 
           <aside className="contact-info-panel">
             <h3>Company Information</h3>
-            <p>
-              SMAJ PI HUB is a digital marketplace and service platform building real-world utility for the Pi Network
-              ecosystem.
-            </p>
+            <p>SMAJ PI HUB is building a trusted economic utility layer for the Pi ecosystem.</p>
             <dl>
               <div>
                 <dt>Email</dt>
-                <dd><a href={`mailto:${companyEmail}`}>{companyEmail}</a></dd>
+                <dd>
+                  <a href={`mailto:${companyEmail}`}>{companyEmail}</a>
+                </dd>
               </div>
               <div>
                 <dt>Quick Support</dt>
-                <dd><a href={`mailto:${quickSupportEmail}`}>{quickSupportEmail}</a></dd>
+                <dd>
+                  <a href={`mailto:${quickSupportEmail}`}>{quickSupportEmail}</a>
+                </dd>
               </div>
               <div>
                 <dt>Office Hours</dt>

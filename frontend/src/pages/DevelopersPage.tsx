@@ -9,9 +9,17 @@ import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
 
 const developerBlocks = [
   ["Pi Identity Hooks", "Build user flows around Pi-first identity and account access.", HubOutlinedIcon],
-  ["Service Modules", "Prepare modular service experiences that can connect into the hub.", IntegrationInstructionsOutlinedIcon],
+  [
+    "Service Modules",
+    "Prepare modular service experiences that can connect into the hub.",
+    IntegrationInstructionsOutlinedIcon,
+  ],
   ["API Readiness", "Plan endpoints for listings, profiles, status, search, support, and events.", ApiOutlinedIcon],
-  ["Trust Standards", "Align integrations with verification, safety, privacy, and clear status rules.", SecurityOutlinedIcon],
+  [
+    "Trust Standards",
+    "Align integrations with verification, safety, privacy, and clear status rules.",
+    SecurityOutlinedIcon,
+  ],
 ] as const;
 
 const integrationSteps = [
@@ -28,19 +36,23 @@ const DevelopersPage = () => {
         <section className="home-hero program-hero">
           <div>
             <span className="home-kicker">DEVELOPER PROGRAM</span>
-            <h1>Build Pi-powered services that can connect into SMAJ PI HUB.</h1>
+            <h1>Build for the Pi Economic Utility Layer</h1>
             <p>
-              The developer program is for builders preparing modules, APIs, tools, and integrations that support
-              marketplace activity, service discovery, trusted identity, and real Pi utility.
+              Help extend practical Pi commerce and work through useful modules and partner integrations. Public APIs
+              and developer tools are planned to expand after the initial economic model is validated.
             </p>
             <div className="home-hero-cta">
-              <Link to="/contact" className="home-hero-primary-btn">Contact Developer Team</Link>
-              <Link to="/white-paper" className="home-hero-secondary-btn">Read Architecture</Link>
+              <Link to="/contact" className="home-hero-primary-btn">
+                Contact Developer Team
+              </Link>
+              <Link to="/white-paper" className="home-hero-secondary-btn">
+                Read Architecture
+              </Link>
             </div>
           </div>
           <aside className="program-hero-card">
             <CodeOutlinedIcon />
-            <strong>Developer-ready ecosystem</strong>
+            <strong>Planned Developer and API Layer</strong>
             <span>Identity, services, APIs, trust, and modular growth.</span>
           </aside>
         </section>
@@ -65,10 +77,13 @@ const DevelopersPage = () => {
           <div>
             <span className="home-kicker">INTEGRATION FLOW</span>
             <h2>A careful path from idea to module.</h2>
-            <p>Developer access will expand as the MVP matures and integration standards become stable.</p>
+            <p>
+              Developer access and public integration tools are planned to expand as Store and Jobs validate the model
+              and integration standards become stable.
+            </p>
           </div>
           <ol>
-            {integrationSteps.map((step) => (
+            {integrationSteps.map(step => (
               <li key={step}>
                 <CheckCircleOutlineOutlinedIcon />
                 {step}
