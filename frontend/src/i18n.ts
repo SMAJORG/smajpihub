@@ -4,56 +4,245 @@ import { initReactI18next } from "react-i18next";
 
 const pageTranslations = {
   en: {
-    pillars: [
-      { title: "One Pi Identity", text: "Use one verified Pi-first identity across services." },
-      { title: "One Pi Wallet", text: "Access Pi pricing, payments, and utility through one wallet." },
-      { title: "Multiple Services", text: "Commerce, jobs, health, education, transport, housing, media, and more connect through one hub." },
+    kicker: "SMAJ PI HUB",
+    title: "The Economic Utility Layer for the Pi Ecosystem",
+    description: "Buy, sell, work, and access real-world services through one verified Pi identity and one Pi wallet.",
+    explore: "Explore Services",
+    foundationKicker: "THE ECONOMIC FOUNDATION",
+    foundationTitle: "Commerce and Work Come First",
+    foundationText:
+      "SMAJ starts with Store and Jobs: connecting buyers, sellers, talent, and employers. A shared Pi identity and wallet support the experience as the economy grows.",
+    foundationCards: [
+      {
+        title: "SMAJ Store",
+        text: "Discover products, connect with sellers, and buy or sell with Pi.",
+        action: "Explore Store",
+      },
+      {
+        title: "SMAJ PI Jobs",
+        text: "Find work, offer your skills, or connect your business with talent.",
+        action: "Explore Jobs",
+      },
     ],
-    servicesKicker: "SMAJ PI HUB SERVICES", servicesTitle: "15 Connected Services, One Familiar Direction",
-    servicesText: "Quickly understand what each platform does, what is live, and how everything fits into the Pi-powered hub.",
-    live: "LIVE", inProgress: "IN PROGRESS", soon: "SOON", mvpKicker: "MVP STARTS HERE",
-    mvpTitle: "SMAJ Store Is the First Marketplace Layer", mvpText: "A trusted marketplace where users discover products, sellers list items, and Pi payments become practical.",
-    viewStore: "View Store Service", mvpFeatures: ["Product Listings", "Buyer/Seller Chat", "Pi Payment Flow", "Dispute Support", "Reviews & Ratings", "Dispute Support"],
-    howKicker: "HOW IT WORKS", howTitle: "A Simple Flow Users Can Follow",
+    howKicker: "HOW SMAJ WORKS",
+    howTitle: "An Economic Loop Built Around Pi",
+    howText:
+      "Start with identity, exchange value, and return to a growing economy. Trust features are being developed alongside the marketplace.",
     steps: [
-      { title: "Connect", text: "Login with Pi and enter SMAJ PI HUB." }, { title: "Verify", text: "Use identity and provider checks to build trust." },
-      { title: "Choose", text: "Open marketplace, jobs, health, education, housing, media, or other services." }, { title: "Use Pi", text: "Buy, sell, and access services through trusted flows." },
+      {
+        title: "Pi Identity",
+        text: "Sign in with Pi.",
+      },
+      {
+        title: "Discover",
+        text: "Find products or work.",
+      },
+      {
+        title: "Transact",
+        text: "Use the available Pi payment flow.",
+      },
+      {
+        title: "Complete Exchange",
+        text: "Deliver goods or agreed work.",
+      },
+      {
+        title: "Build Trust",
+        text: "Reputation tools are planned.",
+      },
+      {
+        title: "Repeat",
+        text: "Return for your next opportunity.",
+      },
     ],
-    trustKicker: "TRUST LAYER", trustTitle: "Built Around Verified Participation", trustText: "Trust, clear access, marketplace safety, and real Pi utility remain practical priorities.",
+    trustKicker: "THE TRUST LAYER",
+    trustTitle: "Built for Trusted Pi Commerce",
+    trustText:
+      "Pi sign-in is available today. Enhanced marketplace protections remain development priorities; planned features are labeled below.",
+    planned: "PLANNED",
     trustFeatures: [
-      { title: "Verified Access", text: "Pi-first identity signals reduce fake participation." }, { title: "Marketplace Safety", text: "Escrow, reviews, ratings, and dispute support shape the marketplace." },
-      { title: "AI Guidance", text: "An assistant helps users find services and next steps." }, { title: "Clear Status", text: "Labels show which services are live or planned." },
+      {
+        title: "Pi Identity Access",
+        text: "Sign in through Pi. Account access alone does not guarantee seller reliability.",
+      },
+      {
+        title: "Seller and Provider Verification",
+        text: "Enhanced business and professional checks are planned.",
+      },
+      {
+        title: "Ratings and Reputation",
+        text: "Expanded review and reputation tools are planned to help participants assess past exchanges.",
+      },
+      {
+        title: "Marketplace Safety",
+        text: "Additional fraud-prevention and activity-monitoring tools are planned.",
+      },
+      {
+        title: "Dispute Support",
+        text: "In-platform dispute workflows are planned. Contact the team for current support.",
+      },
     ],
-    finalTitle: "One Pi Identity. One Wallet. Multiple Services. Real Utility.", readWhitePaper: "Read White Paper",
+    servicesKicker: "EXPANDING SERVICE ECOSYSTEM",
+    servicesTitle: "A Broader Pi Economy, Built Over Time",
+    servicesText:
+      "Store and Jobs form the initial foundation. Explore the wider service architecture below, including live services and modules still in development. Status labels show current availability, not a simultaneous launch promise.",
+    partnerKicker: "MERCHANTS AND PARTNERS",
+    partnerTitle: "Help Build Practical Pi Utility",
+    partnerText:
+      "Bring products, skills, or a useful service to the ecosystem. Talk with the team about merchant participation and partnerships.",
+    merchantAction: "Collaborate With Us",
+    partnerAction: "Explore Partnerships",
+    resourcesLabel: "White paper and frequently asked questions",
+    readWhitePaper: "Read White Paper",
+    whitePaperText: "Explore the strategy, phased roadmap, and long-term architecture.",
+    faqTitle: "Questions About SMAJ?",
+    faqText: "Learn about access, services, and using the hub.",
+    finalTitle: "Take Part in the Pi Utility Economy",
   },
   fr: {
-    pillars: [
-      { title: "Une identité Pi", text: "Utilisez une identité Pi vérifiée dans tous les services." },
-      { title: "Un portefeuille Pi", text: "Accédez aux prix, paiements et utilités Pi avec un seul portefeuille." },
-      { title: "Plusieurs services", text: "Commerce, emploi, santé, éducation, transport, logement et médias sont réunis dans un seul hub." },
+    kicker: "SMAJ PI HUB",
+    title: "La couche d’utilité économique de l’écosystème Pi",
+    description:
+      "Achetez, vendez, travaillez et accédez à des services concrets avec une identité Pi vérifiée et un portefeuille Pi.",
+    explore: "Explorer les services",
+    foundationKicker: "LA BASE ÉCONOMIQUE",
+    foundationTitle: "Le commerce et le travail en premier",
+    foundationText:
+      "SMAJ commence avec Store et Jobs pour relier acheteurs, vendeurs, talents et employeurs. Une identité et un portefeuille Pi partagés accompagnent cette économie.",
+    foundationCards: [
+      {
+        title: "SMAJ Store",
+        text: "Découvrez des produits, échangez avec les vendeurs et achetez ou vendez avec Pi.",
+        action: "Explorer Store",
+      },
+      {
+        title: "SMAJ PI Jobs",
+        text: "Trouvez du travail, proposez vos compétences ou recrutez des talents.",
+        action: "Explorer Jobs",
+      },
     ],
-    servicesKicker: "SERVICES SMAJ PI HUB", servicesTitle: "15 services connectés, une direction commune",
-    servicesText: "Comprenez rapidement chaque plateforme, les services actifs et leur place dans le hub Pi.",
-    live: "ACTIF", inProgress: "EN COURS", soon: "BIENTÔT", mvpKicker: "LE MVP COMMENCE ICI",
-    mvpTitle: "SMAJ Store est la première place de marché", mvpText: "Un marché fiable où les utilisateurs trouvent des produits, les vendeurs publient leurs offres et les paiements Pi deviennent pratiques.",
-    viewStore: "Voir le service Store", mvpFeatures: ["Fiches produits", "Chat acheteur/vendeur", "Paiement Pi", "Gestion des litiges", "Avis et notes", "Assistance litiges"],
-    howKicker: "COMMENT ÇA MARCHE", howTitle: "Un parcours simple à suivre",
+    howKicker: "COMMENT SMAJ FONCTIONNE",
+    howTitle: "Un cycle économique autour de Pi",
+    howText:
+      "Connectez-vous, échangez de la valeur et revenez dans une économie en expansion. Les outils de confiance se développent avec le marché.",
     steps: [
-      { title: "Connexion", text: "Connectez-vous avec Pi et accédez à SMAJ PI HUB." }, { title: "Vérification", text: "Les contrôles d’identité et de prestataire renforcent la confiance." },
-      { title: "Choix", text: "Ouvrez le marché, l’emploi, la santé, l’éducation, le logement ou les médias." }, { title: "Utilisation de Pi", text: "Achetez, vendez et accédez aux services avec Pi." },
+      {
+        title: "Identité Pi",
+        text: "Connectez-vous avec Pi.",
+      },
+      {
+        title: "Découvrir",
+        text: "Trouvez des produits ou du travail.",
+      },
+      {
+        title: "Payer",
+        text: "Utilisez le parcours de paiement Pi disponible.",
+      },
+      {
+        title: "Finaliser l’échange",
+        text: "Livrez les biens ou le travail convenu.",
+      },
+      {
+        title: "Renforcer la confiance",
+        text: "Des outils de réputation sont prévus.",
+      },
+      {
+        title: "Recommencer",
+        text: "Revenez pour une nouvelle opportunité.",
+      },
     ],
-    trustKicker: "COUCHE DE CONFIANCE", trustTitle: "Conçu autour d’une participation vérifiée", trustText: "La confiance, la sécurité du marché et l’utilité réelle de Pi restent prioritaires.",
+    trustKicker: "LA CONFIANCE",
+    trustTitle: "Conçu pour un commerce Pi de confiance",
+    trustText:
+      "La connexion Pi est disponible. Les protections supplémentaires du marché sont en développement et indiquées ci-dessous.",
+    planned: "PRÉVU",
     trustFeatures: [
-      { title: "Accès vérifié", text: "L’identité Pi limite les faux participants." }, { title: "Sécurité du marché", text: "Séquestre, avis, notes et assistance structurent le marché." },
-      { title: "Aide par IA", text: "Un assistant aide à trouver les services et les prochaines étapes." }, { title: "Statut clair", text: "Des étiquettes indiquent les services actifs ou planifiés." },
+      {
+        title: "Accès avec une identité Pi",
+        text: "Connectez-vous avec Pi. Un compte ne garantit pas la fiabilité d’un vendeur.",
+      },
+      {
+        title: "Vérification des prestataires",
+        text: "Des contrôles professionnels et commerciaux renforcés sont prévus.",
+      },
+      {
+        title: "Avis et réputation",
+        text: "Des outils supplémentaires d’avis et de réputation sont prévus pour évaluer les échanges passés.",
+      },
+      {
+        title: "Sécurité du marché",
+        text: "Des outils supplémentaires de prévention de la fraude et de suivi sont prévus.",
+      },
+      {
+        title: "Assistance litiges",
+        text: "La gestion des litiges dans la plateforme est prévue. Contactez l’équipe pour obtenir de l’aide.",
+      },
     ],
-    finalTitle: "Une identité Pi. Un portefeuille. Plusieurs services. Une utilité réelle.", readWhitePaper: "Lire le livre blanc",
+    servicesKicker: "UN ÉCOSYSTÈME EN EXPANSION",
+    servicesTitle: "Une économie Pi qui se construit progressivement",
+    servicesText:
+      "Store et Jobs constituent la base initiale. Découvrez les services actifs et les modules en développement. Les statuts indiquent la disponibilité actuelle, sans promettre un lancement simultané.",
+    partnerKicker: "COMMERÇANTS ET PARTENAIRES",
+    partnerTitle: "Construisons une utilité concrète pour Pi",
+    partnerText:
+      "Proposez des produits, des compétences ou un service utile. Échangez avec l’équipe sur la participation des commerçants et les partenariats.",
+    merchantAction: "Collaborer avec nous",
+    partnerAction: "Découvrir les partenariats",
+    resourcesLabel: "Livre blanc et questions fréquentes",
+    readWhitePaper: "Lire le livre blanc",
+    whitePaperText: "Découvrez la stratégie, les étapes et l’architecture à long terme.",
+    faqTitle: "Des questions sur SMAJ ?",
+    faqText: "Découvrez l’accès, les services et le fonctionnement du hub.",
+    finalTitle: "Participez à l’économie Pi",
   },
 } as const;
 
 const footerTranslations = {
-  en: { description: "Built for Pi wallet access, with SMAJ Token utility expanding across the ecosystem.", platform: "Platform", trust: "Trust & Safety", company: "Company", programs: "Programs", affiliate: "Affiliate Program", collaborate: "Collaborate With Us", partners: "Partners", community: "Community", developers: "Developers", keyServices: "Key Services", viewAll: "View All Services", social: "Social", poweredBy: "Powered By SMAJ Ecosystem", privacy: "Privacy Policy", terms: "Terms & Conditions", cookies: "Cookie Policy", reportAbuse: "Report Abuse", sellerAgreement: "Seller Agreement", rights: "All rights reserved.", scrollTop: "Scroll to top" },
-  fr: { description: "Conçu pour le portefeuille Pi et l’utilité croissante du SMAJ Token.", platform: "Plateforme", trust: "Confiance et sécurité", company: "Entreprise", programs: "Programmes", affiliate: "Programme d’affiliation", collaborate: "Collaborer avec nous", partners: "Partenaires", community: "Communauté", developers: "Développeurs", keyServices: "Services principaux", viewAll: "Voir tous les services", social: "Réseaux sociaux", poweredBy: "Propulsé par SMAJ Ecosystem", privacy: "Confidentialité", terms: "Conditions générales", cookies: "Politique des cookies", reportAbuse: "Signaler un abus", sellerAgreement: "Accord vendeur", rights: "Tous droits réservés.", scrollTop: "Retour en haut" },
+  en: {
+    description: "Built for Pi wallet access, with SMAJ Token utility expanding across the ecosystem.",
+    platform: "Platform",
+    trust: "Trust & Safety",
+    company: "Company",
+    programs: "Programs",
+    affiliate: "Affiliate Program",
+    collaborate: "Collaborate With Us",
+    partners: "Partners",
+    community: "Community",
+    developers: "Developers",
+    keyServices: "Key Services",
+    viewAll: "View All Services",
+    social: "Social",
+    poweredBy: "Powered By SMAJ Ecosystem",
+    privacy: "Privacy Policy",
+    terms: "Terms & Conditions",
+    cookies: "Cookie Policy",
+    reportAbuse: "Report Abuse",
+    sellerAgreement: "Seller Agreement",
+    rights: "All rights reserved.",
+    scrollTop: "Scroll to top",
+  },
+  fr: {
+    description: "Conçu pour le portefeuille Pi et l’utilité croissante du SMAJ Token.",
+    platform: "Plateforme",
+    trust: "Confiance et sécurité",
+    company: "Entreprise",
+    programs: "Programmes",
+    affiliate: "Programme d’affiliation",
+    collaborate: "Collaborer avec nous",
+    partners: "Partenaires",
+    community: "Communauté",
+    developers: "Développeurs",
+    keyServices: "Services principaux",
+    viewAll: "Voir tous les services",
+    social: "Réseaux sociaux",
+    poweredBy: "Propulsé par SMAJ Ecosystem",
+    privacy: "Confidentialité",
+    terms: "Conditions générales",
+    cookies: "Politique des cookies",
+    reportAbuse: "Signaler un abus",
+    sellerAgreement: "Accord vendeur",
+    rights: "Tous droits réservés.",
+    scrollTop: "Retour en haut",
+  },
 } as const;
 
 const resources = {
@@ -71,17 +260,7 @@ const resources = {
         login: "Login with Pi",
         signingIn: "Signing in...",
       },
-      home: {
-        ...pageTranslations.en,
-        kicker: "ONE PI IDENTITY. ONE WALLET. MULTIPLE SERVICES.",
-        description:
-          "SMAJ PI HUB connects verified users to marketplace, services, opportunities, and daily digital tools through one Pi identity and one Pi wallet.",
-        explore: "Explore Services",
-        promise: "CLEAR PRODUCT PROMISE",
-        promiseTitle: "One Access Point for Real Pi Utility",
-        promiseText:
-          "The public page explains the platform. The private dashboard becomes the workspace where users actually explore, manage, and use SMAJ services.",
-      },
+      home: { ...pageTranslations.en },
       footer: footerTranslations.en,
       language: {
         label: "Language",
@@ -104,17 +283,7 @@ const resources = {
         login: "Se connecter avec Pi",
         signingIn: "Connexion...",
       },
-      home: {
-        ...pageTranslations.fr,
-        kicker: "UNE IDENTITÉ PI. UN PORTEFEUILLE. PLUSIEURS SERVICES.",
-        description:
-          "SMAJ PI HUB connecte les utilisateurs vérifiés aux marchés, services, opportunités et outils numériques grâce à une identité Pi et un portefeuille Pi.",
-        explore: "Explorer les services",
-        promise: "UNE PROMESSE CLAIRE",
-        promiseTitle: "Un point d’accès unique à l’utilité réelle de Pi",
-        promiseText:
-          "La page publique présente la plateforme. Le tableau de bord privé devient l’espace où les utilisateurs explorent, gèrent et utilisent les services SMAJ.",
-      },
+      home: { ...pageTranslations.fr },
       footer: footerTranslations.fr,
       language: {
         label: "Langue",
@@ -131,7 +300,32 @@ void i18n
   .init({
     resources,
     fallbackLng: "en",
-    supportedLngs: ["en", "af", "ar", "bn", "zh", "cs", "nl", "fr", "de", "ha", "hi", "id", "it", "ja", "ko", "ms", "pt", "ru", "es", "sw", "tr", "ur", "vi", "yo"],
+    supportedLngs: [
+      "en",
+      "af",
+      "ar",
+      "bn",
+      "zh",
+      "cs",
+      "nl",
+      "fr",
+      "de",
+      "ha",
+      "hi",
+      "id",
+      "it",
+      "ja",
+      "ko",
+      "ms",
+      "pt",
+      "ru",
+      "es",
+      "sw",
+      "tr",
+      "ur",
+      "vi",
+      "yo",
+    ],
     nonExplicitSupportedLngs: true,
     load: "languageOnly",
     interpolation: { escapeValue: false },
@@ -142,7 +336,7 @@ void i18n
     },
   });
 
-i18n.on("languageChanged", (language) => {
+i18n.on("languageChanged", language => {
   const code = language.split("-")[0].toLowerCase();
   document.documentElement.lang = language;
   document.documentElement.dir = ["ar", "fa", "he", "ur"].includes(code) ? "rtl" : "ltr";
