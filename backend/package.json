@@ -10,6 +10,7 @@
     "build": "tsc",
     "lint": "tsc --noEmit",
     "start": "ts-node-dev ./src/index.ts",
+    "test:transactions": "node --test tests/liveTransactions.test.cjs",
     "test:validation": "ts-node ./src/tests/storageValidation.test.ts",
     "test:jobs": "ts-node ./src/tests/jobsValidation.test.ts",
     "test:institutions": "node --test tests/institutions.test.cjs",

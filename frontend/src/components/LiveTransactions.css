@@ -1,0 +1,101 @@
+.live-transactions-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.live-transactions-heading h2 {
+  margin: 0;
+  font-size: clamp(22px, 3vw, 32px);
+}
+.live-transactions-badge {
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.live-transactions-description,
+.live-transactions-update {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.live-transactions-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.live-transactions table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.live-transactions th,
+.live-transactions td {
+  padding: 12px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.live-transactions td:first-child {
+  width: 40%;
+}
+.live-transactions code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.live-transactions-verified {
+  color: var(--primary);
+  font-weight: 700;
+}
+.live-transactions-caption {
+  text-align: left;
+  color: var(--muted);
+  padding: 6px 0 12px;
+  font-size: 12px;
+}
+.live-transactions-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .live-transactions thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .live-transactions table,
+  .live-transactions tbody,
+  .live-transactions tr {
+    display: block;
+  }
+  .live-transactions tr {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 10px;
+  }
+  .live-transactions td,
+  .live-transactions td:first-child {
+    display: grid;
+    grid-template-columns: 95px minmax(0, 1fr);
+    gap: 8px;
+    width: auto;
+    border: 0;
+    padding: 5px 2px;
+  }
+  .live-transactions td::before {
+    content: attr(data-label);
+    font-weight: 600;
+  }
+  .live-transactions-caption {
+    display: block;
+  }
+}

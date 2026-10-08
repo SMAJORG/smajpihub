@@ -11,6 +11,7 @@ import MongoStore from "connect-mongo";
 import { MongoClient } from "mongodb";
 import env from "./environments";
 import mountPaymentsEndpoints from "./handlers/payments";
+import mountLiveTransactions from "./handlers/transactions";
 import mountUserEndpoints, { handleSignIn } from "./handlers/users";
 
 // We must import typedefs for ts-node-dev to pick them up when they change (even though tsc would supposedly
@@ -239,6 +240,10 @@ if (env.session_debug) {
 const paymentsRouter = express.Router();
 mountPaymentsEndpoints(paymentsRouter);
 app.use("/payments", paymentsRouter);
+const transactionsRouter = express.Router();
+mountLiveTransactions(transactionsRouter);
+app.use("/api/transactions", transactionsRouter);
+app.use("/transactions", transactionsRouter); // /api-stripping reverse proxies
 
 // User endpoints (e.g signin, signout) under /user:
 const userRouter = express.Router();
@@ -362,6 +367,10 @@ const start = async () => {
       const client = await getMongoClient();
       const db = client.db(dbName);
       app.locals.paymentCollection = db.collection("pi_payments");
+      app.locals.liveTransactionCollection = db.collection("pi_live_testnet_transactions");
+      await app.locals.liveTransactionCollection.createIndex({ transactionId: 1 }, { unique: true });
+      await app.locals.liveTransactionCollection.createIndex({ paymentId: 1 }, { unique: true });
+      await app.locals.liveTransactionCollection.createIndex({ network: 1, verified: 1, time: -1 });
       app.locals.marketplaceOrderCollection = db.collection("orders");
       app.locals.orderDisputeCollection = db.collection("order_disputes");
       app.locals.productCollection = db.collection("products");
@@ -438,6 +447,15 @@ const start = async () => {
       app.locals.quizCollection = db.collection("quizzes");
       app.locals.quizSubmissionCollection = db.collection("quiz_submissions");
       app.locals.certificateCollection = db.collection("certificates");
+      // Read indexes for the isolated homepage verification/backfill worker.
+      await Promise.all([
+        app.locals.marketplaceOrderCollection.createIndex({ paymentStatus: 1, paidAt: -1 }),
+        app.locals.jobBillingCollection.createIndex({ status: 1, paidAt: -1 }),
+        app.locals.transportBookingCollection.createIndex({ paymentStatus: 1, updatedAt: -1 }),
+        app.locals.coursePaymentCollection.createIndex({ status: 1, completed_at: -1 }),
+        app.locals.universityPaymentCollection.createIndex({ status: 1, completed_at: -1 }),
+        app.locals.userCollection.createIndex({ "streamSubscription.paymentStatus": 1, "streamSubscription.startedAt": -1 }),
+      ]);
       await Promise.all([
         app.locals.userCollection.createIndex({ uid: 1 }, { unique: true }),
         app.locals.userCollection.createIndex({ piUsername: 1 }),
