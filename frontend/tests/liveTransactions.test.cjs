@@ -96,7 +96,7 @@ test("honest empty state, Testnet badge, ten-second polling and cleanup", async 
   app.mount();
   await tick();
   assert(app.render().includes("No verified Testnet transactions yet."));
-  assert(app.render().includes("TESTNET"));
+  assert(app.render().includes("Testnet"));
   app.refresh();
   await tick();
   assert.equal(app.called.length, 2);
@@ -120,7 +120,10 @@ test("transaction details, proper table semantics and safe explorer links", asyn
   assert(html.includes("Verified"));
   assert(html.includes("View on Blockchain"));
   assert(html.includes('scope="col"'));
-  assert(html.includes('data-label="Transaction ID"'));
+  assert(html.includes("Transaction</th>"));
+  assert(!html.includes("Completed app payments"));
+  assert(!html.includes("Refreshes every"));
+  assert(!html.includes("Up to 10"));
   assert(html.includes("dateTime=") || html.includes("datetime="));
   assert(!html.includes("b".repeat(64)));
   app.cleanup();
@@ -146,9 +149,11 @@ test("request errors report unavailable rather than fabricate transactions", asy
   assert(!html.includes("private-api-error"));
   app.cleanup();
 });
-test("mobile layout uses labeled, wrapping rows within the existing section", () => {
+test("mobile layout keeps a compact table and inline badge", () => {
   const css = fs.readFileSync(require("node:path").join(__dirname, "../src/components/LiveTransactions.css"), "utf8");
   assert(css.includes("max-width: 600px"));
   assert(css.includes("overflow-wrap: anywhere"));
-  assert(css.includes("attr(data-label)"));
+  assert(css.includes("table-layout: fixed"));
+  assert(css.includes("flex-shrink: 0"));
+  assert(!css.includes("attr(data-label)"));
 });

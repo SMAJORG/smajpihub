@@ -1,59 +1,96 @@
+.public-home-page .public-home-section.live-transactions {
+  background: var(--surface, #fff) !important;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 24px;
+}
 .live-transactions-heading {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
 }
 .live-transactions-heading h2 {
   margin: 0;
-  font-size: clamp(22px, 3vw, 32px);
+  min-width: 0;
+  max-width: 320px;
+  font-size: clamp(22px, 3vw, 28px);
+  line-height: 1.45;
 }
 .live-transactions-badge {
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 800;
+  flex-shrink: 0;
+  color: #854322;
+  background: #fbe8db;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-weight: 500;
 }
-.live-transactions-description,
-.live-transactions-update {
-  color: var(--muted);
-  font-size: 13px;
+.live-transactions .live-transactions-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0;
+  font-size: 16px;
   line-height: 1.5;
+  color: inherit;
+}
+.live-transactions-summary svg {
+  flex-shrink: 0;
+  color: #176c43;
 }
 .live-transactions-table-wrap {
   max-width: 100%;
-  overflow-x: auto;
 }
 .live-transactions table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 16px;
 }
 .live-transactions th,
 .live-transactions td {
-  padding: 12px 10px;
+  padding: 12px 0;
   text-align: left;
   border-bottom: 1px solid var(--border);
-  vertical-align: top;
+  vertical-align: middle;
 }
-.live-transactions td:first-child {
-  width: 40%;
+.live-transactions th {
+  font-weight: 500;
 }
-.live-transactions code {
+.live-transactions th:first-child {
+  width: 42%;
+}
+.live-transactions th:nth-child(2) {
+  width: 27%;
+}
+.live-transactions td:first-child > a,
+.live-transactions td:first-child > span {
+  color: var(--muted);
+  text-decoration: none;
   overflow-wrap: anywhere;
-  font-size: 12px;
+}
+.live-transactions td:first-child > a:hover {
+  text-decoration: underline;
+}
+.live-transactions time {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.live-transactions-amount {
+  overflow-wrap: anywhere;
+  padding-right: 8px !important;
 }
 .live-transactions-verified {
-  color: var(--primary);
-  font-weight: 700;
-}
-.live-transactions-caption {
-  text-align: left;
-  color: var(--muted);
-  padding: 6px 0 12px;
-  font-size: 12px;
+  display: inline-block;
+  color: #167548;
+  background: #daf1e4;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 14px;
+  font-weight: 600;
 }
 .live-transactions-sr-only {
   position: absolute;
@@ -64,38 +101,28 @@
   white-space: nowrap;
 }
 @media (max-width: 600px) {
-  .live-transactions thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+  .public-home-page .public-home-section.live-transactions {
+    padding: 18px;
   }
-  .live-transactions table,
-  .live-transactions tbody,
-  .live-transactions tr {
-    display: block;
+  .live-transactions-heading {
+    gap: 10px;
   }
-  .live-transactions tr {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 10px;
+  .live-transactions-heading h2 {
+    font-size: 22px;
   }
-  .live-transactions td,
-  .live-transactions td:first-child {
-    display: grid;
-    grid-template-columns: 95px minmax(0, 1fr);
+  .live-transactions-badge {
+    font-size: 13px;
+    padding: 3px 10px;
+  }
+  .live-transactions table {
+    font-size: 14px;
+  }
+  .live-transactions .live-transactions-summary {
+    font-size: 14px;
     gap: 8px;
-    width: auto;
-    border: 0;
-    padding: 5px 2px;
   }
-  .live-transactions td::before {
-    content: attr(data-label);
-    font-weight: 600;
-  }
-  .live-transactions-caption {
-    display: block;
+  .live-transactions-verified {
+    font-size: 12px;
+    padding: 3px 8px;
   }
 }

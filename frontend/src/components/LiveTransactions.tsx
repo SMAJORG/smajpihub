@@ -33,7 +33,6 @@ export default function LiveTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     let pending = false;
@@ -58,7 +57,6 @@ export default function LiveTransactions() {
             .slice(0, 10)
         );
         setUnavailable(data.availability === "unavailable");
-        setLastUpdated(new Date().toISOString());
       } catch {
         if (!controller.signal.aborted) setUnavailable(true);
       } finally {
@@ -79,69 +77,78 @@ export default function LiveTransactions() {
     <section className="home-section public-home-section live-transactions" aria-labelledby="live-transactions-title">
       <div className="live-transactions-heading">
         <h2 id="live-transactions-title">SMAJ PI HUB Live Transactions</h2>
-        <span className="live-transactions-badge">TESTNET</span>
+        <span className="live-transactions-badge">Testnet</span>
       </div>
-      <p className="live-transactions-description">
-        Completed app payments verified through Pi Platform. This feed does not include every direct transfer to the app
-        wallet.
+      <p className="live-transactions-summary">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <path d="m5 14 4-4 4 5 6-8" />
+        </svg>
+        Recent verified Test-Pi payments
       </p>
-      <p className="live-transactions-update" role="status">
-        {loading
-          ? "Loading verified Testnet transactions..."
-          : unavailable
-            ? "Live verification is temporarily unavailable. Previously verified records may be shown."
-            : `Refreshes every 10 seconds${lastUpdated ? ` · Updated ${new Date(lastUpdated).toLocaleTimeString()}` : ""}.`}
-      </p>
+      {loading && <p role="status">Loading verified Testnet transactions...</p>}
+      {unavailable && <p role="status">Live verification is temporarily unavailable.</p>}
       {!loading && transactions.length === 0 && <p>No verified Testnet transactions yet.</p>}
       {transactions.length > 0 && (
         <div className="live-transactions-table-wrap">
-          <table>
-            <caption className="live-transactions-caption">
-              Up to 10 latest verified Test-Pi app payments. Time is recorded completion time, or payment creation time
-              when completion time is unavailable.
-            </caption>
+          <table aria-label="Verified Testnet app payments">
             <thead>
               <tr>
-                <th scope="col">Transaction ID</th>
-                <th scope="col">Amount (Test-Pi)</th>
-                <th scope="col">Time</th>
+                <th scope="col">Transaction</th>
+                <th scope="col">Amount</th>
                 <th scope="col">Status</th>
-                <th scope="col">Blockchain</th>
               </tr>
             </thead>
             <tbody>
               {transactions.map(transaction => {
                 const explorer = safeExplorerUrl(transaction.explorerUrl, transaction.transactionId);
+                const shortHash =
+                  transaction.transactionId.slice(0, 6) + "\u2026" + transaction.transactionId.slice(-4);
                 return (
                   <tr key={transaction.transactionId}>
-                    <td data-label="Transaction ID">
-                      <code>{transaction.transactionId}</code>
-                    </td>
-                    <td data-label="Amount (Test-Pi)">
-                      {transaction.amount.toLocaleString(undefined, { maximumFractionDigits: 7 })}
-                    </td>
-                    <td data-label="Time">
+                    <td>
+                      {explorer ? (
+                        <a
+                          href={explorer}
+                          title={transaction.transactionId}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={"View on Blockchain: " + transaction.transactionId}
+                        >
+                          {shortHash}
+                        </a>
+                      ) : (
+                        <span title={transaction.transactionId}>
+                          {shortHash}
+                          <span className="live-transactions-sr-only"> Link unavailable</span>
+                        </span>
+                      )}
                       <time
                         dateTime={transaction.time}
                         title={
                           transaction.timeKind === "completion" ? "Recorded completion time" : "Payment creation time"
                         }
                       >
-                        {new Date(transaction.time).toLocaleString()}
+                        {new Date(transaction.time).toLocaleDateString()}
                       </time>
                     </td>
-                    <td data-label="Status">
-                      <span className="live-transactions-verified">Verified</span>
+                    <td className="live-transactions-amount">
+                      {transaction.amount.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 7,
+                      })}
+                      {" \u03c0"}
                     </td>
-                    <td data-label="Blockchain">
-                      {explorer ? (
-                        <a href={explorer} target="_blank" rel="noopener noreferrer">
-                          View on Blockchain
-                          <span className="live-transactions-sr-only"> for {transaction.transactionId}</span>
-                        </a>
-                      ) : (
-                        <span>Link unavailable</span>
-                      )}
+                    <td>
+                      <span className="live-transactions-verified">Verified</span>
                     </td>
                   </tr>
                 );
