@@ -66,6 +66,15 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
   const [fit, setFit] = useState<"contain" | "cover">("contain");
   const [speed, setSpeed] = useState(1);
 
+  useEffect(() => {
+    const media = mediaRef?.current;
+    if (!media || !Capacitor.isNativePlatform()) return;
+    const update = () => { void SmajMedia.setPictureInPicturePlaying({ playing: !media.paused }).catch(() => undefined); };
+    media.addEventListener("play", update);
+    media.addEventListener("pause", update);
+    return () => { media.removeEventListener("play", update); media.removeEventListener("pause", update); };
+  }, [mediaRef]);
+
   const showControls = useCallback(() => {
     setControlsVisible(true);
     if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);

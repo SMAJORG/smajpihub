@@ -80,6 +80,21 @@ const loadYouTubeApi = () => {
 
 const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFullscreen?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const action = (event: Event) => {
+      const video = videoRef.current;
+      if (!video) return;
+      const control = (event as CustomEvent<string>).detail;
+      if (control === "toggle") { if (video.paused) void video.play().catch(() => undefined); else video.pause(); }
+      else if (control === "back" || control === "forward") video.currentTime = Math.max(0, Math.min(Number.isFinite(video.duration) ? video.duration : Infinity, video.currentTime + (control === "back" ? -10 : 10)));
+    };
+    window.addEventListener("smaj:pip-action", action);
+    return () => {
+      window.removeEventListener("smaj:pip-action", action);
+      document.documentElement.classList.remove("smaj-native-pip");
+    };
+  }, []);
   const youtubeRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
   const cloudflareIframeRef = useRef<HTMLIFrameElement>(null);
@@ -269,7 +284,9 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
     if (!element) return;
     try {
       if (Capacitor.isNativePlatform()) {
-        const result = await SmajMedia.enterPictureInPicture();
+        const stage = element.closest(".sw-player-stage");
+        stage?.classList.add("sw-pip-target");
+        const result = await SmajMedia.enterPictureInPicture({ playing: !element.paused });
         if (!result.entered) throw new Error("Android rejected Picture-in-Picture");
         return;
       }
@@ -278,6 +295,7 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
       else await element.requestPictureInPicture();
     } catch {
+      document.documentElement.classList.remove("smaj-native-pip");
       setMessage("Picture-in-Picture is not available in this Pi Browser or device.");
     }
   };

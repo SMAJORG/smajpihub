@@ -1,6 +1,5 @@
 package com.smajpihub.mobile;
 
-import android.app.PictureInPictureParams;
 import android.content.pm.ActivityInfo;
 import android.app.DownloadManager;
 import android.content.Context;
@@ -12,7 +11,6 @@ import android.provider.MediaStore;
 import java.io.InputStream;
 import java.io.OutputStream;
 import android.os.Build;
-import android.util.Rational;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -34,9 +32,16 @@ public class SmajMediaPlugin extends Plugin {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) { call.reject("Picture-in-Picture requires Android 8 or newer."); return; }
         getActivity().runOnUiThread(() -> {
             try {
-                PictureInPictureParams params = new PictureInPictureParams.Builder().setAspectRatio(new Rational(16, 9)).build();
-                boolean entered = getActivity().enterPictureInPictureMode(params);
-                JSObject result = new JSObject(); result.put("entered", entered); call.resolve(result);
+                MainActivity activity = (MainActivity) getActivity();
+                activity.preparePictureInPicture(() -> {
+                    try {
+                        boolean entered = activity.enterPictureInPictureMode(activity.pipParams(call.getBoolean("playing", true)));
+                        if (!entered) activity.updatePipUi(false);
+                        JSObject result = new JSObject(); result.put("entered", entered); call.resolve(result);
+                    } catch (IllegalStateException | IllegalArgumentException error) {
+                        activity.updatePipUi(false); call.reject("Android could not enter Picture-in-Picture mode.", error);
+                    }
+                });
             } catch (IllegalStateException | IllegalArgumentException error) {
                 call.reject("Android could not enter Picture-in-Picture mode.", error);
             }
@@ -49,6 +54,10 @@ public class SmajMediaPlugin extends Plugin {
         String location = call.getString("location", "app");
         if (!url.startsWith("https://")) { call.reject("A secure download URL is required."); return; }
         try {
+            if ("app".equals(location)) {
+                long id = StreamDownloadService.create(getContext(), url, title);
+                JSObject result = new JSObject(); result.put("downloadId", id); call.resolve(result); return;
+            }
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             request.setTitle(title).setDescription("Downloading in SMAJ Stream").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).setAllowedOverMetered(true).setAllowedOverRoaming(false);
             if ("downloads".equals(location)) request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "SMAJ/" + fileName);
@@ -63,13 +72,27 @@ public class SmajMediaPlugin extends Plugin {
         if (id == null || id < 1) { call.reject("A valid download id is required."); return; }
         try {
             DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
-            manager.remove(id);
+            if (StreamDownloadService.owns(getContext(), id)) StreamDownloadService.delete(getContext(), id);
+            else manager.remove(id);
             JSObject result = new JSObject(); result.put("deleted", true); call.resolve(result);
         } catch (Exception error) { call.reject("The downloaded video could not be deleted.", error); }
     }
     @PluginMethod public void getDownloadStatus(PluginCall call) {
         Long id = readDownloadId(call);
         if (id == null) { call.reject("Download id is required."); return; }
+        if (StreamDownloadService.owns(getContext(), id)) {
+            try {
+                org.json.JSONObject record = StreamDownloadService.read(getContext(), id);
+                JSObject result = new JSObject();
+                long downloaded = record.optLong("downloadedBytes"), total = record.optLong("totalBytes");
+                result.put("status", record.optString("status")); result.put("downloadedBytes", downloaded); result.put("totalBytes", total);
+                result.put("progress", "complete".equals(record.optString("status")) ? 100 : total > 0 ? Math.min(100, Math.round(downloaded * 100f / total)) : 0);
+                result.put("canPause", true); result.put("reason", record.optInt("reason"));
+                if ("complete".equals(record.optString("status"))) result.put("localUri", Uri.fromFile(StreamDownloadService.file(getContext(), id)).toString());
+                call.resolve(result);
+            } catch (Exception error) { call.reject("Download progress is unavailable.", error); }
+            return;
+        }
         DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
         try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(id))) {
             if (!cursor.moveToFirst()) { call.reject("Download was not found."); return; }
@@ -89,10 +112,13 @@ public class SmajMediaPlugin extends Plugin {
         if (id == null) { call.reject("Download id is required."); return; }
         new Thread(() -> {
             DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
-            Uri source = manager.getUriForDownloadedFile(id);
+            boolean managed = StreamDownloadService.owns(getContext(), id);
+            Uri source = managed ? Uri.fromFile(StreamDownloadService.file(getContext(), id)) : manager.getUriForDownloadedFile(id);
+            try { if (managed && !"complete".equals(StreamDownloadService.read(getContext(), id).optString("status"))) { call.reject("Finish downloading before saving."); return; } }
+            catch (Exception error) { call.reject("Download was not found.", error); return; }
             if (source == null) { call.reject("The downloaded movie file was not found."); return; }
-            long total = 0;
-            try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(id))) {
+            long total = managed ? StreamDownloadService.file(getContext(), id).length() : 0;
+            if (!managed) try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(id))) {
                 if (cursor.moveToFirst()) total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
             }
             try {
@@ -110,6 +136,22 @@ public class SmajMediaPlugin extends Plugin {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { ContentValues ready = new ContentValues(); ready.put(MediaStore.Video.Media.IS_PENDING, 0); getContext().getContentResolver().update(destination, ready, null, null); }
                 JSObject result = new JSObject(); result.put("saved", true); result.put("uri", destination.toString()); call.resolve(result);
             } catch (Exception error) { call.reject("The movie could not be saved to phone storage.", error); }
+        }).start();
+    }
+    @PluginMethod public void setPictureInPicturePlaying(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= 26 && getActivity().isInPictureInPictureMode()) getActivity().setPictureInPictureParams(((MainActivity) getActivity()).pipParams(call.getBoolean("playing", true)));
+            call.resolve();
+        });
+    }
+    @PluginMethod public void pauseDownload(PluginCall call) { changeDownload(call, true); }
+    @PluginMethod public void resumeDownload(PluginCall call) { changeDownload(call, false); }
+    private void changeDownload(PluginCall call, boolean pause) {
+        Long id = readDownloadId(call);
+        if (id == null || !StreamDownloadService.owns(getContext(), id)) { call.reject("Pause is available for new app downloads. Existing Android downloads continue normally."); return; }
+        new Thread(() -> {
+            try { if (pause) StreamDownloadService.pause(getContext(), id); else StreamDownloadService.resume(getContext(), id); call.resolve(); }
+            catch (Exception error) { call.reject("Could not " + (pause ? "pause" : "continue") + " this download.", error); }
         }).start();
     }
     private Long readDownloadId(PluginCall call) {

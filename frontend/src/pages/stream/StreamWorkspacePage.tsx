@@ -1,3 +1,4 @@
+import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
 import { getStreamDownloadRecommendations } from "../../lib/streamCatalog";
 import StreamVideoActions from "./StreamVideoActions";
 import StreamSkeleton from "./StreamSkeleton";
@@ -124,10 +125,10 @@ type Title = {
   backdropUrl?: string | null;
   mediaType?: "movie" | "tv";
   overview?: string;
-  downloadStatus?: "pending" | "downloading" | "ready" | "failed";
+  downloadStatus?: "pending" | "downloading" | "paused" | "ready" | "failed";
   downloadProgress?: number;
 };
-type NativeDownloadRecord = { downloadId: number; fileName: string; title: string; status: "preparing" | "downloading" | "complete" | "failed"; progress: number; id?: string; mediaType?: "movie" | "tv"; posterUrl?: string | null; downloadedBytes?: number; totalBytes?: number; updatedAt?: number };
+type NativeDownloadRecord = { downloadId: number; fileName: string; title: string; status: "preparing" | "downloading" | "paused" | "complete" | "failed"; canPause?: boolean; progress: number; id?: string; mediaType?: "movie" | "tv"; posterUrl?: string | null; downloadedBytes?: number; totalBytes?: number; updatedAt?: number };
 const nativeDownloadPrefix = "smaj:stream-download:";
 const nativeDownloadKey = (type: "movie" | "tv", id: string) => `${nativeDownloadPrefix}${type}:${id}`;
 const readNativeDownload = (type: "movie" | "tv", id: string): NativeDownloadRecord | null => {
@@ -160,6 +161,7 @@ const formatDownloadBytes = (value?: number) => {
 const visibleDownloadStatus = (type: "movie" | "tv", id: string, serverStatus?: Title["downloadStatus"]): Title["downloadStatus"] => {
   if (!Capacitor.isNativePlatform()) return serverStatus;
   const local = readNativeDownload(type, id);
+  if (local?.status === "paused") return "paused";
   if (local?.status === "complete") return "ready";
   if (local?.status === "preparing" || local?.status === "downloading") return "downloading";
   return "failed";
@@ -477,6 +479,27 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
   const removedDownloadKeys = useRef(new Set<string>());
+  const [downloadControlsBusy, setDownloadControlsBusy] = useState<Set<string>>(new Set());
+  const toggleDownloadPause = async (item: Title) => {
+    const type = item.mediaType || "movie";
+    const key = type + ":" + item.id;
+    const record = readNativeDownload(type, item.id);
+    if (!record?.canPause || downloadControlsBusy.has(key)) return;
+    setDownloadControlsBusy(current => new Set(current).add(key));
+    try {
+      const paused = record.status === "paused";
+      if (paused) await SmajMedia.resumeDownload({ downloadId: record.downloadId });
+      else await SmajMedia.pauseDownload({ downloadId: record.downloadId });
+      const native = await SmajMedia.getDownloadStatus({ downloadId: record.downloadId });
+      const status = native.status === "complete" ? "complete" : native.status === "paused" ? "paused" : native.status === "failed" ? "failed" : "downloading";
+      writeNativeDownload(type, item.id, { ...record, status, progress: native.progress ?? record.progress, downloadedBytes: native.downloadedBytes ?? record.downloadedBytes, totalBytes: native.totalBytes ?? record.totalBytes });
+      setRemoteTitles(current => current?.map(title => title.id === item.id && (title.mediaType || "movie") === type ? { ...title, downloadStatus: status === "complete" ? "ready" : status } : title) || null);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "This download could not be paused or continued. Please try again.");
+    } finally {
+      setDownloadControlsBusy(current => { const next = new Set(current); next.delete(key); return next; });
+    }
+  };
   const [remoteTitles, setRemoteTitles] = useState<Title[] | null>(null);
   const [channelResults, setChannelResults] = useState<StreamCreatorDirectoryItem[]>([]);
   const [catalogState, setCatalogState] = useState<"loading" | "ready" | "fallback">(() =>
@@ -576,7 +599,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
                     posterUrl: record.posterUrl || server?.posterUrl || null,
                     mediaType,
                     overview: server?.overview,
-                    downloadStatus: record.status === "complete" ? "ready" : record.status === "failed" ? "failed" : "downloading",
+                    downloadStatus: record.status === "complete" ? "ready" : record.status === "failed" ? "failed" : record.status === "paused" ? "paused" : "downloading",
                     downloadProgress: record.progress || 0,
                   });
                 });
@@ -671,12 +694,13 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
       try {
         const records = readAllNativeDownloads();
         await Promise.all(records.map(async record => {
-          if (!record.id || !record.mediaType || record.downloadId < 1 || (record.status !== "downloading" && record.status !== "preparing")) return;
+          if (!record.id || !record.mediaType || record.downloadId < 1 || (record.status !== "downloading" && record.status !== "preparing" && record.status !== "paused")) return;
           try {
             const status = await SmajMedia.getDownloadStatus({ downloadId: record.downloadId });
             writeNativeDownload(record.mediaType, record.id, {
               ...record,
-              status: status.status === "complete" ? "complete" : status.status === "failed" ? "failed" : "downloading",
+              status: status.status === "complete" ? "complete" : status.status === "failed" ? "failed" : status.status === "paused" && status.canPause ? "paused" : "downloading",
+              canPause: status.canPause,
               progress: status.progress,
               downloadedBytes: status.downloadedBytes,
               totalBytes: status.totalBytes,
@@ -701,7 +725,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
               backdropUrl: existing?.backdropUrl,
               mediaType,
               overview: existing?.overview,
-              downloadStatus: record.status === "complete" ? "ready" : record.status === "failed" ? "failed" : "downloading",
+              downloadStatus: record.status === "complete" ? "ready" : record.status === "failed" ? "failed" : record.status === "paused" ? "paused" : "downloading",
               downloadProgress: record.progress || 0,
             });
           });
@@ -727,8 +751,8 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const list = remoteTitles ?? localList;
   const filtered =
     kind === "search" ? list : list.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
-  const downloadingItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus === "downloading") : [];
-  const completedDownloadItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus !== "downloading") : [];
+  const downloadingItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus === "downloading" || item.downloadStatus === "paused") : [];
+  const completedDownloadItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus !== "downloading" && item.downloadStatus !== "paused") : [];
   const deleteDownloadedTitle = async (item: Title) => {
     const mediaType = item.mediaType || "movie";
     const record = readNativeDownload(mediaType, item.id);
@@ -824,8 +848,8 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
               const progress = item.downloadProgress || record?.progress || 0;
               return <article key={`${item.mediaType || "movie"}-${item.id}`}>
                 <Link className="sw-active-download-poster" to={`/app/services/stream/${item.mediaType === "tv" ? "series" : "title"}/${item.id}`} style={item.posterUrl ? { backgroundImage: `url(${item.posterUrl})` } : undefined}>{!item.posterUrl ? item.name.slice(0, 2).toUpperCase() : null}<PlayArrowRoundedIcon /></Link>
-                <div className="sw-active-download-copy"><strong>{item.name}</strong><div className="sw-active-download-track"><i style={{ width: `${progress}%` }} /></div><small>{record?.status === "preparing" ? "Preparing secure download" : `${formatDownloadBytes(record?.downloadedBytes)}${record?.downloadedBytes && record?.totalBytes ? " of " : ""}${formatDownloadBytes(record?.totalBytes)}` || "Downloading"}</small></div>
-                <b>{progress}%</b>
+                <div className="sw-active-download-copy"><strong>{item.name}</strong><div className="sw-active-download-track"><i style={{ width: `${progress}%` }} /></div><small>{record?.status === "paused" ? "Paused - tap to continue" : record?.status === "preparing" ? "Preparing secure download" : `${formatDownloadBytes(record?.downloadedBytes)}${record?.downloadedBytes && record?.totalBytes ? " of " : ""}${formatDownloadBytes(record?.totalBytes)}` || "Downloading"}</small></div>
+                <div><b>{progress}%</b>{record?.canPause ? <button className="sw-download-toggle" type="button" disabled={downloadControlsBusy.has((item.mediaType || "movie") + ":" + item.id)} onClick={() => void toggleDownloadPause(item)} aria-label={record.status === "paused" ? "Continue download" : "Pause download"} title={record.status === "paused" ? "Continue download" : "Pause download"}>{record.status === "paused" ? <PlayArrowRoundedIcon /> : <PauseRoundedIcon />}</button> : null}</div>
               </article>;
             })}
           </section> : null}
@@ -1096,7 +1120,7 @@ const Detail = ({ series = false }: { series?: boolean }) => {
             await new Promise(resolve => window.setTimeout(resolve, 800));
             const progress = await SmajMedia.getDownloadStatus({ downloadId });
             setDownloadProgress(progress.progress);
-            writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, posterUrl: detail.posterUrl, status: "downloading", progress: progress.progress });
+            writeNativeDownload(type, id, { downloadId, fileName, title: detail.title, posterUrl: detail.posterUrl, status: progress.status === "paused" && progress.canPause ? "paused" : "downloading", canPause: progress.canPause, progress: progress.progress, downloadedBytes: progress.downloadedBytes, totalBytes: progress.totalBytes });
             if (progress.status === "complete") break;
             if (progress.status === "failed") throw new Error(`Android download failed (${progress.reason || "unknown"}).`);
           }
