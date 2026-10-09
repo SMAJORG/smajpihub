@@ -77,7 +77,7 @@ const Footer = () => {
         </div>
         <div>
           <h4>{t("footer.social")}</h4>
-          <a href={`mailto:${companyEmail}`}><MailOutlineOutlinedIcon fontSize="small" />{companyEmail}</a>
+          <a href={`mailto:${quickSupportEmail}`}><MailOutlineOutlinedIcon fontSize="small" />{companyEmail}</a>
           <a href={`mailto:${quickSupportEmail}`}><MailOutlineOutlinedIcon fontSize="small" />Quick support: {quickSupportEmail}</a>
           <div className={styles.socialRow} aria-label="Social links">
             <a className={styles.socialIcon} href="https://x.com/smajpihub" aria-label="X" target="_blank" rel="noreferrer">

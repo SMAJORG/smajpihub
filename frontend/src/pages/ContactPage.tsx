@@ -130,7 +130,7 @@ const ContactPage = () => {
               <div>
                 <dt>Email</dt>
                 <dd>
-                  <a href={`mailto:${companyEmail}`}>{companyEmail}</a>
+                  <a href={`mailto:${quickSupportEmail}`}>{companyEmail}</a>
                 </dd>
               </div>
               <div>

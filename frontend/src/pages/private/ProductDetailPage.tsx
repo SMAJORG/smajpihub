@@ -300,7 +300,7 @@ const ProductDetailPage = () => {
               <textarea rows={5} maxLength={300} value={reportReason} onChange={(event) => setReportReason(event.target.value)} required />
             </label>
             <p>
-              You can also email a detailed report to <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.
+              You can also email a detailed report to <a href="mailto:smajpihub@gmail.com">{supportEmail}</a>.
             </p>
             <div className="confirm-modal-actions">
               <button type="button" className="modal-cancel-button" onClick={() => setReportOpen(false)}>Cancel</button>

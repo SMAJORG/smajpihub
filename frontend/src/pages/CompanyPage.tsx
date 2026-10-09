@@ -8,7 +8,7 @@ import RocketLaunchOutlinedIcon from "@mui/icons-material/RocketLaunchOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
 
 const officialLinks = [
-  ["Email", "info@smajpihub.com", "mailto:info@smajpihub.com"],
+  ["Email", "info@smajpihub.com", "mailto:smajpihub@gmail.com"],
   ["X", "@smajpihub", "https://x.com/smajpihub"],
   ["Telegram", "t.me/smajpihub", "https://t.me/smajpihub"],
   ["Instagram", "@smajpihub", "https://instagram.com/smajpihub"],
