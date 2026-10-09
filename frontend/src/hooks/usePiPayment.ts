@@ -40,6 +40,7 @@ export const usePiPayment = () => {
         const recovery = async () => {
           const { data } = await axiosClient.post<{ orderId: string }>("/payments/incomplete", {
             paymentId: payment.identifier,
+            txid: payment.transaction?.txid,
           });
           return data.orderId;
         };
@@ -64,6 +65,12 @@ export const usePiPayment = () => {
       }
       const { data } = await axiosClient.get<{ order: Order }>(`/marketplace/orders/${orderId}`);
       if (data.order.paymentStatus === "paid") {
+        callbacks?.onComplete?.();
+        return;
+      }
+      if (data.order.paymentId && data.order.paymentStatus === "processing") {
+        const { data: recoveredPayment } = await axiosClient.post<{ orderId: string }>("/payments/incomplete", { paymentId: data.order.paymentId });
+        if (recoveredPayment.orderId !== orderId) throw new Error("The recorded payment belongs to another order. Refresh this order before retrying.");
         callbacks?.onComplete?.();
         return;
       }

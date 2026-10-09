@@ -59,8 +59,9 @@ self.addEventListener("push", event => {
   event.waitUntil(
     self.registration.showNotification(data.title || "SMAJ PI HUB", {
       body: data.body || "You have a new notification.",
-      icon: data.icon || "/logo.png",
-      badge: data.badge || "/logo.png",
+      icon: "/logo.png",
+      badge: "/notification-badge.png",
+      image: data.image || (data.icon && data.icon !== "/logo.png" ? data.icon : undefined),
       tag: data.tag,
       data: { url: data.url || "/notifications" },
     })

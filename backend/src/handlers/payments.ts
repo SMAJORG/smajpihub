@@ -80,8 +80,9 @@ export default function mountPaymentsEndpoints(router: Router) {
       if (payment.user_uid !== user.uid) return res.status(403).json({ message: "This Pi payment belongs to a different account." });
       const orderId = String(payment.metadata?.orderId || "");
       if (!ObjectId.isValid(orderId)) return res.status(409).json({ message: "This pending payment belongs to another service. Open that service to finish it before paying for a Store order." });
-      if (!payment.transaction?.txid) return res.status(409).json({ message: "Pi has not recorded a transaction for this payment yet. Check Pi Wallet before retrying." });
-      req.body = { paymentId, orderId, txid: payment.transaction.txid };
+      const txid = payment.transaction?.txid || req.body?.txid;
+      if (typeof txid !== "string" || !txid) return res.status(409).json({ message: "Pi has not recorded a transaction for this payment yet. Check Pi Wallet before retrying." });
+      req.body = { paymentId, orderId, txid };
       return await completePayment(req, res);
     } catch {
       return res.status(502).json({ message: "Could not verify the pending payment with Pi. Please retry shortly." });
@@ -144,21 +145,29 @@ export default function mountPaymentsEndpoints(router: Router) {
       return res.status(400).json({ error: "bad_request", message: "Only pending orders can be completed with payment." });
     }
     const { data: payment } = await platformAPIKeyClient.get(`/v2/payments/${paymentId}`);
-    if (
-      payment.identifier !== paymentId ||
-      payment.direction !== "user_to_app" ||
-      payment.user_uid !== order.buyerId ||
-      String(payment.metadata?.orderId || "") !== order._id.toString() ||
-      !Number.isFinite(Number(payment.amount)) || Number(payment.amount) <= 0 ||
-      !Number.isFinite(Number(order.pricePi)) || Number(order.pricePi) <= 0 ||
-      Math.round(Number(payment.amount) * 1e7) !== Math.round(Number(order.pricePi) * 1e7) ||
-      payment.transaction?.txid !== txid ||
-      payment.status?.cancelled || payment.status?.user_cancelled
-    ) {
-      return res.status(400).json({ error: "bad_request", message: "Pi payment does not match this order and transaction." });
-    }
+    const mismatch = (candidate: any) => {
+      if (candidate?.identifier !== paymentId) return "Pi returned a different payment identifier.";
+      if (candidate.direction !== "user_to_app") return "This is not a payment to this app.";
+      if (candidate.user_uid !== order.buyerId) return "This payment belongs to a different Pi account.";
+      if (String(candidate.metadata?.orderId || "") !== order._id.toString()) return "This payment belongs to a different order. Resume its original order.";
+      if (!Number.isFinite(Number(order.pricePi)) || Number(order.pricePi) <= 0) return "This order has no valid Pi payment price. Refresh the order or contact support.";
+      if (!Number.isFinite(Number(candidate.amount)) || Number(candidate.amount) <= 0 || Math.round(Number(candidate.amount) * 1e7) !== Math.round(Number(order.pricePi) * 1e7)) return "The Pi payment amount differs from this order's total. Check the original order before paying again.";
+      if (candidate.transaction?.txid && candidate.transaction.txid !== txid) return "The transaction hash differs from the transaction recorded by Pi.";
+      if (candidate.status?.cancelled || candidate.status?.user_cancelled) return "Pi reports that this payment was cancelled.";
+      return null;
+    };
+    const problem = mismatch(payment);
+    if (problem) return res.status(400).json({ error: "payment_mismatch", message: problem });
 
-    await platformAPIKeyClient.post(`/v2/payments/${paymentId}/complete`, { txid });
+    // /complete validates the SDK hash at Pi; an earlier GET can lack transaction data.
+    const completed = payment.status?.developer_completed === true ? payment :
+      (await platformAPIKeyClient.post(`/v2/payments/${paymentId}/complete`, { txid })).data;
+    const confirmed = completed?.identifier ? completed : (await platformAPIKeyClient.get(`/v2/payments/${paymentId}`)).data;
+    const confirmedProblem = mismatch(confirmed);
+    if (confirmedProblem) return res.status(400).json({ error: "payment_mismatch", message: confirmedProblem });
+    if (confirmed.transaction?.txid !== txid || confirmed.transaction?.verified !== true || confirmed.status?.transaction_verified !== true || confirmed.status?.developer_completed !== true) {
+      return res.status(409).json({ error: "verification_pending", message: "Pi has not confirmed completion yet. Check Pi Wallet and retry Continue Payment; do not make another payment." });
+    }
 
     await req.app.locals.marketplaceOrderCollection.updateOne(
       { _id: order._id },

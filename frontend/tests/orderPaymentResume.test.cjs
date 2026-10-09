@@ -9,6 +9,7 @@ const code = ts.transpileModule(source, {
 }).outputText;
 function setup({
   available = true,
+  existingPayment = false,
   incomplete,
   recoveryFails = false,
   incompleteAtCreate = false,
@@ -45,7 +46,7 @@ function setup({
       axiosClient: {
         get: async url => {
           requests.push(["get", url]);
-          return { data: { order: { status: "pending", pricePi: 3 } } };
+          return { data: { order: { status: "pending", pricePi: 3, ...(existingPayment ? { paymentId: "payment-1", paymentStatus: "processing" } : {}) } } };
         },
         post: async (url, body) => {
           requests.push(["post", url, body]);
@@ -127,7 +128,7 @@ const serverSource = fs.readFileSync(
 const serverCode = ts.transpileModule(serverSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-async function completePayment({ mismatch, alreadyPaid = false, rounded = false, recovery = false } = {}) {
+async function completePayment({ mismatch, alreadyPaid = false, rounded = false, recovery = false, delayedTransaction = false, unverified = false, confirmedMismatch = false, piAlreadyCompleted = false } = {}) {
   const order = {
     _id: new ObjectId(),
     buyerId: "buyer",
@@ -158,6 +159,8 @@ async function completePayment({ mismatch, alreadyPaid = false, rounded = false,
   if (mismatch === "amount") payment.amount = 1;
   if (mismatch === "txid") payment.transaction.txid = "other-tx";
   if (mismatch === "cancelled") payment.status.cancelled = true;
+  if (delayedTransaction) payment.transaction = null;
+  if (piAlreadyCompleted) { payment.status = { developer_completed: true, transaction_verified: true }; payment.transaction.verified = true; }
   let updates = 0,
     completions = 0,
     apiReads = 0,
@@ -173,6 +176,7 @@ async function completePayment({ mismatch, alreadyPaid = false, rounded = false,
         },
         post: async () => {
           completions++;
+          return { data: { ...payment, transaction: { txid: confirmedMismatch ? "wrong-tx" : "tx-1", verified: !unverified }, status: { developer_completed: true, transaction_verified: !unverified } } };
         },
       },
     },
@@ -273,4 +277,39 @@ test("submitted payment in SDK error details recovers even without the discovery
   await app.payOrder("order-1", 3, { onComplete: () => complete++ });
   assert.equal(complete, 1);
   assert.equal(app.requests.filter(r => r[1] === "/payments/incomplete").length, 1);
+});
+
+test("a transaction absent from the initial lookup is verified through Pi completion", async () => {
+  const result = await completePayment({ delayedTransaction: true });
+  assert.equal(result.response.status, 200); assert.equal(result.updates, 1);
+});
+test("unverified Pi completion cannot mark an order paid", async () => {
+  const result = await completePayment({ unverified: true });
+  assert.equal(result.response.status, 409); assert.equal(result.updates, 0);
+});
+test("a mismatched completed transaction cannot mark an order paid", async () => {
+  const result = await completePayment({ confirmedMismatch: true });
+  assert.equal(result.response.status, 400); assert.equal(result.updates, 0);
+});
+
+test("a payment already completed by Pi repairs the order without re-completing at Pi", async () => {
+  const result = await completePayment({ piAlreadyCompleted: true });
+  assert.equal(result.response.status, 200); assert.equal(result.updates, 1); assert.equal(result.completions, 0);
+});
+test("an order with a recorded pending payment recovers before opening another wallet payment", async () => {
+  const app = setup({ existingPayment: true }); let completed = 0;
+  await app.payOrder("order-1", 3, { onComplete: () => completed++ });
+  assert.equal(completed, 1); assert.equal(app.opened(), 0);
+});
+test("a failed recorded payment recovery cannot create a second payment", async () => {
+  const app = setup({ existingPayment: true, recoveryFails: true }); let error;
+  await app.payOrder("order-1", 3, { onError: message => { error = message; } });
+  assert.equal(error, "Recovery failed"); assert.equal(app.opened(), 0);
+});
+
+test("incomplete recovery verifies the SDK hash when the Pi lookup has no transaction yet", async () => {
+  const result = await completePayment({ recovery: true, delayedTransaction: true });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.updates, 1);
+  assert.equal(result.completions, 1);
 });

@@ -15,8 +15,9 @@ export const createNotification = async (app: any, input: NotificationInput) => 
     await sendPushNotification(app, input.userId, {
       title: input.title,
       body: input.message,
-      icon: input.image || "/logo.png",
-      badge: "/logo.png",
+      icon: "/logo.png",
+      badge: "/notification-badge.png",
+      image: input.image || undefined,
       url: input.relatedId === "messages" || input.type.includes("message")
         ? "/messages"
         : input.relatedId && (input.type.includes("order") || input.type.includes("payment"))

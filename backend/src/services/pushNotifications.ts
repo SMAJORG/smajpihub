@@ -63,7 +63,8 @@ const sendNativePushNotification = async (app: any, userId: string, payload: Rec
   const title = String(payload.title || "SMAJ PI HUB");
   const body = String(payload.body || "You have a new notification.");
   const path = String(payload.path || payload.url || "/notifications");
-  const imageUrl = typeof payload.icon === "string" && /^https:\/\//.test(payload.icon) ? payload.icon : undefined;
+  const image = payload.image || payload.icon;
+  const imageUrl = typeof image === "string" && /^https:\/\//.test(image) ? image : undefined;
   const data = { path, url: path, type: String(payload.type || "notification") };
 
   await Promise.all(records.map(async (record) => {
@@ -75,7 +76,7 @@ const sendNativePushNotification = async (app: any, userId: string, payload: Rec
         android: {
           priority: "high",
           ttl: 24 * 60 * 60 * 1000,
-          notification: { channelId: "smaj_notifications", sound: "default" },
+          notification: { channelId: "smaj_notifications", sound: "default", icon: "ic_stat_smaj", color: "#08768b" },
         },
       });
     } catch (error: any) {
