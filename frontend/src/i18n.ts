@@ -10,17 +10,16 @@ const pageTranslations = {
     explore: "Explore Services",
     foundationKicker: "THE ECONOMIC FOUNDATION",
     foundationTitle: "Commerce and Work Come First",
-    foundationText:
-      "SMAJ starts with Store and Jobs: connecting buyers, sellers, talent, and employers. A shared Pi identity and wallet support the experience as the economy grows.",
+    foundationText: "Buy, sell, and find work with Pi.",
     foundationCards: [
       {
         title: "SMAJ Store",
-        text: "Discover products, connect with sellers, and buy or sell with Pi.",
+        text: "Buy and sell products with Pi.",
         action: "Explore Store",
       },
       {
         title: "SMAJ PI Jobs",
-        text: "Find work, offer your skills, or connect your business with talent.",
+        text: "Find work or hire talent.",
         action: "Explore Jobs",
       },
     ],
@@ -56,29 +55,28 @@ const pageTranslations = {
     ],
     trustKicker: "THE TRUST LAYER",
     trustTitle: "Built for Trusted Pi Commerce",
-    trustText:
-      "Pi sign-in is available today. Enhanced marketplace protections remain development priorities; planned features are labeled below.",
+    trustText: "Pi sign-in is live. Additional protections are planned.",
     planned: "PLANNED",
     trustFeatures: [
       {
         title: "Pi Identity Access",
-        text: "Sign in through Pi. Account access alone does not guarantee seller reliability.",
+        text: "Pi sign-in; seller reliability is not guaranteed.",
       },
       {
-        title: "Seller and Provider Verification",
-        text: "Enhanced business and professional checks are planned.",
+        title: "Seller Verification",
+        text: "Business and provider checks.",
       },
       {
-        title: "Ratings and Reputation",
-        text: "Expanded review and reputation tools are planned to help participants assess past exchanges.",
+        title: "Ratings & Reputation",
+        text: "Reviews and reputation tools.",
       },
       {
         title: "Marketplace Safety",
-        text: "Additional fraud-prevention and activity-monitoring tools are planned.",
+        text: "Fraud prevention and monitoring.",
       },
       {
         title: "Dispute Support",
-        text: "In-platform dispute workflows are planned. Contact the team for current support.",
+        text: "Dispute tools; contact us for current support.",
       },
     ],
     servicesKicker: "EXPANDING SERVICE ECOSYSTEM",

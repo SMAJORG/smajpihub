@@ -176,7 +176,7 @@ const HomePage = () => {
 
         <LiveTransactions />
 
-        <section className="home-section public-home-section" aria-labelledby="trust-title">
+        <section className="home-section public-home-section public-home-trust" aria-labelledby="trust-title">
           <div className="home-section-head public-home-section-head">
             <span className="home-kicker">{t("home.trustKicker")}</span>
             <h2 id="trust-title">{t("home.trustTitle")}</h2>
@@ -187,8 +187,10 @@ const HomePage = () => {
               <article key={index} className="home-trust-card public-home-commerce-trust-card">
                 <Icon aria-hidden="true" />
                 <div>
-                  <h3>{t(`home.trustFeatures.${index}.title`)}</h3>
-                  {index > 0 && <span className="public-home-planned-label">{t("home.planned")}</span>}
+                  <div className="public-home-trust-card-heading">
+                    <h3>{t(`home.trustFeatures.${index}.title`)}</h3>
+                    {index > 0 && <span className="public-home-planned-label">{t("home.planned")}</span>}
+                  </div>
                   <p>{t(`home.trustFeatures.${index}.text`)}</p>
                 </div>
               </article>
