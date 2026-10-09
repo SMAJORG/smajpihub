@@ -3047,8 +3047,7 @@ html.sw-player-is-fullscreen body { overflow: hidden; }
 }
 .sw-detail-page .sw-seasons > h2,
 .sw-detail-page .sw-related > h2 { margin: 0 0 18px; font-size: 24px; }
-.sw-detail-page .sw-seasons > div,
-.sw-detail-page .sw-related > div {
+.sw-detail-page .sw-seasons > div {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(180px, 220px);
@@ -3063,7 +3062,18 @@ html.sw-player-is-fullscreen body { overflow: hidden; }
 .sw-detail-page .sw-seasons > div > * { min-width: 0; scroll-snap-align: start; }
 .sw-detail-page .sw-seasons > div { grid-auto-columns: minmax(210px, 260px); }
 .sw-detail-page .sw-seasons article { min-width: 0; }
+.sw-detail-page .sw-related > div {
+  display: grid;
+  grid-auto-flow: row;
+  grid-auto-columns: auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  overflow: visible;
+}
 .sw-detail-page .sw-related .sw-title-card { min-width: 0; width: 100%; }
+@media (max-width: 640px) {
+  .sw-detail-page .sw-related > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .sw-player-page .sw-player-close {
   left: max(16px, env(safe-area-inset-left)) !important;
   right: auto !important;
@@ -3084,7 +3094,6 @@ html.sw-player-is-fullscreen body { overflow: hidden; }
 .sw-player-stage .sw-player-back-fullscreen { grid-column: 1; justify-self: start; }
 .sw-player-stage .sw-player-fullscreen-pip { grid-column: 5; justify-self: end; }
 @media (max-width: 600px) {
-  .sw-detail-page .sw-related > div { grid-auto-columns: minmax(150px, 42vw); }
   .sw-detail-page .sw-seasons > h2,
   .sw-detail-page .sw-related > h2 { font-size: 22px; }
 }

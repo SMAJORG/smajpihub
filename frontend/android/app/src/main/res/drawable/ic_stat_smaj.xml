@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome SPI silhouette for Android's notification mask. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M10.5,4H7C0.5,4 0,11.5 6,13.5L8,14.2C11,15.2 10.5,18 7.2,18H2.5V21H7.5C14.5,21 15,13.5 9,11.5L6.5,10.6C3.7,9.6 4,7 7,7H10.5Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M11.5,4H14C22,4 22,16 14.2,16H14V21H11V13H14C18.2,13 18.2,7 14,7H11.5Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M21,4H24V21H21Z" />
+</vector>

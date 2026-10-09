@@ -90,6 +90,9 @@ export const scheduleNativeReminder = async (options: { id: number; title: strin
       title: options.title,
       body: options.body,
       schedule: { at: options.at },
+      smallIcon: "ic_stat_smaj",
+      largeIcon: "smaj_notification_logo",
+      iconColor: "#08768b",
       extra: options.extra,
     }],
   });

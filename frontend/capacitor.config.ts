@@ -7,6 +7,7 @@ const config: CapacitorConfig = {
   server: { androidScheme: "https", hostname: "smajpihub.com" },
   android: { allowMixedContent: false, backgroundColor: "#f2f2f2" },
   plugins: {
+    LocalNotifications: { smallIcon: "ic_stat_smaj", iconColor: "#08768b" },
     StatusBar: {
       overlaysWebView: false,
       style: "DARK",

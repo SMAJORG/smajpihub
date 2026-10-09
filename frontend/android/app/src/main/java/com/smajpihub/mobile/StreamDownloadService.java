@@ -62,7 +62,7 @@ public class StreamDownloadService extends Service {
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(new NotificationChannel("stream-downloads", "Stream downloads", NotificationManager.IMPORTANCE_LOW));
         Notification.Builder n = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, "stream-downloads") : new Notification.Builder(this);
-        startForeground(2401, n.setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("SMAJ Stream").setContentText("Downloading videos. Pause or continue in Downloads.").setOngoing(true).build());
+        startForeground(2401, n.setSmallIcon(R.drawable.ic_stat_smaj).setLargeIcon(android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.smaj_notification_logo)).setColor(android.graphics.Color.rgb(8, 118, 139)).setContentTitle("SMAJ Stream").setContentText("Downloading videos. Pause or continue in Downloads.").setOngoing(true).build());
         long id = intent != null ? intent.getLongExtra("downloadId", 0) : 0;
         if (id < 1 || active.containsKey(id)) { if (active.isEmpty()) stopSelf(); return START_NOT_STICKY; }
         try { if (!"pending".equals(read(this, id).optString("status"))) { if (active.isEmpty()) stopSelf(); return START_NOT_STICKY; } } catch (Exception error) { if (active.isEmpty()) stopSelf(); return START_NOT_STICKY; }
