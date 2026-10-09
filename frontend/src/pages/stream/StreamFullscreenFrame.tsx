@@ -1,4 +1,5 @@
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import PictureInPictureAltRoundedIcon from "@mui/icons-material/PictureInPictureAltRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { Capacitor } from "@capacitor/core";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
@@ -39,6 +40,7 @@ type Props = {
   castSupported?: boolean;
   seekBy?: (offset: number) => void;
   autoFullscreen?: boolean;
+  onPictureInPicture?: () => void;
 };
 
 const formatTime = (value: number) => {
@@ -51,7 +53,7 @@ const formatTime = (value: number) => {
   return hours ? `${hours}:${minutes.toString().padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
 };
 
-const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSupported = false, seekBy, autoFullscreen = false }: Props) => {
+const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSupported = false, seekBy, autoFullscreen = false, onPictureInPicture }: Props) => {
   const frameRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | null>(null);
   const nativeFullscreenRef = useRef(false);
@@ -257,7 +259,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
             toggleControls();
           }}
         >
-          {fullscreen ? <div className="sw-player-controls-top">
+          {fullscreen ? <div className={"sw-player-controls-top" + (onPictureInPicture ? " has-pip" : "")}>
             <button
               className="sw-player-back-fullscreen"
               type="button"
@@ -273,6 +275,7 @@ const StreamFullscreenFrame = ({ title, className, children, mediaRef, castSuppo
             <button type="button" onClick={changeSpeed} aria-label="Playback settings">
               <SettingsRoundedIcon />
             </button>
+            {onPictureInPicture ? <button className="sw-player-fullscreen-pip" type="button" onClick={onPictureInPicture} aria-label="Picture in Picture"><PictureInPictureAltRoundedIcon /></button> : null}
           </div> : null}
           {mediaRef || seekBy ? (
             <div className="sw-player-controls-center">

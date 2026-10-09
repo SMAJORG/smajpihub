@@ -347,7 +347,7 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
     );
   return (
     <section className="sw-watch real">
-      <StreamFullscreenFrame className="sw-real-player" title={video.title} mediaRef={videoRef} autoFullscreen={autoFullscreen}>
+      <StreamFullscreenFrame className="sw-real-player" title={video.title} mediaRef={videoRef} autoFullscreen={autoFullscreen} onPictureInPicture={() => void enterPictureInPicture()}>
         <video
           ref={videoRef}
           autoPlay

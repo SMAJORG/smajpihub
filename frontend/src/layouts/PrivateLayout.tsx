@@ -26,7 +26,7 @@ import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutl
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import LiveTvOutlinedIcon from "@mui/icons-material/LiveTvOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
 import { axiosClient } from "../lib/axiosClient";
 import ConfirmSignOutModal from "../components/ConfirmSignOutModal";
@@ -474,7 +474,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       </div>
       {!fullScreen && !isStreamImmersive ? <nav className="mobile-bottom-nav" aria-label="Mobile private navigation">
         {(isStreamShell ? [
-          { to: "/app/services/stream", label: "Home", icon: <PlayArrowRoundedIcon /> },
+          { to: "/app/services/stream", label: "Home", icon: <HomeOutlinedIcon /> },
           { to: "/app/services/stream/search", label: "Browse", icon: <SearchOutlinedIcon /> },
           { to: "/app/services/stream/live/now", label: "Live", icon: <LiveTvOutlinedIcon /> },
           { to: "/app/services/stream/downloads", label: "Downloads", icon: <DownloadOutlinedIcon /> },
@@ -483,6 +483,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           <NavLink
             key={tab.to}
             to={tab.to}
+            end={isStreamShell && tab.to === "/app/services/stream"}
             data-tour={tab.label.toLowerCase()}
           >
             {tab.icon}
