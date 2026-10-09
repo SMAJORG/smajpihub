@@ -1350,8 +1350,8 @@ const Detail = ({ series = false }: { series?: boolean }) => {
           aria-label={`${detail.title} trailer`}
           onMouseDown={event => event.target === event.currentTarget && closeTrailer()}
         >
-          <button type="button" onClick={closeTrailer} aria-label="Close trailer">
-            <CloseRoundedIcon />
+          <button type="button" onClick={closeTrailer} aria-label="Back from trailer">
+            <ArrowBackRoundedIcon />
           </button>
           {!trailerLoaded ? <span className="sw-trailer-spinner" role="status" aria-label="Loading trailer" /> : null}
           <iframe
@@ -1550,7 +1550,7 @@ const Player = ({ live = false }: { live?: boolean }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   return (
-    <div className="sw-fullscreen-player-shell">
+    <div className={"sw-fullscreen-player-shell" + (live || id?.startsWith("yt-") ? " sw-embedded-player-shell" : "")}>
       <button className="sw-player-close" type="button" onClick={() => navigate(-1)} aria-label="Back">
         <ArrowBackRoundedIcon />
       </button>

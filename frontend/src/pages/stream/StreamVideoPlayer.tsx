@@ -365,7 +365,7 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
     );
   return (
     <section className="sw-watch real">
-      <StreamFullscreenFrame className="sw-real-player" title={video.title} mediaRef={videoRef} autoFullscreen={autoFullscreen} onPictureInPicture={() => void enterPictureInPicture()}>
+      <StreamFullscreenFrame className="sw-real-player" title={video.title} mediaRef={videoRef} autoFullscreen={autoFullscreen} onPictureInPicture={Capacitor.isNativePlatform() ? () => void enterPictureInPicture() : undefined}>
         <video
           ref={videoRef}
           autoPlay
@@ -376,7 +376,7 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
           onPause={() => persist()}
           onEnded={() => persist(true)}
         />
-        <div className="sw-player-screen-actions">
+        {Capacitor.isNativePlatform() ? <div className="sw-player-screen-actions">
           <button
             className="sw-player-pip"
             type="button"
@@ -386,7 +386,7 @@ const StreamVideoPlayer = ({ id, autoFullscreen = false }: { id: string; autoFul
           >
             <PictureInPictureAltRoundedIcon />
           </button>
-        </div>
+        </div> : null}
         <span className="sw-licensed-badge">AUTHORIZED STREAM</span>
         {message ? <p className="sw-player-warning">{message}</p> : null}
       </StreamFullscreenFrame>
