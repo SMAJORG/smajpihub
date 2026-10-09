@@ -286,3 +286,60 @@ test("public GET endpoint returns only verified snapshots; memory DB is unavaila
     await new Promise((r) => server.close(r));
   }
 });
+
+test("recover completed payments without local hash or paid status across app sources", async () => {
+  const collections = [
+    "marketplaceOrderCollection",
+    "jobBillingCollection",
+    "transportBookingCollection",
+    "coursePaymentCollection",
+    "universityPaymentCollection",
+  ];
+  const locals = { liveTransactionCollection: new MemoryCollection() };
+  collections.forEach((name, i) => {
+    locals[name] = new MemoryCollection(
+      Array.from({ length: 3 }, (_, j) => ({
+        _id: new ObjectId(),
+        paymentId: "recover-" + i + "-" + j,
+        pi_payment_identifier: "recover-" + i + "-" + j,
+        paymentStatus: "processing",
+        status: "pending",
+      })),
+    );
+  });
+  locals.paymentCollection = new MemoryCollection([{ _id: new ObjectId(), identifier: "recover-5-0" }]);
+  let calls = 0;
+  const feed = new LiveTransactionFeed(locals, {
+    get: async (url) => {
+      const id = url.split("/").pop();
+      const index = Number(id.split("-")[1]) * 3 + Number(id.split("-")[2]);
+      calls++;
+      return {
+        data: {
+          ...payment(),
+          identifier: id,
+          transaction: {
+            verified: true,
+            txid: index.toString(16).padStart(64, "0"),
+          },
+        },
+      };
+    },
+  });
+  await feed.refresh();
+  assert.equal(calls, 16);
+  assert.equal(await locals.liveTransactionCollection.countDocuments(), 16);
+  assert.equal((await feed.latest()).length, 10);
+  assert(
+    (await feed.latest()).every((row) => row.timeKind === "payment-created"),
+  );
+});
+test("missing local hash never weakens completion verification", () => {
+  assert(verifiedTestnetPayment(payment(), { ...candidate, txid: undefined }));
+  const incomplete = payment();
+  incomplete.status.developer_completed = false;
+  assert.equal(
+    verifiedTestnetPayment(incomplete, { ...candidate, txid: undefined }),
+    null,
+  );
+});

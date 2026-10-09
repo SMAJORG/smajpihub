@@ -359,6 +359,13 @@ export default function mountMarketplaceEndpoints(router: Router) {
       { $inc: { quantity: -quantity }, $set: { updatedAt: new Date() } },
     );
     if (!reservation.modifiedCount) {
+      // Resume this buyer's existing unpaid reservation if it holds the stock.
+      const reservedOrder = await req.app.locals.marketplaceOrderCollection.findOne({
+        buyerId: user.uid, productId, quantity, status: "pending",
+        paymentStatus: { $in: ["pending", "processing", "failed", "cancelled"] },
+        inventoryReserved: true, inventoryReleased: { $ne: true },
+      });
+      if (reservedOrder) return res.status(200).json({ order: serialize(reservedOrder) });
       return res.status(409).json({ error: "out_of_stock", message: "The requested quantity is no longer available" });
     }
     const unitPricePi = Number(withResolvedPiPrice(product).pricePi);

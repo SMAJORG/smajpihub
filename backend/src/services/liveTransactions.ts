@@ -11,7 +11,7 @@ export type LiveTransaction = {
 };
 type Candidate = {
   paymentId: string;
-  txid: string;
+  txid?: string;
   amount?: number;
   time?: string | Date;
 };
@@ -23,9 +23,23 @@ type Source = {
 };
 const sources: Source[] = [
   {
+    collection: "paymentCollection",
+    timeField: "created_at",
+    query: {
+      $or: [
+        { paymentId: { $exists: true, $ne: null } },
+        { identifier: { $exists: true, $ne: null } },
+      ],
+    },
+    read: (r) => ({
+      paymentId: r.paymentId || r.identifier,
+      txid: r.paymentTxid || r.transaction?.txid,
+    }),
+  },
+  {
     collection: "marketplaceOrderCollection",
     timeField: "paidAt",
-    query: { paymentStatus: "paid" },
+    query: { paymentId: { $exists: true, $ne: null } },
     read: (r) => ({
       paymentId: r.paymentId,
       txid: r.paymentTxid,
@@ -36,7 +50,7 @@ const sources: Source[] = [
   {
     collection: "jobBillingCollection",
     timeField: "paidAt",
-    query: { status: "paid" },
+    query: { paymentId: { $exists: true, $ne: null } },
     read: (r) => ({
       paymentId: r.paymentId,
       txid: r.paymentTxid,
@@ -46,7 +60,7 @@ const sources: Source[] = [
   {
     collection: "transportBookingCollection",
     timeField: "updatedAt",
-    query: { paymentStatus: "paid" },
+    query: { paymentId: { $exists: true, $ne: null } },
     read: (r) => ({
       paymentId: r.paymentId,
       txid: r.paymentTxid,
@@ -56,7 +70,7 @@ const sources: Source[] = [
   {
     collection: "coursePaymentCollection",
     timeField: "completed_at",
-    query: { status: "paid" },
+    query: { pi_payment_identifier: { $exists: true, $ne: null } },
     read: (r) => ({
       paymentId: r.pi_payment_identifier,
       txid: r.transaction_identifier,
@@ -67,7 +81,7 @@ const sources: Source[] = [
   {
     collection: "universityPaymentCollection",
     timeField: "completed_at",
-    query: { status: "paid" },
+    query: { pi_payment_identifier: { $exists: true, $ne: null } },
     read: (r) => ({
       paymentId: r.pi_payment_identifier,
       txid: r.transaction_identifier,
@@ -78,12 +92,15 @@ const sources: Source[] = [
   {
     collection: "userCollection",
     timeField: "streamSubscription.startedAt",
-    query: { "streamSubscription.paymentStatus": "paid" },
+    query: { "streamSubscription.paymentId": { $exists: true, $ne: null } },
     read: (r) => ({
       paymentId: r.streamSubscription?.paymentId,
       txid: r.streamSubscription?.paymentTxid,
       amount: r.streamSubscription?.pricePi,
-      time: r.streamSubscription?.startedAt,
+      time:
+        r.streamSubscription?.paymentStatus === "paid"
+          ? r.streamSubscription?.startedAt
+          : undefined,
     }),
   },
 ];
@@ -132,7 +149,9 @@ export function verifiedTestnetPayment(
     tx?.verified !== true ||
     typeof tx?.txid !== "string" ||
     !/^[a-f0-9]{64}$/i.test(tx.txid) ||
-    tx.txid !== candidate.txid ||
+    (candidate.txid != null &&
+      candidate.txid !== "" &&
+      tx.txid !== candidate.txid) ||
     typeof amount !== "number" ||
     !Number.isFinite(amount) ||
     amount <= 0 ||
@@ -192,6 +211,8 @@ export class LiveTransactionFeed {
         const collection = this.locals[source.collection];
         if (!collection) continue;
         const projection: Record<string, number> = {
+          identifier: 1,
+          transaction: 1,
           paymentId: 1,
           paymentTxid: 1,
           pricePi: 1,
@@ -232,8 +253,10 @@ export class LiveTransactionFeed {
               (c) =>
                 typeof c.paymentId === "string" &&
                 /^[a-z0-9_-]{1,200}$/i.test(c.paymentId) &&
-                typeof c.txid === "string" &&
-                /^[a-f0-9]{64}$/i.test(c.txid),
+                (c.txid == null ||
+                  c.txid === "" ||
+                  (typeof c.txid === "string" &&
+                    /^[a-f0-9]{64}$/i.test(c.txid))),
             )
             .map((c) => [c.paymentId, c]),
         ).values(),
