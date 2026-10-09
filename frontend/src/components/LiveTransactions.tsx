@@ -139,13 +139,24 @@ export default function LiveTransactions() {
                       >
                         {new Date(transaction.time).toLocaleDateString()}
                       </time>
+                      {explorer ? (
+                        <a
+                          className="live-transactions-explorer"
+                          href={explorer}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={"View transaction on Pi Testnet Explorer: " + transaction.transactionId}
+                        >
+                          Explorer ↗
+                        </a>
+                      ) : null}
                     </td>
                     <td className="live-transactions-amount">
                       {transaction.amount.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 7,
                       })}
-                      {" \u03c0"}
+                      {"\u00a0\u03c0"}
                     </td>
                     <td>
                       <span className="live-transactions-verified">Verified</span>

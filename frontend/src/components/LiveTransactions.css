@@ -41,10 +41,11 @@
 }
 .live-transactions-table-wrap {
   max-width: 100%;
+  overflow-x: auto;
 }
 .live-transactions table {
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
   border-collapse: collapse;
   font-size: 16px;
 }
@@ -80,7 +81,8 @@
   color: var(--muted);
 }
 .live-transactions-amount {
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
   padding-right: 8px !important;
 }
 .live-transactions-verified {
@@ -125,4 +127,14 @@
     font-size: 12px;
     padding: 3px 8px;
   }
+}
+
+.live-transactions td:first-child > .live-transactions-explorer {
+  display: block;
+  width: fit-content;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--primary, #6d28d9);
+  text-decoration: underline;
+  white-space: nowrap;
 }
