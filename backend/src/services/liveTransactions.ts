@@ -155,7 +155,8 @@ export function verifiedTestnetPayment(
     typeof amount !== "number" ||
     !Number.isFinite(amount) ||
     amount <= 0 ||
-    (candidate.amount !== undefined && Number(candidate.amount) !== amount)
+    (candidate.amount !== undefined &&
+      Math.round(Number(candidate.amount) * 1e7) !== Math.round(amount * 1e7))
   )
     return null;
   const completed = candidate.time ? new Date(candidate.time) : null;

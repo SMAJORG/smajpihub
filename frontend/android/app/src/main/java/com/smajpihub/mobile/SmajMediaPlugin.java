@@ -58,6 +58,15 @@ public class SmajMediaPlugin extends Plugin {
             JSObject result = new JSObject(); result.put("downloadId", id); call.resolve(result);
         } catch (Exception error) { call.reject("The Android download could not start.", error); }
     }
+    @PluginMethod public void deleteDownload(PluginCall call) {
+        Long id = readDownloadId(call);
+        if (id == null || id < 1) { call.reject("A valid download id is required."); return; }
+        try {
+            DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+            manager.remove(id);
+            JSObject result = new JSObject(); result.put("deleted", true); call.resolve(result);
+        } catch (Exception error) { call.reject("The downloaded video could not be deleted.", error); }
+    }
     @PluginMethod public void getDownloadStatus(PluginCall call) {
         Long id = readDownloadId(call);
         if (id == null) { call.reject("Download id is required."); return; }

@@ -70,8 +70,22 @@ export default function mountPaymentsEndpoints(router: Router) {
     return res.status(200).json({ payments, summary, serverTime: new Date().toISOString() });
   });
 
-  router.post("/incomplete", async (_req, res) => {
-    return res.status(200).json({ message: "Pi payments are temporarily disabled. No payment was processed." });
+  router.post("/incomplete", async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const paymentId = String(req.body?.paymentId || "");
+    if (!/^[a-z0-9_-]{1,200}$/i.test(paymentId)) return res.status(400).json({ message: "Invalid Pi payment identifier." });
+    try {
+      const { data: payment } = await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId));
+      if (payment.user_uid !== user.uid) return res.status(403).json({ message: "This Pi payment belongs to a different account." });
+      const orderId = String(payment.metadata?.orderId || "");
+      if (!ObjectId.isValid(orderId)) return res.status(409).json({ message: "This pending payment belongs to another service. Open that service to finish it before paying for a Store order." });
+      if (!payment.transaction?.txid) return res.status(409).json({ message: "Pi has not recorded a transaction for this payment yet. Check Pi Wallet before retrying." });
+      req.body = { paymentId, orderId, txid: payment.transaction.txid };
+      return await completePayment(req, res);
+    } catch {
+      return res.status(502).json({ message: "Could not verify the pending payment with Pi. Please retry shortly." });
+    }
   });
 
   router.post("/approve", async (req, res) => {
@@ -115,7 +129,7 @@ export default function mountPaymentsEndpoints(router: Router) {
     return res.status(200).json({ message: "Payment approved.", paymentId });
   });
 
-  router.post("/complete", async (req, res) => {
+  const completePayment = async (req: Request, res: Response) => {
     const { paymentId, orderId, txid } = req.body || {};
     if (!paymentId || !orderId || !txid) {
       return res.status(400).json({ error: "bad_request", message: "Missing paymentId, orderId, or txid." });
@@ -124,16 +138,20 @@ export default function mountPaymentsEndpoints(router: Router) {
     const order = await findBuyerOrder(req, res, String(orderId));
     if (!order) return;
     if (order.paymentStatus === "paid" && order.paymentId === paymentId && order.paymentTxid === txid) {
-      return res.status(200).json({ message: "Payment already completed.", paymentId, txid });
+      return res.status(200).json({ message: "Payment already completed.", orderId: order._id.toString(), paymentId, txid });
     }
     if (order.status !== "pending") {
       return res.status(400).json({ error: "bad_request", message: "Only pending orders can be completed with payment." });
     }
     const { data: payment } = await platformAPIKeyClient.get(`/v2/payments/${paymentId}`);
     if (
+      payment.identifier !== paymentId ||
+      payment.direction !== "user_to_app" ||
       payment.user_uid !== order.buyerId ||
       String(payment.metadata?.orderId || "") !== order._id.toString() ||
-      Number(payment.amount) !== Number(order.pricePi) ||
+      !Number.isFinite(Number(payment.amount)) || Number(payment.amount) <= 0 ||
+      !Number.isFinite(Number(order.pricePi)) || Number(order.pricePi) <= 0 ||
+      Math.round(Number(payment.amount) * 1e7) !== Math.round(Number(order.pricePi) * 1e7) ||
       payment.transaction?.txid !== txid ||
       payment.status?.cancelled || payment.status?.user_cancelled
     ) {
@@ -179,8 +197,9 @@ export default function mountPaymentsEndpoints(router: Router) {
       }),
     ]);
 
-    return res.status(200).json({ message: "Payment completed.", paymentId, txid });
-  });
+    return res.status(200).json({ message: "Payment completed.", orderId: order._id.toString(), paymentId, txid });
+  };
+  router.post("/complete", completePayment);
 
   router.post("/cancelled_payment", async (req, res) => {
     const { paymentId, orderId } = req.body || {};

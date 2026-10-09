@@ -300,9 +300,9 @@ const StreamSearchPage = () => {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     const timer = window.setTimeout(
       () => {
+        setLoading(true);
         const term = query.trim();
         const request = term ? searchStreamCatalog(term) : getStreamCatalog("trending");
         void request
@@ -476,6 +476,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
   const { slug = "" } = useParams();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
+  const removedDownloadKeys = useRef(new Set<string>());
   const [remoteTitles, setRemoteTitles] = useState<Title[] | null>(null);
   const [channelResults, setChannelResults] = useState<StreamCreatorDirectoryItem[]>([]);
   const [catalogState, setCatalogState] = useState<"loading" | "ready" | "fallback">(() =>
@@ -689,6 +690,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
             const mediaType = record.mediaType || "movie";
             const id = record.id || "";
             const key = `${mediaType}:${id}`;
+            if (removedDownloadKeys.current.has(key)) return;
             const existing = merged.get(key);
             merged.set(key, {
               id,
@@ -727,6 +729,18 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
     kind === "search" ? list : list.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
   const downloadingItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus === "downloading") : [];
   const completedDownloadItems = kind === "downloads" ? filtered.filter(item => item.downloadStatus !== "downloading") : [];
+  const deleteDownloadedTitle = async (item: Title) => {
+    const mediaType = item.mediaType || "movie";
+    const record = readNativeDownload(mediaType, item.id);
+    await removeStreamDownload(mediaType, item.id);
+    if (Capacitor.isNativePlatform() && record && record.downloadId > 0) {
+      await SmajMedia.deleteDownload({ downloadId: record.downloadId });
+    }
+    window.localStorage.removeItem(nativeDownloadKey(mediaType, item.id));
+    removedDownloadKeys.current.add(mediaType + ":" + item.id);
+    setRemoteTitles(current => (current || []).filter(title => title.id !== item.id || (title.mediaType || "movie") !== mediaType));
+    window.dispatchEvent(new Event(STREAM_DOWNLOADS_CHANGED_EVENT));
+  };
   const saveCompletedMovie = async () => {
     if (!saveTarget || !saveTarget.mediaType || saveLocation !== "phone" || !Capacitor.isNativePlatform()) return;
     const record = readNativeDownload(saveTarget.mediaType, saveTarget.id);
@@ -829,7 +843,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
                   <small>{formatDownloadBytes(record?.totalBytes || record?.downloadedBytes) || (item.mediaType === "tv" ? "Series" : "Movie")}</small>
                   <span className={item.downloadStatus === "failed" ? "failed" : ""}>{item.downloadStatus === "failed" ? "Download failed" : item.downloadStatus === "pending" ? "Preparing download" : record?.status === "complete" ? "Ready offline" : "Saved to account"}</span>
                 </div>
-                <div className="sw-download-row-actions"><StreamVideoActions video={{ title: item.name, cloudflareUid: item.id }} watchPath={path} /><button className="sw-download-save" type="button" disabled={item.downloadStatus === "failed" || item.downloadStatus === "pending" || record?.status !== "complete"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}><DownloadRoundedIcon />Save</button></div>
+                <div className="sw-download-row-actions"><StreamVideoActions video={{ title: item.name, cloudflareUid: item.id }} watchPath={path} onRemoveDownload={() => deleteDownloadedTitle(item)} /><button className="sw-download-save" type="button" disabled={item.downloadStatus === "failed" || item.downloadStatus === "pending" || record?.status !== "complete"} onClick={() => { setSaveTarget(item); setSaveLocation(""); setSaveProgress(null); setSaveMessage(""); }}><DownloadRoundedIcon />Save</button></div>
               </article>;
             })}</div>
           </section> : null}

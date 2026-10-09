@@ -17,10 +17,10 @@ import { STREAM_ACTIVITY_EVENT } from "../../lib/streamPlaybackTracking";
 import "./StreamVideoActions.css";
 
 export type ActionVideo = Pick<CreatorVideo, "title" | "cloudflareUid"> & Partial<CreatorVideo>;
-type Props = { video: ActionVideo; owner?: boolean; watchPath?: string; onUpdated?: (video: CreatorVideo) => void; onDeleted?: () => void };
-const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDeleted }: Props) => {
+type Props = { video: ActionVideo; owner?: boolean; watchPath?: string; onUpdated?: (video: CreatorVideo) => void; onDeleted?: () => void; onRemoveDownload?: () => Promise<void> };
+const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDeleted, onRemoveDownload }: Props) => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"menu" | "edit" | "delete" | null>(null);
+  const [mode, setMode] = useState<"menu" | "edit" | "delete" | "delete-download" | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [title, setTitle] = useState(video.title);
@@ -33,6 +33,7 @@ const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDele
   useEffect(() => { busyRef.current = busy; }, [busy]);
   useEffect(() => {
     if (!mode) return;
+    const trigger = triggerRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const first = panelRef.current?.querySelector<HTMLElement>("[data-initial-focus]") || panelRef.current?.querySelector<HTMLElement>("input") || panelRef.current?.querySelector<HTMLElement>("button:not([disabled])");
@@ -51,7 +52,7 @@ const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDele
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", keydown);
-      triggerRef.current?.focus();
+      trigger?.focus();
     };
   }, [mode]);
   const path = watchPath || `/app/services/stream/${video.contentType === "live" && video.liveInputUid ? `live/${video.liveInputUid}` : `watch/${video.cloudflareUid || `yt-${video.youtubeVideoId}`}`}`;
@@ -91,6 +92,13 @@ const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDele
     } catch (error) { fail(error); }
     finally { setBusy(false); }
   };
+  const removeDownload = async () => {
+    if (!onRemoveDownload) return;
+    setBusy(true); setMessage("");
+    try { await onRemoveDownload(); setMode(null); }
+    catch (error) { fail(error); }
+    finally { setBusy(false); }
+  };
   const remove = async () => {
     setBusy(true); setMessage("");
     try {
@@ -103,18 +111,20 @@ const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDele
     <button ref={triggerRef} type="button" className="sw-video-more" aria-label={`More options for ${video.title}`} aria-haspopup="dialog" aria-expanded={Boolean(mode)} onClick={() => { setMessage(""); setMode("menu"); }}><MoreVertRoundedIcon /></button>
     {mode ? createPortal(
       <div className={`sw-video-modal-layer ${mode === "menu" ? "menu" : "centered"}`} onMouseDown={event => { if (event.target === event.currentTarget && !busy) setMode(null); }}>
-        <section ref={panelRef} className="sw-video-action-panel" role="dialog" aria-modal="true" aria-label={mode === "edit" ? "Edit video" : mode === "delete" ? "Delete video" : `Options for ${video.title}`}>
-          <header><div><h2>{mode === "edit" ? "Edit video" : mode === "delete" ? "Delete video?" : "Video options"}</h2><p>{video.title}</p></div><button type="button" disabled={busy} aria-label="Close video options" onClick={() => setMode(null)}><CloseRoundedIcon /></button></header>
+        <section ref={panelRef} className="sw-video-action-panel" role="dialog" aria-modal="true" aria-label={mode === "edit" ? "Edit video" : mode === "delete-download" ? "Delete download?" : mode === "delete" ? "Delete video" : `Options for ${video.title}`}>
+          <header><div><h2>{mode === "edit" ? "Edit video" : mode === "delete-download" ? "Delete download?" : mode === "delete" ? "Delete video?" : "Video options"}</h2><p>{video.title}</p></div><button type="button" disabled={busy} aria-label="Close video options" onClick={() => setMode(null)}><CloseRoundedIcon /></button></header>
           {mode === "menu" ? <div className="sw-video-action-list">
             <button type="button" disabled={busy || !playable} onClick={() => { setMode(null); navigate(path); }}><PlayArrowRoundedIcon /><span>Watch video</span></button>
             <button type="button" disabled={busy || !playable} onClick={() => void share()}><ShareRoundedIcon /><span>Share</span></button>
             {video.downloadAllowed && playable ? <button type="button" disabled={busy} onClick={() => void saveToDevice()}><DownloadRoundedIcon /><span>Save to device</span></button> : null}
+            {onRemoveDownload ? <button type="button" className="danger" disabled={busy} onClick={() => { setMessage(""); setMode("delete-download"); }}><DeleteOutlineRoundedIcon /><span>Delete download</span></button> : null}
             {owner ? <>
               <button type="button" disabled={busy || !video.cloudflareUid} onClick={() => { setMode(null); navigate(`/app/services/stream/studio/analytics?video=${encodeURIComponent(video.cloudflareUid)}`); }}><BarChartRoundedIcon /><span>View analytics</span></button>
               <button type="button" disabled={busy} onClick={() => { setTitle(video.title); setDescription(video.description || ""); setCategory(video.category || "Entertainment"); setVisibility(video.visibility || "private"); setMessage(""); setMode("edit"); }}><EditRoundedIcon /><span>Edit details</span></button>
               <button type="button" className="danger" disabled={busy} onClick={() => { setMessage(""); setMode("delete"); }}><DeleteOutlineRoundedIcon /><span>Delete</span></button>
             </> : null}
           </div> : null}
+          {mode === "delete-download" ? <div className="sw-video-delete-confirm"><p>Remove this video from your downloads and delete its in-app offline copy. The original video stays available on Stream.</p><footer><button type="button" data-initial-focus disabled={busy} onClick={() => setMode(null)}>Cancel</button><button type="button" className="danger" disabled={busy} onClick={() => void removeDownload()}>{busy ? "Deleting..." : "Delete download"}</button></footer></div> : null}
           {mode === "edit" ? <form className="sw-video-edit-form" onSubmit={event => void save(event)}>
             <label>Title<input value={title} onChange={event => setTitle(event.target.value)} required maxLength={140} disabled={busy} /></label>
             <label>Description<textarea value={description} onChange={event => setDescription(event.target.value)} maxLength={4000} rows={3} disabled={busy} /></label>

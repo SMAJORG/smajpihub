@@ -368,7 +368,7 @@ export default function mountMarketplaceEndpoints(router: Router) {
       if (reservedOrder) return res.status(200).json({ order: serialize(reservedOrder) });
       return res.status(409).json({ error: "out_of_stock", message: "The requested quantity is no longer available" });
     }
-    const unitPricePi = Number(withResolvedPiPrice(product).pricePi);
+    const unitPricePi = Math.round(Number(withResolvedPiPrice(product).pricePi) * 1e7) / 1e7;
 
     const order = {
       buyerId: user.uid,

@@ -307,7 +307,9 @@ test("recover completed payments without local hash or paid status across app so
       })),
     );
   });
-  locals.paymentCollection = new MemoryCollection([{ _id: new ObjectId(), identifier: "recover-5-0" }]);
+  locals.paymentCollection = new MemoryCollection([
+    { _id: new ObjectId(), identifier: "recover-5-0" },
+  ]);
   let calls = 0;
   const feed = new LiveTransactionFeed(locals, {
     get: async (url) => {
@@ -340,6 +342,21 @@ test("missing local hash never weakens completion verification", () => {
   incomplete.status.developer_completed = false;
   assert.equal(
     verifiedTestnetPayment(incomplete, { ...candidate, txid: undefined }),
+    null,
+  );
+});
+
+test("legacy Store precision still verifies the actual Pi amount", () => {
+  const p = payment();
+  p.amount = 0.0009549;
+  const verified = verifiedTestnetPayment(p, {
+    ...candidate,
+    amount: 300 / 314159,
+  });
+  assert(verified);
+  assert.equal(verified.amount, p.amount);
+  assert.equal(
+    verifiedTestnetPayment(p, { ...candidate, amount: 0.000955 }),
     null,
   );
 });
