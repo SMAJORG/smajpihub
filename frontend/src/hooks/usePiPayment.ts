@@ -13,6 +13,26 @@ type PaymentCallbacks = {
   onError?: (message: string) => void;
 };
 
+const isTemporaryPiFailure = (error: unknown) => {
+  const failure = error as { response?: { status?: number; data?: { error?: string; retryable?: boolean } } };
+  const status = failure.response?.status;
+  return failure.response?.data?.retryable !== false &&
+    (!failure.response || status === 429 || (status !== undefined && status >= 500) ||
+      (status === 409 && failure.response?.data?.error === "verification_pending"));
+};
+
+// Retry confirmation of the same transfer; never create a payment to retry a POST.
+const postPiPayment = async <T,>(url: string, body: Record<string, unknown>) => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await axiosClient.post<T>(url, body, { timeout: 65000, headers: { "X-SMAJ-Silent": "true" } });
+    } catch (error) {
+      if (!isTemporaryPiFailure(error) || attempt >= 2) throw error;
+      await new Promise<void>(resolve => window.setTimeout(resolve, 1000 * (attempt + 1)));
+    }
+  }
+};
+
 export const usePiPayment = () => {
   const [isPaying, setIsPaying] = useState(false);
   const payingRef = useRef(false);
@@ -38,7 +58,7 @@ export const usePiPayment = () => {
         if (recoveryPaymentIds.has(payment.identifier)) return;
         recoveryPaymentIds.add(payment.identifier);
         const recovery = async () => {
-          const { data } = await axiosClient.post<{ orderId: string }>("/payments/incomplete", {
+          const { data } = await postPiPayment<{ orderId: string }>("/payments/incomplete", {
             paymentId: payment.identifier,
             txid: payment.transaction?.txid,
           });
@@ -69,7 +89,7 @@ export const usePiPayment = () => {
         return;
       }
       if (data.order.paymentId && data.order.paymentStatus === "processing") {
-        const { data: recoveredPayment } = await axiosClient.post<{ orderId: string }>("/payments/incomplete", { paymentId: data.order.paymentId });
+        const { data: recoveredPayment } = await postPiPayment<{ orderId: string }>("/payments/incomplete", { paymentId: data.order.paymentId });
         if (recoveredPayment.orderId && recoveredPayment.orderId !== orderId) throw new Error("The recorded payment belongs to another order. Refresh this order before retrying.");
         if (recoveredPayment.orderId === orderId) {
           callbacks?.onComplete?.();
@@ -82,6 +102,8 @@ export const usePiPayment = () => {
 
       // The SDK returns before the wallet closes; keep the action busy until a terminal callback.
       let retriedAfterRecovery = false;
+      let completion: Promise<void> | undefined;
+      let completed = false;
       const createPayment = (): Promise<void> => withPiTimeout(
         new Promise<void>((resolve, reject) => {
           const result = pi.createPayment(
@@ -93,19 +115,28 @@ export const usePiPayment = () => {
             {
               onReadyForServerApproval: async paymentId => {
                 try {
-                  await axiosClient.post("/payments/approve", { orderId, paymentId });
+                  await postPiPayment("/payments/approve", { orderId, paymentId });
                   callbacks?.onReady?.();
                 } catch (error) {
                   reject(error);
                 }
               },
               onReadyForServerCompletion: async (paymentId, txid) => {
+                if (completed) return;
+                if (!completion) {
+                  completion = (async () => {
+                    await postPiPayment("/payments/complete", { orderId, paymentId, txid });
+                    completed = true;
+                    callbacks?.onComplete?.();
+                    resolve();
+                  })();
+                }
                 try {
-                  await axiosClient.post("/payments/complete", { orderId, paymentId, txid });
-                  callbacks?.onComplete?.();
-                  resolve();
+                  await completion;
                 } catch (error) {
-                  reject(error);
+                  completion = undefined;
+                  // Keep the wallet action busy while Pi retries its completion callback.
+                  if (!isTemporaryPiFailure(error)) reject(error);
                 }
               },
               onCancel: () => {

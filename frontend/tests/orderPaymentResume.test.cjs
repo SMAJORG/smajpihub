@@ -14,6 +14,7 @@ function setup({
   recoveryFails = false,
   incompleteAtCreate = false,
   incompleteFromError = false,
+  completionFailures = [],
 } = {}) {
   const requests = [],
     handoffs = [],
@@ -48,8 +49,9 @@ function setup({
           requests.push(["get", url]);
           return { data: { order: { status: "pending", pricePi: 3, ...(existingPayment ? { paymentId: "payment-1", paymentStatus: "processing" } : {}) } } };
         },
-        post: async (url, body) => {
-          requests.push(["post", url, body]);
+        post: async (url, body, config) => {
+          requests.push(["post", url, body, config]);
+          if (url === "/payments/complete" && completionFailures.length) throw completionFailures.shift();
           if (recoveryFails && url === "/payments/incomplete")
             throw { response: { data: { message: "Recovery failed" } } };
           return { data: { orderId: incomplete?.metadata?.orderId || "order-1" } };
@@ -60,7 +62,7 @@ function setup({
     "../lib/soloHost": { isPiPaymentAvailable: () => available, isSoloHostRuntime: () => false },
   };
   const exports = {};
-  vm.runInNewContext(code, { exports, require: name => modules[name], Error, window: { Pi: pi } });
+  vm.runInNewContext(code, { exports, require: name => modules[name], Error, window: { Pi: pi, setTimeout: resolve => { resolve(); return 1; } } });
   return {
     payOrder: exports.usePiPayment().payOrder,
     requests,
@@ -128,7 +130,7 @@ const serverSource = fs.readFileSync(
 const serverCode = ts.transpileModule(serverSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rounded = false, recovery = false, delayedTransaction = false, unverified = false, confirmedMismatch = false, piAlreadyCompleted = false } = {}) {
+async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rounded = false, recovery = false, delayedTransaction = false, unverified = false, confirmedMismatch = false, piAlreadyCompleted = false, piFailure, notificationHangs = false } = {}) {
   const order = {
     _id: new ObjectId(),
     buyerId: "buyer",
@@ -176,11 +178,12 @@ async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rou
         },
         post: async () => {
           completions++;
+          if (piFailure) throw piFailure;
           return { data: { ...payment, transaction: { txid: confirmedMismatch ? "wrong-tx" : "tx-1", verified: !unverified }, status: { developer_completed: true, transaction_verified: !unverified } } };
         },
       },
     },
-    "../services/notifications": { createNotification: async () => {} },
+    "../services/notifications": { createNotification: async () => { if (notificationHangs) await new Promise(() => {}); } },
   };
   const exports = {};
   vm.runInNewContext(serverCode, { exports, require: name => modules[name], Date, Promise });
@@ -355,4 +358,70 @@ test("a different pending payment discovered by the wallet is recovered and chec
   await app.callbacks().onReadyForServerCompletion("new", "new-tx");
   await pending;
   assert.equal(complete, 1);
+});
+
+test("transient confirmation failure retries the same payment and hash before completing", async () => {
+  const app = setup({ completionFailures: [{ response: { status: 502 } }, { response: { status: 409, data: { error: "verification_pending" } } }] });
+  let completed = 0;
+  const pending = app.payOrder("order-1", 3, { onComplete: () => completed++ });
+  await flush();
+  await app.callbacks().onReadyForServerCompletion("payment-1", "tx-1");
+  await pending;
+  const posts = app.requests.filter(r => r[1] === "/payments/complete");
+  assert.equal(posts.length, 3);
+  for (const request of posts) {
+    assert.equal(request[2].paymentId, "payment-1");
+    assert.equal(request[2].txid, "tx-1");
+    assert.equal(request[3].timeout, 65000);
+  }
+  assert.equal(app.opened(), 1);
+  assert.equal(completed, 1);
+});
+
+test("duplicate SDK completion callbacks share a request and notify once", async () => {
+  const app = setup(); let completed = 0;
+  const pending = app.payOrder("order-1", 3, { onComplete: () => completed++ });
+  await flush();
+  await Promise.all([app.callbacks().onReadyForServerCompletion("payment-1", "tx-1"), app.callbacks().onReadyForServerCompletion("payment-1", "tx-1")]);
+  await pending;
+  await app.callbacks().onReadyForServerCompletion("payment-1", "tx-1");
+  assert.equal(app.requests.filter(r => r[1] === "/payments/complete").length, 1);
+  assert.equal(completed, 1);
+});
+
+test("permanent confirmation rejection stops without retrying or marking paid", async () => {
+  const app = setup({ completionFailures: [{ response: { status: 400, data: { message: "Wrong amount" } } }] });
+  let error, completed = 0;
+  const pending = app.payOrder("order-1", 3, { onError: value => { error = value; }, onComplete: () => completed++ });
+  await flush(); await app.callbacks().onReadyForServerCompletion("payment-1", "tx-1"); await pending;
+  assert.equal(error, "Wrong amount"); assert.equal(completed, 0);
+  assert.equal(app.requests.filter(r => r[1] === "/payments/complete").length, 1);
+});
+
+test("server returns a retryable response when Pi completion fails instead of rejecting the handler", async () => {
+  const result = await completePayment({ piFailure: { response: { status: 503 } } });
+  assert.equal(result.response.status, 502); assert.equal(result.response.body.retryable, true);
+  assert.equal(result.updates, 0);
+});
+
+test("server reports rejected app API credentials without exposing upstream details", async () => {
+  const result = await completePayment({ piFailure: { response: { status: 401 } } });
+  assert.equal(result.response.status, 502); assert.equal(result.response.body.retryable, false);
+  assert.equal(result.updates, 0);
+});
+
+test("slow push delivery does not delay the successful wallet completion response", async () => {
+  const result = await completePayment({ notificationHangs: true });
+  assert.equal(result.response.status, 200); assert.equal(result.updates, 1);
+});
+
+test("exhausted transient retries keep checkout busy for the next SDK completion callback", async () => {
+  const app = setup({ completionFailures: Array.from({ length: 3 }, () => ({ response: { status: 503 } })) });
+  let completed = 0, errors = 0;
+  const pending = app.payOrder("order-1", 3, { onComplete: () => completed++, onError: () => errors++ });
+  await flush();
+  await app.callbacks().onReadyForServerCompletion("payment-1", "tx-1");
+  assert.deepEqual(app.busy, [true]); assert.equal(errors, 0);
+  await app.callbacks().onReadyForServerCompletion("payment-1", "tx-1"); await pending;
+  assert.equal(completed, 1); assert.equal(app.opened(), 1);
 });
