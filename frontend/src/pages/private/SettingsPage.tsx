@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ConfirmSignOutModal from "../../components/ConfirmSignOutModal";
 import TrustBadge from "../../components/TrustBadge";
-import LanguageSoonButton from "../../components/LanguageSoonButton";
+import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
+import { Capacitor } from "@capacitor/core";
+import { APP_VERSION, checkAppUpdate, type AppUpdate } from "../../lib/appUpdates";
+import { ANDROID_APK_URL } from "../../lib/androidDownload";
+import "./SettingsPage.css";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
@@ -74,6 +78,36 @@ const SettingsPage = () => {
     publicProfile: saved.publicProfile ?? true,
     allowContact: saved.allowContact ?? true,
   });
+  const [checkingVersion, setCheckingVersion] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdate | null>(null);
+  const [updatingApp, setUpdatingApp] = useState(false);
+  const updateDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { if (updateInfo) updateDialog.current?.showModal(); }, [updateInfo]);
+  const closeUpdate = () => { updateDialog.current?.close(); setUpdateInfo(null); };
+  const checkVersion = async () => {
+    setCheckingVersion(true);
+    setMessage("");
+    try { setUpdateInfo(await checkAppUpdate(Capacitor.isNativePlatform())); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "Could not check for updates."); }
+    finally { setCheckingVersion(false); }
+  };
+  const installUpdate = async () => {
+    setUpdatingApp(true);
+    try {
+      if (updateInfo?.native) {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url: ANDROID_APK_URL });
+        closeUpdate();
+      } else {
+        if ("serviceWorker" in navigator) {
+          const registration = await navigator.serviceWorker.getRegistration();
+          await registration?.update();
+        }
+        window.location.reload();
+      }
+    } catch { setMessage("Could not open the update. Please try again."); closeUpdate(); }
+    finally { setUpdatingApp(false); }
+  };
   const [message, setMessage] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(true);
@@ -243,14 +277,10 @@ const SettingsPage = () => {
 
   return (
     <main className="private-page settings-page">
-      <LanguageSoonButton />
-      <section className="private-page-head">
-        <div>
-          <p className="private-kicker">ACCOUNT</p>
-          <h1>Settings</h1>
-          <p>Simple account controls for your SMAJ PI HUB profile, theme, notifications, privacy, and session.</p>
-        </div>
-      </section>
+      <header className="settings-topbar">
+        <button type="button" aria-label="Back to account" onClick={() => navigate("/settings")}><ArrowBackIosNewOutlinedIcon /></button>
+        <h1>Settings</h1>
+      </header>
 
       <form className="settings-sections" onSubmit={(event) => void saveSettings(event)}>
         <section>
@@ -292,6 +322,9 @@ const SettingsPage = () => {
             )}
             <button type="button" className="private-primary-button" disabled={!verificationReady || hasRequestedVerification || requestingVerification || !nextVerificationLevel} onClick={() => void requestVerification()}>{verificationButtonLabel}</button>
           </div>
+          <button type="button" className="settings-menu-row" onClick={() => void checkVersion()} disabled={checkingVersion}>
+            <span>Check version</span><span className="settings-row-value">{checkingVersion ? "Checking..." : APP_VERSION}</span><ChevronRightOutlinedIcon aria-hidden="true" />
+          </button>
           <div className="settings-action-row">
             <button type="button" className="private-secondary-button" onClick={replayWelcomeTour}>Replay welcome tour</button>
             <button type="button" className="private-secondary-button danger" onClick={() => setShowSignOut(true)}>Logout</button>
@@ -300,29 +333,23 @@ const SettingsPage = () => {
 
         <section>
           <h2>Theme Settings</h2>
-          <div className="appearance-options">
-            {(["light", "dark"] as const).map((theme) => (
-              <button type="button" className={form.theme === theme ? "active" : ""} key={theme} onClick={() => setField("theme", theme)}>
-                {theme === "light" ? "Light mode" : "Dark mode"}
-              </button>
-            ))}
-          </div>
+          <label className="setting-line toggle-line"><span><strong>Dark mode</strong><small>Use a darker appearance.</small></span><input type="checkbox" role="switch" checked={form.theme === "dark"} onChange={(event) => setField("theme", event.target.checked ? "dark" : "light")} /></label>
         </section>
 
         <section>
           <h2>Notification Settings</h2>
-          <div className="setting-line toggle-line"><span><strong>Phone push notifications</strong><small>{pushSupported ? "Show important alerts even when SMAJ PI HUB is closed." : "Install this site on your Home Screen and use a supported browser."}</small></span><button type="button" className="private-secondary-button" disabled={!pushSupported || pushBusy} onClick={() => void togglePhoneNotifications()}>{pushBusy ? "Please wait..." : pushEnabled ? "Disable" : "Enable"}</button></div>
-          <label className="setting-line toggle-line"><span><strong>Email notifications</strong><small>Receive important account and support updates.</small></span><input type="checkbox" checked={form.emailNotifications} onChange={(event) => setField("emailNotifications", event.target.checked)} /></label>
-          <label className="setting-line toggle-line"><span><strong>Product/order notifications</strong><small>Get marketplace listing, order, and payment updates.</small></span><input type="checkbox" checked={form.productNotifications} onChange={(event) => setField("productNotifications", event.target.checked)} /></label>
-          <label className="setting-line toggle-line"><span><strong>Message notifications</strong><small>Get alerts for buyer and seller conversations.</small></span><input type="checkbox" checked={form.messageNotifications} onChange={(event) => setField("messageNotifications", event.target.checked)} /></label>
+          <div className="setting-line toggle-line"><span><strong>Phone push notifications</strong><small>{pushSupported ? "Show important alerts even when SMAJ PI HUB is closed." : "Install this site on your Home Screen and use a supported browser."}</small></span><button type="button" className={`settings-switch ${pushEnabled ? "enabled" : ""}`} role="switch" aria-label="Phone push notifications" aria-checked={pushEnabled} disabled={!pushSupported || pushBusy} onClick={() => void togglePhoneNotifications()}><i /></button></div>
+          <label className="setting-line toggle-line"><span><strong>Email notifications</strong><small>Receive important account and support updates.</small></span><input type="checkbox" role="switch" checked={form.emailNotifications} onChange={(event) => setField("emailNotifications", event.target.checked)} /></label>
+          <label className="setting-line toggle-line"><span><strong>Product/order notifications</strong><small>Get marketplace listing, order, and payment updates.</small></span><input type="checkbox" role="switch" checked={form.productNotifications} onChange={(event) => setField("productNotifications", event.target.checked)} /></label>
+          <label className="setting-line toggle-line"><span><strong>Message notifications</strong><small>Get alerts for buyer and seller conversations.</small></span><input type="checkbox" role="switch" checked={form.messageNotifications} onChange={(event) => setField("messageNotifications", event.target.checked)} /></label>
         </section>
 
         <section>
           <h2>Privacy & Security</h2>
           <Link className="settings-device-link" to="/settings/security/app-lock"><span className="settings-device-icon" aria-hidden="true"><LockOutlinedIcon /></span><span><strong>App Lock</strong><small>Fingerprint, face, or device credential protection</small></span><ChevronRightOutlinedIcon aria-hidden="true" /></Link>
           <Link className="settings-device-link" to="/settings/devices"><span className="settings-device-icon" aria-hidden="true"><DevicesOutlinedIcon /></span><span><strong>Devices & Sessions</strong><small>Manage active web and Android logins</small></span><ChevronRightOutlinedIcon aria-hidden="true" /></Link>
-          <label className="setting-line toggle-line"><span><strong>Show profile publicly</strong><small>Allow marketplace users to see your public seller or buyer profile.</small></span><input type="checkbox" checked={form.publicProfile} onChange={(event) => setField("publicProfile", event.target.checked)} /></label>
-          <label className="setting-line toggle-line"><span><strong>Allow sellers/buyers to contact me</strong><small>Enable safe marketplace contact for service and order activity.</small></span><input type="checkbox" checked={form.allowContact} onChange={(event) => setField("allowContact", event.target.checked)} /></label>
+          <label className="setting-line toggle-line"><span><strong>Show profile publicly</strong><small>Allow marketplace users to see your public seller or buyer profile.</small></span><input type="checkbox" role="switch" checked={form.publicProfile} onChange={(event) => setField("publicProfile", event.target.checked)} /></label>
+          <label className="setting-line toggle-line"><span><strong>Allow sellers/buyers to contact me</strong><small>Enable safe marketplace contact for service and order activity.</small></span><input type="checkbox" role="switch" checked={form.allowContact} onChange={(event) => setField("allowContact", event.target.checked)} /></label>
           <button type="button" className="private-secondary-button danger" onClick={() => setDeleteRequested(true)}>Delete account</button>
         </section>
 
@@ -330,6 +357,12 @@ const SettingsPage = () => {
         <button className="private-primary-button">Save changes</button>
       </form>
 
+      {updateInfo ? <dialog ref={updateDialog} className="settings-update-sheet" aria-labelledby="settings-update-title" onCancel={() => setUpdateInfo(null)}>
+        <h2 id="settings-update-title">{updateInfo.available ? "New Version" : "Up to date"}</h2>
+        <div className="settings-update-app"><img src="/icon-192x192.png" alt="" /><div><strong>SMAJ PI HUB</strong><p>Version: {updateInfo.version}</p></div></div>
+        <strong>Details</strong><p>{updateInfo.available ? updateInfo.details : "You are using the latest version."}</p>
+        <div className="settings-update-actions"><button type="button" onClick={closeUpdate}>{updateInfo.available ? "Later" : "Close"}</button>{updateInfo.available ? <button type="button" disabled={updatingApp} onClick={() => void installUpdate()}>{updatingApp ? "Updating..." : "Update"}</button> : null}</div>
+      </dialog> : null}
       <ConfirmSignOutModal open={showSignOut} onCancel={() => setShowSignOut(false)} onConfirm={() => void logout()} />
       {deleteRequested ? (
         <div className="confirm-modal-backdrop">

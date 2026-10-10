@@ -72,3 +72,5 @@ jobs:
         run: |
           gh release view android-latest --repo "$GITHUB_REPOSITORY" || gh release create android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android" --notes "Latest installable SMAJ PI HUB Android preview build." --prerelease --target "$GITHUB_SHA"
           gh release upload android-latest android/app/build/outputs/apk/debug/SMAJ-PI-HUB.apk --repo "$GITHUB_REPOSITORY" --clobber
+          printf 'Version: %s\n\nThe latest SMAJ PI HUB Android build includes the newest fixes and improvements.\n' "$VITE_APP_VERSION" > "$RUNNER_TEMP/smaj-release-notes.txt"
+          gh release edit android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android $VITE_APP_VERSION" --notes-file "$RUNNER_TEMP/smaj-release-notes.txt"

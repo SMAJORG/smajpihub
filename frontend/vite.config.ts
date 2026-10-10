@@ -12,6 +12,8 @@ const productionApiBaseURL = "https://smajpihub.onrender.com";
 export default defineConfig(({ mode }) => {
   const rootDir = configDir;
   const env = loadEnv(mode, rootDir, "");
+  const appVersion = env.VITE_APP_VERSION || "1.0.2";
+  const appBuildId = env.VITE_BUILD_ID || env.GITHUB_SHA || new Date().toISOString();
   const isPublicBuild = mode === "public";
   const isLegacyBuild = mode === "legacy";
   const isCapacitorBuild = mode === "capacitor";
@@ -42,8 +44,15 @@ export default defineConfig(({ mode }) => {
   return {
     root: rootDir,
     base: "/",
+    define: { "import.meta.env.VITE_APP_BUILD_ID": JSON.stringify(appBuildId) },
     plugins: [
       react(),
+      {
+        name: "app-version-manifest",
+        generateBundle() {
+          this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ version: appVersion, buildId: appBuildId, details: "The latest SMAJ PI HUB build includes the newest fixes and improvements." }) });
+        },
+      },
       ...(isLegacyBuild
         ? [
             legacy({
@@ -60,6 +69,7 @@ export default defineConfig(({ mode }) => {
           if (isSoloHostBuild) return html;
           const apiBaseURL = env.VITE_API_BASE_URL || env.VITE_BACKEND_URL || productionApiBaseURL;
           return html
+            .replace(/%VITE_BUILD_ID%/g, () => appBuildId)
             .replace(/\$\$BACKEND_URL\$\$/g, () => apiBaseURL)
             .replace(/\$\$API_BASE_URL\$\$/g, () => apiBaseURL)
             .replace(/\$\$SANDBOX_SDK\$\$/g, env.VITE_SANDBOX_SDK || "true")

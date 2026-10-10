@@ -166,7 +166,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       : "";
   });
   const isStoreShell = location.pathname === "/store";
-  const isHeaderHiddenPage = location.pathname === "/app/services" || location.pathname === "/search" || location.pathname === "/messages";
+  const isHeaderHiddenPage = location.pathname === "/settings/preferences" || location.pathname === "/app/services" || location.pathname === "/search" || location.pathname === "/messages";
   const dashboardTab = new URLSearchParams(location.search).get("tab");
   const isDashboardDiscovery = location.pathname === "/dashboard" && ["trending", "lifestyle", "categories"].includes(dashboardTab || "");
   const backFallback = backFallbackForPath(location.pathname);
@@ -455,7 +455,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
         )}
         {mobileSidebarOpen && !fullScreen ? <button className="private-overlay" onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu" /> : null}
         <div className="private-content">
-          {backFallback ? (
+          {backFallback && location.pathname !== "/settings/preferences" ? (
             <button
               className="private-route-back"
               type="button"
