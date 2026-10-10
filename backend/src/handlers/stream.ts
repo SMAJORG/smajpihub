@@ -1,3 +1,4 @@
+import { deleteAdminStreamVideo, StreamAdminDeletionError } from "../services/streamAdminDeletion";
 import { deleteCreatorContent, editCreatorContent, parseCreatorContentPatch } from "../services/streamCreatorContent";
 import { getStreamPlaybackTotals, recordStreamPlayback } from "../services/streamAnalytics";
 import { enrichProfileAvatars, synchronizeAvatarSnapshots } from "../services/profileAvatars";
@@ -1247,6 +1248,21 @@ const mountStreamEndpoints = (router: Router) => {
       { upsert: true },
     );
     return res.json({ settings });
+  });
+
+  router.delete("/admin/videos/:uid", async (req, res) => {
+    const admin = await requireStreamAdmin(req, res); if (!admin) return;
+    const uid = String(req.params.uid || "").slice(0, 180);
+    try {
+      const result = await deleteAdminStreamVideo(req.app.locals.streamContentCollection, uid, async remoteUid => {
+        if (!env.cloudflare_stream_account_id || !env.cloudflare_stream_api_token) throw new StreamAdminDeletionError(503, "Cloudflare Stream is not configured. The video was not deleted.");
+        const response = await axios.delete(`https://api.cloudflare.com/client/v4/accounts/${env.cloudflare_stream_account_id}/stream/${encodeURIComponent(remoteUid)}`, { headers: { Authorization: `Bearer ${env.cloudflare_stream_api_token}` }, timeout: 15000 });
+        if (response.data?.success === false) throw new Error("Cloudflare rejected deletion.");
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(error instanceof StreamAdminDeletionError ? error.status : 502).json({ error: "video_delete_failed", message: error instanceof StreamAdminDeletionError ? error.message : "Cloudflare deletion failed. The video remains in Stream; try again." });
+    }
   });
 
   router.patch("/admin/videos/:uid", async (req, res) => {

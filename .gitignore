@@ -11,3 +11,6 @@ frontend/android/app/src/main/assets/capacitor.config.json
 frontend/android/app/*.keystore
 frontend/android/app/*.jks
 solohost/.env
+
+# Local backup password for the persistent Android update key
+frontend/android/app/*.signing-password

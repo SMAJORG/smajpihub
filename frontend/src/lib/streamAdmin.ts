@@ -17,3 +17,5 @@ export const getTitleAvailability = async (type: "movie" | "tv", id: string) => 
 
 export const importInternetArchiveTitle = async (input: { identifier: string; tmdbId: number; mediaType: "movie" | "tv"; title: string; license: string; rightsUrl: string; rightsConfirmed: boolean; downloadAllowed: boolean }) =>
   (await axiosClient.post("/stream/admin/internet-archive/import", input)).data;
+
+export const deleteModerationVideo = async (uid: string) => (await axiosClient.delete<{ deleted: boolean; cloudflareDeleted: boolean }>(`/stream/admin/videos/${encodeURIComponent(uid)}`)).data;

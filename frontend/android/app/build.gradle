@@ -2,6 +2,12 @@ apply plugin: 'com.android.application'
 
 def smajBuildNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "2"
 
+def smajSigningStore = System.getenv("SMAJ_ANDROID_KEYSTORE_PATH")
+def smajSigningPassword = System.getenv("SMAJ_ANDROID_KEYSTORE_PASSWORD")
+if (System.getenv("CI") == "true" && (!smajSigningStore || !smajSigningPassword)) {
+    throw new GradleException("Persistent APK signing credentials are required in CI; refusing to generate an incompatible key.")
+}
+
 android {
     namespace = "com.smajpihub.mobile"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,6 +22,18 @@ android {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        debug {
+            if (smajSigningStore) {
+                if (!smajSigningPassword) throw new GradleException("APK signing password is missing.")
+                storeFile file(smajSigningStore)
+                storeType "PKCS12"
+                storePassword smajSigningPassword
+                keyAlias "smaj-updates"
+                keyPassword smajSigningPassword
+            }
         }
     }
     buildTypes {

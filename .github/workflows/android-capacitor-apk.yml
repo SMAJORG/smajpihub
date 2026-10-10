@@ -40,19 +40,30 @@ jobs:
         with:
           packages: platform-tools
 
-      - name: Restore stable debug signing key
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: smaj-android-debug-signing-v1
+      - name: Restore persistent APK signing key
+        env:
+          SMAJ_ANDROID_KEYSTORE_BASE64: ${{ secrets.SMAJ_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$SMAJ_ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::Configure SMAJ_ANDROID_KEYSTORE_BASE64 and SMAJ_ANDROID_KEYSTORE_PASSWORD repository secrets. Refusing to create an incompatible signing key."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$SMAJ_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/smaj-updates.keystore"
 
       - name: Install web dependencies
         run: npm ci
 
       - name: Build and sync Capacitor
+        env:
+          SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
+          SMAJ_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SMAJ_ANDROID_KEYSTORE_PASSWORD }}
         run: npm run android:sync
 
       - name: Build installable APK
+        env:
+          SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
+          SMAJ_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SMAJ_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           chmod +x android/gradlew
           cd android

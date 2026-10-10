@@ -141,7 +141,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
         <button className="private-menu-toggle admin-mobile-menu-toggle" type="button" onClick={toggleAdminMenu} aria-label={mobileSidebarOpen ? "Close admin menu" : "Toggle admin menu"}>
           {mobileSidebarOpen ? <CloseIcon /> : <MenuIcon />}
         </button>
-        <Link to="/admin" className="private-brand"><img src={logoImage} alt="" /><span>SMAJ ADMIN</span></Link>
+        <Link to="/admin" className="private-brand" aria-label="Admin dashboard"><img src={logoImage} alt="" /></Link>
         <form className="admin-header-search" onSubmit={submitSearch}>
           <SearchOutlinedIcon />
           <input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search admin..." aria-label="Search admin pages" />
@@ -189,7 +189,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
       <div className={`private-body ${sidebarCollapsed ? "private-body-collapsed" : ""}`}>
         <aside id="admin-mobile-sidebar" className={`private-sidebar ${sidebarCollapsed ? "private-sidebar-collapsed" : ""} ${mobileSidebarOpen ? "private-sidebar-open" : ""}`}>
           <div className="private-sidebar-top">
-            <Link to="/admin" className="private-sidebar-brand" title="SMAJ ADMIN" aria-label="SMAJ Admin dashboard"><img src={logoImage} alt="" /><span>SMAJ ADMIN</span></Link>
+            <Link to="/admin" className="private-sidebar-brand" title="Admin dashboard" aria-label="Admin dashboard"><img src={logoImage} alt="" /></Link>
             <button className="private-sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
               {sidebarCollapsed ? <KeyboardDoubleArrowRightIcon /> : <KeyboardDoubleArrowLeftIcon />}
             </button>

@@ -33,3 +33,5 @@
 
 .sw-video-modal-layer{z-index:2147483230}
 .sw-channel-video-card>.sw-video-more{inset:auto 0 8px auto!important;display:grid!important;opacity:1;visibility:visible}
+
+.sw-moderation-list>article{position:relative}.sw-moderation-list>article>.sw-video-more{position:absolute;right:14px;top:14px;z-index:2}.sw-moderation-copy{padding-right:32px}

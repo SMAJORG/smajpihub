@@ -17,8 +17,8 @@ import { STREAM_ACTIVITY_EVENT } from "../../lib/streamPlaybackTracking";
 import "./StreamVideoActions.css";
 
 export type ActionVideo = Pick<CreatorVideo, "title" | "cloudflareUid"> & Partial<CreatorVideo>;
-type Props = { video: ActionVideo; owner?: boolean; watchPath?: string; onUpdated?: (video: CreatorVideo) => void; onDeleted?: () => void; onRemoveDownload?: () => Promise<void> };
-const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDeleted, onRemoveDownload }: Props) => {
+type Props = { video: ActionVideo; owner?: boolean; watchPath?: string; onUpdated?: (video: CreatorVideo) => void; onDeleted?: () => void; onRemoveDownload?: () => Promise<void>; deleteAction?: () => Promise<void>; deleteDescription?: string };
+const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDeleted, onRemoveDownload, deleteAction, deleteDescription }: Props) => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"menu" | "edit" | "delete" | "delete-download" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -102,7 +102,8 @@ const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDele
   const remove = async () => {
     setBusy(true); setMessage("");
     try {
-      await deleteCreatorVideo(video.cloudflareUid || video._id || "");
+      if (deleteAction) await deleteAction();
+      else await deleteCreatorVideo(video.cloudflareUid || video._id || "");
       setMode(null); onDeleted?.(); window.dispatchEvent(new Event(STREAM_ACTIVITY_EVENT));
     } catch (error) { fail(error); }
     finally { setBusy(false); }
@@ -118,6 +119,7 @@ const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDele
             <button type="button" disabled={busy || !playable} onClick={() => void share()}><ShareRoundedIcon /><span>Share</span></button>
             {video.downloadAllowed && playable ? <button type="button" disabled={busy} onClick={() => void saveToDevice()}><DownloadRoundedIcon /><span>Save to device</span></button> : null}
             {onRemoveDownload ? <button type="button" className="danger" disabled={busy} onClick={() => { setMessage(""); setMode("delete-download"); }}><DeleteOutlineRoundedIcon /><span>Delete download</span></button> : null}
+            {deleteAction && !owner ? <button type="button" className="danger" disabled={busy} onClick={() => setMode("delete")}><DeleteOutlineRoundedIcon /><span>Delete video</span></button> : null}
             {owner ? <>
               <button type="button" disabled={busy || !video.cloudflareUid} onClick={() => { setMode(null); navigate(`/app/services/stream/studio/analytics?video=${encodeURIComponent(video.cloudflareUid)}`); }}><BarChartRoundedIcon /><span>View analytics</span></button>
               <button type="button" disabled={busy} onClick={() => { setTitle(video.title); setDescription(video.description || ""); setCategory(video.category || "Entertainment"); setVisibility(video.visibility || "private"); setMessage(""); setMode("edit"); }}><EditRoundedIcon /><span>Edit details</span></button>
@@ -131,7 +133,7 @@ const StreamVideoActions = ({ video, owner = false, watchPath, onUpdated, onDele
             <div><label>Category<input value={category} onChange={event => setCategory(event.target.value)} required maxLength={60} disabled={busy} /></label><label>Visibility<select value={visibility} onChange={event => setVisibility(event.target.value as typeof visibility)} disabled={busy}><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></label></div>
             <footer><button type="button" disabled={busy} onClick={() => setMode(null)}>Cancel</button><button className="primary" type="submit" disabled={busy || !title.trim() || !category.trim()}>{busy ? "Saving..." : "Save changes"}</button></footer>
           </form> : null}
-          {mode === "delete" ? <div className="sw-video-delete-confirm"><p>This video will be removed from your channel and will no longer be available to watch on Stream.</p><footer><button type="button" data-initial-focus disabled={busy} onClick={() => setMode(null)}>Cancel</button><button type="button" className="danger" disabled={busy} onClick={() => void remove()}>{busy ? "Deleting..." : "Delete video"}</button></footer></div> : null}
+          {mode === "delete" ? <div className="sw-video-delete-confirm"><p>{deleteDescription || "This video will be removed from your channel and will no longer be available to watch on Stream."}</p><footer><button type="button" data-initial-focus disabled={busy} onClick={() => setMode(null)}>Cancel</button><button type="button" className="danger" disabled={busy} onClick={() => void remove()}>{busy ? "Deleting..." : "Delete video"}</button></footer></div> : null}
           {message ? <p className="sw-video-action-message" role="status">{message}</p> : null}
         </section>
       </div>, document.body

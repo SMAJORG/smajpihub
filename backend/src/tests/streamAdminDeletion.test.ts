@@ -1,0 +1,23 @@
+import assert from "node:assert/strict";
+import { createMemoryCollections } from "../services/memoryDatabase";
+import { deleteAdminStreamVideo } from "../services/streamAdminDeletion";
+const main = async () => {
+  const collection = createMemoryCollections().streamContentCollection;
+  const uid = "a".repeat(32);
+  await collection.insertOne({ cloudflareUid: uid, contentSource: "cloudflare_stream" });
+  let remoteCalls = 0;
+  await assert.rejects(deleteAdminStreamVideo(collection, uid, async () => { remoteCalls++; throw { response: { status: 503 } }; }));
+  assert(await collection.findOne({ cloudflareUid: uid }), "remote failure must preserve app record");
+  await deleteAdminStreamVideo(collection, uid, async remoteUid => { assert.equal(remoteUid, uid); assert(await collection.findOne({ cloudflareUid: uid })); remoteCalls++; });
+  assert.equal(await collection.findOne({ cloudflareUid: uid }), null);
+  await collection.insertOne({ cloudflareUid: uid, contentSource: "cloudflare_stream" });
+  await deleteAdminStreamVideo(collection, uid, async () => { throw { response: { status: 404 } }; });
+  assert.equal(await collection.findOne({ cloudflareUid: uid }), null);
+  await collection.insertOne({ cloudflareUid: "yt-external", contentSource: "youtube" });
+  const result = await deleteAdminStreamVideo(collection, "yt-external", async () => { throw Error("external sources must not call Cloudflare"); });
+  assert.equal(result.cloudflareDeleted, false);
+  await assert.rejects(deleteAdminStreamVideo(collection, "missing", async () => {}), /not found/);
+  assert.equal(remoteCalls, 2);
+  console.log("Admin deletion remote-first, failure preservation, already-deleted and external-source checks passed");
+};
+void main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,10 +1,12 @@
+import StreamVideoActions from "./StreamVideoActions";
 import StreamSkeleton from "./StreamSkeleton";
-import { useCallback, useEffect, useState } from "react";
-import { getModerationVideos, updateModerationVideo, type ModerationVideo } from "../../lib/streamAdmin";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getModerationVideos, updateModerationVideo, deleteModerationVideo, type ModerationVideo } from "../../lib/streamAdmin";
 import { searchStreamCatalog, type StreamCatalogTitle } from "../../lib/streamCatalog";
 import ActionDialog from "../../components/ActionDialog";
 
 const StreamModerationPanel = () => {
+  const revision = useRef(0);
   const [videos, setVideos] = useState<ModerationVideo[] | null>(null);
   const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState("");
@@ -14,18 +16,21 @@ const StreamModerationPanel = () => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StreamCatalogTitle[]>([]);
   const [rejectVideo, setRejectVideo] = useState<ModerationVideo | null>(null);
-  const load = useCallback(() =>
+  const load = useCallback(() => {
+    const request = ++revision.current;
     void getModerationVideos(filter)
-      .then(setVideos)
+      .then(items => { if (request === revision.current) setVideos(items); })
       .catch(error => {
+        if (request !== revision.current) return;
         setVideos([]);
         setMessageType("error");
         setMessage(error?.response?.data?.message || "The moderation queue could not be loaded.");
-      }), [filter]);
+      });
+  }, [filter]);
   useEffect(() => {
     load();
     const interval = window.setInterval(load, 15_000);
-    return () => window.clearInterval(interval);
+    return () => { revision.current += 1; window.clearInterval(interval); };
   }, [load]);
   const act = async (video: ModerationVideo, body: Record<string, unknown>) => {
     try {
@@ -96,6 +101,7 @@ const StreamModerationPanel = () => {
       <div className="sw-moderation-list">
         {videos.map(video => (
           <article key={video.cloudflareUid}>
+            <StreamVideoActions video={video} deleteAction={async () => { await deleteModerationVideo(video.cloudflareUid); }} deleteDescription={video.contentSource === "cloudflare_stream" ? "Permanently delete this video from Cloudflare Stream and the app? This cannot be undone." : "Remove this video from Stream? The original external source will remain."} onDeleted={() => { revision.current += 1; setVideos(current => current?.filter(item => item.cloudflareUid !== video.cloudflareUid) || []); }} />
             <div className="sw-moderation-preview">
               {video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" /> : <span>VIDEO</span>}
             </div>
