@@ -186,6 +186,10 @@ async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rou
     "../services/notifications": { createNotification: async () => { if (notificationHangs) await new Promise(() => {}); } },
   };
   const exports = {};
+  const serviceExports = {};
+  const serviceCode = ts.transpileModule(fs.readFileSync(require("node:path").join(__dirname, "../../backend/src/services/storePayments.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  vm.runInNewContext(serviceCode, { exports: serviceExports, require: name => modules[name] || modules["../services/" + name.replace("./", "")], Date, Promise });
+  modules["../services/storePayments"] = serviceExports;
   vm.runInNewContext(serverCode, { exports, require: name => modules[name], Date, Promise });
   const routes = {};
   const router = {
@@ -424,4 +428,29 @@ test("exhausted transient retries keep checkout busy for the next SDK completion
   assert.deepEqual(app.busy, [true]); assert.equal(errors, 0);
   await app.callbacks().onReadyForServerCompletion("payment-1", "tx-1"); await pending;
   assert.equal(completed, 1); assert.equal(app.opened(), 1);
+});
+
+async function approvePersistedPayment(databaseFails = false) {
+  const order = { _id: new ObjectId(), buyerId: "buyer", status: "pending", timeline: [] };
+  const events = [], routes = {}; let response;
+  const modules = {
+    mongodb: { ObjectId },
+    "../services/auth": { resolveCurrentUser: async () => ({ uid: "buyer" }) },
+    "../services/platformAPIClient": { platformAPIKeyClient: { post: async () => events.push("pi-approved") } },
+    "../services/notifications": { createNotification: async () => {} },
+    "../services/storePayments": {},
+  };
+  const exports = {}; vm.runInNewContext(serverCode, { exports, require: name => modules[name], Date, Promise });
+  exports.default({ get: () => {}, post: (url, handler) => { routes[url] = handler; } });
+  await routes["/approve"]({ body: { orderId: String(order._id), paymentId: "payment-1" }, app: { locals: { marketplaceOrderCollection: {
+    findOne: async () => order,
+    updateOne: async (_, update) => { if (databaseFails) throw Error("database unavailable"); events.push("persisted"); assert.equal(update.$set.paymentRecoveryState, "pending"); return { matchedCount: 1 }; },
+  } } } }, { status: status => ({ json: body => { response = { status, body }; } }) });
+  return { events, response };
+}
+test("payment recovery intent is stored before Pi can approve the wallet transfer", async () => {
+  const result = await approvePersistedPayment(); assert.deepEqual(result.events, ["persisted", "pi-approved"]); assert.equal(result.response.status, 200);
+});
+test("failed persistence cannot approve a transfer that the server cannot recover", async () => {
+  const result = await approvePersistedPayment(true); assert.deepEqual(result.events, []); assert.equal(result.response.status, 502);
 });

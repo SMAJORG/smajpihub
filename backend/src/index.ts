@@ -10,6 +10,7 @@ import logger from "morgan";
 import MongoStore from "connect-mongo";
 import { MongoClient } from "mongodb";
 import env from "./environments";
+import { startStorePaymentRecovery } from "./services/storePaymentRecovery";
 import mountPaymentsEndpoints from "./handlers/payments";
 import mountLiveTransactions from "./handlers/transactions";
 import mountUserEndpoints, { handleSignIn } from "./handlers/users";
@@ -345,6 +346,7 @@ app.get("/health", async (_, res) => {
     features: {
       heroBanners: Boolean(app.locals.heroBannerCollection),
       education: Boolean(app.locals.universityCollection),
+      storePaymentRecovery: Boolean(app.locals.storePaymentRecoveryStarted),
     },
   });
 });
@@ -785,6 +787,8 @@ const start = async () => {
         ? "Connected to in-memory development database"
         : `Connected to MongoDB on: ${maskMongoUri(mongoUri)}`,
     );
+
+    if (env.pi_payments_enabled && !env.use_memory_db) startStorePaymentRecovery(app);
 
     app.listen(env.port, () => {
       console.log(`SMAJ PI HUB backend listening on port ${env.port}!`);
