@@ -128,13 +128,13 @@ const serverSource = fs.readFileSync(
 const serverCode = ts.transpileModule(serverSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-async function completePayment({ mismatch, alreadyPaid = false, rounded = false, recovery = false, delayedTransaction = false, unverified = false, confirmedMismatch = false, piAlreadyCompleted = false } = {}) {
+async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rounded = false, recovery = false, delayedTransaction = false, unverified = false, confirmedMismatch = false, piAlreadyCompleted = false } = {}) {
   const order = {
     _id: new ObjectId(),
     buyerId: "buyer",
     sellerId: "seller",
     pricePi: 3,
-    status: alreadyPaid ? "paid" : "pending",
+    status: orderStatus || (alreadyPaid ? "paid" : "pending"),
     paymentStatus: alreadyPaid ? "paid" : "processing",
     paymentId: "payment-1",
     paymentTxid: alreadyPaid ? "tx-1" : undefined,
@@ -200,7 +200,8 @@ async function completePayment({ mismatch, alreadyPaid = false, rounded = false,
           findOne: async query => (query.buyerId === "buyer" && String(query._id) === String(order._id) ? order : null),
           updateOne: async (_, update) => {
             updates++;
-            assert.equal(update.$set.status, "paid");
+            assert.equal(update.$set.status, order.status === "pending" ? "paid" : order.status);
+            return { matchedCount: 1 };
           },
         },
       },
@@ -312,4 +313,31 @@ test("incomplete recovery verifies the SDK hash when the Pi lookup has no transa
   assert.equal(result.response.status, 200);
   assert.equal(result.updates, 1);
   assert.equal(result.completions, 1);
+});
+
+test("incomplete recovery completes Pi without rolling back fulfillment or cancellation", async () => {
+  for (const orderStatus of ["paid", "processing", "shipped", "delivered", "completed", "cancelled"]) {
+    const result = await completePayment({ recovery: true, orderStatus });
+    assert.equal(result.response.status, 200, orderStatus);
+    assert.equal(result.completions, 1, orderStatus);
+    assert.equal(result.updates, 1, orderStatus);
+  }
+});
+test("recovery completes Pi even when MongoDB already records this payment", async () => {
+  const result = await completePayment({ recovery: true, alreadyPaid: true, orderStatus: "shipped" });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.completions, 1);
+  assert.equal(result.updates, 0);
+});
+test("normal completion still rejects a new payment on a non-pending order", async () => {
+  const result = await completePayment({ orderStatus: "cancelled" });
+  assert.equal(result.response.status, 400);
+  assert.equal(result.completions, 0);
+  assert.equal(result.updates, 0);
+});
+test("recovery on a non-pending order still rejects the wrong amount", async () => {
+  const result = await completePayment({ recovery: true, orderStatus: "shipped", mismatch: "amount" });
+  assert.equal(result.response.status, 400);
+  assert.equal(result.completions, 0);
+  assert.equal(result.updates, 0);
 });

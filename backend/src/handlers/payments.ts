@@ -83,7 +83,7 @@ export default function mountPaymentsEndpoints(router: Router) {
       const txid = payment.transaction?.txid || req.body?.txid;
       if (typeof txid !== "string" || !txid) return res.status(409).json({ message: "Pi has not recorded a transaction for this payment yet. Check Pi Wallet before retrying." });
       req.body = { paymentId, orderId, txid };
-      return await completePayment(req, res);
+      return await completePayment(req, res, true);
     } catch {
       return res.status(502).json({ message: "Could not verify the pending payment with Pi. Please retry shortly." });
     }
@@ -130,7 +130,7 @@ export default function mountPaymentsEndpoints(router: Router) {
     return res.status(200).json({ message: "Payment approved.", paymentId });
   });
 
-  const completePayment = async (req: Request, res: Response) => {
+  const completePayment = async (req: Request, res: Response, recovering = false) => {
     const { paymentId, orderId, txid } = req.body || {};
     if (!paymentId || !orderId || !txid) {
       return res.status(400).json({ error: "bad_request", message: "Missing paymentId, orderId, or txid." });
@@ -138,10 +138,11 @@ export default function mountPaymentsEndpoints(router: Router) {
 
     const order = await findBuyerOrder(req, res, String(orderId));
     if (!order) return;
-    if (order.paymentStatus === "paid" && order.paymentId === paymentId && order.paymentTxid === txid) {
+    const alreadyRecorded = order.paymentStatus === "paid" && order.paymentId === paymentId && order.paymentTxid === txid;
+    if (alreadyRecorded && !recovering) {
       return res.status(200).json({ message: "Payment already completed.", orderId: order._id.toString(), paymentId, txid });
     }
-    if (order.status !== "pending") {
+    if (!recovering && order.status !== "pending") {
       return res.status(400).json({ error: "bad_request", message: "Only pending orders can be completed with payment." });
     }
     const { data: payment } = await platformAPIKeyClient.get(`/v2/payments/${paymentId}`);
@@ -169,15 +170,18 @@ export default function mountPaymentsEndpoints(router: Router) {
       return res.status(409).json({ error: "verification_pending", message: "Pi has not confirmed completion yet. Check Pi Wallet and retry Continue Payment; do not make another payment." });
     }
 
-    await req.app.locals.marketplaceOrderCollection.updateOne(
-      { _id: order._id },
+    // Recovery acknowledges the existing transfer without undoing fulfillment or cancellation.
+    if (alreadyRecorded) return res.status(200).json({ message: "Payment recovered.", orderId: order._id.toString(), paymentId, txid });
+    if (order.paymentStatus === "paid" && (order.paymentId || order.paymentTxid)) return res.status(409).json({ message: "Pi payment completed, but this order records another payment. Contact support to reconcile the extra transfer." });
+    const recorded = await req.app.locals.marketplaceOrderCollection.updateOne(
+      { _id: order._id, status: order.status, paymentStatus: order.paymentStatus },
       {
         $set: {
-          status: "paid",
+          status: order.status === "pending" ? "paid" : order.status,
           paymentStatus: "paid",
           paymentId,
           paymentTxid: txid,
-          paidAt: new Date(),
+          paidAt: order.paidAt || new Date(),
           updatedAt: new Date(),
           timeline: [
             ...(Array.isArray(order.timeline) ? order.timeline : []),
@@ -186,6 +190,8 @@ export default function mountPaymentsEndpoints(router: Router) {
         },
       }
     );
+
+    if (recorded.matchedCount === 0) return res.status(409).json({ message: "Pi payment completed, but the order changed. Refresh and retry; do not make another payment." });
 
     await Promise.all([
       createNotification(req.app, {
@@ -208,7 +214,7 @@ export default function mountPaymentsEndpoints(router: Router) {
 
     return res.status(200).json({ message: "Payment completed.", orderId: order._id.toString(), paymentId, txid });
   };
-  router.post("/complete", completePayment);
+  router.post("/complete", (req, res) => completePayment(req, res));
 
   router.post("/cancelled_payment", async (req, res) => {
     const { paymentId, orderId } = req.body || {};
