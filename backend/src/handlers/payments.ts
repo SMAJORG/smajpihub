@@ -152,7 +152,7 @@ export default function mountPaymentsEndpoints(router: Router) {
       if (candidate.user_uid !== order.buyerId) return "This payment belongs to a different Pi account.";
       if (String(candidate.metadata?.orderId || "") !== order._id.toString()) return "This payment belongs to a different order. Resume its original order.";
       if (!Number.isFinite(Number(order.pricePi)) || Number(order.pricePi) <= 0) return "This order has no valid Pi payment price. Refresh the order or contact support.";
-      if (!Number.isFinite(Number(candidate.amount)) || Number(candidate.amount) <= 0 || Math.round(Number(candidate.amount) * 1e7) !== Math.round(Number(order.pricePi) * 1e7)) return "The Pi payment amount differs from this order's total. Check the original order before paying again.";
+      if (!Number.isFinite(Number(candidate.amount)) || Number(candidate.amount) <= 0 || (!recovering && Math.round(Number(candidate.amount) * 1e7) !== Math.round(Number(order.pricePi) * 1e7))) return "The Pi payment amount differs from this order's total. Check the original order before paying again.";
       if (candidate.transaction?.txid && candidate.transaction.txid !== txid) return "The transaction hash differs from the transaction recorded by Pi.";
       if (candidate.status?.cancelled || candidate.status?.user_cancelled) return "Pi reports that this payment was cancelled.";
       return null;
@@ -168,6 +168,15 @@ export default function mountPaymentsEndpoints(router: Router) {
     if (confirmedProblem) return res.status(400).json({ error: "payment_mismatch", message: confirmedProblem });
     if (confirmed.transaction?.txid !== txid || confirmed.transaction?.verified !== true || confirmed.status?.transaction_verified !== true || confirmed.status?.developer_completed !== true) {
       return res.status(409).json({ error: "verification_pending", message: "Pi has not confirmed completion yet. Check Pi Wallet and retry Continue Payment; do not make another payment." });
+    }
+
+    // Acknowledge the verified transfer without crediting a mismatched order.
+    if (recovering && Math.round(Number(confirmed.amount) * 1e7) !== Math.round(Number(order.pricePi) * 1e7)) {
+      await req.app.locals.marketplaceOrderCollection.updateOne(
+        { _id: order._id },
+        { $addToSet: { paymentReconciliation: { paymentId, txid, amountPi: Number(confirmed.amount), reason: "amount_mismatch" } } }
+      );
+      return res.status(200).json({ message: "Previous transfer acknowledged and recorded for reconciliation.", orderId: "", originalOrderId: order._id.toString(), paymentId, txid, requiresReconciliation: true });
     }
 
     // Recovery acknowledges the existing transfer without undoing fulfillment or cancellation.

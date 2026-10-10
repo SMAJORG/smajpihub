@@ -29,7 +29,7 @@ function setup({
     createPayment: (_, callbacks) => {
       walletOpened++;
       walletCallbacks = callbacks;
-      if (incompleteAtCreate) {
+      if (incompleteAtCreate && walletOpened === 1) {
         if (!incompleteFromError) foundPayment(incomplete);
         void callbacks.onError(new Error("A pending payment needs to be handled."), incomplete);
       }
@@ -200,7 +200,8 @@ async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rou
           findOne: async query => (query.buyerId === "buyer" && String(query._id) === String(order._id) ? order : null),
           updateOne: async (_, update) => {
             updates++;
-            assert.equal(update.$set.status, order.status === "pending" ? "paid" : order.status);
+            if (update.$set) assert.equal(update.$set.status, order.status === "pending" ? "paid" : order.status);
+            else assert.equal(update.$addToSet.paymentReconciliation.reason, "amount_mismatch");
             return { matchedCount: 1 };
           },
         },
@@ -335,9 +336,23 @@ test("normal completion still rejects a new payment on a non-pending order", asy
   assert.equal(result.completions, 0);
   assert.equal(result.updates, 0);
 });
-test("recovery on a non-pending order still rejects the wrong amount", async () => {
+test("recovery acknowledges a different amount without marking the order paid", async () => {
   const result = await completePayment({ recovery: true, orderStatus: "shipped", mismatch: "amount" });
-  assert.equal(result.response.status, 400);
-  assert.equal(result.completions, 0);
-  assert.equal(result.updates, 0);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.response.body.orderId, "");
+  assert.equal(result.response.body.requiresReconciliation, true);
+  assert.equal(result.completions, 1);
+  assert.equal(result.updates, 1);
+});
+
+test("a different pending payment discovered by the wallet is recovered and checkout retries automatically", async () => {
+  const app = setup({ incompleteAtCreate: true, incomplete: { identifier: "old", metadata: { orderId: "old-order" }, transaction: { txid: "old-tx" } } });
+  let complete = 0;
+  const pending = app.payOrder("order-1", 3, { onComplete: () => complete++ });
+  await flush(); await flush();
+  assert.equal(app.opened(), 2);
+  assert.equal(complete, 0);
+  await app.callbacks().onReadyForServerCompletion("new", "new-tx");
+  await pending;
+  assert.equal(complete, 1);
 });

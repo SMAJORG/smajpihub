@@ -70,16 +70,19 @@ export const usePiPayment = () => {
       }
       if (data.order.paymentId && data.order.paymentStatus === "processing") {
         const { data: recoveredPayment } = await axiosClient.post<{ orderId: string }>("/payments/incomplete", { paymentId: data.order.paymentId });
-        if (recoveredPayment.orderId !== orderId) throw new Error("The recorded payment belongs to another order. Refresh this order before retrying.");
-        callbacks?.onComplete?.();
-        return;
+        if (recoveredPayment.orderId && recoveredPayment.orderId !== orderId) throw new Error("The recorded payment belongs to another order. Refresh this order before retrying.");
+        if (recoveredPayment.orderId === orderId) {
+          callbacks?.onComplete?.();
+          return;
+        }
       }
       if (data.order.status !== "pending") throw new Error("This order is no longer awaiting payment.");
       if (Math.round(data.order.pricePi * 1e7) !== Math.round(amount * 1e7))
         throw new Error("The order amount changed. Refresh the order before paying.");
 
       // The SDK returns before the wallet closes; keep the action busy until a terminal callback.
-      await withPiTimeout(
+      let retriedAfterRecovery = false;
+      const createPayment = (): Promise<void> => withPiTimeout(
         new Promise<void>((resolve, reject) => {
           const result = pi.createPayment(
             {
@@ -123,6 +126,11 @@ export const usePiPayment = () => {
                   resolve();
                   return;
                 }
+                if (results.length && !retriedAfterRecovery) {
+                  retriedAfterRecovery = true;
+                  createPayment().then(resolve, reject);
+                  return;
+                }
                 reject(
                   results.length
                     ? new Error("The previous payment was recovered. Tap Continue Payment again for this order.")
@@ -136,6 +144,7 @@ export const usePiPayment = () => {
         180000,
         "Payment is taking longer than expected. Check Pi Wallet and this order before trying again."
       );
+      await createPayment();
     } catch (error) {
       const serverMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
       callbacks?.onError?.(
