@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
 import { resolveCurrentUser, setSessionUser } from "../services/auth";
 import env from "../environments";
+import { adminAccount, sendAdminUserMessage } from "../services/adminUserMessaging";
 import { canTransitionOrder, releaseOrderInventory, timelineEntry } from "../services/orderLifecycle";
 
 const serialize = (document: Record<string, any>) => ({ ...document, _id: document._id.toString(), accessToken: undefined });
@@ -392,7 +393,30 @@ export default function mountAdminEndpoints(router: Router) {
 
   router.get("/users", async (req, res) => {
     const users = await req.app.locals.userCollection.find({}).sort({ createdAt: -1 }).toArray();
-    return res.status(200).json({ users: users.map(serialize) });
+    const currentUser = await resolveCurrentUser(req);
+    return res.status(200).json({ users: users.map(adminAccount), currentUserUid: currentUser?.uid });
+  });
+
+  router.post("/users/messages", async (req, res) => {
+    const sender = await resolveCurrentUser(req);
+    if (!sender?.uid) return res.status(401).json({ message: "Sign in with an account that supports messaging." });
+    const { userIds, message, requestId } = req.body || {};
+    if (!Array.isArray(userIds) || !userIds.length || userIds.length > 50 || userIds.some((id: unknown) => typeof id !== "string" || !ObjectId.isValid(id)) || typeof message !== "string" || !message.trim() || message.trim().length > 1000 || typeof requestId !== "string" || !/^[a-zA-Z0-9-]{16,80}$/.test(requestId)) {
+      return res.status(400).json({ message: "Choose up to 50 valid accounts and enter a message of 1 to 1,000 characters." });
+    }
+    const results: Array<Record<string, any>> = [];
+    const seen = new Set<string>();
+    for (const id of [...new Set<string>(userIds)]) {
+      try {
+        const recipient = await req.app.locals.userCollection.findOne({ _id: new ObjectId(id) });
+        if (!recipient?.uid || recipient.uid === sender.uid) { results.push({ userId: id, sent: false, error: "Account has no messaging identity or is your own account." }); continue; }
+        if (seen.has(recipient.uid)) { results.push({ userId: id, sent: false, error: "Duplicate messaging identity." }); continue; }
+        seen.add(recipient.uid);
+        const result = await sendAdminUserMessage(req.app.locals, sender, recipient, message, requestId, input => createNotification(req.app, input));
+        results.push({ userId: id, sent: true, ...result });
+      } catch { results.push({ userId: id, sent: false, error: "Message could not be delivered. Retry this account." }); }
+    }
+    return res.status(200).json({ results });
   });
 
   router.patch("/users/:id", async (req, res) => {
