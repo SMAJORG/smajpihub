@@ -33,6 +33,9 @@ const AdminModulePage = () => {
     if (!group || !item) return;
     setLoading(true);
     setError("");
+    if ((group.number >= 6 && group.number <= 19) || item.label === "Fraud Alerts") {
+      setRecords([]); setLoading(false); setError("This module requires its own admin management API. No unrelated platform records are shown."); return;
+    }
     const storeOrders = group.number === 5 && ["Orders", "Payments", "Disputes"].includes(item.label);
     const source = group.number === 2
       ? { endpoint: "/admin/users", key: "users", href: "/admin/users" }
@@ -108,7 +111,7 @@ const AdminModulePage = () => {
         <article><span>Records</span><strong>{records.length}</strong><small>Live {item.label.toLowerCase()}</small></article>
         <article><span>Needs attention</span><strong>{attentionCount}</strong><small>Pending or flagged</small></article>
         <article><span>Platform users</span><strong>{stats.totalUsers || 0}</strong><small>SMAJ PI HUB</small></article>
-        <article><span>Transactions</span><strong>{stats.totalOrders || 0}</strong><small>All services</small></article>
+        <article><span>Marketplace orders</span><strong>{stats.totalOrders || 0}</strong><small>Store records</small></article>
       </section>
       <section className="admin-workspace-table">
         <header><div><h2>{item.label}</h2><p>{visible.length} of {records.length} records</p></div><div className="admin-workspace-tools"><label><SearchOutlinedIcon /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={"Search " + item.label.toLowerCase()} /></label><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option>{statuses.map((value) => <option value={value} key={value}>{value}</option>)}</select></div></header>

@@ -3,7 +3,7 @@ export type AdminNavGroup = { number: number; label: string; icon: "overview" | 
 const items = (labels: string[], routes: Record<string, string> = {}): AdminNavItem[] => labels.map((label) => ({ label, to: routes[label] }));
 
 const configuredAdminNavigation: AdminNavGroup[] = [
-  { number: 1, label: "Overview", icon: "overview", items: items(["Dashboard", "Live Activity", "Platform Health", "Pending Actions", "Global Analytics"], { Dashboard: "/admin", "Global Analytics": "/admin/reports" }) },
+  { number: 1, label: "Overview", icon: "overview", items: items(["Dashboard", "Live Activity", "Platform Health", "Pending Actions", "Global Analytics"], { Dashboard: "/admin", "Global Analytics": "/admin/analytics" }) },
   { number: 2, label: "Users & Identity", icon: "users", items: items(["All Users", "Pi Accounts", "Basic Users", "Verified Users", "Trusted Sellers / Providers", "KYB Applications", "Suspended Users", "User Reports", "Verification Logs"], { "All Users": "/admin/users", "KYB Applications": "/admin/onboarding", "User Reports": "/admin/reports" }) },
   { number: 3, label: "Pi Payments", icon: "payments", items: items(["Dashboard", "All Transactions", "Pending Payments", "Completed Payments", "Failed Payments", "Payment Confirmations", "Refund / Reversal Cases", "Service Transactions", "Blockchain Logs"], { Dashboard: "/admin/orders", "All Transactions": "/admin/orders", "Pending Payments": "/admin/orders", "Completed Payments": "/admin/orders", "Failed Payments": "/admin/orders" }) },
   { number: 4, label: "SMAJ AI Assistant", icon: "platform", items: items(["Usage Dashboard", "Conversations", "Recommendations", "Search Activity", "Service Navigation", "Reports", "Safety Controls", "AI Configuration"]) },
@@ -27,11 +27,24 @@ const configuredAdminNavigation: AdminNavGroup[] = [
   { number: 22, label: "Content & CMS", icon: "system", items: items(["News", "Homepage", "Service Pages", "Banners", "FAQ", "White Paper", "Legal Pages", "Media Library"], { Banners: "/admin/heroes" }) },
   { number: 23, label: "Partners", icon: "users", items: items(["All Partners", "Applications", "Approved Partners", "Businesses", "NGOs", "Universities", "Healthcare Providers", "Restaurants"], { Applications: "/admin/ambassadors" }) },
   { number: 24, label: "Developers & API", icon: "system", items: items(["API Dashboard", "Developers", "Applications", "API Keys", "API Usage", "Webhooks", "Integration Logs", "Documentation"]) },
-  { number: 25, label: "Analytics", icon: "overview", items: items(["Platform Analytics", "User Growth", "Active Users", "Countries", "Services Usage", "Pi Transaction Volume", "Conversion", "Revenue / Fees", "Growth Reports"], { "Platform Analytics": "/admin/reports" }) },
+  { number: 25, label: "Analytics", icon: "overview", items: items(["Platform Analytics", "User Growth", "Active Users", "Countries", "Services Usage", "Pi Transaction Volume", "Conversion", "Revenue / Fees", "Growth Reports"], { "Platform Analytics": "/admin/analytics" }) },
   { number: 26, label: "System", icon: "system", items: items(["Admin Team", "Roles & Permissions", "Audit Logs", "Pi Network Integration", "Payment Configuration", "Verification Settings", "AI Settings", "API Settings", "Storage", "Security", "System Health", "Feature Flags", "Localization", "General Settings"], { "General Settings": "/admin/settings" }) },
 ];
 
 const routeSlug = (value: string) => value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+const serviceIds: Record<number, string> = { 5: "store", 6: "stream", 7: "sports", 8: "food", 9: "jobs", 10: "health", 11: "edu", 12: "transport", 13: "agro", 14: "energy", 15: "charity", 16: "housing", 17: "events", 18: "swap", 19: "token" };
+for (const group of configuredAdminNavigation) {
+  const service = serviceIds[group.number];
+  if (service) {
+    group.items.unshift({ label: "Analytics & Management", to: "/admin/services/" + service });
+    const dashboard = group.items.find(item => item.label === "Dashboard");
+    if (dashboard && !dashboard.to) dashboard.to = "/admin/services/" + service;
+  }
+  if (group.number === 25) for (const item of group.items) {
+    if (["User Growth", "Active Users", "Services Usage", "Pi Transaction Volume", "Growth Reports"].includes(item.label)) item.to = "/admin/analytics";
+  }
+}
 
 export const adminNavigation: AdminNavGroup[] = configuredAdminNavigation.map((group) => ({
   ...group,

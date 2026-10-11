@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
 import { resolveCurrentUser, setSessionUser } from "../services/auth";
 import env from "../environments";
+import { buildAdminAnalytics, parseAnalyticsRange } from "../services/adminAnalytics";
 import { adminAccount, sendAdminUserMessage } from "../services/adminUserMessaging";
 import { canTransitionOrder, releaseOrderInventory, timelineEntry } from "../services/orderLifecycle";
 
@@ -170,6 +171,36 @@ export default function mountAdminEndpoints(router: Router) {
     return res.status(200).json({ message: "Hero banner deleted." });
   });
 
+  const analyticsCache = new Map<string, { expires: number; promise: ReturnType<typeof buildAdminAnalytics> }>();
+  const analyticsSnapshot = (req: Request) => {
+    const range = parseAnalyticsRange(req.query);
+    const key = JSON.stringify(range);
+    let entry = analyticsCache.get(key);
+    if (!entry || entry.expires < Date.now()) {
+      if (analyticsCache.size >= 20) analyticsCache.clear();
+      const promise = buildAdminAnalytics(req.app.locals, range).catch(error => { analyticsCache.delete(key); throw error; });
+      entry = { expires: Date.now() + 10_000, promise }; analyticsCache.set(key, entry);
+    }
+    return entry.promise;
+  };
+  router.get("/analytics", async (req, res) => {
+    try { const { records, ...snapshot } = await analyticsSnapshot(req); return res.json(snapshot); }
+    catch (error: any) { return res.status(400).json({ message: error.message || "Analytics unavailable." }); }
+  });
+  router.get("/analytics/records", async (req, res) => {
+    try {
+      const snapshot = await analyticsSnapshot(req);
+      const metric = String(req.query.metric || "");
+      if (!["growth", "active", "payments", "orders", "usage", "status"].includes(metric)) return res.status(400).json({ message: "Choose a valid metric." });
+      const range = parseAnalyticsRange(req.query);
+      const available = metric === "usage" ? snapshot.services.some(service => service.available && (!req.query.service || service.id === req.query.service)) : snapshot.charts[metric as keyof typeof snapshot.charts]?.available;
+      if (!available) return res.status(503).json({ message: "The requested metric is unavailable; required implementation is listed in the analytics definitions." });
+      const rows = snapshot.records.filter(row => row.metric === metric && (metric === "active" || (Date.parse(row.time) >= range.from && Date.parse(row.time) < range.to)) && (!req.query.service || row.service === req.query.service) && (!req.query.status || row.status === req.query.status)).sort((a, b) => b.time.localeCompare(a.time));
+      const page = Math.max(1, Math.floor(Number(req.query.page) || 1));
+      return res.json({ records: rows.slice((page - 1) * 50, page * 50), total: rows.length, page });
+    } catch (error: any) { return res.status(400).json({ message: error.message || "Records unavailable." }); }
+  });
+
   router.get("/stats", async (req, res) => {
     try {
       const { userCollection, productCollection, marketplaceOrderCollection, reportCollection, supportCollection, onboardingCollection, ambassadorCollection, notificationCollection, jobCollection, jobCompanyCollection, jobProfileCollection } = req.app.locals;
@@ -210,7 +241,7 @@ export default function mountAdminEndpoints(router: Router) {
         pendingJobProfiles,
       ] = await Promise.all([
         safeCount(userCollection),
-        safeCount(userCollection, { blocked: { $ne: true } }),
+        safeCount(userCollection, { blocked: { $ne: true }, lastSeenAt: { $gte: new Date(Date.now() - 15 * 60_000) } }),
         safeCount(userCollection, { verificationStatus: "approved", verificationLevel: { $in: ["pi_verified", "seller_verified", "trusted_seller", "verified"] } }),
         safeCount(userCollection, sellerQuery),
         safeCount(userCollection, { verificationStatus: "approved", verificationLevel: { $in: ["seller_verified", "trusted_seller"] } }),

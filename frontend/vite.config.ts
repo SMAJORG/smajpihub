@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import legacy from "@vitejs/plugin-legacy";
 import * as path from "node:path";
 import * as fs from "node:fs";
@@ -33,6 +34,7 @@ export default defineConfig(({ mode }) => {
         manualChunks(id: string) {
           if (!id.includes("node_modules")) return undefined;
           if (id.includes("react-router") || id.includes("react-dom") || id.includes("/react/")) return "react-vendor";
+          if (id.includes("recharts") || id.includes("d3-") || id.includes("victory-vendor")) return "admin-charts";
           if (id.includes("@mui")) return "mui-vendor";
           if (id.includes("styled-components") || id.includes("stylis")) return "styling-vendor";
           if (id.includes("axios")) return "http-vendor";
@@ -47,6 +49,7 @@ export default defineConfig(({ mode }) => {
     define: { "import.meta.env.VITE_APP_BUILD_ID": JSON.stringify(appBuildId) },
     plugins: [
       react(),
+      tailwindcss(),
       {
         name: "app-version-manifest",
         generateBundle() {

@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import express from "express";
+import { createMemoryCollections } from "../services/memoryDatabase";
+import { buildAdminAnalytics, parseAnalyticsRange } from "../services/adminAnalytics";
+import mountAdminEndpoints from "../handlers/admin";
+async function main() {
+  const locals: any = createMemoryCollections();
+  locals.liveTransactionCollection = createMemoryCollections().paymentCollection;
+  const now = Date.parse("2026-10-11T22:10:00Z");
+  const range = parseAnalyticsRange({ from: new Date(now - 86400000).toISOString(), to: new Date(now).toISOString(), timezone: "Asia/Dubai", live: "true" }, now);
+  await locals.userCollection.insertOne({ uid: "one", displayName: "One", createdAt: new Date(now - 10 * 60000), lastSeenAt: new Date(now - 5 * 60000), verificationStatus: "approved", verificationLevel: "trusted_seller", accessToken: "secret-one" });
+  await locals.userCollection.insertOne({ uid: "two", createdAt: new Date(now - 6 * 3600000), lastSeenAt: new Date(now - 20 * 60000) });
+  await locals.userCollection.insertOne({ uid: "blocked", blocked: true, createdAt: new Date(now - 6 * 3600000), lastSeenAt: new Date(now - 60000) });
+  await locals.marketplaceOrderCollection.insertOne({ paymentId: "verified", pricePi: 99, paymentStatus: "paid", createdAt: new Date(now - 60000), paidAt: new Date(now - 60000), productTitle: "Verified order" });
+  await locals.marketplaceOrderCollection.insertOne({ paymentId: "not-verified", pricePi: 10000, paymentStatus: "paid", createdAt: new Date(now - 60000) });
+  await locals.marketplaceOrderCollection.insertOne({ paymentId: "pending", pricePi: 10000, paymentStatus: "pending", createdAt: new Date(now - 60000) });
+  await locals.marketplaceOrderCollection.insertOne({ paymentId: "failed", pricePi: 10000, paymentStatus: "failed", createdAt: new Date(now - 60000) });
+  const verified = { transactionId: "a".repeat(64), paymentId: "verified", amount: 0.1, verified: true, network: "Pi Testnet", time: new Date(now - 60000).toISOString() };
+  await locals.liveTransactionCollection.insertOne(verified);
+  await locals.liveTransactionCollection.insertOne(verified);
+  await locals.liveTransactionCollection.insertOne({ ...verified, transactionId: "b".repeat(64), verified: false, amount: 1000 });
+  await locals.liveTransactionCollection.insertOne({ ...verified, transactionId: "c".repeat(64), network: "Pi Network", amount: 1000 });
+  await locals.liveTransactionCollection.insertOne({ ...verified, transactionId: "d".repeat(64), paymentId: "older", time: new Date(now - 2 * 86400000 + 60000).toISOString(), amount: 0.2 });
+  await locals.streamPlaybackSessionCollection.insertOne({ createdAt: new Date(now - 60000) });
+  const snapshot = await buildAdminAnalytics(locals, range, now);
+  assert.equal(snapshot.kpis.totalUsers, 3);
+  assert.equal(snapshot.kpis.activeUsers, 1, "Blocked and stale accounts are excluded");
+  assert.equal(snapshot.kpis.newUsersToday, 1, "Today is evaluated in Dubai, not UTC");
+  assert.equal(snapshot.kpis.piVolume, 0.1, "Only verified Testnet transactions contribute; orders are not money evidence");
+  assert.equal(snapshot.kpis.totalTransactions, 2, "Transaction hashes are deduplicated");
+  assert.equal(snapshot.charts.payments.data.reduce((sum, row) => sum + row.previous, 0), 0.2);
+  assert.equal(snapshot.services.find(service => service.id === "store")?.count, 4);
+  assert.equal(snapshot.services.find(service => service.id === "sports")?.count, null);
+  assert.equal(snapshot.services.length, 15);
+  assert.equal(snapshot.kpis.fraudAlerts, null);
+  assert.equal(snapshot.charts.status.data.find(row => row.name === "successful")?.value, 1);
+  assert.equal(snapshot.charts.status.data.find(row => row.name === "pending")?.value, 1);
+  assert.equal(snapshot.charts.status.data.find(row => row.name === "failed")?.value, 1);
+  assert.equal(snapshot.charts.status.data.find(row => row.name === "unverified")?.value, 1);
+  assert.equal(snapshot.contributions.find(row => row.service === "store")?.value, 0.1);
+  assert(!JSON.stringify(snapshot.records).includes("secret-one"));
+  const historical = await buildAdminAnalytics(locals, { ...range, live: false }, now);
+  assert.equal(historical.charts.active.available, false);
+  const scoped = await buildAdminAnalytics(locals, { ...range, service: "stream" }, now);
+  assert.equal(scoped.kpis.piVolume, 0);
+  assert.equal(scoped.charts.orders.available, false);
+  assert.throws(() => parseAnalyticsRange({ from: "2026-01-01", to: "2026-02-01" }, now));
+  assert.throws(() => parseAnalyticsRange({ timezone: "Invalid/Zone" }, now));
+  assert.throws(() => parseAnalyticsRange({ service: "fake" }, now));
+  assert.throws(() => parseAnalyticsRange({ from: new Date(now - 181 * 86400000).toISOString(), to: new Date(now).toISOString() }, now));
+  const dst = parseAnalyticsRange({ from: "2026-11-01T01:00:00-04:00", to: "2026-11-01T01:30:00-05:00", timezone: "America/New_York" }, Date.parse("2026-11-02T00:00:00Z"));
+  assert.equal(dst.to - dst.from, 90 * 60000, "DST offsets preserve actual elapsed time");
+  const missing = await buildAdminAnalytics({ ...locals, liveTransactionCollection: undefined }, range, now);
+  assert.equal(missing.kpis.piVolume, null);
+  assert.equal(missing.charts.payments.available, false);
+  const app = express(); Object.assign(app.locals, locals); app.use(express.json()); app.use((req, _res, next) => { (req as any).session = {}; next(); });
+  const router = express.Router(); mountAdminEndpoints(router); app.use("/admin", router);
+  await locals.userCollection.insertOne({ uid: "admin-test", username: "analytics-test-admin", role: "admin", accessToken: "test-admin-token" });
+  await locals.userCollection.insertOne({ uid: "buyer-test", username: "analytics-test-buyer", role: "buyer", accessToken: "test-buyer-token" });
+  const server = app.listen(0, "127.0.0.1"); await new Promise<void>(resolve => server.once("listening", resolve));
+  const port = (server.address() as any).port;
+  try {
+    for (const path of ["/admin/analytics", "/admin/analytics/records?metric=payments"]) {
+      assert.equal((await fetch("http://127.0.0.1:" + port + path)).status, 401);
+      assert.equal((await fetch("http://127.0.0.1:" + port + path, { headers: { Authorization: "Bearer test-buyer-token" } })).status, 403);
+      const response = await fetch("http://127.0.0.1:" + port + path, { headers: { Authorization: "Bearer test-admin-token" } });
+      assert.equal(response.status, 200);
+      assert(!(JSON.stringify(await response.json()).includes("test-admin-token")));
+    }
+    assert.equal((await fetch("http://127.0.0.1:" + port + "/admin/analytics?timezone=invalid", { headers: { Authorization: "Bearer test-admin-token" } })).status, 400);
+  } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
+  console.log("Verified finance, deduplication, service scope, timezone/DST, missing data and admin authorization checks passed.");
+}
+void main().catch(error => { console.error(error); process.exitCode = 1; });

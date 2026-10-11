@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isAxiosError } from "axios";
 import { Link } from "react-router-dom";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
@@ -7,7 +7,6 @@ import { axiosClient } from "../../lib/axiosClient";
 import { formatPiAmount } from "../../lib/formatters";
 import type { Order, OrderStatus, Product } from "../../types/marketplace";
 import type { User } from "../../types/pi";
-import { getStreamAdminOverview, type StreamAdminOverview } from "../../lib/streamAdmin";
 import ActionDialog from "../../components/ActionDialog";
 import { showFeedback } from "../../lib/feedback";
 import {
@@ -26,14 +25,6 @@ import {
 
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
 
-type AdminStats = Record<string, number>;
-type AdminActivity = {
-  type: string;
-  label: string;
-  description: string;
-  createdAt: string;
-  href?: string;
-};
 
 const getStoredAccessToken = () => {
   try {
@@ -68,156 +59,7 @@ const Head = ({ title, description, action }: { title: string; description: stri
 
 const Notice = ({ text }: { text: string }) => text ? <div className="private-alert success">{text}</div> : null;
 
-export const AdminDashboardPage = () => {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [activity, setActivity] = useState<AdminActivity[]>([]);
-  const [streamOverview, setStreamOverview] = useState<StreamAdminOverview | null>(null);
-  const [dashboardUsers, setDashboardUsers] = useState<AdminUser[]>([]);
-  const [dashboardOrders, setDashboardOrders] = useState<Order[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  const load = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) setRefreshing(true);
-    try {
-      const [statsResponse, activityResponse, streamResponse, usersResponse, ordersResponse] = await Promise.all([
-        adminFetch<{ stats: AdminStats; updatedAt: string }>("/admin/stats"),
-        adminFetch<{ activity: AdminActivity[]; updatedAt: string }>("/admin/activity"),
-        getStreamAdminOverview().catch(() => null),
-        axiosClient.get<{ users: AdminUser[] }>("/admin/users").catch(() => null),
-        axiosClient.get<{ orders: Order[] }>("/admin/orders").catch(() => null),
-      ]);
-      setStats(statsResponse.stats);
-      setActivity(activityResponse.activity);
-      setStreamOverview(streamResponse);
-      setDashboardUsers(usersResponse?.data.users || []);
-      setDashboardOrders(ordersResponse?.data.orders || []);
-      setLastUpdated(new Date(statsResponse.updatedAt || activityResponse.updatedAt || Date.now()));
-      setError("");
-    } catch {
-      setError("Admin stats could not load. Check backend admin access, session, and database collections.");
-    } finally {
-      if (showRefreshing) setRefreshing(false);
-    }
-  }, []);
-  useEffect(() => {
-    let mounted = true;
-    const run = async (showRefreshing = false) => {
-      if (!mounted) return;
-      await load(showRefreshing);
-    };
-    void run();
-    const interval = window.setInterval(() => void run(true), 15_000);
-    return () => {
-      mounted = false;
-      window.clearInterval(interval);
-    };
-  }, [load]);
-  const attention = [
-    ["Pending products", stats?.pendingProducts || 0, "/admin/products"],
-    ["Seller applications", stats?.pendingOnboarding || 0, "/admin/onboarding"],
-    ["Ambassador applications", stats?.pendingAmbassadors || 0, "/admin/ambassadors"],
-    ["Open reports", stats?.unreadReports || 0, "/admin/reports"],
-    ["Failed or cancelled payments", stats?.failedCancelledPayments || 0, "/admin/orders"],
-    ["Jobs moderation", stats?.pendingJobsModeration || 0, "/admin/jobs"],
-    ["Stream moderation", streamOverview?.stats.pendingVideos || 0, "/admin/stream/moderation"],
-  ] as const;
-  const updatedLabel = lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Not loaded";
-  const monthlyOperations = useMemo(() => {
-    const year = new Date().getFullYear();
-    const values = Array.from({ length: 12 }, () => ({ orders: 0, volume: 0 }));
-    dashboardOrders.forEach((order) => {
-      const date = new Date(order.createdAt);
-      if (!Number.isNaN(date.getTime()) && date.getFullYear() === year) {
-        values[date.getMonth()].orders += 1;
-        values[date.getMonth()].volume += Number(order.pricePi || 0);
-      }
-    });
-    return values;
-  }, [dashboardOrders]);
-  const monthlyMaximum = Math.max(...monthlyOperations.flatMap((month) => [month.orders, month.volume]), 1);
-  const chartPoints = (key: "orders" | "volume") => monthlyOperations.map((month, index) => (index * 100) + "," + (230 - (month[key] / monthlyMaximum) * 200)).join(" ");
-  const demographics = useMemo(() => {
-    const countries = new Map<string, number>();
-    dashboardUsers.forEach((entry) => {
-      const country = entry.country?.trim() || "Not provided";
-      countries.set(country, (countries.get(country) || 0) + 1);
-    });
-    return [...countries.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  }, [dashboardUsers]);
-  const completionRate = Math.min(100, Math.round(((Number(stats?.completedOrders || 0)) / Math.max(Number(stats?.totalOrders || 0), 1)) * 100));
-  const monthlyOrderMaximum = Math.max(...monthlyOperations.map((month) => month.orders), 1);
-
-  return (
-    <main className="private-page admin-dashboard-page">
-      <PullToRefresh onRefresh={() => load(false)} />
-      <Head
-        title="Admin Dashboard"
-        description="Platform health, moderation, and marketplace operations."
-        action={<button className="private-secondary-button" type="button" onClick={() => void load(true)} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>}
-      />
-      {error ? <div className="private-alert error">{error}</div> : null}
-      {!stats ? <PrivateSkeleton variant="stats" count={6} /> : (
-        <>
-          <div className="private-alert admin-live-status"><i /> Live operations · updated {updatedLabel}</div>
-          <section className="admin-tail-overview">
-            <div className="admin-tail-left">
-              <div className="admin-tail-metrics">
-                <Link to="/admin/users"><i>US</i><span>Total Users</span><strong>{stats.totalUsers || 0}</strong><small>Live users</small></Link>
-                <Link to="/admin/orders"><i>OR</i><span>Total Orders</span><strong>{stats.totalOrders || 0}</strong><small>{stats.pendingOrders || 0} pending</small></Link>
-              </div>
-              <article className="admin-monthly-sales">
-                <header><h2>Monthly Sales</h2><span>⋮</span></header>
-                <div>{monthlyOperations.map((month, index) => <i key={index} style={{ height: Math.max(4, (month.orders / monthlyOrderMaximum) * 100) + "%" }} title={month.orders + " orders"} />)}</div>
-                <footer>{["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((month) => <span key={month}>{month}</span>)}</footer>
-              </article>
-            </div>
-            <article className="admin-monthly-target">
-              <header><h2>Monthly Target</h2><p>Completed marketplace orders</p></header>
-              <div className="admin-target-gauge" style={{ "--admin-target": completionRate + "%" } as CSSProperties}><span><strong>{completionRate}%</strong><small>Live completion</small></span></div>
-              <p>{completionRate >= 75 ? "Great progress. Keep up your good work!" : "Track pending orders to improve completion."}</p>
-              <footer><span>Target<strong>{stats.totalOrders || 0}</strong></span><span>Completed<strong>{stats.completedOrders || 0}</strong></span><span>Pending<strong>{stats.pendingOrders || 0}</strong></span></footer>
-            </article>
-          </section>
-          <section className="admin-attention-panel">
-            <div className="section-title compact"><div><p className="private-kicker">ACTION CENTER</p><h2>Needs attention</h2><p>One queue for marketplace and Stream operations.</p></div></div>
-            <div>{attention.map(([label, count, to]) => <Link to={to} key={label}><span>{label}</span><strong>{count}</strong><small>{count ? "Review now" : "All clear"}</small></Link>)}</div>
-          </section>
-          <section className="admin-statistics-card">
-            <header><div><h2>Statistics</h2><p>Real monthly marketplace orders and Pi volume for {new Date().getFullYear()}.</p></div><span>Live · 15 sec</span></header>
-            <div className="admin-statistics-legend"><span><i /> Orders</span><span><i /> Pi volume</span></div>
-            <div className="admin-statistics-chart">
-              <svg viewBox="0 0 1100 250" role="img" aria-label="Monthly orders and Pi volume statistics" preserveAspectRatio="none"><polyline className="orders" points={chartPoints("orders")} /><polyline className="volume" points={chartPoints("volume")} /></svg>
-              <div>{["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((month) => <span key={month}>{month}</span>)}</div>
-            </div>
-          </section>
-          <section className="admin-dashboard-lower">
-            <article className="admin-demographic-card">
-              <header><h2>Customers Demographic</h2><p>Real users grouped by country.</p></header>
-              {demographics.length ? <div>{demographics.map(([country, count]) => <div key={country}><span><b>{country}</b><small>{count} customer{count === 1 ? "" : "s"}</small></span><i><b style={{ width: ((count / Math.max(dashboardUsers.length, 1)) * 100) + "%" }} /></i><strong>{Math.round((count / Math.max(dashboardUsers.length, 1)) * 100)}%</strong></div>)}</div> : <div className="private-state compact"><p>No customer country data yet.</p></div>}
-            </article>
-            <article className="admin-recent-orders-card">
-              <header><div><h2>Recent Orders</h2><p>Latest real marketplace orders.</p></div><Link to="/admin/orders">See all</Link></header>
-              {dashboardOrders.length ? <div className="admin-recent-orders-table">{dashboardOrders.slice(0,5).map((order) => <Link to="/admin/orders" key={order._id}><span><img src={order.productImage} alt="" /><b>{order.productTitle}</b></span><small>{order.sellerName}</small><strong>{formatPiAmount(order.pricePi)}</strong><em className={order.status}>{order.status}</em></Link>)}</div> : <div className="private-state compact"><p>No orders yet.</p></div>}
-            </article>
-          </section>
-          <section className="management-list admin-activity-list">
-            {activity.length ? activity.map((item) => (
-              <article className="report-card" key={`${item.type}-${item.createdAt}-${item.description}`}>
-                <div>
-                  <span>{item.label}</span>
-                  <h3>{item.description}</h3>
-                  <p>{new Date(item.createdAt).toLocaleString()}</p>
-                </div>
-                {item.href ? <Link to={item.href}>Open</Link> : null}
-              </article>
-            )) : <div className="private-state compact"><h3>No admin activity yet</h3><p>Real database activity will appear here when users, products, orders, reports, or applications are created.</p></div>}
-          </section>
-        </>
-      )}
-    </main>
-  );
-};
+export { default as AdminDashboardPage } from "./AdminAnalyticsPage";
 
 type AdminUser = User & { _id: string; email?: string; lastSeenAt?: string; blocked?: boolean; verificationRequested?: boolean; verificationStatus?: "none" | "pending" | "approved" | "rejected"; verificationRequestType?: "pi_verified" | "seller_verified" | "trusted_seller" };
 
@@ -734,115 +576,22 @@ export const AdminOrdersPage = () => {
 type Report = { _id: string; targetType: string; targetId: string; reason: string; details?: string; resolved?: boolean; createdAt: string; source?: "marketplace" | "support" };
 export const AdminReportsPage = () => {
   const [reports, setReports] = useState<Report[]>([]);
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [message, setMessage] = useState("");
-  const [loadError, setLoadError] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("open");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
-    setRefreshing(true);
-    const [reportResponse, statsResponse, orderResponse, productResponse, userResponse] = await Promise.all([
-      axiosClient.get("/admin/reports").catch(() => null),
-      axiosClient.get("/admin/stats").catch(() => null),
-      axiosClient.get("/admin/orders").catch(() => null),
-      axiosClient.get("/admin/products").catch(() => null),
-      axiosClient.get("/admin/users").catch(() => null),
-    ]);
-    if (reportResponse) setReports(reportResponse.data.reports || []);
-    if (statsResponse) setStats(statsResponse.data.stats);
-    if (orderResponse) setOrders(orderResponse.data.orders || []);
-    if (productResponse) setProducts(productResponse.data.products || []);
-    if (userResponse) setUsers(userResponse.data.users || []);
-    const availability: Array<[string, unknown]> = [["reports", reportResponse], ["stats", statsResponse], ["orders", orderResponse], ["products", productResponse], ["users", userResponse]];
-    const unavailable = availability.filter(([, response]) => !response).map(([name]) => name);
-    setLoadError(unavailable.length ? "Some live data is unavailable: " + unavailable.join(", ") + ". Retrying automatically." : "");
-    setRefreshing(false);
+    try { const response = await axiosClient.get<{ reports: Report[] }>("/admin/reports"); setReports(response.data.reports); setError(""); }
+    catch { setError("Reports could not load. Refresh to retry."); }
+    finally { setLoading(false); }
   }, []);
-  useEffect(() => {
-    const initial = window.setTimeout(() => void load(), 0);
-    const interval = window.setInterval(() => void load(), 15_000);
-    return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(interval);
-    };
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
   const resolve = async (report: Report) => {
-    await axiosClient.patch(report.source === "support" ? `/admin/support/${report._id}/resolve` : `/admin/reports/${report._id}/resolve`);
-    setMessage("Record resolved.");
-    await load();
+    try { await axiosClient.patch(report.source === "support" ? `/admin/support/${report._id}/resolve` : `/admin/reports/${report._id}/resolve`); setMessage("Record resolved."); await load(); }
+    catch { setError("Could not resolve this report."); }
   };
-  const visible = useMemo(() => reports.filter((report) => filter === "all" || (filter === "open" && !report.resolved) || (filter === "resolved" && report.resolved) || report.source === filter), [reports, filter]);
-  const totalPi = useMemo(() => orders.filter((order) => ["paid", "processing", "shipped", "delivered", "completed"].includes(order.status)).reduce((sum, order) => sum + order.pricePi, 0), [orders]);
-  const pendingRevenue = useMemo(() => orders.filter((order) => order.status === "pending").reduce((sum, order) => sum + order.pricePi, 0), [orders]);
-  const visibleProducts = products.filter((product) => product.approved && !product.hidden).length;
-  const trustedUsers = users.filter((user) => user.verificationStatus === "approved" && user.verificationLevel === "trusted_seller").length;
-  const recentOrders = orders.slice(0, 5);
-  const latestProducts = products.slice(0, 5);
-  const transactionCandles = useMemo(() => {
-    const grouped = new Map<string, number[]>();
-    orders.forEach((order) => {
-      const date = new Date(order.createdAt);
-      if (Number.isNaN(date.getTime())) return;
-      const key = date.toISOString().slice(0, 10);
-      grouped.set(key, [...(grouped.get(key) || []), Number(order.pricePi || 0)]);
-    });
-    return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([date, values]) => ({
-      date,
-      open: values[0],
-      close: values[values.length - 1],
-      high: Math.max(...values),
-      low: Math.min(...values),
-    }));
-  }, [orders]);
-  const candleMaximum = Math.max(...transactionCandles.map((candle) => candle.high), 1);
-
-  return (
-    <main className="private-page">
-      <Head title="Analytics & Reports" description="Live platform metrics, marketplace health, reports, support, and operational signals." action={<button className="private-secondary-button" type="button" onClick={() => void load()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh live data"}</button>} />
-      <Notice text={message} />
-      {loadError ? <div className="private-alert error">{loadError}</div> : null}
-      {!stats ? <PrivateSkeleton variant="stats" count={6} /> : (
-        <>
-          <section className="admin-analytics-grid">
-            <article><span>Total users</span><strong>{stats.totalUsers}</strong><small>{trustedUsers} trusted sellers</small></article>
-            <article><span>Products</span><strong>{stats.totalProducts}</strong><small>{visibleProducts} visible, {stats.pendingProducts} pending</small></article>
-            <article><span>Orders</span><strong>{stats.totalOrders}</strong><small>{stats.pendingOrders} pending, {stats.paidOrders} paid/completed</small></article>
-            <article><span>Paid volume</span><strong>{formatPiAmount(totalPi)}</strong><small>{formatPiAmount(pendingRevenue)} pending</small></article>
-            <article><span>Open reports</span><strong>{stats.reportedProducts}</strong><small>{stats.supportRequests} support requests</small></article>
-            <article><span>Onboarding</span><strong>{stats.pendingOnboarding}</strong><small>pending public applications</small></article>
-          </section>
-          <section className="admin-analytics-panels">
-            <article>
-              <div className="section-title compact"><div><h2>Recent orders</h2><p>Live order records from marketplace checkout.</p></div></div>
-              {recentOrders.length ? recentOrders.map((order) => <div className="analytics-row" key={order._id}><span>{order.productTitle}</span><strong>{formatPiAmount(order.pricePi)}</strong><small>{order.status}</small></div>) : <p>No orders yet.</p>}
-            </article>
-            <article>
-              <div className="section-title compact"><div><h2>Latest products</h2><p>Real seller listings and review status.</p></div></div>
-              {latestProducts.length ? latestProducts.map((product) => <div className="analytics-row" key={product._id}><span>{product.title}</span><strong>{product.reviewStatus || "pending"}</strong><small>{product.sellerName}</small></div>) : <p>No products yet.</p>}
-            </article>
-          </section>
-        </>
-      )}
-      <section className="admin-candle-panel">
-        <div className="section-title compact"><div><p className="private-kicker">PI ORDER ANALYTICS</p><h2>Transaction candles</h2><p>Real order values grouped by day. Updated every 15 seconds.</p></div><span className="admin-live-chip"><i /> Live</span></div>
-        {transactionCandles.length ? <div className="admin-candle-chart" role="img" aria-label="Daily Pi order value candlestick chart">
-          {transactionCandles.map((candle) => {
-            const top = ((candleMaximum - candle.high) / candleMaximum) * 100;
-            const bottom = (candle.low / candleMaximum) * 100;
-            const bodyTop = ((candleMaximum - Math.max(candle.open, candle.close)) / candleMaximum) * 100;
-            const bodyHeight = Math.max(4, (Math.abs(candle.open - candle.close) / candleMaximum) * 100);
-            const rising = candle.close >= candle.open;
-            return <div className="admin-candle-column" key={candle.date} title={candle.date + " · O " + candle.open + " H " + candle.high + " L " + candle.low + " C " + candle.close}><div className="admin-candle-plot"><i style={{ top: top + "%", bottom: bottom + "%" }} /><b className={rising ? "rising" : "falling"} style={{ top: bodyTop + "%", height: bodyHeight + "%" }} /></div><small>{new Date(candle.date).toLocaleDateString([], { month: "short", day: "numeric" })}</small></div>;
-          })}
-        </div> : <div className="private-state compact"><h3>No transaction candles yet</h3><p>Candles will appear when real marketplace orders contain Pi values and timestamps.</p></div>}
-      </section>
-      <section className="admin-filter-bar"><label>Filter<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="open">Open</option><option value="all">All</option><option value="marketplace">Marketplace</option><option value="support">Support</option><option value="resolved">Resolved</option></select></label><span>{visible.length} records</span></section>
-      {visible.length === 0 ? <div className="private-state">No records match this filter.</div> : <div className="management-list">{visible.map((report) => <article className="report-card" key={`${report.source}-${report._id}`}><div><span>{report.source || "marketplace"} - {report.targetType}</span><h3>{report.reason}</h3><p>{report.details || `Target: ${report.targetId}`}</p></div><strong className={report.resolved ? "resolved" : "open"}>{report.resolved ? "Resolved" : "Open"}</strong>{!report.resolved ? <button onClick={() => void resolve(report)}>Mark resolved</button> : null}</article>)}</div>}
-    </main>
-  );
+  const visible = reports.filter(report => filter === "all" || (filter === "open" && !report.resolved) || (filter === "resolved" && report.resolved) || report.source === filter);
+  return <main className="private-page"><Head title="Reports & support" description="Review marketplace reports and support requests." action={<Link className="private-secondary-button" to="/admin/analytics">Analytics overview</Link>} /><Notice text={message} />{error ? <div className="private-alert error">{error}</div> : null}<section className="admin-filter-bar"><label>Filter<select value={filter} onChange={event => setFilter(event.target.value)}><option value="open">Open</option><option value="all">All</option><option value="marketplace">Marketplace</option><option value="support">Support</option><option value="resolved">Resolved</option></select></label><button type="button" onClick={() => void load()}>Refresh</button></section>{loading ? <PrivateSkeleton variant="list" count={3} /> : !visible.length ? <div className="private-state">No reports match this filter.</div> : <div className="management-list">{visible.map(report => <article className="report-card" key={report.source + report._id}><div><span>{report.source || "marketplace"}</span><h3>{report.reason}</h3><p>{report.details || report.targetId}</p></div><strong>{report.resolved ? "Resolved" : "Open"}</strong>{!report.resolved ? <button onClick={() => void resolve(report)}>Mark resolved</button> : null}</article>)}</div>}</main>;
 };
 
 export const AdminSettingsPage = () => <main className="private-page"><Head title="Admin Settings" description="Administrative preferences use your main SMAJ settings." /><div className="private-state"><p>Theme, language, notifications, and logout are managed in account settings.</p><Link className="private-primary-button" to="/settings">Open Settings</Link></div></main>;

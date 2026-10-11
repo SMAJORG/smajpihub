@@ -1,0 +1,12 @@
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(ad);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(ad);
+@source "../../components/ui/chart.tsx";
+@source "./AdminAnalyticsPage.tsx";
+@theme inline {
+  --color-background: var(--smaj-card);
+  --color-foreground: var(--smaj-text);
+  --color-muted: var(--smaj-secondary-bg);
+  --color-muted-foreground: var(--smaj-text-secondary);
+  --color-border: var(--smaj-border);
+}
