@@ -453,6 +453,12 @@ export default function mountAdminEndpoints(router: Router) {
   router.patch("/users/:id", async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid user id" });
     const updates: Record<string, unknown> = {};
+    for (const [field, max] of Object.entries({ displayName: 100, country: 100, contactPhone: 40, email: 254, bio: 1000 })) {
+      if (req.body?.[field] === undefined) continue;
+      if (typeof req.body[field] !== "string" || req.body[field].trim().length > max || (field === "displayName" && !req.body[field].trim()) || (field === "email" && req.body[field].trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.body[field].trim()))) return res.status(400).json({ message: "Enter a valid " + field + " (maximum " + max + " characters)." });
+      updates[field] = req.body[field].trim();
+    }
+    if (typeof req.body?.sellerActive === "boolean") updates.sellerActive = req.body.sellerActive;
     if (typeof req.body?.blocked === "boolean") updates.blocked = req.body.blocked;
     if (["buyer", "seller", "admin"].includes(req.body?.role)) {
       updates.role = req.body.role;
@@ -471,8 +477,11 @@ export default function mountAdminEndpoints(router: Router) {
     }
     if (!Object.keys(updates).length) return res.status(400).json({ error: "bad_request", message: "No valid user update supplied" });
     const before = await req.app.locals.userCollection.findOne({ _id: new ObjectId(req.params.id) });
+    if (!before) return res.status(404).json({ message: "Account not found." });
+    updates.updatedAt = new Date();
     await req.app.locals.userCollection.updateOne({ _id: new ObjectId(req.params.id) }, { $set: updates });
     const after = await req.app.locals.userCollection.findOne({ _id: new ObjectId(req.params.id) });
+    if (!after) return res.status(404).json({ message: "Account no longer exists." });
     if (after?.uid && (updates.verificationLevel || updates.verificationStatus)) {
       await req.app.locals.productCollection.updateMany(
         { sellerId: after.uid },
@@ -492,7 +501,7 @@ export default function mountAdminEndpoints(router: Router) {
         await createNotification(req.app, { userId: after.uid, type: "verification_update", title, message, relatedId: "settings" });
       }
     }
-    return res.status(200).json({ message: "User updated", user: serialize(after) });
+    return res.status(200).json({ message: "User updated", user: adminAccount(after) });
   });
 
   router.get("/verification-requests", async (req, res) => {

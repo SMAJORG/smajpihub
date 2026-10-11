@@ -22521,3 +22521,12 @@ svg {
   .admin-shell .admin-tail-metrics { grid-template-columns: minmax(0, 1fr); }
   .admin-shell .admin-demographic-card > div:last-child > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; }
 }
+/* Align the desktop brand with the header rather than reserving a second header gap. */
+@media(min-width:1024px) {
+  .admin-shell .private-sidebar,.admin-shell .private-sidebar.private-sidebar-collapsed { position:fixed; top:0; left:0; bottom:0; z-index:3100; width:290px; height:100vh; height:100dvh; padding-top:16px; }
+  .admin-shell .private-sidebar.private-sidebar-collapsed { width:88px; }
+  .admin-shell .private-sidebar-top { min-height:48px; margin-top:0; margin-bottom:16px; }
+}
+@media(min-width:1024px) {
+  .admin-shell .private-body > .private-content { grid-column:2; }
+}

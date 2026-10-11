@@ -6,7 +6,6 @@ import PullToRefresh from "../../components/PullToRefresh";
 import { axiosClient } from "../../lib/axiosClient";
 import { formatPiAmount } from "../../lib/formatters";
 import type { Order, OrderStatus, Product } from "../../types/marketplace";
-import type { User } from "../../types/pi";
 import ActionDialog from "../../components/ActionDialog";
 import { showFeedback } from "../../lib/feedback";
 import {
@@ -23,29 +22,6 @@ import {
   type JobsSalaryDispute,
 } from "../../lib/jobsApi";
 
-const PI_USER_STORAGE_KEY = "smaj_pi_user";
-
-
-const getStoredAccessToken = () => {
-  try {
-    const stored = window.localStorage.getItem(PI_USER_STORAGE_KEY);
-    if (!stored) return "";
-    const user = JSON.parse(stored) as { accessToken?: string };
-    return user.accessToken || "";
-  } catch {
-    return "";
-  }
-};
-
-const adminFetch = async <T,>(path: string): Promise<T> => {
-  const accessToken = getStoredAccessToken();
-  const response = await axiosClient.get<T>(path, {
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}`, "X-SMAJ-Access-Token": accessToken } : undefined,
-    withCredentials: true,
-  });
-  return response.data;
-};
-
 const Head = ({ title, description, action }: { title: string; description: string; action?: ReactNode }) => (
   <section className="private-page-head">
     <div>
@@ -61,92 +37,7 @@ const Notice = ({ text }: { text: string }) => text ? <div className="private-al
 
 export { default as AdminDashboardPage } from "./AdminAnalyticsPage";
 
-type AdminUser = User & { _id: string; email?: string; lastSeenAt?: string; blocked?: boolean; verificationRequested?: boolean; verificationStatus?: "none" | "pending" | "approved" | "rejected"; verificationRequestType?: "pi_verified" | "seller_verified" | "trusted_seller" };
-
-export const AdminUsersPage = () => {
-  const [search, setSearch] = useState("");
-  const [currentUid, setCurrentUid] = useState("");
-  const [draft, setDraft] = useState("");
-  const [selected, setSelected] = useState<AdminUser | null>(null);
-  const [audience, setAudience] = useState<AdminUser[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [requestId, setRequestId] = useState("");
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [message, setMessage] = useState("");
-  const load = useCallback(async () => {
-    try { const data = await adminFetch<{ users: AdminUser[]; currentUserUid: string }>("/admin/users"); setUsers(data.users); setCurrentUid(data.currentUserUid); setError(""); }
-    catch { setError("Accounts could not load. Try refreshing."); }
-    finally { setLoading(false); }
-  }, []);
-  const filtered = users.filter(user => [user.displayName, user.piUsername, user.username, user.uid, user.country].some(value => value?.toLowerCase().includes(search.toLowerCase().trim())));
-  const recipients = Array.from(new Map(users.filter(user => user.uid && user.uid !== currentUid).map(user => [user.uid, user])).values());
-  const compose = (accounts: AdminUser[]) => { setDraft(""); setAudience(accounts); setRequestId(crypto.randomUUID()); setError(""); };
-  const send = async (text: string) => {
-    if (!audience || busy) return;
-    if (text.length > 1000) { setError("Messages must be 1,000 characters or fewer."); return; }
-    setDraft(text); setBusy(true); setError("");
-    let sent = 0;
-    const failed: AdminUser[] = [];
-    try {
-      for (let offset = 0; offset < audience.length; offset += 10) {
-        const batch = audience.slice(offset, offset + 10);
-        try {
-          const accessToken = getStoredAccessToken();
-          const response = await axiosClient.post<{ results: { userId: string; sent: boolean }[] }>("/admin/users/messages", { userIds: batch.map(user => user._id), message: text, requestId }, { timeout: 60_000, headers: accessToken ? { Authorization: `Bearer ${accessToken}`, "X-SMAJ-Access-Token": accessToken } : undefined, withCredentials: true });
-          for (const user of batch) { if (response.data.results.find(result => result.userId === user._id)?.sent) sent++; else failed.push(user); }
-        } catch { failed.push(...batch); }
-      }
-      setMessage(`Delivered to ${sent} account${sent === 1 ? "" : "s"}.`);
-      if (failed.length) { setAudience(failed); setError(`${failed.length} account(s) could not receive the message. Retry with the same text; accounts without a messaging identity and your own account cannot receive it.`); }
-      else setAudience(null);
-    } finally { setBusy(false); }
-  };
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
-  const update = async (id: string, body: object) => { try { await axiosClient.patch(`/admin/users/${id}`, body); setMessage("User updated."); await load(); } catch { setError("Account could not be updated. Try again."); } };
-
-  return (
-    <main className="private-page">
-      <Head title="User accounts" description="View accounts, manage access, and send messages." action={<button type="button" className="private-primary-button" disabled={loading || !recipients.length || busy} onClick={() => compose(recipients)}>Message all users</button>} />
-      <div className="row-actions"><label>Search accounts <input type="search" placeholder="Name, username, country or user ID" value={search} onChange={event => setSearch(event.target.value)} /></label><button type="button" onClick={() => void load()}>Refresh</button><span>{filtered.length} of {users.length} accounts</span></div>
-      {error ? <div className="private-alert error" role="alert">{error}</div> : null}
-      {loading ? <PrivateSkeleton variant="stats" count={3} /> : null}
-      {selected ? <section className="report-card" aria-label="Account details"><div style={{ width: "100%", overflowWrap: "anywhere" }}><div className="row-actions"><h2>{selected.displayName || selected.username || "User account"}</h2><button type="button" onClick={() => setSelected(null)}>Close details</button><button type="button" disabled={!selected.uid || selected.uid === currentUid} onClick={() => compose([selected])}>Message user</button></div><dl>{[
-        ["Username", selected.piUsername || selected.username], ["User ID", selected.uid], ["Account ID", selected._id], ["Country", selected.country], ["Phone", selected.contactPhone], ["Email", selected.email], ["Last seen", selected.lastSeenAt ? new Date(selected.lastSeenAt).toLocaleString() : "Not provided"], ["Role", selected.role], ["Status", selected.blocked ? "Blocked" : "Active"], ["Verification", selected.verificationStatus || "none"], ["Verification level", selected.verificationLevel || "basic"], ["Joined", selected.createdAt ? new Date(selected.createdAt).toLocaleString() : "Not provided"], ["Bio", selected.bio],
-      ].map(([label, value]) => <div key={label} style={{ padding: "8px 0" }}><dt><strong>{label}</strong></dt><dd style={{ margin: 0 }}>{value || "Not provided"}</dd></div>)}</dl></div></section> : null}
-      <ActionDialog open={audience !== null} title={audience?.length === 1 ? "Message user" : "Message all users"} description={`Send a message to ${audience?.length || 0} account(s). It will appear in their inbox, where they can reply. Your own account is skipped. ${error}`} initialValue={draft} inputLabel="Message (maximum 1,000 characters)" confirmLabel="Send message" busy={busy} onCancel={() => { if (!busy) setAudience(null); }} onConfirm={text => void send(text)} />
-      <Notice text={message} />
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead><tr><th>User</th><th>Role</th><th>Verification</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>{filtered.map((user) => (
-            <tr key={user._id}>
-              <td><strong>{user.displayName}</strong><small>@{user.piUsername || user.username}{user.verificationRequested || user.verificationStatus === "pending" ? ` - Requested ${user.verificationRequestType === "trusted_seller" ? "Trusted Seller" : user.verificationRequestType === "seller_verified" ? "Seller Verified" : "Pi Verified"}` : ""}</small></td>
-              <td><select value={user.role} onChange={(event) => void update(user._id, { role: event.target.value })}><option>buyer</option><option>seller</option><option>admin</option></select></td>
-              <td>
-                <select value={user.verificationLevel || "basic"} onChange={(event) => void update(user._id, { verificationLevel: event.target.value })}><option value="basic">Basic</option><option value="pi_verified">Pi Verified</option><option value="seller_verified">Seller Verified</option><option value="trusted_seller">Trusted Seller</option></select>
-                <select value={user.verificationStatus || "none"} onChange={(event) => void update(user._id, { verificationStatus: event.target.value, verificationLevel: event.target.value === "approved" ? user.verificationLevel || "pi_verified" : user.verificationLevel })}><option value="none">No badge</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
-              </td>
-              <td>{user.blocked ? "Blocked" : "Active"}</td>
-              <td>
-                <div className="row-actions">
-                  <button type="button" onClick={() => { setSelected(user); window.scrollTo({ top: 0, behavior: "smooth" }); }}>View account</button>
-                  <button type="button" disabled={!user.uid || user.uid === currentUid || busy} onClick={() => compose([user])}>Message</button>
-                  {user.verificationRequested || user.verificationStatus === "pending" ? <button onClick={() => void update(user._id, { verificationLevel: user.verificationRequestType || "pi_verified", verificationStatus: "approved" })}>Approve</button> : null}
-                  {user.verificationRequested || user.verificationStatus === "pending" ? <button onClick={() => void update(user._id, { verificationStatus: "rejected" })}>Reject</button> : null}
-                  {user.verificationStatus === "approved" ? <button onClick={() => void update(user._id, { verificationLevel: "basic", verificationStatus: "none" })}>Remove Badge</button> : null}
-                  <button onClick={() => void update(user._id, { blocked: !user.blocked })}>{user.blocked ? "Unblock" : "Block"}</button>
-                </div>
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-        {!loading && !filtered.length ? <div className="private-state compact">No accounts match your search.</div> : null}
-      </div>
-    </main>
-  );
-};
+export { default as AdminUsersPage } from "./AdminUsersPage";
 
 type OnboardingApplication = {
   _id: string;

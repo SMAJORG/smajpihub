@@ -1,0 +1,42 @@
+﻿/* Account controls stay in panels instead of expanding the account list. */
+.admin-accounts-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--smaj-text-secondary); }
+.admin-accounts-toolbar button,.admin-account-action-trigger { display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:8px 12px; color:var(--smaj-text); background:var(--smaj-card); border:1px solid var(--smaj-border); border-radius:8px; cursor:pointer; font:inherit; font-size:13px; }
+.admin-accounts-page .admin-table { min-width:660px; }
+.admin-accounts-page .admin-table td { vertical-align:middle; }
+.admin-account-name { padding:0; color:var(--smaj-text); background:transparent; border:0; text-align:left; font:inherit; font-weight:650; cursor:pointer; }
+.admin-account-name:hover { color:#7352d6; }
+.admin-account-status { display:inline-flex; padding:4px 9px; border-radius:99px; font-size:12px; color:#067647; background:#ecfdf3; }
+.admin-account-status.blocked { color:#b42318; background:#fef3f2; }
+.admin-account-menu { position:fixed; z-index:4200; width:220px; padding:6px; border:1px solid var(--smaj-border); border-radius:10px; color:var(--smaj-text); background:var(--smaj-card); box-shadow:0 12px 30px #10182822; }
+.admin-account-menu button { display:flex; gap:10px; align-items:center; width:100%; min-height:43px; padding:10px; border:0; border-radius:6px; color:inherit; background:transparent; font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+.admin-account-menu button:hover,.admin-account-menu button:focus { background:var(--smaj-secondary-bg); }
+.admin-account-menu button:disabled { opacity:.45; cursor:not-allowed; }
+.admin-account-overlay { position:fixed; inset:0; z-index:4300; display:flex; justify-content:flex-end; background:#10182866; }
+.admin-account-panel { display:flex; flex-direction:column; width:min(560px,100%); height:100%; height:100dvh; min-width:0; color:var(--smaj-text); background:var(--smaj-card); box-shadow:-12px 0 36px #10182822; }
+.admin-account-panel header { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:20px 24px; border-bottom:1px solid var(--smaj-border); }
+.admin-account-panel h2 { margin:0; font-size:20px; overflow-wrap:anywhere; }
+.admin-account-panel header button { flex-shrink:0; display:grid; place-items:center; width:36px; height:36px; padding:0; color:inherit; background:transparent; border:1px solid var(--smaj-border); border-radius:8px; cursor:pointer; }
+.admin-account-panel-body { min-height:0; flex:1; padding:24px; overflow-y:auto; overscroll-behavior:contain; }
+.admin-account-tabs { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:24px; border-bottom:1px solid var(--smaj-border); }
+.admin-account-tabs button { padding:9px 10px; color:var(--smaj-text-secondary); background:transparent; border:0; border-bottom:2px solid transparent; cursor:pointer; font:inherit; font-size:13px; }
+.admin-account-tabs button[aria-pressed=true] { color:#7352d6; border-bottom-color:#7352d6; }
+.admin-account-panel fieldset { display:grid; gap:18px; margin:0; padding:0; min-width:0; border:0; }
+.admin-account-panel label { display:grid; gap:7px; font-size:13px; font-weight:600; }
+.admin-account-panel :is(input,textarea,select) { width:100%; min-width:0; padding:11px 12px; color:var(--smaj-text); background:var(--smaj-secondary-bg); border:1px solid var(--smaj-border); border-radius:8px; font:inherit; font-weight:400; }
+.admin-account-panel textarea { resize:vertical; }
+.admin-account-panel .admin-account-check { display:flex; align-items:center; gap:10px; }
+.admin-account-panel input[type=checkbox] { width:18px; height:18px; accent-color:#7352d6; }
+.admin-account-panel p,.admin-account-panel small,.admin-account-panel dt { color:var(--smaj-text-secondary); font-size:13px; line-height:1.6; }
+.admin-account-panel dl { display:grid; gap:12px; margin:8px 0; padding-top:18px; border-top:1px solid var(--smaj-border); }
+.admin-account-panel dd { margin:2px 0 0; overflow-wrap:anywhere; font-size:13px; }
+.admin-account-panel footer { display:flex; justify-content:flex-end; gap:10px; padding:16px 24px; border-top:1px solid var(--smaj-border); }
+.admin-account-panel footer button { min-height:40px; padding:9px 16px; border-radius:8px; color:var(--smaj-text); background:var(--smaj-card); border:1px solid var(--smaj-border); font:inherit; font-size:13px; cursor:pointer; }
+.admin-account-panel footer .primary { color:#fff; background:#7352d6; border-color:#7352d6; }
+.admin-account-panel :is(button,input,textarea,select):focus-visible,.admin-account-action-trigger:focus-visible { outline:2px solid #7352d6; outline-offset:2px; }
+.admin-account-panel button:disabled { opacity:.5; cursor:not-allowed; }
+.admin-account-panel .admin-account-notice { padding:12px; border-radius:8px; }
+.admin-account-panel .admin-account-notice.error { color:#b42318; background:#fef3f2; }
+.admin-account-panel .admin-account-notice.success { color:#067647; background:#ecfdf3; }
+@media(max-width:480px) { .admin-account-panel header,.admin-account-panel-body,.admin-account-panel footer { padding:16px; } .admin-accounts-page .private-page-head { gap:16px; } }
+.admin-accounts-page .admin-table .admin-account-name { padding:0; color:var(--smaj-text)!important; background:transparent!important; border:0; border-radius:0; font-size:14px; font-weight:650; }
+.admin-accounts-page .admin-table .admin-account-name:hover { color:#7352d6!important; text-decoration:underline; }
