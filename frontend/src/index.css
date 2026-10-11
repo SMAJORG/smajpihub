@@ -22455,3 +22455,69 @@ svg {
 @media (max-width: 1023px) {
   .messages-page.conversation-selected .chat-panel { min-height: 0; }
 }
+
+/* Keep admin navigation and workspaces inside the available viewport. */
+.admin-shell, .admin-shell * { box-sizing: border-box; }
+.admin-shell { min-width: 0; width: 100%; }
+.admin-shell .private-body { width: 100%; min-width: 0; }
+.admin-shell .private-content,
+.admin-shell.admin-sidebar-collapsed .private-content {
+  width: 100%; min-width: 0; margin-left: 0;
+}
+.admin-shell .private-page { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.admin-shell .private-page > *,
+.admin-shell .private-page-head > div,
+.admin-shell .admin-tail-overview > *,
+.admin-shell .admin-dashboard-lower > * { min-width: 0; max-width: 100%; }
+.admin-shell .private-page-head, .admin-shell .admin-module-head,
+.admin-shell .admin-workspace-table > header { flex-wrap: wrap; }
+.admin-shell .private-page-head, .admin-shell .report-card,
+.admin-shell .admin-nav-group-label { overflow-wrap: anywhere; }
+.admin-shell .admin-table-wrap, .admin-shell .admin-workspace-table,
+.admin-shell .admin-recent-orders-table { min-width: 0; max-width: 100%; overflow-x: auto; }
+.admin-shell .admin-workspace-tools { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.admin-shell .admin-workspace-tools label { min-width: 0; max-width: 100%; }
+.admin-shell .private-sidebar { min-width: 0; }
+.admin-shell .admin-navigation { min-height: 0; overflow-x: hidden; overflow-y: auto; }
+.admin-shell .admin-header-search { min-width: 0; }
+.admin-shell .admin-header-search input { min-width: 0; width: 100%; }
+.admin-shell .admin-profile-menu, .admin-shell .admin-notification-popover,
+.admin-shell .admin-search-results { max-width: calc(100vw - 24px); max-height: calc(100dvh - 140px); overflow-y: auto; overflow-wrap: anywhere; }
+.admin-shell .admin-tail-metrics > a { grid-template-columns: 48px minmax(0, 1fr); }
+.admin-shell .admin-tail-metrics strong { grid-column: 2; }
+.admin-shell .admin-tail-metrics small { grid-column: 2; grid-row: auto; justify-self: start; max-width: 100%; }
+@media (min-width: 1024px) {
+  .admin-shell .private-body, .admin-shell .private-body.private-body-collapsed {
+    display: grid !important; grid-template-columns: 290px minmax(0, 1fr); align-items: start;
+  }
+  .admin-shell .private-body.private-body-collapsed { grid-template-columns: 88px minmax(0, 1fr); }
+  .admin-shell .private-sidebar, .admin-shell .private-sidebar.private-sidebar-collapsed {
+    position: sticky; left: auto; width: 100%; max-width: none; top: 80px;
+    height: calc(100vh - 80px); height: calc(100dvh - 80px);
+  }
+  .admin-shell .private-header { display: flex; min-width: 0; gap: 12px; }
+  .admin-shell .admin-header-search { flex: 1; }
+  .admin-shell .admin-desktop-actions { flex-shrink: 0; }
+  .admin-shell .admin-mobile-menu-toggle { flex-shrink: 0; }
+}
+@media (max-width: 1399px) {
+  .admin-shell .admin-tail-overview, .admin-shell .admin-dashboard-lower,
+  .admin-shell .admin-dashboard-panels { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1023px) {
+  .admin-shell .private-body, .admin-shell .private-body.private-body-collapsed { display: block !important; }
+  .admin-shell .private-sidebar, .admin-shell .private-sidebar.private-sidebar-collapsed {
+    position: fixed; left: 0; width: min(320px, calc(100vw - 24px)); max-width: none;
+    height: calc(100vh - 68px); height: calc(100dvh - 68px);
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform .2s ease, visibility .2s ease;
+  }
+  .admin-shell .private-sidebar.private-sidebar-open { transform: translateX(0); visibility: visible; }
+  .admin-shell .private-sidebar-top, .admin-shell .private-sidebar-logout { flex-shrink: 0; }
+  .admin-shell .admin-mobile-utilities { max-width: 100%; }
+  .admin-shell .admin-mobile-profile { min-width: 0; }
+}
+@media (max-width: 767px) {
+  .admin-shell .admin-tail-metrics { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell .admin-demographic-card > div:last-child > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; }
+}

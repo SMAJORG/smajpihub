@@ -77,9 +77,32 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
   }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
-    document.body.style.overflow = mobileSidebarOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    const previousOverflow = document.body.style.overflow;
+    if (mobileSidebarOpen) document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
   }, [mobileSidebarOpen]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeMobileMenus = () => {
+      if (!desktop.matches) return;
+      setMobileSidebarOpen(false);
+      setMobileUtilitiesOpen(false);
+    };
+    desktop.addEventListener("change", closeMobileMenus);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMobileSidebarOpen(false);
+      setMobileUtilitiesOpen(false);
+      setProfileMenuOpen(false);
+      setNotificationsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      desktop.removeEventListener("change", closeMobileMenus);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
 
   const logout = async () => {
     await signOut();
