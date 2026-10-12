@@ -8,6 +8,7 @@ const SETTINGS_KEY = "smaj_android_app_lock";
 const SESSION_TOKEN_KEY = "smaj_pi_access_token";
 export const APP_LOCK_CHANGED_EVENT = "smaj:app-lock-changed";
 let nativeAuthenticationActive = false;
+let nativeSessionWrite: Promise<void> = Promise.resolve();
 export const supportsNativeAppLock = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
 export const isNativeAuthenticationActive = () => nativeAuthenticationActive;
 export const getAppLockSettings = async (): Promise<AppLockSettings> => {
@@ -25,5 +26,12 @@ export const authenticateNativeDevice = async (reason = "Unlock SMAJ PI HUB") =>
   try { await BiometricAuth.authenticate({ reason, cancelTitle: "Cancel", allowDeviceCredential: true, androidTitle: "Unlock SMAJ PI HUB", androidSubtitle: "Use fingerprint, face, PIN, pattern, or password", androidConfirmationRequired: false, androidBiometryStrength: AndroidBiometryStrength.weak }); }
   finally { window.setTimeout(() => { nativeAuthenticationActive = false; }, 350); }
 };
-export const storeNativeSessionToken = async (token?: string) => { if (supportsNativeAppLock() && token) await SecureStorage.set(SESSION_TOKEN_KEY, token); };
-export const clearNativeSessionToken = async () => { if (supportsNativeAppLock()) await SecureStorage.remove(SESSION_TOKEN_KEY); };
+export const storeNativeSessionToken = async (token?: string) => { if (supportsNativeAppLock() && token) { nativeSessionWrite = SecureStorage.set(SESSION_TOKEN_KEY, token); await nativeSessionWrite; } };
+export const clearNativeSessionToken = async () => { if (supportsNativeAppLock()) { await nativeSessionWrite.catch(() => undefined); await SecureStorage.remove(SESSION_TOKEN_KEY); } };
+
+export const getNativeSessionToken = async (): Promise<string> => {
+  if (!supportsNativeAppLock()) return "";
+  await nativeSessionWrite.catch(() => undefined);
+  const token = await SecureStorage.get(SESSION_TOKEN_KEY);
+  return typeof token === "string" ? token : "";
+};

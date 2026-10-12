@@ -174,7 +174,7 @@ export default function mountAdminEndpoints(router: Router) {
   const analyticsCache = new Map<string, { expires: number; promise: ReturnType<typeof buildAdminAnalytics> }>();
   const analyticsSnapshot = (req: Request) => {
     const range = parseAnalyticsRange(req.query);
-    const key = JSON.stringify(range);
+    const key = req.query.period ? JSON.stringify({ period: req.query.period, timezone: range.timezone, service: range.service, live: range.live }) : JSON.stringify(range);
     let entry = analyticsCache.get(key);
     if (!entry || entry.expires < Date.now()) {
       if (analyticsCache.size >= 20) analyticsCache.clear();

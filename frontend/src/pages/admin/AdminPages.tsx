@@ -35,7 +35,7 @@ const Head = ({ title, description, action }: { title: string; description: stri
 
 const Notice = ({ text }: { text: string }) => text ? <div className="private-alert success">{text}</div> : null;
 
-export { default as AdminDashboardPage } from "./AdminAnalyticsPage";
+export { default as AdminDashboardPage } from "./AdminOverviewPage";
 
 export { default as AdminUsersPage } from "./AdminUsersPage";
 

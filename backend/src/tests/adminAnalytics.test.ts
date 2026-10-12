@@ -7,6 +7,10 @@ async function main() {
   const locals: any = createMemoryCollections();
   locals.liveTransactionCollection = createMemoryCollections().paymentCollection;
   const now = Date.parse("2026-10-11T22:10:00Z");
+  const preset = parseAnalyticsRange({ period: "30D", from: "2099-01-01T00:00:00Z", to: "2099-02-01T00:00:00Z", timezone: "Africa/Lagos" }, now);
+  assert.equal(preset.to, now, "Preset dates come from the server, regardless of device clock");
+  assert.equal(preset.to - preset.from, 30 * 86400000);
+  assert.throws(() => parseAnalyticsRange({ period: "unknown" }, now));
   const range = parseAnalyticsRange({ from: new Date(now - 86400000).toISOString(), to: new Date(now).toISOString(), timezone: "Asia/Dubai", live: "true" }, now);
   await locals.userCollection.insertOne({ uid: "one", displayName: "One", createdAt: new Date(now - 10 * 60000), lastSeenAt: new Date(now - 5 * 60000), verificationStatus: "approved", verificationLevel: "trusted_seller", accessToken: "secret-one" });
   await locals.userCollection.insertOne({ uid: "two", createdAt: new Date(now - 6 * 3600000), lastSeenAt: new Date(now - 20 * 60000) });

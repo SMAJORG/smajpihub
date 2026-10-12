@@ -1,3 +1,4 @@
+import { ensureVoicePermission, voiceRecordingError } from "../../lib/voiceRecording";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
@@ -132,6 +133,7 @@ const MessagesPage = () => {
   const nearBottomRef = useRef(true);
   const typingTimeoutRef = useRef<number | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStartingRef = useRef(false);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingStartedAtRef = useRef(0);
   const recordingTimerRef = useRef<number | null>(null);
@@ -652,15 +654,18 @@ const MessagesPage = () => {
   };
 
   const startVoiceRecording = async () => {
-    if (!activeId || recording) return;
+    if (!activeId || recording || recordingStartingRef.current) return;
     clearVoicePreview();
     setVoiceError("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setVoiceError("Voice recording is not supported in this browser.");
       return;
     }
+    recordingStartingRef.current = true;
     try {
+      await ensureVoicePermission();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
       const mimeType = [
         "audio/webm;codecs=opus",
         "audio/webm",
@@ -668,7 +673,6 @@ const MessagesPage = () => {
         "audio/ogg;codecs=opus",
       ].find((type) => MediaRecorder.isTypeSupported(type));
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      recordingStreamRef.current = stream;
       recorderRef.current = recorder;
       recordingChunksRef.current = [];
       recordingStartedAtRef.current = Date.now();
@@ -699,18 +703,26 @@ const MessagesPage = () => {
         });
       };
 
+      recorder.onerror = (event) => {
+        keepRecordingRef.current = false;
+        stopRecordingTimer();
+        stopRecordingTracks();
+        setRecording(false);
+        setVoiceError(voiceRecordingError((event as Event & { error?: DOMException }).error));
+        if (recorder.state !== "inactive") recorder.stop();
+      };
       recorder.start();
       setRecording(true);
       setRecordingSeconds(0);
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingSeconds(Math.max(0, Math.round((Date.now() - recordingStartedAtRef.current) / 1000)));
       }, 500);
-    } catch {
+    } catch (error) {
       stopRecordingTimer();
       stopRecordingTracks();
       setRecording(false);
-      setVoiceError("Microphone permission is needed to record a voice note.");
-    }
+      setVoiceError(voiceRecordingError(error));
+    } finally { recordingStartingRef.current = false; }
   };
 
   const stopVoiceRecording = () => {

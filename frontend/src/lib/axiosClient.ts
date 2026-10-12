@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import axios, { type AxiosRequestConfig } from "axios";
 import { showFeedback } from "./feedback";
 import { buildResponseCacheKey, isCacheableApiRead, readCachedResponse, storeCachedResponse } from "./offlineCache";
@@ -54,14 +55,16 @@ const getStoredAccessToken = () => {
   }
 };
 
-axiosClient.interceptors.request.use(config => {
+axiosClient.interceptors.request.use(async config => {
   config.withCredentials = true;
   const method = String(config.method || "get").toLowerCase();
   if (typeof navigator !== "undefined" && !navigator.onLine && !["get", "head", "options"].includes(method)) {
     showFeedback("You're offline. This action needs an internet connection.", "info");
     return Promise.reject(new Error("SMAJ_OFFLINE_MUTATION_BLOCKED"));
   }
-  const accessToken = getStoredAccessToken();
+  const accessToken = getStoredAccessToken() || (Capacitor.isNativePlatform()
+    ? await import("./nativeAppLock").then(({ getNativeSessionToken }) => getNativeSessionToken()).catch(() => "")
+    : "");
   if (accessToken) {
     config.headers = config.headers ?? {};
     (config.headers as Record<string, string>).Authorization = `Bearer ${accessToken}`;

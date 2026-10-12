@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Activity, ArrowDownRight, ArrowUpRight, BadgeCheck, BarChart3, CircleHelp, CreditCard, RefreshCw, ShieldCheck, Users, X } from "lucide-react";
@@ -66,12 +67,18 @@ export default function AdminAnalyticsPage() {
     if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end || end - start > 180 * 86_400_000 || end > Date.now() + 60_000) { setLoading(false); setError("Choose dates in order, up to 180 days, ending no later than now."); return; }
     if (manual) setRefreshing(true);
     try {
-      const response = await axiosClient.get<Snapshot>("/admin/analytics", { params: { from: new Date(start).toISOString(), to: new Date(end).toISOString(), timezone, live: String(period === "Live"), service }, signal: controller.signal });
+      const response = await axiosClient.get<Snapshot>("/admin/analytics", { params: { ...(period === "Custom" ? { from: new Date(start).toISOString(), to: new Date(end).toISOString() } : { period }), timezone, live: String(period === "Live"), service }, headers: { "X-SMAJ-Silent": "true" }, signal: controller.signal });
       if (controller.signal.aborted) return;
       setData(response.data); snapshotRef.current = response.data; setError("");
       const observed = response.data.charts.active.data[0];
       if (period === "Live" && observed) setSamples(previous => [...previous.filter(point => point.time !== observed.time), observed].slice(-60));
-    } catch { if (!controller.signal.aborted) setError("Analytics could not refresh. Previous data is shown with its original timestamp. Check admin access and retry."); }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        const status = isAxiosError(error) ? error.response?.status : undefined;
+        const message = isAxiosError<{ message?: string }>(error) ? error.response?.data?.message : undefined;
+        setError(status === 401 ? "Sign in again to load admin analytics." : status === 403 ? "Your account does not have admin analytics access." : status === 404 ? "The analytics API is missing from this backend deployment. Update the backend and retry." : message || "The analytics server could not be reached. Check your connection and retry.");
+      }
+    }
     finally { if (!controller.signal.aborted) { setLoading(false); setRefreshing(false); if (controllerRef.current === controller) controllerRef.current = null; } }
   }, [period, from, to, timezone, service]);
   useEffect(() => {
@@ -119,8 +126,8 @@ export default function AdminAnalyticsPage() {
   return <main className="private-page admin-enterprise-page">
     <header className="ea-page-head"><div><p className="ea-eyebrow">SMAJ PI HUB / {service ? "SERVICE ANALYTICS" : "OVERVIEW"}</p><h1>{currentService?.name || (service ? "Service analytics" : "Analytics & Reports")}</h1><p>Platform performance, verified payments and operational activity.</p></div><button className="ea-button" type="button" disabled={refreshing || loading} onClick={() => void load(true)}><RefreshCw size={15} />{refreshing ? "Refreshing" : "Refresh"}</button></header>
     <section className="ea-toolbar" aria-label="Analytics filters"><div className="ea-periods">{periods.map(value => <button type="button" key={value} aria-pressed={period === value} onClick={() => setPeriod(value)}>{value}</button>)}</div><div className="ea-options"><label><input type="checkbox" checked={compare} onChange={event => setCompare(event.target.checked)} />Previous period</label><label>Timezone<select value={timezone} onChange={event => setTimezone(event.target.value)}>{Array.from(new Set([timezoneDefault, "UTC", "Asia/Dubai", "Africa/Lagos", "America/New_York"])).map(value => <option key={value}>{value}</option>)}</select></label></div>{period === "Custom" ? <div className="ea-date-range"><label>From<input type="datetime-local" value={from} onChange={event => setFrom(event.target.value)} /></label><label>To<input type="datetime-local" value={to} onChange={event => setTo(event.target.value)} /></label><small>Entered in your device timezone ({timezoneDefault}); chart labels use {timezone}.</small></div> : null}</section>
-    <div className="ea-status"><span><i className={error ? "stale" : ""} />{period === "Live" ? "Live observations" : "Database snapshot"} | refresh every 15 seconds</span><span>{data ? "Updated " + date(data.updatedAt) : "Loading snapshot"} | {timezone}</span></div>
-    {error ? <div className="private-alert error" role="alert">{error}</div> : null}
+    <div className="ea-status"><span><i className={error ? "stale" : ""} />{period === "Live" ? "Live observations" : "Database snapshot"} | refresh every 15 seconds</span><span>{data ? "Updated " + date(data.updatedAt) : loading ? "Loading snapshot" : "No snapshot loaded"} | {timezone}</span></div>
+    {error ? <div className="ea-card" style={{ padding: 16 }} role="alert">{error}{data ? " Previous data keeps its original timestamp." : ""}</div> : null}
     {loading && !data ? <PrivateSkeleton variant="dashboard" count={4} /> : data ? <>
       {service ? <nav className="ea-tabs" aria-label="Service workspace"><button type="button" aria-pressed={tab === "analytics"} onClick={() => setTab("analytics")}>Analytics</button><button type="button" aria-pressed={tab === "management"} onClick={() => setTab("management")}>Management</button><Link to="/admin">All platforms</Link></nav> : null}
       {tab === "management" && service ? <section className="ea-card ea-service-management"><h2>{currentService?.name} management</h2>{serviceManagement[service]?.length ? <div className="ea-management-links">{serviceManagement[service].map(link => <Link className="ea-button" key={link.href} to={link.href}>{link.label}</Link>)}</div> : <p>A dedicated administrator management API is required for this service. Global marketplace records are not presented as this service's data.</p>}{currentService?.available ? <button className="ea-button" onClick={() => inspect("usage", undefined, service)}>Inspect {currentService.unit}</button> : <p>{currentService?.reason}</p>}</section> : <>

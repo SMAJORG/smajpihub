@@ -20,8 +20,10 @@ export const analyticsServices = [
 export type AnalyticsRange = { from: number; to: number; previousFrom: number; timezone: string; live: boolean; step: number; service?: string };
 export function parseAnalyticsRange(query: Row, now = Date.now()): AnalyticsRange {
   const validDate = (value: unknown) => typeof value === "string" && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? Date.parse(value) : NaN;
-  const from = query.from ? validDate(query.from) : now - 30 * DAY;
-  const to = query.to ? validDate(query.to) : now;
+  const durations: Record<string, number> = { Live: 3600_000, "24H": DAY, "7D": 7 * DAY, "30D": 30 * DAY, "90D": 90 * DAY };
+  if (query.period && !durations[String(query.period)]) throw new Error("Choose a valid analytics period.");
+  const to = query.period ? now : query.to ? validDate(query.to) : now;
+  const from = query.period ? to - durations[String(query.period)] : query.from ? validDate(query.from) : now - 30 * DAY;
   const timezone = typeof query.timezone === "string" ? query.timezone : "UTC";
   try { new Intl.DateTimeFormat("en", { timeZone: timezone }).format(now); } catch { throw new Error("Choose a valid timezone."); }
   if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to || to - from > 180 * DAY || to > now + 60_000) throw new Error("Choose an explicit timezone and a date range of up to 180 days ending no later than now.");
@@ -38,7 +40,9 @@ const projection = Object.fromEntries(["_id", "uid", "username", "displayName", 
 async function read(locals: Row, key: string): Promise<{ rows: Row[]; error: string | null }> {
   if (!locals[key]) return { rows: [], error: "Required collection: " + key };
   try {
-    const rows = await locals[key].find({}).project(projection).limit(MAX_ROWS + 1).toArray();
+    const cursor = locals[key].find({}).project(projection).limit(MAX_ROWS + 1);
+    if (typeof cursor.maxTimeMS === "function") cursor.maxTimeMS(8000);
+    const rows = await cursor.toArray();
     if (rows.length > MAX_ROWS) return { rows: [], error: "Database aggregation required for " + key + " above 50,000 records; totals are withheld." };
     return { rows, error: null };
   } catch { return { rows: [], error: "Could not read " + key + ". Retry refresh." }; }
