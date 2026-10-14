@@ -1,46 +1,13 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const ts = require("typescript");
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/appUpdates.ts"), "utf8")
-  .replaceAll("import.meta.env.VITE_APP_VERSION", '"1.0.2"')
-  .replaceAll("import.meta.env.VITE_APP_BUILD_ID", '"build-old"')
-  .replaceAll("import.meta.env.BASE_URL", '"/"');
-const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-function setup(data, ok = true) {
-  const calls = []; let cleared = 0;
-  const exports = {};
-  new Function("exports", "window", "fetch", code)(exports,
-    { location: { origin: "https://smajpihub.com" }, setTimeout: () => 1, clearTimeout: () => cleared++ },
-    async (url, config) => { calls.push({ url, config }); return { ok, json: async () => data }; });
-  return { ...exports, calls, cleared: () => cleared };
-}
-test("web checks compare published build identity, even when the version is unchanged", async () => {
-  const app = setup({ version: "1.0.2", buildId: "build-new" });
-  assert.equal((await app.checkAppUpdate(false)).available, true);
-  assert.equal(app.calls[0].url, "https://smajpihub.com/version.json");
-  assert.equal(app.calls[0].config.cache, "no-store");
-  assert.equal(app.cleared(), 1);
-});
-test("current web build reports up to date", async () => {
-  assert.equal((await setup({ version: "1.0.2", buildId: "build-old" }).checkAppUpdate(false)).available, false);
-});
-test("Android compares numeric versions from the published APK release", async () => {
-  const app = setup({ body: "Version: 1.0.10\n\nPayment fixes.", assets: [{ name: "SMAJ-PI-HUB.apk" }] });
-  const update = await app.checkAppUpdate(true);
-  assert.equal(update.available, true); assert.equal(update.native, true);
-  assert.equal(update.version, "1.0.10"); assert.equal(update.details, "Payment fixes.");
-  assert.match(app.calls[0].url, /releases\/tags\/android-latest$/);
-});
-test("older and matching Android releases never offer an update", async () => {
-  const app = setup({ body: "Version: 1.0.2", assets: [{ name: "SMAJ-PI-HUB.apk" }] });
-  assert.equal((await app.checkAppUpdate(true)).available, false);
-  assert.equal((await app.checkAppUpdate(true, "1.0.10")).available, false);
-});
-test("unpublished or failed release checks report failure instead of saying up to date", async () => {
-  for (const [data, ok] of [[{}, true], [{ body: "Version: 1.0.10", assets: [] }, true], [{}, false]]) {
-    const app = setup(data, ok); await assert.rejects(app.checkAppUpdate(true)); assert.equal(app.cleared(), 1);
-  }
-  await assert.rejects(setup({}).checkAppUpdate(false), /unavailable/);
-});
+﻿const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript');
+const source=fs.readFileSync(path.join(__dirname,'../src/lib/appUpdates.ts'),'utf8').replaceAll('import.meta.env.VITE_APP_VERSION','"1.0.2"').replaceAll('import.meta.env.VITE_APP_BUILD_ID','"build-old"').replaceAll('import.meta.env.BASE_URL','"/"');
+const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+function manifest(code=10){return{version:`1.0.${code}`,versionCode:code,url:`https://github.com/SMAJORG/smajpihub/releases/download/android-v1.0.${code}/SMAJ-PI-HUB.apk`,sha256:'a'.repeat(64),size:42000000}}
+function release(code=10){return{body:`Version: 1.0.${code}\n\nPayment fixes.\n<!-- SMAJ_ANDROID_UPDATE\n${JSON.stringify(manifest(code))}\n-->`}}
+function setup(data,ok=true,options={}){const calls=[],installs=[],browser=[];let cleared=0;const exports={};const requireStub=name=>name==='@capacitor/core'?{Capacitor:{isNativePlatform:()=>Boolean(options.native),isPluginAvailable:()=>options.plugin!==false},registerPlugin:()=>({install:async pkg=>{installs.push(pkg);return{installerOpened:true}}})}:name==='@capacitor/app'?{App:{getInfo:async()=>({version:options.installed||'1.0.2'})}}:name==='@capacitor/browser'?{Browser:{open:async pkg=>browser.push(pkg)}}:(()=>{throw Error(name)})();new Function('exports','window','fetch','require',code)(exports,{location:{origin:'https://smajpihub.com'},setTimeout:()=>1,clearTimeout:()=>cleared++},async(url,config)=>{calls.push({url,config});return{ok,json:async()=>data}},requireStub);return{...exports,calls,installs,browser,cleared:()=>cleared}}
+test('web checks preserve build identity even without a version change',async()=>{const app=setup({version:'1.0.2',buildId:'build-new'});assert.equal((await app.checkAppUpdate(false)).available,true);assert.equal(app.calls[0].url,'https://smajpihub.com/version.json');assert.equal(app.calls[0].config.cache,'no-store');assert.equal(app.cleared(),1);assert.equal((await setup({version:'1.0.2',buildId:'build-old'}).checkAppUpdate(false)).available,false)});
+test('Android uses verified immutable downloads and hides metadata from details',async()=>{const app=setup(release());const update=await app.checkAppUpdate(true);assert.equal(update.available,true);assert.equal(update.details,'Payment fixes.');assert.match(update.apk.url,/android-v1\.0\.10/);assert.equal(app.calls.length,1,'Only the CORS-enabled release API is needed')});
+test('installed Android version overrides the bundled web version',async()=>{const app=setup(release(),true,{native:true,installed:'1.0.10'});assert.equal((await app.checkAppUpdate(true)).available,false);assert.equal((await setup(release(2)).checkAppUpdate(true,'1.0.10')).available,false)});
+test('missing metadata and failed checks never claim up to date',async()=>{for(const [data,ok]of[[{},true],[{body:'Version: 1.0.10'},true],[{},false]]){const app=setup(data,ok);await assert.rejects(app.checkAppUpdate(true));assert.equal(app.cleared(),1)}});
+test('damaged metadata, mutable URLs and different versions are rejected',()=>{const app=setup(release());for(const delta of[{url:'https://evil.example/app.apk'},{url:'https://github.com/SMAJORG/smajpihub/releases/download/android-latest/SMAJ-PI-HUB.apk'},{sha256:'broken'},{size:0},{versionCode:11},{version:'1.0.11'}])assert.throws(()=>app.parseAndroidUpdate({...manifest(),...delta},'1.0.10'))});
+test('installer receives integrity fields and duplicate taps share one operation',async()=>{const app=setup(release());const update=await app.checkAppUpdate(true);const first=app.installAppUpdate(update),second=app.installAppUpdate(update);assert.equal(first,second);await first;assert.deepEqual(app.installs,[update.apk]);await assert.rejects(app.installAppUpdate({...update,available:false}))});
+test('legacy native apps open only the version-specific APK',async()=>{const app=setup(release(),true,{plugin:false});await app.installAppUpdate(await app.checkAppUpdate(true));assert.equal(app.browser[0].url,manifest().url)});

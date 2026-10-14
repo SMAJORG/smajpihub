@@ -5,8 +5,7 @@ import LanguageSoonButton from "../../components/LanguageSoonButton";
 import TrustBadge from "../../components/TrustBadge";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import { Capacitor } from "@capacitor/core";
-import { APP_VERSION, checkAppUpdate, type AppUpdate } from "../../lib/appUpdates";
-import { ANDROID_APK_URL } from "../../lib/androidDownload";
+import { APP_VERSION, checkAppUpdate, installAppUpdate, type AppUpdate } from "../../lib/appUpdates";
 import "./SettingsPage.css";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
@@ -96,8 +95,7 @@ const SettingsPage = () => {
     setUpdatingApp(true);
     try {
       if (updateInfo?.native) {
-        const { Browser } = await import("@capacitor/browser");
-        await Browser.open({ url: ANDROID_APK_URL });
+        await installAppUpdate(updateInfo);
         closeUpdate();
       } else {
         if ("serviceWorker" in navigator) {
@@ -106,7 +104,7 @@ const SettingsPage = () => {
         }
         window.location.reload();
       }
-    } catch { setMessage("Could not open the update. Please try again."); closeUpdate(); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not open the update. Please try again."); closeUpdate(); }
     finally { setUpdatingApp(false); }
   };
   const [message, setMessage] = useState("");

@@ -1,3 +1,4 @@
+import NativeUpdatePrompt from "./components/NativeUpdatePrompt";
 import { useLayoutEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import router from "./Router.tsx";
@@ -28,6 +29,7 @@ function App() {
       <NativeWelcomeGate>
         <NativeAppLockGate>
         <NativeRuntimeBridge />
+        <NativeUpdatePrompt />
         {!isAdminRoute ? (
           <main className="desktop-access-block" aria-labelledby="desktop-access-title">
             <div>

@@ -6,82 +6,96 @@ on:
     branches:
       - main
 
+concurrency:
+  group: smaj-android-release
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
 jobs:
   apk:
     runs-on: ubuntu-latest
-    env:
-      VITE_APP_VERSION: 1.0.${{ github.run_number }}
     defaults:
       run:
         working-directory: frontend
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-
       - name: Restore persistent APK signing key
         env:
           SMAJ_ANDROID_KEYSTORE_BASE64: ${{ secrets.SMAJ_ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$SMAJ_ANDROID_KEYSTORE_BASE64" ]; then
-            echo "::error::Configure SMAJ_ANDROID_KEYSTORE_BASE64 and SMAJ_ANDROID_KEYSTORE_PASSWORD repository secrets. Refusing to create an incompatible signing key."
+            echo "::error::Persistent APK signing secrets are required."
             exit 1
           fi
           umask 077
           printf '%s' "$SMAJ_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/smaj-updates.keystore"
-
+      - name: Set increasing Android version
+        run: |
+          code=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          test "$GITHUB_RUN_ATTEMPT" -lt 100
+          test "$code" -gt 0
+          test "$code" -lt 2100000000
+          echo "SMAJ_ANDROID_VERSION_CODE=$code" >> "$GITHUB_ENV"
+          echo "VITE_APP_VERSION=1.0.$code" >> "$GITHUB_ENV"
       - name: Install web dependencies
         run: npm ci
-
       - name: Build and sync Capacitor
         env:
           SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
           SMAJ_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SMAJ_ANDROID_KEYSTORE_PASSWORD }}
         run: npm run android:sync
-
-      - name: Build installable APK
+      - name: Build signed release APK
         env:
           SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
           SMAJ_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SMAJ_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug
-          mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/SMAJ-PI-HUB.apk
-
-      - name: Upload APK
+          ./gradlew assembleRelease
+          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/SMAJ-PI-HUB.apk
+      - name: Verify installable update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/verify-android-apk.sh android/app/build/outputs/apk/release/SMAJ-PI-HUB.apk
+      - name: Upload verified APK
         uses: actions/upload-artifact@v4
         with:
           name: SMAJ-PI-HUB-Android
-          path: frontend/android/app/build/outputs/apk/debug/SMAJ-PI-HUB.apk
+          path: |
+            frontend/android/app/build/outputs/apk/release/SMAJ-PI-HUB.apk
+            frontend/android/app/build/outputs/apk/release/SMAJ-PI-HUB-update.json
           if-no-files-found: error
-
-      - name: Publish public APK release
+      - name: Publish verified update
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view android-latest --repo "$GITHUB_REPOSITORY" || gh release create android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android" --notes "Latest installable SMAJ PI HUB Android preview build." --prerelease --target "$GITHUB_SHA"
-          gh release upload android-latest android/app/build/outputs/apk/debug/SMAJ-PI-HUB.apk --repo "$GITHUB_REPOSITORY" --clobber
-          printf 'Version: %s\n\nThe latest SMAJ PI HUB Android build includes the newest fixes and improvements.\n' "$VITE_APP_VERSION" > "$RUNNER_TEMP/smaj-release-notes.txt"
+          apk="android/app/build/outputs/apk/release/SMAJ-PI-HUB.apk"
+          manifest="android/app/build/outputs/apk/release/SMAJ-PI-HUB-update.json"
+          tag="android-v$VITE_APP_VERSION"
+          printf 'Version: %s\n\nVerified SMAJ PI HUB Android update.\n' "$VITE_APP_VERSION" > "$RUNNER_TEMP/smaj-release-notes.txt"
+          printf '\n<!-- SMAJ_ANDROID_UPDATE\n' >> "$RUNNER_TEMP/smaj-release-notes.txt"
+          cat "$manifest" >> "$RUNNER_TEMP/smaj-release-notes.txt"
+          printf '\n-->\n' >> "$RUNNER_TEMP/smaj-release-notes.txt"
+          gh release create "$tag" "$apk" "$manifest" --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android $VITE_APP_VERSION" --notes-file "$RUNNER_TEMP/smaj-release-notes.txt" --prerelease --target "$GITHUB_SHA"
+          gh release view android-latest --repo "$GITHUB_REPOSITORY" || gh release create android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android" --notes "Verified Android updates." --prerelease --target "$GITHUB_SHA"
+          gh release upload android-latest "$apk" "$manifest" --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android $VITE_APP_VERSION" --notes-file "$RUNNER_TEMP/smaj-release-notes.txt"

@@ -4,7 +4,7 @@ import AndroidRoundedIcon from "@mui/icons-material/AndroidRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import { isCapacitorNative } from "../lib/capacitorPiAuth";
-import { ANDROID_APK_URL } from "../lib/androidDownload";
+import { ANDROID_APK_URL, downloadVerifiedAndroidApk } from "../lib/androidDownload";
 import { COOKIE_CONSENT_EVENT, COOKIE_CONSENT_KEY } from "./CookieConsent";
 import "./AndroidDownloadPrompt.css";
 
@@ -54,7 +54,7 @@ const AndroidDownloadPrompt = () => {
       <button className="android-download-close" type="button" onClick={() => hideFor(7)} aria-label="Close download app message"><CloseRoundedIcon /></button>
       <div className="android-download-icon" aria-hidden="true"><AndroidRoundedIcon /></div>
       <div className="android-download-copy"><strong id="android-download-title">Get SMAJ PI HUB on Android</strong><span>Faster access to your services, messages and account.</span></div>
-      <a className="android-download-action" href={ANDROID_APK_URL} download onClick={() => hideFor(30)}><DownloadRoundedIcon /> Download App</a>
+      <a className="android-download-action" href={ANDROID_APK_URL} download onClick={event => { void downloadVerifiedAndroidApk(event).then(started => { if (started) hideFor(30); }); }}><DownloadRoundedIcon /> Download App</a>
     </aside>
   );
 };

@@ -1,6 +1,6 @@
 apply plugin: 'com.android.application'
 
-def smajBuildNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "2"
+def smajBuildNumber = System.getenv("SMAJ_ANDROID_VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER") ?: "2"
 
 def smajSigningStore = System.getenv("SMAJ_ANDROID_KEYSTORE_PATH")
 def smajSigningPassword = System.getenv("SMAJ_ANDROID_KEYSTORE_PASSWORD")
@@ -25,7 +25,7 @@ android {
         }
     }
     signingConfigs {
-        debug {
+        stable {
             if (smajSigningStore) {
                 if (!smajSigningPassword) throw new GradleException("APK signing password is missing.")
                 storeFile file(smajSigningStore)
@@ -33,11 +33,18 @@ android {
                 storePassword smajSigningPassword
                 keyAlias "smaj-updates"
                 keyPassword smajSigningPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
     buildTypes {
+        debug {
+            if (smajSigningStore) signingConfig signingConfigs.stable
+        }
         release {
+            if (smajSigningStore) signingConfig signingConfigs.stable
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -71,4 +78,14 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// Never create an unsigned release APK, even outside CI.
+tasks.register("requireReleaseSigning") {
+    doLast {
+        if (!smajSigningStore || !smajSigningPassword) throw new GradleException("Release builds require the persistent SMAJ signing key.")
+    }
+}
+tasks.configureEach { task ->
+    if (task.name == "preReleaseBuild") task.dependsOn("requireReleaseSigning")
 }

@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
     @Override public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SmajPermissionsPlugin.class);
         registerPlugin(SmajMediaPlugin.class);
+        registerPlugin(SmajUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
         bridge.getWebView().setWebChromeClient(new SmajWebChromeClient(bridge));
         bridge.getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
