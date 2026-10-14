@@ -146,7 +146,10 @@ const MessagesPage = () => {
   const ignoreMousePressRef = useRef(false);
   const ignoreConversationMousePressRef = useRef(false);
   const selectedId = params.get("conversation");
-  const [chatFullscreen, setChatFullscreen] = useState(false);
+  const [chatFullscreen, setChatFullscreen] = useState(Boolean(selectedId));
+  useEffect(() => {
+    setChatFullscreen(Boolean(selectedId));
+  }, [selectedId]);
   useEffect(() => {
     if (!chatFullscreen && !selectedId) return;
     const viewport = window.visualViewport;

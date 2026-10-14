@@ -165,6 +165,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       ? savedRoute
       : "";
   });
+  const isConversationOpen = location.pathname === "/messages" && Boolean(new URLSearchParams(location.search).get("conversation"));
   const isStoreShell = location.pathname === "/store";
   const isHeaderHiddenPage = location.pathname === "/settings/preferences" || location.pathname === "/app/services" || location.pathname === "/search" || location.pathname === "/messages";
   const dashboardTab = new URLSearchParams(location.search).get("tab");
@@ -472,7 +473,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           </div>
         </div>
       </div>
-      {!fullScreen && !isStreamImmersive ? <nav className="mobile-bottom-nav" aria-label="Mobile private navigation">
+      {!fullScreen && !isStreamImmersive && !isConversationOpen ? <nav className="mobile-bottom-nav" aria-label="Mobile private navigation">
         {(isStreamShell ? [
           { to: "/app/services/stream", label: "Home", icon: <HomeOutlinedIcon /> },
           { to: "/app/services/stream/search", label: "Browse", icon: <SearchOutlinedIcon /> },
