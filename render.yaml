@@ -20,6 +20,8 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
+      - key: PI_NETWORK
+        sync: false
       - key: TRANSLATION_API_URL
         value: https://smajpihub-translate.onrender.com
       - key: TRANSLATION_API_URL_AR

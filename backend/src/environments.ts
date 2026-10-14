@@ -78,7 +78,7 @@ const platformApiURL =
   process.env.PLATFORM_API_URL || productionPiPlatformAPIURL;
 
 const env: Environment = {
-  pi_network: process.env.PI_NETWORK || "Pi Testnet",
+  pi_network: process.env.PI_NETWORK?.trim() || "Pi Testnet",
   node_env: nodeEnv,
   is_production: isProduction,
   is_render: isRender,
@@ -154,7 +154,9 @@ if (
 
 if (isProduction) {
   const missing: string[] = [];
-  if (env.pi_payments_enabled && !["Pi Network", "Pi Testnet"].includes(process.env.PI_NETWORK || "")) missing.push("PI_NETWORK");
+  // Validate the resolved value: existing deployments may omit this setting
+  // and use the same Testnet default as development and .env.example.
+  if (env.pi_payments_enabled && !["Pi Network", "Pi Testnet"].includes(env.pi_network)) missing.push("PI_NETWORK (Pi Network or Pi Testnet)");
   if (
     !process.env.SESSION_SECRET ||
     env.session_secret === defaultSessionSecret
