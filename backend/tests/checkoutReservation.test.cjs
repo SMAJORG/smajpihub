@@ -30,6 +30,7 @@ test("checkout resumes own reserved unpaid order but rejects unavailable stock f
     app = express(),
     router = express.Router();
   app.use(express.json());
+  app.locals.memoryDatabase = true;
   const productId = new ObjectId(),
     orderId = new ObjectId();
   app.locals.productCollection = new MemoryCollection([

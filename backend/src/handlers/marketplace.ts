@@ -1,3 +1,5 @@
+import crypto from "crypto";
+import { financialTransaction, financialError } from "../services/financialIntegrity";
 import { enrichProfileAvatars } from "../services/profileAvatars";
 import { Request, Response, Router } from "express";
 import { ObjectId } from "mongodb";
@@ -188,6 +190,13 @@ const resolveProductImageFields = async (fields: ReturnType<typeof productFields
 };
 
 export default function mountMarketplaceEndpoints(router: Router) {
+  for (const method of ["get", "post", "patch", "put", "delete"] as const) {
+    const register = router[method].bind(router) as any;
+    (router as any)[method] = (path: string, handler: any) => register(path, (req: Request, res: Response, next: any) =>
+      Promise.resolve().then(() => handler(req, res, next)).catch((error: any) => {
+        if (!res.headersSent) res.status(error.status || 503).json({ message: error.status ? error.message : "Operation unavailable; retry the same request" });
+      }));
+  }
   router.get("/products", async (req, res) => {
     const query: Record<string, any> = { active: true, hidden: { $ne: true }, approved: true, reviewStatus: "approved" };
     const search = String(req.query.search || "").trim();
@@ -338,80 +347,44 @@ export default function mountMarketplaceEndpoints(router: Router) {
   });
 
   router.post("/orders", async (req, res) => {
-    const user = await requireUser(req, res);
-    if (!user) return;
-    const productId = String(req.body?.productId || "");
-    if (!ObjectId.isValid(productId)) {
-      return res.status(400).json({ error: "bad_request", message: "Invalid product id" });
-    }
-
-    const product = await req.app.locals.productCollection.findOne({ _id: new ObjectId(productId), active: true, hidden: { $ne: true }, approved: true, reviewStatus: "approved" });
-    if (!product) {
-      return res.status(404).json({ error: "not_found", message: "Product not found" });
-    }
-    if (product.sellerId === user.uid) {
-      return res.status(400).json({ error: "bad_request", message: "You cannot order your own product" });
-    }
-
-    const quantity = Math.min(20, Math.max(1, Math.floor(Number(req.body?.quantity) || 1)));
-    const reservation = await req.app.locals.productCollection.updateOne(
-      { _id: product._id, active: true, quantity: { $gte: quantity } },
-      { $inc: { quantity: -quantity }, $set: { updatedAt: new Date() } },
-    );
-    if (!reservation.modifiedCount) {
-      // Resume this buyer's existing unpaid reservation if it holds the stock.
-      const reservedOrder = await req.app.locals.marketplaceOrderCollection.findOne({
-        buyerId: user.uid, productId, quantity, status: "pending",
-        paymentStatus: { $in: ["pending", "processing", "failed", "cancelled"] },
-        inventoryReserved: true, inventoryReleased: { $ne: true },
-      });
-      if (reservedOrder) return res.status(200).json({ order: serialize(reservedOrder) });
-      return res.status(409).json({ error: "out_of_stock", message: "The requested quantity is no longer available" });
-    }
-    const unitPricePi = Math.round(Number(withResolvedPiPrice(product).pricePi) * 1e7) / 1e7;
-
-    const order = {
-      buyerId: user.uid,
-      buyerName: user.displayName || user.piUsername || user.username,
-      sellerId: product.sellerId,
-      sellerName: product.sellerName || product.piUsername || "Pi seller",
-      productId,
-      productTitle: product.title,
-      productImage: product.image,
-      productCategory: product.category,
-      unitPricePi,
-      quantity,
-      pricePi: unitPricePi * quantity,
-      inventoryReserved: true,
-      inventoryReleased: false,
-      status: "pending",
-      paymentStatus: "pending",
-      paymentId: null,
-      paymentTxid: null,
-      paidAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      timeline: [
-        timelineEntry("pending", "Order Created", "Your SMAJ Store order was created successfully."),
-        timelineEntry("payment_pending", "Payment Pending", "Open Pi Browser to complete payment."),
-      ],
-    };
-    let result;
     try {
-      result = await req.app.locals.marketplaceOrderCollection.insertOne(order);
-    } catch (error) {
-      await req.app.locals.productCollection.updateOne(
-        { _id: product._id },
-        { $inc: { quantity }, $set: { updatedAt: new Date() } },
-      );
-      throw error;
-    }
-    await Promise.all([
-      createNotification(req.app, { userId: user.uid, type: "order_created", title: "Order created", message: `${product.title} order was created. Payment is pending.`, relatedId: result.insertedId.toString(), image: product.image }),
-      createNotification(req.app, { userId: user.uid, type: "payment_pending", title: "Payment pending", message: `Complete payment for ${product.title} to confirm your order.`, relatedId: result.insertedId.toString(), image: product.image }),
-      createNotification(req.app, { userId: product.sellerId, type: "new_order", title: "New order", message: `${order.buyerName} ordered ${product.title}`, relatedId: result.insertedId.toString(), image: product.image }),
-    ]);
-    return res.status(201).json({ order: serialize({ ...order, _id: result.insertedId }) });
+      const user = await requireUser(req, res); if (!user) return;
+      const productId = String(req.body?.productId || "");
+      if (!ObjectId.isValid(productId)) return res.status(400).json({ message: "Invalid product id" });
+      const quantity = Math.min(20, Math.max(1, Math.floor(Number(req.body?.quantity) || 1)));
+      const key = req.get("Idempotency-Key") || crypto.randomUUID();
+      if (!/^[a-z0-9_-]{1,100}$/i.test(key)) return res.status(400).json({ message: "Invalid checkout key" });
+      const orderId = new ObjectId(crypto.createHash("sha256").update(user.uid + ":" + key).digest("hex").slice(0,24));
+      let resumed = false;
+      const order = await financialTransaction(req.app, async session => {
+        const options = session ? { session } : {};
+        const existing = await req.app.locals.marketplaceOrderCollection.findOne({ _id: orderId }, options);
+        if (existing) {
+          if (existing.buyerId !== user.uid || existing.productId !== productId || existing.quantity !== quantity) throw financialError("Checkout key reused for another request");
+          resumed = true; return existing;
+        }
+        const product = await req.app.locals.productCollection.findOne({ _id: new ObjectId(productId), active: true, hidden: { $ne: true }, approved: true, reviewStatus: "approved" }, options);
+        if (!product || product.sellerId === user.uid) throw financialError("Product unavailable", 404);
+        const held = await req.app.locals.marketplaceOrderCollection.findOne({ buyerId: user.uid, productId, quantity, status: "pending", inventoryReserved: true, inventoryReleased: { $ne: true } }, options);
+        if (held) { resumed = true; return held; }
+        const unitPricePi = Math.round(Number(withResolvedPiPrice(product).pricePi) * 1e7) / 1e7;
+        if (!Number.isFinite(unitPricePi) || unitPricePi <= 0) throw financialError("Invalid product price", 400);
+        const stock = await req.app.locals.productCollection.updateOne({ _id: product._id, quantity: { $gte: quantity }, active: true, approved: true }, { $inc: { quantity: -quantity } }, options);
+        if (!stock.modifiedCount) throw financialError("Requested quantity is unavailable");
+        const created = { _id: orderId, buyerId: user.uid, buyerName: user.displayName || user.username, sellerId: product.sellerId,
+          sellerName: product.sellerName, productId, productTitle: product.title, productImage: product.image, productCategory: product.category,
+          quantity, unitPricePi, pricePi: unitPricePi * quantity, status: "pending", paymentStatus: "pending", paymentId: null, paymentTxid: null,
+          paidAt: null, inventoryReserved: true, inventoryReleased: false, reservationExpiresAt: new Date(Date.now()+30*60*1000),
+          createdAt: new Date(), updatedAt: new Date(), timeline: [timelineEntry("pending", "Order Created")] };
+        await req.app.locals.marketplaceOrderCollection.insertOne(created, options);
+        if (req.app.locals.notificationCollection) for (const [userId, type] of [[user.uid, "order_created"], [product.sellerId, "new_order"]]) {
+          const notificationId = new ObjectId(crypto.createHash("sha256").update(String(orderId)+":"+type).digest("hex").slice(0,24));
+          await req.app.locals.notificationCollection.updateOne({ _id: notificationId }, { $setOnInsert: { userId, type, title: "Order created", message: product.title + " order is awaiting payment", relatedId: String(orderId), read: false, createdAt: new Date() } }, { upsert: true, ...options });
+        }
+        return created;
+      });
+      return res.status(resumed ? 200 : 201).json({ order: serialize(order) });
+    } catch (error: any) { return res.status(error.status || 503).json({ message: error.status ? error.message : "Order creation unavailable. Retry the same checkout." }); }
   });
 
   router.post("/products/:id/report", async (req, res) => {
@@ -461,6 +434,7 @@ export default function mountMarketplaceEndpoints(router: Router) {
     if (["delivered", "completed"].includes(status) && order.buyerId !== user.uid) {
       return res.status(403).json({ error: "forbidden", message: "Only the buyer can confirm delivery" });
     }
+    if (status === "cancelled" && order.paymentId && order.paymentStatus !== "cancelled") return res.status(409).json({ message: "Payment must be reconciled before releasing stock" });
     if (!canTransitionOrder(order.status, status)) {
       return res.status(409).json({
         error: "invalid_transition",
@@ -486,16 +460,18 @@ export default function mountMarketplaceEndpoints(router: Router) {
       updatedAt: new Date(),
       timeline: [...(Array.isArray(order.timeline) ? order.timeline : []), timelineEntry(status, labels[status], noteMap[status])],
     };
-    const transition = await req.app.locals.marketplaceOrderCollection.updateOne(
+    const transition = await financialTransaction(req.app, async session => {
+    const result = await req.app.locals.marketplaceOrderCollection.updateOne(
       { _id: order._id, status: order.status },
-      { $set: updates },
+      { $set: updates }, session ? { session } : {}
     );
+    if (result.modifiedCount && status === "cancelled") await releaseOrderInventory(req.app, order, "order_cancelled", session);
+    return result;
+    });
     if (!transition.modifiedCount) {
       return res.status(409).json({ error: "order_changed", message: "Order changed while it was being updated" });
     }
-    if (status === "cancelled") {
-      await releaseOrderInventory(req.app, order, "order_cancelled");
-    }
+
     const receiverId = order.buyerId === user.uid ? order.sellerId : order.buyerId;
     const notificationTitle = status === "shipped" ? "Order shipped" : status === "completed" ? "Delivery confirmed" : `Order ${status}`;
     const notificationMessage = status === "shipped"
@@ -645,6 +621,11 @@ export default function mountMarketplaceEndpoints(router: Router) {
     return res.status(201).json({ message: "Seller review saved" });
   });
 
+  router.get("/seller/settlements", async (req, res) => {
+    const user = await requireUser(req, res); if (!user) return;
+    const settlements = await req.app.locals.settlementCollection.find({ sellerUid: user.uid }).sort({ createdAt: -1 }).limit(100).toArray();
+    res.json({ settlements });
+  });
   router.get("/seller", async (req, res) => {
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(200).json({ products: [], orders: [], stats: { totalProducts: 0, totalOrders: 0, pendingOrders: 0, paidOrders: 0, averageRating: 0, totalReviews: 0 } });

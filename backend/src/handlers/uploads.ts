@@ -57,6 +57,7 @@ export default function mountUploadEndpoints(router: Router) {
       if (institutionEvidence && Buffer.from(String(req.body?.document || "").split(",")[1] || "", "base64").length > 5 * 1024 * 1024) return res.status(400).json({ message: "Upload authorization evidence up to 5 MB." });
       const name = String(req.body?.name || "document.pdf").slice(0, 120);
       const upload = await uploadPdfToCloudinary(String(req.body?.document || ""), safePurpose(req.body?.purpose), name);
+      if (upload.protectedAsset) await req.app.locals.cvAssetCollection.updateOne({ _id: upload.publicId }, { $set: { ownerId: String(user._id), url: upload.url, protectedAsset: true, createdAt: new Date() } }, { upsert: true });
       if (institutionEvidence) await req.app.locals.institutionEvidenceCollection.insertOne({ userId: String(user._id), url: upload.url, createdAt: new Date().toISOString() });
       return res.status(201).json(upload);
     } catch (err: any) {

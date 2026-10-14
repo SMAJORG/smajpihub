@@ -18,7 +18,7 @@ const crossSiteSession = env.is_production && !env.is_solohost;
 const sessionCookieOptions = {
   httpOnly: true,
   sameSite: crossSiteSession ? "none" as const : "lax" as const,
-  secure: crossSiteSession,
+  secure: env.is_production && (!env.is_solohost || env.frontend_url.split(",").every(origin => origin.trim().startsWith("https://"))),
   maxAge: 1000 * 60 * 60 * 24 * 7,
 };
 const normalizePiUsername = (username: string) => username.trim().replace(/^@+/, "").toLowerCase();
@@ -116,6 +116,8 @@ const refreshExistingAuthSession = async (req: Request, currentUser: any) => {
 const destroySession = async (req: Request, res: Response) => {
   const currentUser = await resolveCurrentUser(req).catch(() => null);
   if (currentUser) {
+    await req.app.locals.userCollection.updateOne({ _id: currentUser._id }, { $unset: { accessToken: "" } });
+    await req.app.locals.userCollection.updateOne({ _id: currentUser._id }, { $set: { accessTokenRevokedAt: new Date() }, $unset: { accessToken: "" } });
     const sessionKey = currentDeviceSessionKey(req);
     if (sessionKey && req.app.locals.deviceSessionCollection) {
       await req.app.locals.deviceSessionCollection.updateOne({ sessionKey, userId: currentUser.uid }, { $set: { active: false, revokedAt: new Date() } });
@@ -209,6 +211,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
             createdAt: currentUser.createdAt || new Date(),
             lastSeenAt: new Date(),
             accessToken: auth.accessToken,
+            accessTokenRevokedAt: null,
           },
         },
       );
@@ -506,6 +509,7 @@ export default function mountUserEndpoints(router: Router) {
       { sessionKey, userId: currentUser.uid, active: true },
       { $set: { active: false, revokedAt: new Date() } },
     );
+    await req.app.locals.userCollection.updateOne({ _id: currentUser._id }, { $set: { accessTokenRevokedAt: new Date() }, $unset: { accessToken: "" } });
     await req.app.locals.nativePushTokenCollection?.deleteOne({ sessionKey, userId: currentUser.uid });
     return res.json({ removed: result.matchedCount > 0 });
   });
@@ -518,6 +522,7 @@ export default function mountUserEndpoints(router: Router) {
       { userId: currentUser.uid, sessionKey: { $ne: currentKey }, active: true },
       { $set: { active: false, revokedAt: new Date() } },
     );
+    await req.app.locals.userCollection.updateOne({ _id: currentUser._id }, { $set: { accessTokenRevokedAt: new Date() }, $unset: { accessToken: "" } });
     await req.app.locals.nativePushTokenCollection?.deleteMany?.({ userId: currentUser.uid, sessionKey: { $ne: currentKey } });
     return res.json({ removed: true });
   });
@@ -542,6 +547,6 @@ export default function mountUserEndpoints(router: Router) {
   });
 
   // GET|POST /user/signout
-  router.get("/signout", destroySession);
+  router.get("/signout", (_, res) => res.status(405).json({ message: "Use POST to sign out" }));
   router.post("/signout", destroySession);
 }

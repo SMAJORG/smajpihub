@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import env from "../environments";
 
 type CloudinaryResponse = {
@@ -7,6 +8,7 @@ type CloudinaryResponse = {
   height?: number;
   bytes?: number;
   format?: string;
+  type?: string;
 };
 
 export type CloudinaryUpload = {
@@ -93,14 +95,26 @@ export const uploadPdfToCloudinary = async (document: string, purpose = "documen
   params.set("upload_preset", env.cloudinary_upload_preset);
   params.set("filename_override", sanitizeAssetName(originalName, "document.pdf"));
   params.set("folder", `${env.cloudinary_folder}/${safePurpose(purpose)}`);
+  const protectedCv = safePurpose(purpose) === "jobs-private-cv";
+  if (protectedCv) {
+    const secret = process.env.CLOUDINARY_API_SECRET, key = process.env.CLOUDINARY_API_KEY;
+    if (!secret || !key) throw Object.assign(new Error("Protected CV storage is not configured"), { statusCode: 503 });
+    params.delete("upload_preset");
+    params.set("timestamp", String(Math.floor(Date.now() / 1000)));
+    params.set("type", "authenticated");
+    const signed = [...params.entries()].filter(([k]) => k !== "file").sort(([a], [b]) => a.localeCompare(b)).map(([k,v]) => k + "=" + v).join("&");
+    params.set("signature", crypto.createHash("sha1").update(signed + secret).digest("hex"));
+    params.set("api_key", key);
+  }
   const response = await fetch(`https://api.cloudinary.com/v1_1/${env.cloudinary_cloud_name}/raw/upload`, {
     method: "POST",
     body: params,
   });
   if (!response.ok) throw new Error(`Cloudinary PDF upload failed: ${response.status}`);
   const data = (await response.json()) as CloudinaryResponse;
+  if (protectedCv && data.type !== "authenticated") throw new Error("CV provider did not confirm authenticated storage");
   if (!data.secure_url?.startsWith("https://res.cloudinary.com/")) throw new Error("Cloudinary did not return a secure PDF URL");
-  return { url: data.secure_url, publicId: data.public_id, bytes: data.bytes, format: data.format, storage: "cloudinary" as const };
+  return { url: data.secure_url, publicId: data.public_id, bytes: data.bytes, format: data.format, protectedAsset: protectedCv, storage: "cloudinary" as const };
 };
 
 export const resolveImageValue = async (value: unknown, purpose = "image", originalName = "image") => {

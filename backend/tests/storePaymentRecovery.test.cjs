@@ -28,8 +28,9 @@ function setup({ mismatch, absentTransaction = false, cancelled = false, unverif
       return { matchedCount: 1 };
     },
   };
-  const app = { locals: { marketplaceOrderCollection: collection } };
-  const shared = load("storePayments.ts", { mongodb: { ObjectId }, "./platformAPIClient": { platformAPIKeyClient: api }, "./notifications": { createNotification: async () => {} } });
+  const ledger = { updateOne: async () => ({ matchedCount: 1 }) };
+  const app = { locals: { marketplaceOrderCollection: collection, settlementCollection: ledger } };
+  const shared = load("storePayments.ts", { mongodb: { ObjectId }, "./platformAPIClient": { platformAPIKeyClient: api }, "./financialIntegrity": { financialTransaction: async (app, fn) => fn(), bindPayment: async () => {}, verifyIncomingPayment: () => {} }, "./notifications": { createNotification: async () => {} } });
   const recovery = load("storePaymentRecovery.ts", { "./platformAPIClient": { platformAPIKeyClient: api }, "./storePayments": shared });
   return { app, order, payment, api, recover: () => recovery.recoverPendingStorePayments(app), posts: () => posts, reads: () => reads, scans: () => scans };
 }

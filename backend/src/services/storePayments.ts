@@ -1,3 +1,4 @@
+import { bindPayment, financialTransaction, verifyIncomingPayment } from "./financialIntegrity";
 import { ObjectId } from "mongodb";
 import { platformAPIKeyClient } from "./platformAPIClient";
 import { createNotification } from "./notifications";
@@ -17,6 +18,7 @@ export const completeStorePayment = async (
     if (!ObjectId.isValid(String(orderId))) return reply(400, { error: "bad_request", message: "Invalid order id" });
     const order = await app.locals.marketplaceOrderCollection.findOne({ _id: new ObjectId(String(orderId)), buyerId: buyerUid });
     if (!order) return reply(404, { error: "not_found", message: "Order not found" });
+    if (!recovering && order.paymentId && order.paymentId !== paymentId) return reply(409, { message: "Resume the bound payment; another transfer requires reconciliation." });
     const alreadyRecorded = order.paymentStatus === "paid" && order.paymentId === paymentId && order.paymentTxid === txid;
     if (alreadyRecorded && !recovering) {
       return reply(200, { message: "Payment already completed.", orderId: order._id.toString(), paymentId, txid });
@@ -27,6 +29,7 @@ export const completeStorePayment = async (
     const payment = recoveredPayment || (await platformAPIKeyClient.get(`/v2/payments/${paymentId}`)).data;
     const mismatch = (candidate: any) => {
       if (candidate?.identifier !== paymentId) return "Pi returned a different payment identifier.";
+      if (candidate.network !== app.locals.piNetwork) return "Payment network differs from this deployment.";
       if (candidate.direction !== "user_to_app") return "This is not a payment to this app.";
       if (candidate.user_uid !== order.buyerId) return "This payment belongs to a different Pi account.";
       if (String(candidate.metadata?.orderId || "") !== order._id.toString()) return "This payment belongs to a different order. Resume its original order.";
@@ -36,6 +39,7 @@ export const completeStorePayment = async (
       if (candidate.status?.cancelled || candidate.status?.user_cancelled) return "Pi reports that this payment was cancelled.";
       return null;
     };
+    if (!recovering) verifyIncomingPayment(payment, { paymentId, payer: order.buyerId, amount: Number(order.pricePi), metadataKey: "orderId", intentId: order._id.toString() });
     const problem = mismatch(payment);
     if (problem) return reply(400, { error: "payment_mismatch", message: problem });
 
@@ -61,13 +65,16 @@ export const completeStorePayment = async (
     // Recovery acknowledges the existing transfer without undoing fulfillment or cancellation.
     if (alreadyRecorded) return reply(200, { message: "Payment recovered.", orderId: order._id.toString(), paymentId, txid });
     if (order.paymentStatus === "paid" && (order.paymentId || order.paymentTxid)) return reply(409, { message: "Pi payment completed, but this order records another payment. Contact support to reconcile the extra transfer." });
-    const recorded = await app.locals.marketplaceOrderCollection.updateOne(
-      { _id: order._id, status: order.status, paymentStatus: order.paymentStatus },
+    const recorded = await financialTransaction(app, async session => {
+    await bindPayment(app, confirmed, "store:" + order._id.toString(), session);
+    const result = await app.locals.marketplaceOrderCollection.updateOne(
+      { _id: order._id, status: order.status, paymentStatus: order.paymentStatus, paymentId: order.paymentId },
       {
         $set: {
           status: order.status === "pending" ? "paid" : order.status,
           paymentStatus: "paid",
           paymentRecoveryState: "completed",
+          reconciliationRequired: order.status === "cancelled" || Boolean(order.inventoryReleased),
           paymentRecoveryError: null,
           paymentId,
           paymentTxid: txid,
@@ -79,7 +86,16 @@ export const completeStorePayment = async (
           ],
         },
       }
+      , session ? { session } : {}
     );
+    if (result.matchedCount && order.status !== "cancelled" && !order.inventoryReleased) {
+      await app.locals.settlementCollection.updateOne({ _id: "store:" + order._id.toString() }, { $setOnInsert: {
+        orderId: order._id.toString(), sellerUid: order.sellerId, buyerUid: order.buyerId, amountPi: Number(confirmed.amount),
+        receiptPaymentId: paymentId, receiptTxid: txid, network: confirmed.network, status: "held", createdAt: new Date()
+      } }, { upsert: true, ...(session ? { session } : {}) });
+    }
+    return result;
+    });
 
     if (recorded.matchedCount === 0) {
       const current = await app.locals.marketplaceOrderCollection.findOne({ _id: order._id, buyerId: buyerUid });
@@ -101,8 +117,8 @@ export const completeStorePayment = async (
       createNotification(app, {
         userId: order.sellerId,
         type: "payment_received",
-        title: "Payment received",
-        message: `${order.buyerName} paid for ${order.productTitle}.`,
+        title: "Buyer payment verified",
+        message: `${order.buyerName} paid the app for ${order.productTitle}. Merchant settlement is separate.`,
         relatedId: order._id.toString(),
         image: order.productImage,
       }),

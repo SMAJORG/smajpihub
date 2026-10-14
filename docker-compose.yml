@@ -60,9 +60,9 @@ services:
   mongo:
     image: mongo:7.0
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
-    ports:
-      - 27027:27017
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    expose:
+      - "27017"
     volumes:
       - ${DATA_DIRECTORY}/mongo/data:/data/db

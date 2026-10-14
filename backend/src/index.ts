@@ -1,3 +1,5 @@
+import { recoverJobsBilling } from "./services/jobsBillingRecovery";
+import { expireUnfundedReservations } from "./services/inventoryRecovery";
 import mountInstitutionEndpoints from "./handlers/institutions";
 import fs from "fs";
 import path from "path";
@@ -71,13 +73,15 @@ const maskMongoUri = (uri: string) =>
 
 const app: express.Application = express();
 const serviceStartedAt = new Date();
+app.locals.piNetwork = env.pi_network;
 const isProduction = env.is_production;
 const crossSiteSession = isProduction && !env.is_solohost;
 const sessionTtlSeconds = 60 * 60 * 24 * 7;
+const configuredHttps = () => env.frontend_url.split(",").every(origin => origin.trim().startsWith("https://"));
 const sessionCookieOptions = {
   httpOnly: true,
   sameSite: crossSiteSession ? ("none" as const) : ("lax" as const),
-  secure: crossSiteSession,
+  secure: isProduction && (!env.is_solohost || configuredHttps()),
   maxAge: 1000 * sessionTtlSeconds,
 };
 
@@ -128,11 +132,9 @@ const corsAllowlist = env.is_solohost
       "https://www.smaj.org",
       "https://smajpihub.com",
       "https://www.smajpihub.com",
-      "https://sandbox.minepi.com",
+      ...(!isProduction ? ["https://sandbox.minepi.com", "http://localhost:3000", "http://localhost:3314", "http://localhost:5173"] : []),
       "https://smajpihub.onrender.com",
-      "http://localhost:3000",
-      "http://localhost:3314",
-      "http://localhost:5173",
+
       ...configuredFrontendOrigins,
     ];
 
@@ -161,7 +163,7 @@ app.use(
       }
 
       // Allow Codespaces preview hosts for development previews.
-      if (origin.endsWith(".app.github.dev")) {
+      if (!isProduction && origin.endsWith(".app.github.dev")) {
         callback(null, true);
         return;
       }
@@ -172,6 +174,15 @@ app.use(
   }),
 );
 
+// Reject browser mutations from untrusted or missing cross-site origins.
+app.use((req, res, next) => {
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    const origin = req.get("origin");
+    if ((origin && !allowedOrigins.has(origin.replace(/\/+$/, "")) && !(!isProduction && origin.endsWith(".app.github.dev")))
+        || (!origin && req.get("sec-fetch-site") === "cross-site")) return res.status(403).json({ error: "untrusted_origin" });
+  }
+  next();
+});
 // Handle cookies
 app.use(cookieParser());
 
@@ -206,7 +217,7 @@ app.use(async (req, res, next) => {
     return res.status(401).json({ error: "session_revoked", message: "This device was signed out. Please sign in again." });
   } catch (error) {
     console.error("Device session validation failed:", error);
-    return next();
+    return res.status(503).json({ error: "authentication_unavailable" });
   }
 });
 if (env.session_debug) {
@@ -362,12 +373,18 @@ const start = async () => {
   try {
     if (env.use_memory_db) {
       Object.assign(app.locals, createMemoryCollections());
+      app.locals.memoryDatabase = true;
       console.warn(
         "Using in-memory development database. Data resets when the backend stops.",
       );
     } else {
       const client = await getMongoClient();
       const db = client.db(dbName);
+      const topology = await db.admin().command({ hello: 1 });
+      if (env.is_production && !topology.setName && topology.msg !== "isdbgrid") throw new Error("Production requires transaction-capable MongoDB; configure a replica set before rollout");
+      app.locals.mongoClient = client;
+      app.locals.settlementCollection = db.collection("merchant_settlements");
+      app.locals.cvAssetCollection = db.collection("cv_assets");
       app.locals.paymentCollection = db.collection("pi_payments");
       app.locals.liveTransactionCollection = db.collection("pi_live_testnet_transactions");
       await app.locals.liveTransactionCollection.createIndex({ transactionId: 1 }, { unique: true });
@@ -788,8 +805,17 @@ const start = async () => {
         : `Connected to MongoDB on: ${maskMongoUri(mongoUri)}`,
     );
 
-    if (env.pi_payments_enabled && !env.use_memory_db) startStorePaymentRecovery(app);
+    if (env.pi_payments_enabled && !env.use_memory_db) {
+      startStorePaymentRecovery(app);
+      let busy = false;
+      const billingTimer = setInterval(() => { if (busy) return; busy = true; void recoverJobsBilling(app).catch(() => undefined).finally(() => { busy = false; }); }, 15000);
+      billingTimer.unref();
+    }
 
+    if (!env.use_memory_db) {
+      const inventoryTimer = setInterval(() => { void expireUnfundedReservations(app).catch(() => console.error("Inventory recovery unavailable")); }, 60000);
+      inventoryTimer.unref();
+    }
     app.listen(env.port, () => {
       console.log(`SMAJ PI HUB backend listening on port ${env.port}!`);
       console.log(

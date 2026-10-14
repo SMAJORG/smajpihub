@@ -168,6 +168,7 @@ async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rou
     apiReads = 0,
     response;
   const modules = {
+    "../services/financialIntegrity": { financialTransaction: async (app, fn) => fn(), bindPayment: async () => {}, validPaymentId: id => typeof id === "string", verifyIncomingPayment: () => {} },
     mongodb: { ObjectId },
     "../services/auth": { resolveCurrentUser: async () => ({ uid: "buyer" }) },
     "../services/platformAPIClient": {
@@ -203,6 +204,7 @@ async function completePayment({ orderStatus, mismatch, alreadyPaid = false, rou
     body: { orderId: order._id.toString(), paymentId: "payment-1", txid: "tx-1" },
     app: {
       locals: {
+        settlementCollection: { updateOne: async () => ({ matchedCount: 1 }) },
         marketplaceOrderCollection: {
           findOne: async query => (query.buyerId === "buyer" && String(query._id) === String(order._id) ? order : null),
           updateOne: async (_, update) => {
@@ -434,9 +436,10 @@ async function approvePersistedPayment(databaseFails = false) {
   const order = { _id: new ObjectId(), buyerId: "buyer", status: "pending", timeline: [] };
   const events = [], routes = {}; let response;
   const modules = {
+    "../services/financialIntegrity": { financialTransaction: async (app, fn) => fn(), bindPayment: async () => {}, validPaymentId: id => typeof id === "string", verifyIncomingPayment: () => {} },
     mongodb: { ObjectId },
     "../services/auth": { resolveCurrentUser: async () => ({ uid: "buyer" }) },
-    "../services/platformAPIClient": { platformAPIKeyClient: { post: async () => events.push("pi-approved") } },
+    "../services/platformAPIClient": { platformAPIKeyClient: { get: async () => ({ data: {} }), post: async () => events.push("pi-approved") } },
     "../services/notifications": { createNotification: async () => {} },
     "../services/storePayments": {},
   };

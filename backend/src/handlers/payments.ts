@@ -1,3 +1,4 @@
+import { verifyIncomingPayment, bindPayment, validPaymentId } from "../services/financialIntegrity";
 import { Request, Response, Router } from "express";
 import { ObjectId } from "mongodb";
 import { resolveCurrentUser } from "../services/auth";
@@ -44,6 +45,7 @@ const paymentRoute = (handler: (req: Request, res: Response) => Promise<unknown>
     } catch (error) {
       const failure = error as { code?: string; response?: { status?: number } };
       const upstreamStatus = failure.response?.status;
+      if ((error as any).status) return res.status((error as any).status).json({ error: "payment_conflict", message: (error as Error).message });
       const retryable = !upstreamStatus || upstreamStatus === 429 || upstreamStatus >= 500;
       console.error("[pi-payment] request failed", { path: req.path, upstreamStatus, code: failure.code });
       if (res.headersSent) return;
@@ -119,8 +121,24 @@ export default function mountPaymentsEndpoints(router: Router) {
       return res.status(400).json({ error: "bad_request", message: "Only pending orders can be approved for payment." });
     }
 
+    if (!validPaymentId(paymentId)) return res.status(400).json({ message: "Invalid payment identifier" });
+    if (order.paymentStatus === "paid" || order.paidAt || order.paymentTxid) return res.status(409).json({ message: "Order already has a verified receipt" });
+    if (order.paymentId && order.paymentId !== paymentId) {
+      if (!validPaymentId(order.paymentId)) return res.status(409).json({ message: "Invalid historical payment; reconciliation required" });
+      const previous = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(order.paymentId))).data;
+      if (previous.identifier !== order.paymentId || previous.user_uid !== order.buyerId || String(previous.metadata?.orderId) !== order._id.toString()
+          || !(previous.status?.cancelled || previous.status?.user_cancelled) || previous.transaction?.txid)
+        return res.status(409).json({ message: "Resume the existing payment; its outcome is not safely cancelled" });
+    }
+    const authoritative = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;
+    verifyIncomingPayment(authoritative, { paymentId, payer: order.buyerId, amount: Number(order.pricePi), metadataKey: "orderId", intentId: order._id.toString() });
+    await bindPayment(req.app, authoritative, "store:" + order._id.toString());
+    if (order.paymentId === paymentId && order.paymentStatus === "processing") {
+      if (!authoritative.status?.developer_approved) await platformAPIKeyClient.post("/v2/payments/" + encodeURIComponent(paymentId) + "/approve");
+      return res.json({ message: "Existing payment approval retained", paymentId });
+    }
     const savedPayment = await req.app.locals.marketplaceOrderCollection.updateOne(
-      { _id: order._id, buyerId: order.buyerId, status: "pending" },
+      { _id: order._id, buyerId: order.buyerId, status: "pending", paymentStatus: { $ne: "paid" }, paidAt: null, paymentTxid: null, $or: [{ paymentId: null }, { paymentId: order.paymentId }] },
       {
         $set: {
           paymentId,
@@ -163,75 +181,17 @@ export default function mountPaymentsEndpoints(router: Router) {
   };
   router.post("/complete", paymentRoute((req, res) => completePayment(req, res)));
 
-  router.post("/cancelled_payment", async (req, res) => {
+  for (const path of ["/cancelled_payment", "/failed"]) router.post(path, paymentRoute(async (req, res) => {
     const { paymentId, orderId } = req.body || {};
-    if (!paymentId || !orderId) {
-      return res.status(400).json({ error: "bad_request", message: "Missing paymentId or orderId." });
-    }
-
-    const order = await findBuyerOrder(req, res, String(orderId));
-    if (!order) return;
-
+    if (!validPaymentId(paymentId) || typeof orderId !== "string") return res.status(400).json({ message: "Invalid payment callback" });
+    const order = await findBuyerOrder(req, res, orderId); if (!order) return;
+    if (order.paymentId !== paymentId) return res.status(409).json({ message: "Payment identifier does not match this order" });
+    if (order.paymentStatus === "paid" || order.paidAt || order.paymentTxid) return res.json({ message: "Verified payment retained", paymentStatus: "paid" });
+    // A wallet error is an observation, not evidence that no funds were submitted.
     await req.app.locals.marketplaceOrderCollection.updateOne(
-      { _id: order._id },
-      {
-        $set: {
-          paymentId,
-          paymentStatus: "cancelled",
-          updatedAt: new Date(),
-          timeline: [
-            ...(Array.isArray(order.timeline) ? order.timeline : []),
-            timelineEntry("cancelled", "Payment Cancelled", "Pi payment was cancelled."),
-          ],
-        },
-      }
+      { _id: order._id, paymentId, paymentStatus: { $ne: "paid" }, paidAt: null, paymentTxid: null },
+      { $set: { paymentRecoveryNextCheckAt: new Date(0), lastPaymentCallback: path, updatedAt: new Date() } }
     );
-
-    await createNotification(req.app, {
-      userId: order.buyerId,
-      type: "payment_cancelled",
-      title: "Payment cancelled",
-      message: `${order.productTitle} payment was cancelled.`,
-      relatedId: order._id.toString(),
-      image: order.productImage,
-    });
-
-    return res.status(200).json({ message: "Payment cancelled." });
-  });
-
-  router.post("/failed", async (req, res) => {
-    const { paymentId, orderId } = req.body || {};
-    if (!paymentId || !orderId) {
-      return res.status(400).json({ error: "bad_request", message: "Missing paymentId or orderId." });
-    }
-
-    const order = await findBuyerOrder(req, res, String(orderId));
-    if (!order) return;
-
-    await req.app.locals.marketplaceOrderCollection.updateOne(
-      { _id: order._id },
-      {
-        $set: {
-          paymentId,
-          paymentStatus: "failed",
-          updatedAt: new Date(),
-          timeline: [
-            ...(Array.isArray(order.timeline) ? order.timeline : []),
-            timelineEntry("failed", "Payment Failed", "Pi payment failed. Please try again."),
-          ],
-        },
-      }
-    );
-
-    await createNotification(req.app, {
-      userId: order.buyerId,
-      type: "payment_failed",
-      title: "Payment failed",
-      message: `${order.productTitle} payment failed. Please try again.`,
-      relatedId: order._id.toString(),
-      image: order.productImage,
-    });
-
-    return res.status(200).json({ message: "Payment failed. Order remains pending." });
-  });
+    return res.json({ message: "Payment outcome queued for verification" });
+  }));
 }

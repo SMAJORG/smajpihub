@@ -1,3 +1,5 @@
+import { recordMerchantSettlement } from "../services/merchantSettlement";
+import { verifyOutboundPayment, bindPayment, financialTransaction } from "../services/financialIntegrity";
 import { Request, Response, Router } from "express";
 import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
@@ -90,6 +92,12 @@ const requireAdmin = async (req: Request, res: Response) => {
 };
 
 export default function mountAdminEndpoints(router: Router) {
+  for (const method of ["get", "post", "patch", "put", "delete"] as const) {
+    const register = router[method].bind(router) as any;
+    (router as any)[method] = (path: string, handler: any) => register(path, (req: Request, res: Response, next: any) => Promise.resolve().then(() => handler(req,res,next)).catch((error: any) => {
+      if (!res.headersSent) res.status(error.status || 503).json({ message: error.status ? error.message : "Operation unavailable; retry the existing operation" });
+    }));
+  }
   router.use((_, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
@@ -608,23 +616,41 @@ export default function mountAdminEndpoints(router: Router) {
     }
     const order = await req.app.locals.marketplaceOrderCollection.findOne({ _id: new ObjectId(req.params.id) });
     if (!order) return res.status(404).json({ error: "not_found", message: "Order not found" });
+    if (req.body.status === "cancelled" && order.paymentId && order.paymentStatus !== "cancelled") return res.status(409).json({ message: "Reconcile payment before cancellation" });
     if (!canTransitionOrder(order.status, req.body.status)) {
       return res.status(409).json({ error: "invalid_transition", message: `Order cannot move from ${order.status} to ${req.body.status}` });
     }
     const now = new Date();
+    const result = await financialTransaction(req.app, async session => {
     const result = await req.app.locals.marketplaceOrderCollection.updateOne(
       { _id: order._id, status: order.status },
       { $set: {
         status: req.body.status,
         updatedAt: now,
         timeline: [...(Array.isArray(order.timeline) ? order.timeline : []), timelineEntry(req.body.status, `Admin marked order ${req.body.status}`)],
-      } },
+      } }, session ? { session } : {}
     );
+    if (result.modifiedCount && req.body.status === "cancelled") await releaseOrderInventory(req.app, order, "admin_cancelled", session);
+    return result;
+    });
     if (!result.modifiedCount) return res.status(409).json({ error: "order_changed", message: "Order changed while it was being updated" });
-    if (req.body.status === "cancelled") await releaseOrderInventory(req.app, order, "admin_cancelled");
+
     return res.status(200).json({ message: "Order updated" });
   });
 
+  router.get("/financial-reconciliation", async (req, res) => {
+    const exceptions = await req.app.locals.marketplaceOrderCollection.find({ $or: [{ reconciliationRequired: true }, { paymentRecoveryState: { $in: ["blocked", "reconciled", "retry"] } }] }).limit(100).toArray();
+    const held = await req.app.locals.settlementCollection.find({ status: "held" }).limit(100).toArray();
+    res.json({ exceptions: exceptions.map(serialize), heldSettlements: held, generatedAt: new Date() });
+  });
+  router.get("/settlements", async (req, res) => {
+    const records = await req.app.locals.settlementCollection.find({}).sort({ createdAt: -1 }).limit(100).toArray();
+    res.json({ settlements: records });
+  });
+  router.post("/orders/:id/settlement", async (req, res) => {
+    try { res.json(await recordMerchantSettlement(req.app, req.params.id, req.body?.paymentId)); }
+    catch (error: any) { res.status(error.status || 503).json({ message: error.status ? error.message : "Settlement verification unavailable" }); }
+  });
   router.patch("/orders/:id/refund", async (req, res) => {
     if (!ObjectId.isValid(req.params.id) || !["approve", "reject", "complete"].includes(req.body?.action)) {
       return res.status(400).json({ error: "bad_request", message: "Invalid refund action" });
@@ -642,11 +668,20 @@ export default function mountAdminEndpoints(router: Router) {
     if (action === "complete" && reference.length < 6) {
       return res.status(400).json({ error: "bad_request", message: "A manual Pi refund transaction reference is required" });
     }
+    if (order.settlementStatus === "settled") return res.status(409).json({ message: "Merchant already settled; reconcile before issuing an app refund" });
+    let verifiedReturn: any;
+    if (action === "complete") {
+      try { verifiedReturn = await verifyOutboundPayment(reference, { uid: order.buyerId, amount: Number(order.pricePi), metadataKey: "refundOrderId", intentId: req.params.id }); }
+      catch (error: any) { return res.status(error.status || 503).json({ message: "Refund transfer is not verified" }); }
+    }
     const note = String(req.body?.note || "").trim().slice(0, 500);
     const refundStatus = action === "approve" ? "manual_required" : action === "reject" ? "rejected" : "completed";
     const now = new Date();
-    const refundUpdate = await req.app.locals.marketplaceOrderCollection.updateOne({
+    const refundUpdate = await financialTransaction(req.app, async session => {
+    if (verifiedReturn) await bindPayment(req.app, verifiedReturn, "refund:" + req.params.id, session);
+    return req.app.locals.marketplaceOrderCollection.updateOne({
       _id: order._id,
+      settlementStatus: { $ne: "settled" },
       refundStatus: action === "complete" ? { $in: ["approved", "manual_required"] } : "requested",
     }, { $set: {
       refundStatus,
@@ -655,8 +690,10 @@ export default function mountAdminEndpoints(router: Router) {
       refundReviewedAt: now,
       refundReference: action === "complete" ? reference : order.refundReference || null,
       refundedAt: action === "complete" ? now : null,
+      refundTxid: verifiedReturn?.transaction?.txid || null,
       updatedAt: now,
-    } });
+    } }, session ? { session } : {});
+    });
     if (!refundUpdate.modifiedCount) return res.status(409).json({ error: "refund_changed", message: "Refund changed while it was being updated" });
     await createNotification(req.app, {
       userId: order.buyerId,

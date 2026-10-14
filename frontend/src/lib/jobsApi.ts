@@ -81,6 +81,8 @@ export type JobsApiApplication = {
 };
 
 export type JobsProfile = {
+  userId?: string;
+  id?: string;
   title: string;
   skills: string[] | string;
   location: string;
@@ -511,3 +513,9 @@ export type JobsEmployerPaymentsResponse = {
 
 export const getJobsEmployerPayments = async () =>
   (await axiosClient.get<JobsEmployerPaymentsResponse>("/jobs/employer/payments")).data;
+
+export const downloadJobsCv = async (candidateId: string, name = "CV.pdf") => {
+  const response = await axiosClient.get("/jobs/profile/" + encodeURIComponent(candidateId) + "/cv/download", { responseType: "blob" });
+  const url = URL.createObjectURL(response.data); const link = document.createElement("a");
+  link.href = url; link.download = name; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+};

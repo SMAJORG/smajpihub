@@ -1,3 +1,6 @@
+import crypto from "crypto";
+import { visibleCv } from "../services/candidateAuthorization";
+import { verifyIncomingPayment, bindPayment, financialTransaction, validPaymentId } from "../services/financialIntegrity";
 import type { Request, Response, Router } from "express";
 import { ObjectId } from "mongodb";
 import { resolveCurrentUser } from "../services/auth";
@@ -268,6 +271,8 @@ const enrichApplicationsWithCandidateProfiles = async (req: Request, application
       [user.uid, user._id?.toString()].filter(Boolean).map((id) => [id, user]),
     ),
   );
+  const actor = await resolveCurrentUser(req);
+  const company = actor ? await req.app.locals.jobCompanyCollection.findOne({ ownerId: userId(actor) }) : null;
   return applications.map((application) => {
     const profile: any = profileByUserId.get(application.candidateId);
     const candidate: any = userById.get(application.candidateId);
@@ -282,6 +287,7 @@ const enrichApplicationsWithCandidateProfiles = async (req: Request, application
       ...application,
       profileSnapshot: {
         ...(application.profileSnapshot || {}),
+        cv: visibleCv(profile, actor, company, application),
         ...(avatar ? { avatar, avatarConfirmationValue: avatar } : {}),
       },
     };
@@ -417,8 +423,16 @@ const ensureSeedData = async (req: Request) => {
 };
 
 export default function mountJobsEndpoints(router: Router) {
+  router.use((_, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
+  for (const method of ["get", "post", "patch", "put", "delete"] as const) {
+    const register = router[method].bind(router) as any;
+    (router as any)[method] = (path: string, handler: any) => register(path, (req: Request, res: Response, next: any) =>
+      Promise.resolve().then(() => handler(req, res, next)).catch((error: any) => {
+        if (!res.headersSent) res.status(error.status || 503).json({ error: "request_failed", message: error.status ? error.message : "Request could not be completed. Retry the existing operation." });
+      }));
+  }
   router.get("/metrics", async (req, res) => {
-    await ensureSeedData(req);
+    if (!env.is_production) await ensureSeedData(req);
     const [opportunities, employers, remote] = await Promise.all([
       req.app.locals.jobCollection.countDocuments(ACTIVE),
       req.app.locals.jobCompanyCollection.countDocuments({
@@ -441,7 +455,7 @@ export default function mountJobsEndpoints(router: Router) {
     });
   });
   router.get("/jobs", async (req, res) => {
-    await ensureSeedData(req);
+    if (!env.is_production) await ensureSeedData(req);
     const page = clampPage(req.query.page);
     const pageSize = clampPageSize(req.query.pageSize);
     const query: Record<string, any> = { ...ACTIVE };
@@ -471,7 +485,7 @@ export default function mountJobsEndpoints(router: Router) {
     });
   });
   router.get("/jobs/:id", async (req, res) => {
-    await ensureSeedData(req);
+    if (!env.is_production) await ensureSeedData(req);
     const document = await req.app.locals.jobCollection.findOne({
       slug: req.params.id,
       ...ACTIVE,
@@ -625,7 +639,7 @@ export default function mountJobsEndpoints(router: Router) {
     res.status(201).json({ job: serializeJobDocument(document) });
   });
   router.get("/companies", async (req, res) => {
-    await ensureSeedData(req);
+    if (!env.is_production) await ensureSeedData(req);
     const search = String(req.query.search || "").trim();
     const field = String(req.query.field || "").trim();
     const country = String(req.query.country || "").trim();
@@ -650,7 +664,7 @@ export default function mountJobsEndpoints(router: Router) {
     res.json({ companies: results });
   });
   router.get("/companies/:id", async (req, res) => {
-    await ensureSeedData(req);
+    if (!env.is_production) await ensureSeedData(req);
     const company = await req.app.locals.jobCompanyCollection.findOne({ slug: req.params.id });
     if (!company)
       return res
@@ -708,7 +722,9 @@ export default function mountJobsEndpoints(router: Router) {
       : "applications";
     if (!/^https:\/\/res\.cloudinary\.com\//i.test(url) || !name.toLowerCase().endsWith(".pdf") || !size)
       return res.status(400).json({ error: "invalid_cv", message: "Upload a valid PDF CV." });
-    const cv = { url, name, size, visibility, updatedAt: new Date().toISOString() };
+    const asset = await req.app.locals.cvAssetCollection.findOne({ ownerId: userId(user), url });
+    if (!asset?.protectedAsset) return res.status(400).json({ message: "Re-upload your CV using protected storage" });
+    const cv = { url, protectedAsset: true, name, size, visibility, updatedAt: new Date().toISOString() };
     await req.app.locals.jobProfileCollection.updateOne(
       { userId: userId(user) },
       { $set: { cv }, $setOnInsert: { userId: userId(user), createdAt: new Date().toISOString() } },
@@ -779,6 +795,26 @@ export default function mountJobsEndpoints(router: Router) {
     await req.app.locals.jobProfileCollection.updateOne({ userId: userId(user) }, { $set: { verificationStatus: "pending", verificationEvidence: evidence, verificationRequestedAt: new Date().toISOString() } });
     await audit(req, user, "candidate.verification_requested", userId(user)); res.json({ verificationStatus: "pending" });
   });
+  router.get("/profile/:candidateId/cv/download", async (req, res) => {
+    const user = await requireUser(req, res); if (!user) return;
+    const profile = await req.app.locals.jobProfileCollection.findOne({ userId: req.params.candidateId });
+    const company = await req.app.locals.jobCompanyCollection.findOne({ ownerId: userId(user) });
+    const application = await req.app.locals.jobApplicationCollection.findOne({ candidateId: req.params.candidateId, employerId: userId(user) });
+    const cv = visibleCv(profile, user, company, application);
+    if (!cv) return res.status(404).json({ message: "CV unavailable" });
+    const asset = await req.app.locals.cvAssetCollection.findOne({ url: cv.url, ownerId: req.params.candidateId, protectedAsset: true });
+    const secret = process.env.CLOUDINARY_API_SECRET, key = process.env.CLOUDINARY_API_KEY;
+    if (!asset || !secret || !key) return res.status(409).json({ message: "Re-upload this CV into protected storage" });
+    const params = new URLSearchParams({ public_id: asset._id, type: "authenticated", format: "pdf", expires_at: String(Math.floor(Date.now()/1000)+60), timestamp: String(Math.floor(Date.now()/1000)) });
+    const signed = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k+"="+v).join("&");
+    params.set("signature", crypto.createHash("sha1").update(signed+secret).digest("hex")); params.set("api_key", key);
+    const upstream = await fetch("https://api.cloudinary.com/v1_1/" + env.cloudinary_cloud_name + "/raw/download?" + params, { signal: AbortSignal.timeout(15000) });
+    if (!upstream.ok) return res.status(502).json({ message: "Protected document unavailable" });
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    if (bytes.length > 5_000_000) return res.status(413).end();
+    res.setHeader("Content-Type", "application/pdf"); res.setHeader("X-Content-Type-Options", "nosniff");
+    return res.send(bytes);
+  });
   router.get("/billing/plans", (_req, res) => res.json({ plans: employerPlans }));
   router.post("/billing/intents", async (req, res) => {
     const user = await requireEmployer(req, res); if (!user) return;
@@ -805,6 +841,21 @@ export default function mountJobsEndpoints(router: Router) {
       message: paymentEnabled ? undefined : "Pi payment activation is pending platform payment configuration.",
     });
   });
+  router.get("/billing/intents/:billingId", async (req, res) => {
+    const user = await requireEmployer(req, res); if (!user) return;
+    const intent = await req.app.locals.jobBillingCollection.findOne({ billingId: req.params.billingId, employerId: userId(user) });
+    if (!intent) return res.status(404).json({ message: "Billing intent unavailable" });
+    res.json({ intent });
+  });
+  router.post("/billing/resume", async (req, res) => {
+    const user = await requireEmployer(req, res); if (!user) return;
+    const intent = await req.app.locals.jobBillingCollection.findOne({ billingId: req.body?.billingId, employerId: userId(user) });
+    if (!intent || !validPaymentId(intent.paymentId)) return res.status(409).json({ message: "No bound payment to resume" });
+    const payment = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(intent.paymentId))).data;
+    if (!payment.transaction?.txid) return res.status(409).json({ message: "Existing payment has no confirmed transfer. Check Pi Wallet before retrying." });
+    req.body = { billingId: intent.billingId, paymentId: intent.paymentId, txid: payment.transaction.txid };
+    return completeJobsBillingRequest(req, res);
+  });
   router.post("/billing/approve", async (req, res) => {
     const user = await requireEmployer(req, res); if (!user) return;
     const { billingId, paymentId } = req.body || {};
@@ -812,80 +863,33 @@ export default function mountJobsEndpoints(router: Router) {
       return res.status(400).json({ error: "bad_request", message: "Missing billingId or paymentId." });
     const intent = await req.app.locals.jobBillingCollection.findOne({ billingId, employerId: userId(user) });
     if (!intent) return res.status(404).json({ error: "not_found", message: "Billing request not found." });
-    if (intent.status !== "pending_payment")
+    if (intent.status !== "pending_payment" && !(intent.status === "processing" && intent.paymentId === paymentId))
       return res.status(400).json({ error: "bad_request", message: "Only pending billing requests can be approved." });
     if (!env.pi_api_key)
       return res.status(503).json({ error: "payments_unavailable", message: "Pi payment activation is pending platform payment configuration." });
-    await platformAPIKeyClient.post(`/v2/payments/${paymentId}/approve`);
-    await req.app.locals.jobBillingCollection.updateOne(
-      { billingId },
+    if (!validPaymentId(paymentId) || (intent.paymentId && intent.paymentId !== paymentId)) return res.status(409).json({ message: "Resume the bound payment" });
+    const payment = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;
+    verifyIncomingPayment(payment, { paymentId, payer: user.uid, amount: Number(intent.pricePi), metadataKey: "billingId", intentId: billingId });
+    await bindPayment(req.app, payment, "jobs:" + billingId);
+    const binding = await req.app.locals.jobBillingCollection.updateOne(
+      { billingId, status: { $in: ["pending_payment", "processing"] }, $or: [{ paymentId: { $exists: false } }, { paymentId }] },
       { $set: { paymentId, status: "processing", updatedAt: new Date().toISOString() } }
     );
+    if (!binding.matchedCount) return res.status(409).json({ message: "Billing changed; resume the bound payment" });
+    await platformAPIKeyClient.post(`/v2/payments/${paymentId}/approve`);
     await audit(req, user, "billing.payment_approved", billingId, { paymentId });
     res.json({ message: "Payment approved.", paymentId });
   });
-  router.post("/billing/complete", async (req, res) => {
-    const user = await requireEmployer(req, res); if (!user) return;
-    const { billingId, paymentId, txid } = req.body || {};
-    if (!billingId || !paymentId || !txid)
-      return res.status(400).json({ error: "bad_request", message: "Missing billingId, paymentId, or txid." });
-    const intent = await req.app.locals.jobBillingCollection.findOne({ billingId, employerId: userId(user) });
-    if (!intent) return res.status(404).json({ error: "not_found", message: "Billing request not found." });
-    if (intent.status !== "processing" && intent.status !== "pending_payment")
-      return res.status(400).json({ error: "bad_request", message: "Only pending billing requests can be completed." });
-    if (!env.pi_api_key)
-      return res.status(503).json({ error: "payments_unavailable", message: "Pi payment activation is pending platform payment configuration." });
-    await platformAPIKeyClient.post(`/v2/payments/${paymentId}/complete`, { txid });
-    const paidAt = new Date().toISOString();
-    await req.app.locals.jobBillingCollection.updateOne(
-      { billingId },
-      { $set: { status: "paid", paymentId, paymentTxid: txid, paidAt, updatedAt: paidAt } }
-    );
-    let job: any = null;
-    if (intent.jobId) {
-      const perk =
-        intent.id === "featured"
-          ? { featured: true }
-          : intent.id === "monthly"
-            ? { featured: true, sponsoredUntil: new Date(Date.now() + 30 * 86_400_000).toISOString() }
-            : {};
-      if (Object.keys(perk).length)
-        await req.app.locals.jobCollection.updateOne(
-          { slug: intent.jobId, employerId: userId(user) },
-          { $set: { ...perk, updatedAt: paidAt } }
-        );
-      job = await req.app.locals.jobCollection.findOne({ slug: intent.jobId });
-    } else if (intent.id === "monthly") {
-      await req.app.locals.userCollection.updateOne(
-        { _id: user._id },
-        {
-          $set: {
-            jobsEmployerPlan: "monthly",
-            jobsEmployerPlanExpiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
-          },
-        }
-      );
-    }
-    await audit(req, user, "billing.payment_completed", billingId, { paymentId, txid, planId: intent.id });
-    await createNotification(req.app, {
-      userId: userId(user),
-      type: "jobs_billing_paid",
-      title: "Employer plan activated",
-      message: `${intent.name} is now active${job ? ` for ${job.title}` : ""}.`,
-      relatedId: billingId,
-    });
-    res.json({ message: "Payment completed.", paymentId, txid, job: job ? serializeJobDocument(job) : undefined });
-  });
+  router.post("/billing/complete", completeJobsBillingRequest);
   router.post("/billing/cancelled_payment", async (req, res) => {
     const user = await requireEmployer(req, res); if (!user) return;
     const { billingId, paymentId } = req.body || {};
-    if (!billingId) return res.status(400).json({ error: "bad_request", message: "Missing billingId." });
+    if (!billingId || !validPaymentId(paymentId)) return res.status(400).json({ error: "bad_request", message: "Missing billingId." });
     const intent = await req.app.locals.jobBillingCollection.findOne({ billingId, employerId: userId(user) });
     if (!intent) return res.status(404).json({ error: "not_found", message: "Billing request not found." });
-    await req.app.locals.jobBillingCollection.updateOne(
-      { billingId },
-      { $set: { status: "cancelled", paymentId, updatedAt: new Date().toISOString() } }
-    );
+    if (intent.paymentId !== paymentId) return res.status(409).json({ message: "Payment binding conflict" });
+    if (intent.status === "paid") return res.json({ message: "Verified payment retained" });
+    await req.app.locals.jobBillingCollection.updateOne({ billingId, paymentId, status: { $ne: "paid" } }, { $set: { callbackObservedAt: new Date().toISOString() } });
     await audit(req, user, "billing.payment_cancelled", billingId, { paymentId });
     res.json({ message: "Payment cancelled." });
   });
@@ -1010,9 +1014,9 @@ export default function mountJobsEndpoints(router: Router) {
       });
     const now = new Date().toISOString();
     const applicationCompany = await req.app.locals.jobCompanyCollection.findOne({ slug: job.companyId });
-    const shareCv =
-      profile.cv?.visibility === "applications" ||
-      (profile.cv?.visibility === "verified_employers" && applicationCompany?.verified === true);
+    const shareCv = profile.cv?.protectedAsset &&
+      (profile.cv?.visibility === "applications" ||
+      (profile.cv?.visibility === "verified_employers" && applicationCompany?.verified === true));
     const application = {
       ...key,
       employerId: job.employerId,
@@ -1441,9 +1445,9 @@ export default function mountJobsEndpoints(router: Router) {
 
     const userIds = Array.from(new Set(profiles.map((p: any) => p.userId).filter(Boolean)));
     const users = userIds.length && req.app.locals.userCollection
-      ? await req.app.locals.userCollection.find({ uid: { $in: userIds } }).toArray()
+      ? await req.app.locals.userCollection.find({ _id: { $in: validObjectIds(userIds as string[]) } }).toArray()
       : [];
-    const userByUid = new Map(users.map((u: any) => [u.uid, u]));
+    const userByUid = new Map(users.map((u: any) => [u._id.toString(), u]));
 
     const results = profiles.map((profile: any) => {
       const candidate = userByUid.get(profile.userId) as any;
@@ -1458,7 +1462,7 @@ export default function mountJobsEndpoints(router: Router) {
         avatar: candidate?.avatar || profile.avatar || profile.avatarConfirmationValue || "",
         displayName: candidate?.displayName || candidate?.username || profile.title || "Candidate",
         verificationStatus: profile.verificationStatus,
-        cv: profile.cv,
+        cv: visibleCv(profile, user, company),
         employment: profile.employment || [],
         updatedAt: profile.updatedAt,
       };
@@ -1484,9 +1488,10 @@ export default function mountJobsEndpoints(router: Router) {
     if (!profile) return res.status(404).json({ error: "not_found" });
 
     const candidate = req.app.locals.userCollection
-      ? (await req.app.locals.userCollection.findOne({ uid: candidateUserId })) as any
+      ? (await req.app.locals.userCollection.findOne({ _id: documentId(candidateUserId) })) as any
       : null;
 
+    const application = await req.app.locals.jobApplicationCollection.findOne({ candidateId: candidateUserId, employerId: owner });
     res.json({
       candidate: {
         userId: profile.userId,
@@ -1499,7 +1504,7 @@ export default function mountJobsEndpoints(router: Router) {
         avatar: candidate?.avatar || profile.avatar || profile.avatarConfirmationValue || "",
         displayName: candidate?.displayName || candidate?.username || profile.title || "Candidate",
         verificationStatus: profile.verificationStatus,
-        cv: profile.cv,
+        cv: visibleCv(profile, user, company, application),
         employment: profile.employment || [],
         updatedAt: profile.updatedAt,
       },
@@ -1851,3 +1856,76 @@ export default function mountJobsEndpoints(router: Router) {
     res.json({ payments, summary, serverTime: new Date().toISOString() });
   });
 }
+
+export const completeJobsBillingRequest = async (req: Request, res: Response) => {
+    const user = await requireEmployer(req, res); if (!user) return;
+    const { billingId, paymentId, txid } = req.body || {};
+    if (!billingId || !paymentId || !txid)
+      return res.status(400).json({ error: "bad_request", message: "Missing billingId, paymentId, or txid." });
+    const intent = await req.app.locals.jobBillingCollection.findOne({ billingId, employerId: userId(user) });
+    if (!intent) return res.status(404).json({ error: "not_found", message: "Billing request not found." });
+    if (intent.status !== "processing" && intent.status !== "pending_payment" && !(intent.status === "paid" && intent.paymentId === paymentId && intent.paymentTxid === txid))
+      return res.status(400).json({ error: "bad_request", message: "Only pending billing requests can be completed." });
+    if (!env.pi_api_key)
+      return res.status(503).json({ error: "payments_unavailable", message: "Pi payment activation is pending platform payment configuration." });
+    if (!validPaymentId(paymentId) || (intent.paymentId && intent.paymentId !== paymentId)) return res.status(409).json({ message: "Payment binding conflict" });
+    const expected = { paymentId, payer: user.uid, amount: Number(intent.pricePi), metadataKey: "billingId", intentId: billingId };
+    let payment = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;
+    verifyIncomingPayment(payment, expected);
+    if (!payment.status?.developer_completed) await platformAPIKeyClient.post("/v2/payments/" + encodeURIComponent(paymentId) + "/complete", { txid });
+    payment = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;
+    verifyIncomingPayment(payment, expected, true, txid);
+    let job: any = null;
+    let credited = false;
+    await financialTransaction(req.app, async session => {
+    credited = false;
+    const options = session ? { session } : {};
+    const current = await req.app.locals.jobBillingCollection.findOne({ billingId }, options);
+    if (current?.status === "paid") {
+      if (current.paymentId !== paymentId || current.paymentTxid !== txid) throw Object.assign(new Error("Billing already has another receipt"), { status: 409 });
+      return;
+    }
+    credited = true;
+    const paidAt = current.paidAt || new Date().toISOString();
+    await bindPayment(req.app, payment, "jobs:" + billingId, session);
+    await req.app.locals.jobBillingCollection.updateOne(
+      { billingId, status: current.status },
+      { $set: { status: "paid", paymentId, paymentTxid: txid, paidAt, updatedAt: paidAt } }, options
+    );
+    if (intent.jobId) {
+      const perk =
+        intent.id === "featured"
+          ? { featured: true }
+          : intent.id === "monthly"
+            ? { featured: true, sponsoredUntil: new Date(new Date(paidAt).getTime() + 30 * 86_400_000).toISOString() }
+            : {};
+      if (Object.keys(perk).length)
+        await req.app.locals.jobCollection.updateOne(
+          { slug: intent.jobId, employerId: userId(user) },
+          { $set: { ...perk, updatedAt: paidAt } }, options
+        );
+      job = await req.app.locals.jobCollection.findOne({ slug: intent.jobId }, options);
+    } else if (intent.id === "monthly") {
+      await req.app.locals.userCollection.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            jobsEmployerPlan: "monthly",
+            jobsEmployerPlanExpiresAt: new Date(new Date(paidAt).getTime() + 30 * 86_400_000).toISOString(),
+          },
+        }, options
+      );
+    }
+    });
+    if (credited) {
+    void audit(req, user, "billing.payment_completed", billingId, { paymentId, txid, planId: intent.id })?.catch(() => undefined);
+    void createNotification(req.app, {
+      userId: userId(user),
+      type: "jobs_billing_paid",
+      title: "Employer plan activated",
+      message: `${intent.name} is now active${job ? ` for ${job.title}` : ""}.`,
+      relatedId: billingId,
+    });
+    }
+    res.json({ message: "Payment completed.", paymentId, txid, job: job ? serializeJobDocument(job) : undefined });
+};

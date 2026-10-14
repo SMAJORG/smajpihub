@@ -1,3 +1,4 @@
+import { downloadJobsCv } from "../../lib/jobsApi";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
@@ -81,7 +82,7 @@ const CandidateProfileContent = ({ candidateId, onBack }: { candidateId: string;
       {candidate.cv ? (
         <section className="jobs-candidate-profile-section">
           <h2>Resume / CV</h2>
-          <a href={candidate.cv.url} target="_blank" rel="noreferrer">
+          <a href="#" onClick={event => { event.preventDefault(); void downloadJobsCv(candidate.userId, candidate.cv?.name).catch(() => undefined); }}>
             {candidate.cv.name} ({Math.round(candidate.cv.size / 1024)} KB)
           </a>
         </section>

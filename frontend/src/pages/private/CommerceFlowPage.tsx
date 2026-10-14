@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import { usePiPayment } from "../../hooks/usePiPayment";
@@ -26,6 +26,7 @@ const CommerceFlowPage = ({ mode }: { mode: "cart" | "checkout" | "payment-metho
   const [cartItems, setCartItems] = useState(() => getCartItems());
   const [buyNowItem, setBuyNowItemState] = useState(() => getBuyNowItem());
   const [order, setOrder] = useState<Order | null>(null);
+  const checkoutKey = useRef(crypto.randomUUID());
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState((location.state as { message?: string } | null)?.message || "");
   const [error, setError] = useState("");
@@ -83,7 +84,7 @@ const CommerceFlowPage = ({ mode }: { mode: "cart" | "checkout" | "payment-metho
       const { data } = await axiosClient.post<{ order: Order }>("/marketplace/orders", {
         productId: checkoutItem.productId,
         quantity: checkoutItem.quantity,
-      });
+      }, { headers: { "Idempotency-Key": checkoutKey.current } });
 
       setOrder(data.order);
 

@@ -1,3 +1,4 @@
+import { downloadJobsCv } from "../../lib/jobsApi";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
@@ -4065,7 +4066,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                           <details className="jobs-cv-menu">
                             <summary aria-label="CV options">⋮</summary>
                             <div>
-                              <a href={profile.cv.url} target="_blank" rel="noreferrer">View CV</a>
+                              <a href="#" onClick={event => { event.preventDefault(); void downloadJobsCv(profile.userId || profile.id || "", profile.cv?.name).catch(() => undefined); }}>View CV</a>
                               <label>
                                 Visibility
                                 <select

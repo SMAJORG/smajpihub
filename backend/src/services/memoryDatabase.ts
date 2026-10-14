@@ -6,6 +6,7 @@ type Query = Record<string, any>;
 const getValue = (document: Document, key: string) => document[key];
 
 const sameValue = (left: any, right: any) => {
+  if (left == null && right == null) return true;
   if (left instanceof ObjectId || right instanceof ObjectId) {
     return String(left) === String(right);
   }
@@ -128,6 +129,7 @@ export class MemoryCollection {
 
   async insertOne(document: Document) {
     const inserted = { _id: document._id || new ObjectId(), ...document };
+    if (this.documents.some(d => sameValue(d._id, inserted._id))) throw Object.assign(new Error("Duplicate _id"), { code: 11000 });
     this.documents.push(inserted);
     return { insertedId: inserted._id };
   }
@@ -148,7 +150,8 @@ export class MemoryCollection {
     if (options?.upsert) {
       const inserted = { _id: new ObjectId(), ...query };
       applyUpdate(inserted, update, true);
-      this.documents.push(inserted);
+      if (this.documents.some(d => sameValue(d._id, inserted._id))) throw Object.assign(new Error("Duplicate _id"), { code: 11000 });
+    this.documents.push(inserted);
       return { matchedCount: 0, modifiedCount: 0, upsertedId: inserted._id };
     }
     return { matchedCount: 0, modifiedCount: 0, upsertedId: null };
@@ -212,6 +215,9 @@ export const createMemoryCollections = () => ({
   institutionStudentApplicationCollection: new MemoryCollection(),
   institutionAnnouncementCollection: new MemoryCollection(),
   institutionAuditCollection: new MemoryCollection(),
+  memoryDatabase: true,
+  settlementCollection: new MemoryCollection(),
+  cvAssetCollection: new MemoryCollection(),
   paymentCollection: new MemoryCollection(),
   marketplaceOrderCollection: new MemoryCollection(),
   orderDisputeCollection: new MemoryCollection(),

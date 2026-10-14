@@ -18,6 +18,7 @@ if (result.error) {
 }
 
 interface Environment {
+  pi_network: string;
   node_env: string;
   is_production: boolean;
   is_render: boolean;
@@ -77,6 +78,7 @@ const platformApiURL =
   process.env.PLATFORM_API_URL || productionPiPlatformAPIURL;
 
 const env: Environment = {
+  pi_network: process.env.PI_NETWORK || "Pi Testnet",
   node_env: nodeEnv,
   is_production: isProduction,
   is_render: isRender,
@@ -152,6 +154,7 @@ if (
 
 if (isProduction) {
   const missing: string[] = [];
+  if (env.pi_payments_enabled && !["Pi Network", "Pi Testnet"].includes(process.env.PI_NETWORK || "")) missing.push("PI_NETWORK");
   if (
     !process.env.SESSION_SECRET ||
     env.session_secret === defaultSessionSecret

@@ -1,3 +1,4 @@
+import { getUserPlatformAPIClient } from "./platformAPIClient";
 import { Request } from "express";
 import { ObjectId } from "mongodb";
 import { UserData } from "../types/user";
@@ -22,8 +23,13 @@ export const resolveCurrentUser = async (req: Request): Promise<UserData | null>
   if (!accessToken) return null;
 
   const currentUser = await userCollection.findOne({ accessToken });
-  if (!currentUser || currentUser.blocked) return null;
+  if (!currentUser || currentUser.blocked || (currentUser as any).accessTokenRevokedAt) return null;
 
+  try {
+    const verified = (await getUserPlatformAPIClient().get("/v2/me", { headers: { Authorization: "Bearer " + accessToken } })).data;
+    if (verified?.uid !== currentUser.uid) return null;
+    if (verified.credentials?.valid_until?.timestamp && verified.credentials.valid_until.timestamp * 1000 <= Date.now()) return null;
+  } catch { return null; }
   return currentUser;
 };
 

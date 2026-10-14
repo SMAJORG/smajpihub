@@ -17,7 +17,8 @@
     "test:orders": "ts-node ./src/tests/orderLifecycle.test.ts",
     "sessions:cleanup": "ts-node ./src/scripts/cleanupUserSessions.ts",
     "storage:report": "ts-node ./src/scripts/storageReport.ts",
-    "storage:migrate-images": "ts-node ./src/scripts/migrateBase64ImagesToCloudinary.ts"
+    "storage:migrate-images": "ts-node ./src/scripts/migrateBase64ImagesToCloudinary.ts",
+    "test:p0": "node --test tests/p0Integrity.test.cjs tests/p0MongoTransactions.test.cjs"
   },
   "dependencies": {
     "axios": "^1.7.9",
