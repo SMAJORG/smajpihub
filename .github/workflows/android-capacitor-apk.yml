@@ -92,10 +92,10 @@ jobs:
           manifest="android/app/build/outputs/apk/release/SMAJ-PI-HUB-update.json"
           tag="android-v$VITE_APP_VERSION"
           printf 'Version: %s\n\nVerified SMAJ PI HUB Android update.\n' "$VITE_APP_VERSION" > "$RUNNER_TEMP/smaj-release-notes.txt"
-          printf '\n<!-- SMAJ_ANDROID_UPDATE\n' >> "$RUNNER_TEMP/smaj-release-notes.txt"
-          cat "$manifest" >> "$RUNNER_TEMP/smaj-release-notes.txt"
-          printf '\n-->\n' >> "$RUNNER_TEMP/smaj-release-notes.txt"
-          gh release create "$tag" "$apk" "$manifest" --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android $VITE_APP_VERSION" --notes-file "$RUNNER_TEMP/smaj-release-notes.txt" --prerelease --target "$GITHUB_SHA"
+          metadata_name="smaj-update-$VITE_APP_VERSION-$(jq -r '.size' "$manifest")-$(jq -r '.sha256' "$manifest").json"
+          metadata="$RUNNER_TEMP/$metadata_name"
+          cp "$manifest" "$metadata"
+          gh release create "$tag" "$apk" "$manifest" "$metadata" --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android $VITE_APP_VERSION" --notes-file "$RUNNER_TEMP/smaj-release-notes.txt" --prerelease --target "$GITHUB_SHA"
           gh release view android-latest --repo "$GITHUB_REPOSITORY" || gh release create android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android" --notes "Verified Android updates." --prerelease --target "$GITHUB_SHA"
-          gh release upload android-latest "$apk" "$manifest" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload android-latest "$apk" "$manifest" "$metadata" --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit android-latest --repo "$GITHUB_REPOSITORY" --title "SMAJ PI HUB Android $VITE_APP_VERSION" --notes-file "$RUNNER_TEMP/smaj-release-notes.txt"

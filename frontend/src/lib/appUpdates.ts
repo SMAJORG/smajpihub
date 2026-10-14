@@ -28,8 +28,11 @@ export const checkAppUpdate = async (native: boolean, currentVersion = APP_VERSI
     if (native) {
       const version = String(data.body || "").match(/^Version:\s*(\d+\.\d+\.\d+)\s*$/m)?.[1];
       const encoded = String(data.body || "").match(/<!-- SMAJ_ANDROID_UPDATE\s*\n([\s\S]*?)\n-->/)?.[1];
-      if (!version || !encoded) throw new Error("The verified Android update is not published yet. Check again shortly.");
-      const apk = parseAndroidUpdate(JSON.parse(encoded), version);
+      const marker = Array.isArray(data.assets) ? data.assets.find((asset: { name?: string }) => (asset.name || "").startsWith(`smaj-update-${version}-`) && /^smaj-update-1\.0\.\d+-\d+-[a-f0-9]{64}\.json$/.test(asset.name || ""))?.name : undefined;
+      const fields = marker?.match(/^smaj-update-(1\.0\.(\d+))-(\d+)-([a-f0-9]{64})\.json$/);
+      if (!version || (!encoded && !fields)) throw new Error("The verified Android update is not published yet. Check again shortly.");
+      const metadata = fields ? { version: fields[1], versionCode: Number(fields[2]), size: Number(fields[3]), sha256: fields[4], url: `https://github.com/SMAJORG/smajpihub/releases/download/android-v${fields[1]}/SMAJ-PI-HUB.apk` } : JSON.parse(encoded!);
+      const apk = parseAndroidUpdate(metadata, version);
       return { available: isNewerVersion(version, currentVersion), version, native, apk, details: String(data.body).replace(/^Version:.*\n?/, "").replace(/<!-- SMAJ_ANDROID_UPDATE[\s\S]*?-->/, "").trim() };
     }
     if (typeof data.buildId !== "string" || !data.buildId || typeof data.version !== "string") throw new Error("Update information is unavailable. Please try again later.");
