@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ConfirmSignOutModal from "../../components/ConfirmSignOutModal";
+import LanguageSoonButton from "../../components/LanguageSoonButton";
 import TrustBadge from "../../components/TrustBadge";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import { Capacitor } from "@capacitor/core";
@@ -277,6 +278,7 @@ const SettingsPage = () => {
 
   return (
     <main className="private-page settings-page">
+      <LanguageSoonButton />
       <header className="settings-topbar">
         <button type="button" aria-label="Back to account" onClick={() => navigate("/settings")}><ArrowBackIosNewOutlinedIcon /></button>
         <h1>Settings</h1>
