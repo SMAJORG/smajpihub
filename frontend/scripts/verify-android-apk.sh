@@ -12,7 +12,8 @@ package_line="$(printf '%s\n' "$badging" | head -n 1)"
 [[ "$package_line" == *"versionCode='$SMAJ_ANDROID_VERSION_CODE'"* ]] || { echo 'Unexpected version code'; exit 1; }
 [[ "$package_line" == *"versionName='$VITE_APP_VERSION'"* ]] || { echo 'APK and web version disagree'; exit 1; }
 [[ "$badging" != *application-debuggable* ]] || { echo 'Refusing to publish a debug APK'; exit 1; }
-new_cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/smaj-apk-verification.txt")"
+cat "$RUNNER_TEMP/smaj-apk-verification.txt"
+new_cert="$(sed -n 's/^Signer.*certificate SHA-256 digest: //p' | head -n 1 "$RUNNER_TEMP/smaj-apk-verification.txt")"
 [[ "$new_cert" =~ ^[a-fA-F0-9]{64}$ ]] || { echo 'Signing certificate is missing'; exit 1; }
 if gh api "repos/$GITHUB_REPOSITORY/releases/tags/android-latest" > "$RUNNER_TEMP/smaj-previous-release.json" 2>/dev/null; then
   previous_version="$(jq -r '.body' "$RUNNER_TEMP/smaj-previous-release.json" | sed -n 's/^Version: 1\.0\.\([0-9][0-9]*\).*$/\1/p')"
@@ -26,7 +27,7 @@ if gh api "repos/$GITHUB_REPOSITORY/releases/tags/android-latest" > "$RUNNER_TEM
     printf '%s  %s\n' "${previous_sha#sha256:}" "$RUNNER_TEMP/smaj-previous.apk" | sha256sum --check
   fi
   "$build_tools/apksigner" verify --print-certs "$RUNNER_TEMP/smaj-previous.apk" > "$RUNNER_TEMP/smaj-previous-verification.txt"
-  previous_cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/smaj-previous-verification.txt")"
+  previous_cert="$(sed -n 's/^Signer.*certificate SHA-256 digest: //p' | head -n 1 "$RUNNER_TEMP/smaj-previous-verification.txt")"
   [[ "$new_cert" == "$previous_cert" ]] || { echo 'Signing key changed: refusing to publish an incompatible update'; exit 1; }
 fi
 sha="$(sha256sum "$apk" | cut -d ' ' -f 1)"
