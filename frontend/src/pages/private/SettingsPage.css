@@ -27,20 +27,20 @@
 .settings-page .setting-line:last-child { border-bottom: 0; }
 .settings-page .setting-line strong { font-size: 16px; font-weight: 400; line-height: 1.4; }
 .settings-page .setting-line small { margin-top: 4px; color: var(--settings-muted); font-size: 13px; line-height: 1.45; }
-.settings-page .toggle-line input[type="checkbox"], .settings-page .settings-switch { position: relative; width: 48px; height: 28px; min-width: 48px; margin: 0; padding: 0; border: 0; border-radius: 999px; background: #b8bcc3; box-shadow: none; cursor: pointer; appearance: none; }
+.settings-page .toggle-line input[type="checkbox"], .settings-page .settings-switch { position: relative; width: 48px; height: 28px; min-width: 48px; margin: 0; padding: 0; border: 0; border-radius: 999px; background: #e5e7eb; box-shadow: none; cursor: pointer; appearance: none; -webkit-appearance: none; flex-shrink: 0; transition: background .18s ease; }
 .settings-page .toggle-line input[type="checkbox"]::after, .settings-page .settings-switch i { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #0002; transition: transform .18s; }
-.settings-page .toggle-line input[type="checkbox"]:checked, .settings-page .settings-switch.enabled { background: linear-gradient(100deg, #00bfe4, #3de1a0); box-shadow: none; }
+.settings-page .toggle-line input[type="checkbox"]:checked, .settings-page .settings-switch.enabled { background: var(--smaj-primary, #7434f5); box-shadow: none; }
 .settings-page .toggle-line input[type="checkbox"]:checked::after, .settings-page .settings-switch.enabled i { transform: translateX(20px); }
-.settings-page .settings-switch:disabled { opacity: .45; cursor: default; }
-.settings-page .settings-device-link { display: flex; align-items: center; gap: 12px; min-height: 74px; padding: 17px 0; border-bottom: 1px solid var(--settings-line); color: inherit; text-decoration: none; }
+.settings-page .toggle-line input[type="checkbox"]:disabled, .settings-page .settings-switch:disabled { opacity: .45; cursor: default; }
+.settings-page .settings-sections a.settings-device-link { display: flex; align-items: center; gap: 12px; min-height: 74px; margin: 0; padding: 17px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: inherit; text-decoration: none; }
 .settings-page .settings-device-link > span:nth-child(2) { flex: 1; min-width: 0; }
 .settings-page .settings-device-link strong, .settings-page .settings-device-link small { display: block; }
 .settings-page .settings-device-link strong { font-size: 16px; font-weight: 400; }
 .settings-page .settings-device-link small { margin-top: 4px; color: var(--settings-muted); font-size: 13px; }
-.settings-page .settings-device-icon { color: var(--settings-muted); }
+.settings-page .settings-sections .settings-device-icon { width: 28px; height: 32px; flex: 0 0 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--settings-muted); }
 .settings-page .settings-device-link > svg { color: var(--settings-muted); }
 .settings-page .settings-sections > .private-primary-button { width: 100%; justify-self: stretch; border-radius: 8px; min-height: 46px; }
-.settings-page :is(button, a, input, select):focus-visible { outline: 2px solid #00bfa5; outline-offset: 3px; }
+.settings-page :is(button, a, input, select):focus-visible { outline: 2px solid var(--smaj-primary, #7434f5); outline-offset: 3px; }
 .settings-update-sheet { position: fixed; inset: auto 0 0; width: min(100%, 560px); max-height: 85dvh; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; margin: 0 auto; padding: 28px 24px max(24px, env(safe-area-inset-bottom)); border: 0; border-radius: 18px 18px 0 0; background: #fff; color: #141518; box-shadow: 0 -10px 60px #0003; }
 .settings-update-sheet::backdrop { background: #0009; }
 .settings-update-sheet h2 { margin: 0 0 28px; color: #141518 !important; font-size: 22px; }
