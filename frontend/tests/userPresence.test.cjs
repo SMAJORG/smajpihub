@@ -1,0 +1,32 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),path=require('node:path');
+const exportsFixture={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../../backend/src/services/userPresence.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsFixture,Date});
+const {readUserPresence,presenceUpdate,PRESENCE_TTL_MS}=exportsFixture;
+const now=Date.parse('2026-10-15T12:00:00Z'),first='a'.repeat(32),second='b'.repeat(32);
+test('stale online flags and profile edits cannot manufacture live presence',()=>{assert.equal(readUserPresence({online:true,lastSeenAt:new Date(now-9*3600000),updatedAt:new Date(now)},now).online,false);assert.equal(readUserPresence({updatedAt:new Date(now)},now).lastSeenAt,null);assert.equal(readUserPresence(null,now).online,false)});
+test('authenticated heartbeat has a short server-assigned expiry',()=>{const update=presenceUpdate({},first,true,now);const entry=update.$set['presenceSessions.'+first];assert.equal(entry.expiresAt.getTime(),now+PRESENCE_TTL_MS);assert.equal(readUserPresence({lastSeenAt:new Date(now),presenceSessions:{[first]:entry}},now+1000).online,true);assert.equal(readUserPresence({lastSeenAt:new Date(now),presenceSessions:{[first]:entry}},now+PRESENCE_TTL_MS+1).online,false)});
+test('closing one tab leaves another active tab online',()=>{const sessions={[first]:{expiresAt:new Date(now+30000)},[second]:{expiresAt:new Date(now+30000)}};const update=presenceUpdate({presenceSessions:sessions},first,false,now);assert.equal(update.$unset['presenceSessions.'+first],'');assert.equal(update.$unset['presenceSessions.'+second],undefined);delete sessions[first];assert.equal(readUserPresence({presenceSessions:sessions},now).online,true)});
+test('explicit departure cannot fall back to login time and stay online',()=>{assert.equal(readUserPresence({lastSeenAt:new Date(now),presenceSessions:{}},now).online,false)});
+test('expired tabs are pruned without conflicting with an active heartbeat',()=>{const update=presenceUpdate({presenceSessions:{[first]:{expiresAt:new Date(now-1000)},[second]:{expiresAt:new Date(now-1000)}}},first,true,now);assert.equal(update.$unset['presenceSessions.'+first],undefined);assert.equal(update.$unset['presenceSessions.'+second],'')});
+function clientFixture(uid='buyer') {
+ const requests=[],intervals=[],events={};let cleanup,hidden=false;
+ const doc={get hidden(){return hidden},addEventListener:(name,fn)=>events[name]=fn,removeEventListener:(name)=>delete events[name]};
+ const win={setInterval:(fn,ms)=>{intervals.push({fn,ms});return 1},clearInterval:()=>{},addEventListener:(name,fn)=>events[name]=fn,removeEventListener:(name)=>delete events[name]};
+ const modules={react:{useEffect:fn=>cleanup=fn()},'../lib/axiosClient':{axiosClient:{post:async(url,body)=>requests.push({url,...body})}}};
+ const out={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src/hooks/useUserPresence.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,require:name=>modules[name],document:doc,window:win,crypto:{randomUUID:()=>first},navigator:{onLine:true},Promise});out.useUserPresence(uid);
+ return{requests,intervals,events,hide:value=>hidden=value,cleanup:()=>cleanup?.()};
+}
+const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve()};
+test('visible app refreshes authenticated presence every 15 seconds and hides offline immediately',async()=>{const app=clientFixture();await flush();assert.equal(app.requests[0].active,true);assert.equal(app.requests[0].url,"/user/presence");assert.equal(app.intervals[0].ms,15000);app.hide(true);app.events.visibilitychange();await flush();assert.equal(app.requests.at(-1).active,false);const count=app.requests.length;app.intervals[0].fn();await flush();assert.equal(app.requests.length,count);app.hide(false);app.events.visibilitychange();await flush();assert.equal(app.requests.at(-1).active,true);app.cleanup();await flush();assert.equal(app.requests.at(-1).active,false)});
+test('signed-out visitors do not send presence updates',async()=>{const app=clientFixture(null);await flush();assert.equal(app.requests.length,0)});
+
+async function presenceRequest(user, body) {
+ const source=fs.readFileSync(path.join(__dirname,'../../backend/src/handlers/users.ts'),'utf8');
+ const begin=source.indexOf('  router.post("/presence"'),end=source.indexOf('  router.post("/dev-signin"',begin);
+ let handler,response;const writes=[];
+ vm.runInNewContext(ts.transpileModule(source.slice(begin,end),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,{router:{post:(_,fn)=>handler=fn},resolveCurrentUser:async()=>user,presenceUpdate,Date});
+ await handler({body,app:{locals:{userCollection:{updateOne:async(filter,update)=>writes.push({filter,update})}}}},{status:status=>({json:body=>response={status,body}})});
+ return{response,writes};
+}
+test('presence endpoint authenticates and cannot update a body-supplied user ID',async()=>{const result=await presenceRequest({uid:'viewer'},{uid:'victim',sessionId:first,active:true});assert.equal(result.response.status,200);assert.equal(result.writes[0].filter.uid,'viewer')});
+test('presence endpoint rejects unauthenticated callers and unsafe session keys',async()=>{const denied=await presenceRequest(null,{sessionId:first,active:true});assert.equal(denied.response.status,401);assert.equal(denied.writes.length,0);for(const sessionId of ['bad.key','$set','short']){const invalid=await presenceRequest({uid:'viewer'},{sessionId,active:true});assert.equal(invalid.response.status,400);assert.equal(invalid.writes.length,0)}});
+test('presence endpoint bounds the number of live tabs per account',async()=>{const presenceSessions={};for(let i=0;i<32;i++)presenceSessions[String(i).padStart(32,'0')]={expiresAt:new Date(Date.now()+30000)};const result=await presenceRequest({uid:'viewer',presenceSessions},{sessionId:first,active:true});assert.equal(result.response.status,429);assert.equal(result.writes.length,0)});

@@ -1,3 +1,4 @@
+import { presenceUpdate } from "../services/userPresence";
 import { synchronizeAvatarSnapshots } from "../services/profileAvatars";
 import { Router, Request, Response } from "express";
 
@@ -259,6 +260,17 @@ export const handleSignIn = async (req: Request, res: Response) => {
 };
 
 export default function mountUserEndpoints(router: Router) {
+  router.post("/presence", async (req, res) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ message: "Sign in to update presence." });
+    const { sessionId, active } = req.body || {};
+    if (typeof sessionId !== "string" || !/^[a-zA-Z0-9_-]{20,80}$/.test(sessionId) || typeof active !== "boolean") return res.status(400).json({ message: "Invalid presence update." });
+    const sessions = (user as any).presenceSessions || {};
+    const currentSessions = Object.values(sessions).filter((entry: any) => new Date(entry?.expiresAt || 0).getTime() > Date.now());
+    if (active && !sessions[sessionId] && currentSessions.length >= 32) return res.status(429).json({ message: "Too many active sessions." });
+    await req.app.locals.userCollection.updateOne({ uid: user.uid }, presenceUpdate(user, sessionId, active));
+    return res.status(200).json({ updated: true });
+  });
   router.post("/dev-signin", async (req: Request, res: Response) => {
     if (!env.dev_auth || env.is_production) {
       return res.status(404).json({ error: "not_found", message: "Development sign-in is disabled" });

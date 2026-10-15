@@ -22604,3 +22604,20 @@ svg {
 @media (prefers-reduced-motion: reduce) { .voice-note-wave.active i { animation: none; } }
 
 .conversation-meta-line > svg { width: 16px; height: 16px; margin-right: 4px; vertical-align: middle; color: var(--smaj-primary); }
+
+/* One continuous chat wallpaper behind the floating controls and messages. */
+.chat-panel.chat-panel-fullscreen {
+ background-color: #d9c9f5;
+ background-image: url("/chat-doodles.svg"), radial-gradient(ellipse at 96% 4%, #ffe89b 0%, transparent 57%), radial-gradient(ellipse at 100% 100%, #a0e1e9 0%, transparent 60%), linear-gradient(155deg, #f3bad7 0%, #c4a5ed 65%, #bdc9f4 100%);
+ background-size: 320px 320px, 100% 100%, 100% 100%, 100% 100%;
+ background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+ border: 0;
+}
+.chat-panel-fullscreen > header, .chat-panel-fullscreen .chat-messages { background: transparent; }
+.chat-panel-fullscreen .conversation-avatar { position: relative; overflow: visible; }
+.chat-panel-fullscreen .conversation-avatar > img { display: block; border-radius: 50%; }
+.chat-panel-fullscreen .conversation-avatar > i { display: block; position: absolute; right: -1px; bottom: 0; z-index: 2; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--smaj-card); border-radius: 50%; }
+.chat-panel-fullscreen .conversation-avatar > i.online { background: #22c55e; }
+.chat-panel-fullscreen .conversation-avatar > i.offline { background: #94a3b8; }
+.chat-panel-fullscreen .voice-note-composer { margin: 0 8px max(8px, env(safe-area-inset-bottom, 0px)); padding: 12px 16px; border-radius: 24px; }
+html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-color: #272036; background-image: url("/chat-doodles.svg"), radial-gradient(ellipse at 96% 4%, #50432c 0%, transparent 57%), radial-gradient(ellipse at 100% 100%, #234550 0%, transparent 60%), linear-gradient(155deg, #493147 0%, #352653 65%, #29354f 100%); }

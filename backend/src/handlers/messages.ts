@@ -1,10 +1,10 @@
+import { readUserPresence } from "../services/userPresence";
 import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
 import { resolveCurrentUser } from "../services/auth";
 
 const serialize = (item: Record<string, any>) => ({ ...item, _id: item._id.toString() });
-const ONLINE_WINDOW_MS = 2 * 60 * 1000;
 const TYPING_WINDOW_MS = 5 * 1000;
 const verificationStatus = (user: any) => ["none", "pending", "approved", "rejected"].includes(user?.verificationStatus) ? user.verificationStatus : user?.verificationRequested ? "pending" : "none";
 const hasCompletePiProfile = (user: any) => Boolean(user?.displayName && user?.piUsername && user?.country && user?.contactPhone && user?.avatar && user?.bio);
@@ -75,9 +75,7 @@ const enrichConversations = async (req: any, currentUser: Record<string, any>, c
   return conversations.map((conversation) => {
     const otherUserId = conversation.buyerId === currentUser.uid ? conversation.sellerId : conversation.buyerId;
     const otherUser = usersById.get(otherUserId);
-    const lastSeenAt = otherUser?.lastSeenAt || otherUser?.updatedAt || conversation.updatedAt;
-    const lastSeenMs = lastSeenAt ? new Date(lastSeenAt).getTime() : 0;
-    const online = Boolean(otherUser?.online) || (lastSeenMs > 0 && Date.now() - lastSeenMs < ONLINE_WINDOW_MS);
+    const presence = readUserPresence(otherUser);
     const typingAt = conversation.typingBy?.[otherUserId];
     const typingMs = typingAt ? new Date(typingAt).getTime() : 0;
     return {
@@ -87,8 +85,7 @@ const enrichConversations = async (req: any, currentUser: Record<string, any>, c
       profileImage: otherUser?.avatar || (conversation.buyerId === currentUser.uid ? conversation.sellerAvatar : conversation.buyerAvatar) || "",
       verificationLevel: publicVerificationLevel(otherUser),
       verificationStatus: verificationStatus(otherUser),
-      online,
-      lastSeenAt,
+      ...presence,
       typing: typingMs > 0 && Date.now() - typingMs < TYPING_WINDOW_MS,
       archived: Array.isArray(conversation.archivedBy) && conversation.archivedBy.includes(currentUser.uid),
     };

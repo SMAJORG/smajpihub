@@ -67,13 +67,16 @@ const getConversationMeta = (conversation: RichConversation, currentUserId?: str
     conversation.productTitle,
   ].filter(Boolean).join(" · ");
 
+const isConversationOnline = (conversation: RichConversation) => Boolean(conversation.online && (!conversation.presenceExpiresAt || new Date(conversation.presenceExpiresAt).getTime() > Date.now()));
+
 const formatLastSeen = (conversation: RichConversation) => {
-  if (conversation.online) return "Online";
-  const value = conversation.lastSeenAt || conversation.updatedAt;
+  if (isConversationOnline(conversation)) return "Online";
+  const value = conversation.lastSeenAt;
   if (!value) return "Offline";
   const then = new Date(value).getTime();
   if (!Number.isFinite(then)) return "Offline";
-  const diffMinutes = Math.max(1, Math.round((Date.now() - then) / 60000));
+  if (Date.now() - then < 60000) return "Last seen just now";
+  const diffMinutes = Math.max(1, Math.floor((Date.now() - then) / 60000));
   if (diffMinutes < 60) return `Last seen ${diffMinutes}m ago`;
   const diffHours = Math.round(diffMinutes / 60);
   if (diffHours < 24) return `Last seen ${diffHours}h ago`;
@@ -202,6 +205,7 @@ const MessagesPage = () => {
     if (pendingProductId) setParams(current => { const next = new URLSearchParams(current); next.delete("product"); return next; }, { replace: true });
   };
   const active = useMemo(() => conversations.find((item) => item._id === activeId), [activeId, conversations]);
+  const activeUpdatedAt = active?.updatedAt;
   const selectedMessages = useMemo(
     () => messages.filter((item) => selectedMessageIds.has(item._id) && !item.deletedForEveryone),
     [messages, selectedMessageIds]
@@ -280,7 +284,7 @@ const MessagesPage = () => {
 
   useEffect(() => {
     const initial = window.setTimeout(() => void loadConversations(), 0);
-    const timer = window.setInterval(() => void loadConversations(), 5000);
+    const timer = window.setInterval(() => { if (!document.hidden) void loadConversations(); }, 5000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
@@ -289,10 +293,13 @@ const MessagesPage = () => {
 
   useEffect(() => {
     const initial = window.setTimeout(() => void loadMessages(), 0);
+    const refresh = () => { if (!document.hidden) void loadMessages(); };
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       window.clearTimeout(initial);
+      document.removeEventListener("visibilitychange", refresh);
     };
-  }, [loadMessages]);
+  }, [loadMessages, activeUpdatedAt]);
 
   useEffect(() => () => {
     keepRecordingRef.current = false;
@@ -900,7 +907,7 @@ const MessagesPage = () => {
               >
                 <span className="conversation-avatar">
                   {item.profileImage ? <img src={item.profileImage} alt="" /> : getConversationInitial(item, user?.uid)}
-                  <i className={item.online ? "online" : "offline"} />
+                  <i className={isConversationOnline(item) ? "online" : "offline"} />
                 </span>
                 <div>
                   <strong className="conversation-name">{getConversationName(item, user?.uid)}<TrustBadge level={item.verificationLevel} status={item.verificationStatus} /></strong>
@@ -930,7 +937,7 @@ const MessagesPage = () => {
                   <div className="chat-person">
                     <span className="conversation-avatar">
                       {active.profileImage ? <img src={active.profileImage} alt="" /> : getConversationInitial(active, user?.uid)}
-                      <i className={active.online ? "online" : "offline"} />
+                      <i className={isConversationOnline(active) ? "online" : "offline"} />
                     </span>
                     <div>
                       <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge level={active.verificationLevel} status={active.verificationStatus} /></strong>
@@ -1070,7 +1077,7 @@ const MessagesPage = () => {
                   <div className="chat-person">
                     <span className="conversation-avatar">
                       {active.profileImage ? <img src={active.profileImage} alt="" /> : getConversationInitial(active, user?.uid)}
-                      <i className={active.online ? "online" : "offline"} />
+                      <i className={isConversationOnline(active) ? "online" : "offline"} />
                     </span>
                     <div>
                       <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge level={active.verificationLevel} status={active.verificationStatus} /></strong>
