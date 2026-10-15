@@ -22621,3 +22621,55 @@ svg {
 .chat-panel-fullscreen .conversation-avatar > i.offline { background: #94a3b8; }
 .chat-panel-fullscreen .voice-note-composer { margin: 0 8px max(8px, env(safe-area-inset-bottom, 0px)); padding: 12px 16px; border-radius: 24px; }
 html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-color: #272036; background-image: url("/chat-doodles.svg"), radial-gradient(ellipse at 96% 4%, #50432c 0%, transparent 57%), radial-gradient(ellipse at 100% 100%, #234550 0%, transparent 60%), linear-gradient(155deg, #493147 0%, #352653 65%, #29354f 100%); }
+
+/* Expandable chat gallery; native albums are supplied only after photo permission. */
+.chat-gallery-backdrop { position: fixed; top: var(--chat-viewport-top, 0px); left: 0; width: 100%; height: var(--chat-viewport-height, 100dvh); z-index: 2147483105; display: flex; align-items: flex-end; background: rgb(0 0 0 / .35); }
+.chat-gallery-sheet { position: relative; display: flex; flex-direction: column; width: min(100%, 680px); height: 62%; max-height: 100%; min-height: min(280px, 100%); margin: 0 auto; overflow: hidden; border-radius: 26px 26px 0 0; background: var(--smaj-card); color: var(--smaj-text); box-shadow: 0 -12px 45px rgb(0 0 0 / .14); transition: height .2s ease; }
+.chat-gallery-sheet.expanded { height: calc(100% - 8px); }
+.chat-gallery-sheet button { font: inherit; color: inherit; cursor: pointer; }
+.chat-gallery-sheet button:focus-visible { outline: 2px solid var(--smaj-primary); outline-offset: -3px; }
+.chat-gallery-handle { display: grid; place-items: center; flex: 0 0 24px; width: 100%; border: 0; background: transparent; touch-action: none; }
+.chat-gallery-handle span { width: 42px; height: 5px; border-radius: 99px; background: var(--smaj-border); }
+.chat-gallery-sheet > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px 10px; }
+.chat-gallery-sheet > header > div { display: flex; gap: 4px; }
+.chat-gallery-sheet > header button { display: flex; align-items: center; justify-content: center; min-width: 38px; min-height: 38px; padding: 6px; border: 0; background: transparent; }
+.chat-gallery-sheet > header .chat-gallery-title { justify-content: flex-start; min-width: 0; gap: 4px; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; text-align: left; }
+.chat-gallery-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.chat-gallery-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 0 3px; }
+.chat-gallery-grid > button, .chat-gallery-skeleton { position: relative; display: grid; place-items: center; aspect-ratio: 1; min-width: 0; padding: 0; border: 0; background: var(--smaj-secondary-bg); overflow: hidden; }
+.chat-gallery-grid img, .chat-gallery-grid video { width: 100%; height: 100%; object-fit: cover; }
+.chat-gallery-grid > button.selected { outline: 3px solid var(--smaj-primary); outline-offset: -3px; }
+.chat-gallery-selection { position: absolute; right: 8px; top: 8px; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid #fff; border-radius: 50%; background: rgb(0 0 0 / .15); color: #fff; }
+.chat-gallery-selection svg { width: 18px; }
+.selected .chat-gallery-selection { background: var(--smaj-primary); }
+.chat-gallery-grid .chat-gallery-camera { display: flex; flex-direction: column; gap: 8px; color: #fff; background: #26212f; }
+.chat-gallery-camera > svg { width: 36px; height: 36px; }
+.chat-gallery-camera > span { font-size: 12px; }
+.chat-gallery-duration { position: absolute; bottom: 5px; left: 5px; padding: 2px 5px; border-radius: 6px; background: #0008; color: #fff; font-size: 11px; }
+.chat-gallery-skeleton { animation: chatGalleryLoading 1.3s ease-in-out infinite alternate; }
+@keyframes chatGalleryLoading { from { opacity: .4; } to { opacity: .9; } }
+.chat-gallery-empty { padding: 24px 16px; text-align: center; color: var(--smaj-text-secondary); }
+.chat-gallery-empty > svg { width: 34px; height: 34px; }
+.chat-gallery-empty button, .chat-gallery-load { padding: 10px 16px; border: 0; border-radius: 99px; color: var(--smaj-primary); background: var(--smaj-secondary-bg); }
+.chat-gallery-load { display: block; margin: 12px auto; }
+.chat-gallery-sheet > footer { display: flex; align-items: center; flex: 0 0 auto; gap: 8px; padding: 8px 12px max(8px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--smaj-border); background: var(--smaj-card); }
+.chat-gallery-sheet > footer > button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 72px; min-height: 58px; padding: 6px 12px; border: 0; border-radius: 99px; background: transparent; font-size: 12px; }
+.chat-gallery-sheet > footer > button.active { color: var(--smaj-primary); background: var(--smaj-secondary-bg); }
+.chat-gallery-sheet > footer > .chat-gallery-next { flex-direction: row; min-height: 42px; margin-left: auto; color: #fff; background: var(--smaj-primary); font-weight: 700; }
+.chat-gallery-sheet > footer > small { margin-left: auto; color: var(--smaj-text-secondary); font-size: 11px; line-height: 1.5; }
+.chat-gallery-menu { position: absolute; right: 12px; top: 64px; z-index: 2; padding: 6px; border: 1px solid var(--smaj-border); border-radius: 16px; background: var(--smaj-card); box-shadow: 0 8px 24px #0002; }
+.chat-gallery-menu button { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 16px; border: 0; background: transparent; }
+.chat-gallery-albums { position: absolute; top: 70px; left: 12px; right: 12px; bottom: 88px; z-index: 3; padding: 8px; overflow-y: auto; border: 1px solid var(--smaj-border); border-radius: 20px; background: var(--smaj-card); box-shadow: 0 8px 25px #0002; }
+.chat-gallery-albums > button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; }
+.chat-gallery-albums > button[aria-pressed="true"] { background: var(--smaj-secondary-bg); }
+.chat-gallery-albums img, .chat-gallery-albums button > svg { flex: 0 0 42px; width: 42px; height: 42px; object-fit: cover; border-radius: 8px; }
+.chat-gallery-albums strong { font-weight: 500; overflow-wrap: anywhere; }
+.chat-gallery-albums button > span { color: var(--smaj-text-secondary); }
+.chat-gallery-hint, .chat-gallery-error { margin: 0; padding: 10px 14px; font-size: 13px; line-height: 1.4; }
+.chat-gallery-error { color: #b42332; }
+.chat-gallery-input { display: none; }
+.chat-photo-composer > video { width: 100%; min-height: 0; flex: 1; object-fit: contain; background: #111; }
+.chat-video-message { max-width: 100%; margin: 0; }
+.chat-video-message video { display: block; width: 100%; max-height: 360px; border-radius: 12px; background: #111; }
+.chat-video-message figcaption, .chat-video-message > a { display: block; padding-top: 6px; font-size: 13px; color: inherit; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .chat-gallery-sheet { transition: none; } .chat-gallery-skeleton { animation: none; } }

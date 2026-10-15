@@ -264,7 +264,7 @@ export default function mountMessageEndpoints(router: Router) {
     }
     const receiverId = conversation.buyerId === user.uid ? conversation.sellerId : conversation.buyerId;
     const imageCaption = messageType === "image" && message ? message.slice(0, 1000) : "";
-    const displayMessage = messageType === "voice" ? `Voice message (${Math.floor(audioDurationSeconds / 60)}:${String(audioDurationSeconds % 60).padStart(2, "0")})` : messageType === "image" ? imageCaption || "Photo" : messageType === "document" ? `Document: ${attachmentName}` : message;
+    const displayMessage = messageType === "voice" ? `Voice message (${Math.floor(audioDurationSeconds / 60)}:${String(audioDurationSeconds % 60).padStart(2, "0")})` : messageType === "image" ? imageCaption || "Photo" : messageType === "document" ? (attachmentMimeType.startsWith("video/") ? message.slice(0, 1000) || "Video" : `Document: ${attachmentName}`) : message;
     // Product context belongs to an explicit enquiry, not every reply in the thread.
     let productContext = {};
     const enquiryProductId = String(req.body?.productId || "");

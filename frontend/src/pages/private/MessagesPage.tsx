@@ -23,6 +23,7 @@ import type { ChatMessage, Conversation } from "../../types/marketplace";
 import TrustBadge from "../../components/TrustBadge";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import VoiceNoteComposer from "../../components/VoiceNoteComposer";
+import ChatAttachmentSheet from "../../components/ChatAttachmentSheet";
 import { VoiceRecordingClock } from "../../lib/voiceRecordingClock";
 import { uploadImage } from "../../lib/uploadImage";
 
@@ -97,6 +98,7 @@ const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
 });
 
 const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_CHAT_VIDEO_BYTES = 2_500_000;
 const MAX_CHAT_DOCUMENT_BYTES = 3 * 1024 * 1024;
 
 const MessagesPage = () => {
@@ -136,7 +138,6 @@ const MessagesPage = () => {
   const [deletingConversations, setDeletingConversations] = useState(false);
   const [conversationActionError, setConversationActionError] = useState("");
   const chatMessagesRef = useRef<HTMLDivElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const nearBottomRef = useRef(true);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -648,8 +649,9 @@ const MessagesPage = () => {
     setAttachOpen(false);
     setVoiceError("");
     if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > MAX_CHAT_IMAGE_BYTES) {
-      setVoiceError("Choose a JPG, PNG, WebP, or GIF photo that is 2 MB or smaller.");
+    const video = file.type.startsWith("video/");
+    if ((!file.type.startsWith("image/") && !video) || file.size > (video ? MAX_CHAT_VIDEO_BYTES : MAX_CHAT_IMAGE_BYTES)) {
+      setVoiceError(video ? "Choose a video smaller than 2.5 MB." : "Choose a JPG, PNG, WebP, or GIF photo that is 2 MB or smaller.");
       return;
     }
     try {
@@ -667,12 +669,13 @@ const MessagesPage = () => {
     setVoiceError("");
     nearBottomRef.current = true;
     try {
-      const attachmentUrl = await uploadImage(pendingPhoto.dataUrl, "message-photos");
+      const video = pendingPhoto.file.type.startsWith("video/");
+      const attachmentUrl = video ? "" : await uploadImage(pendingPhoto.dataUrl, "message-photos");
       await axiosClient.post(`/messages/${activeId}`, {
         productId: pendingProductId,
-        messageType: "image",
+        messageType: video ? "document" : "image",
         message: pendingPhotoCaption.trim(),
-        attachmentUrl,
+        ...(video ? { attachmentDataUrl: pendingPhoto.dataUrl } : { attachmentUrl }),
         attachmentName: pendingPhoto.file.name,
         attachmentMimeType: pendingPhoto.file.type,
         attachmentSize: pendingPhoto.file.size,
@@ -1003,6 +1006,8 @@ const MessagesPage = () => {
                               </button>
                               <figcaption>{item.message && item.message !== "Photo" ? item.message : item.attachmentName || "Photo"}</figcaption>
                             </figure>
+                          ) : item.messageType === "document" && item.attachmentMimeType?.startsWith("video/") && item.attachmentDataUrl ? (
+                            <figure className="chat-attachment chat-video-message"><video controls playsInline preload="metadata" src={item.attachmentDataUrl} /><figcaption>{item.message && item.message !== "Video" ? item.message : item.attachmentName || "Video"}</figcaption><a href={item.attachmentDataUrl} download={item.attachmentName || "video"}>Save video</a></figure>
                           ) : item.messageType === "document" && item.attachmentDataUrl ? (
                             <a className="chat-attachment chat-document-message" href={item.attachmentDataUrl} download={item.attachmentName || "document"} target="_blank" rel="noreferrer">
                               <DescriptionOutlinedIcon />
@@ -1034,7 +1039,6 @@ const MessagesPage = () => {
                   <VoiceNoteComposer recording={recording} paused={recordingPaused} seconds={recording ? recordingSeconds : voicePreview?.durationSeconds || 0} previewUrl={voicePreview?.url} busy={sendingVoice} onPause={pauseVoiceRecording} onResume={resumeVoiceRecording} onDelete={cancelVoiceRecording} onSend={finishAndSendVoice} />
                 ) : (
                   <form onSubmit={send}>
-                    <input ref={photoInputRef} className="chat-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { void preparePhotoAttachment(event.target.files?.[0]); event.currentTarget.value = ""; }} />
                     <input ref={documentInputRef} className="chat-file-input" type="file" accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,application/pdf,text/plain,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { void sendAttachment(event.target.files?.[0], "document"); event.currentTarget.value = ""; }} />
                     <button type="button" onClick={() => setEmojiOpen((open) => !open)} aria-label="Emoji">
                       <SentimentSatisfiedAltOutlinedIcon />
@@ -1054,8 +1058,8 @@ const MessagesPage = () => {
                   </form>
                 )}
                 {emojiOpen ? <div className="chat-emoji-picker" role="dialog" aria-label="Choose an emoji">{["👍", "😊", "❤️", "👋", "🔥", "😍", "😂", "🙏"].map((emoji) => <button key={emoji} type="button" onClick={() => { setText((current) => `${current}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div> : null}
-                {pendingPhoto ? <div className="chat-photo-composer" role="dialog" aria-modal="true" aria-label="Photo preview"><header><strong>Send photo</strong><button type="button" onClick={clearPendingPhoto} aria-label="Close photo preview"><CloseOutlinedIcon /></button></header><img src={pendingPhoto.url} alt="Selected photo preview" /><div><input value={pendingPhotoCaption} maxLength={1000} onChange={(event) => setPendingPhotoCaption(event.target.value)} placeholder="Write a message..." /><button type="button" className="chat-send-button" disabled={sendingAttachment} onClick={() => void sendPendingPhoto()} aria-label="Send photo"><SendOutlinedIcon /></button></div></div> : null}
-                {attachOpen ? <div className="chat-action-sheet" role="dialog" aria-modal="true" aria-label="Attachments"><button type="button" disabled={sendingAttachment} onClick={() => photoInputRef.current?.click()}><ImageOutlinedIcon />Photo sharing</button><button type="button" disabled={sendingAttachment} onClick={() => documentInputRef.current?.click()}><DescriptionOutlinedIcon />Document sharing</button><button type="button" onClick={() => setAttachOpen(false)}>Cancel</button></div> : null}
+                {pendingPhoto ? <div className="chat-photo-composer" role="dialog" aria-modal="true" aria-label="Attachment preview"><header><strong>{pendingPhoto.file.type.startsWith("video/") ? "Send video" : "Send photo"}</strong><button type="button" onClick={clearPendingPhoto} aria-label="Close attachment preview"><CloseOutlinedIcon /></button></header>{pendingPhoto.file.type.startsWith("video/") ? <video src={pendingPhoto.url} controls playsInline preload="metadata" /> : <img src={pendingPhoto.url} alt="Selected photo preview" />}<div><input value={pendingPhotoCaption} maxLength={1000} onChange={(event) => setPendingPhotoCaption(event.target.value)} placeholder="Write a message..." /><button type="button" className="chat-send-button" disabled={sendingAttachment} onClick={() => void sendPendingPhoto()} aria-label="Send attachment"><SendOutlinedIcon /></button></div></div> : null}
+                {attachOpen ? <ChatAttachmentSheet onClose={() => setAttachOpen(false)} onChoose={file => void preparePhotoAttachment(file)} onDocument={() => { setAttachOpen(false); documentInputRef.current?.click(); }} busy={sendingAttachment} /> : null}
                 {reportOpen ? <div className="chat-action-sheet" role="dialog" aria-modal="true" aria-label="Report conversation"><strong>Report conversation</strong><select value={reportReason} onChange={(event) => setReportReason(event.target.value)}><option>Spam or scam</option><option>Harassment</option><option>Unsafe payment request</option><option>Misleading product information</option><option>Other</option></select><button type="button" className="chat-report-submit" onClick={() => void submitConversationReport()}>Submit report</button><button type="button" onClick={() => setReportOpen(false)}>Cancel</button></div> : null}
                 {selectedMessages.length ? <div className="chat-action-sheet chat-selection-sheet" role="dialog" aria-modal="true" aria-label="Selected messages"><strong>{selectedMessages.length} selected</strong><button type="button" disabled={deletingMessage} onClick={() => void deleteSelectedMessages("me")}>Delete for me</button>{canDeleteSelectedForEveryone ? <button type="button" className="chat-delete-everyone" disabled={deletingMessage} onClick={() => void deleteSelectedMessages("everyone")}>Delete for everyone</button> : null}<button type="button" disabled={deletingMessage} onClick={() => setSelectedMessageIds(new Set())}>Cancel</button></div> : null}
                 {deleteTarget && !selectedMessages.length ? <div className="chat-action-sheet" role="dialog" aria-modal="true" aria-label="Delete message"><strong>Delete message</strong><button type="button" disabled={deletingMessage} onClick={() => void deleteMessage("me")}>Delete for me</button>{deleteTarget.senderId === user?.uid && Date.now() - new Date(deleteTarget.createdAt).getTime() <= 15 * 60 * 1000 ? <button type="button" className="chat-delete-everyone" disabled={deletingMessage} onClick={() => void deleteMessage("everyone")}>Delete for everyone</button> : null}<button type="button" disabled={deletingMessage} onClick={() => setDeleteTarget(null)}>Cancel</button></div> : null}
@@ -1143,6 +1147,8 @@ const MessagesPage = () => {
                               </button>
                               <figcaption>{item.message && item.message !== "Photo" ? item.message : item.attachmentName || "Photo"}</figcaption>
                             </figure>
+                          ) : item.messageType === "document" && item.attachmentMimeType?.startsWith("video/") && item.attachmentDataUrl ? (
+                            <figure className="chat-attachment chat-video-message"><video controls playsInline preload="metadata" src={item.attachmentDataUrl} /><figcaption>{item.message && item.message !== "Video" ? item.message : item.attachmentName || "Video"}</figcaption><a href={item.attachmentDataUrl} download={item.attachmentName || "video"}>Save video</a></figure>
                           ) : item.messageType === "document" && item.attachmentDataUrl ? (
                             <a className="chat-attachment chat-document-message" href={item.attachmentDataUrl} download={item.attachmentName || "document"} target="_blank" rel="noreferrer">
                               <DescriptionOutlinedIcon />
@@ -1174,7 +1180,6 @@ const MessagesPage = () => {
                   <VoiceNoteComposer recording={recording} paused={recordingPaused} seconds={recording ? recordingSeconds : voicePreview?.durationSeconds || 0} previewUrl={voicePreview?.url} busy={sendingVoice} onPause={pauseVoiceRecording} onResume={resumeVoiceRecording} onDelete={cancelVoiceRecording} onSend={finishAndSendVoice} />
                 ) : (
                   <form onSubmit={send}>
-                    <input ref={photoInputRef} className="chat-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { void preparePhotoAttachment(event.target.files?.[0]); event.currentTarget.value = ""; }} />
                     <input ref={documentInputRef} className="chat-file-input" type="file" accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,application/pdf,text/plain,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { void sendAttachment(event.target.files?.[0], "document"); event.currentTarget.value = ""; }} />
                     <button type="button" onClick={() => setEmojiOpen((open) => !open)} aria-label="Emoji">
                       <SentimentSatisfiedAltOutlinedIcon />
@@ -1194,8 +1199,8 @@ const MessagesPage = () => {
                   </form>
                 )}
                 {emojiOpen ? <div className="chat-emoji-picker" role="dialog" aria-label="Choose an emoji">{["👍", "😊", "❤️", "👋", "🔥", "😍", "😂", "🙏"].map((emoji) => <button key={emoji} type="button" onClick={() => { setText((current) => `${current}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div> : null}
-                {pendingPhoto ? <div className="chat-photo-composer" role="dialog" aria-modal="true" aria-label="Photo preview"><header><strong>Send photo</strong><button type="button" onClick={clearPendingPhoto} aria-label="Close photo preview"><CloseOutlinedIcon /></button></header><img src={pendingPhoto.url} alt="Selected photo preview" /><div><input value={pendingPhotoCaption} maxLength={1000} onChange={(event) => setPendingPhotoCaption(event.target.value)} placeholder="Write a message..." /><button type="button" className="chat-send-button" disabled={sendingAttachment} onClick={() => void sendPendingPhoto()} aria-label="Send photo"><SendOutlinedIcon /></button></div></div> : null}
-                {attachOpen ? <div className="chat-action-sheet" role="dialog" aria-modal="true" aria-label="Attachments"><button type="button" disabled={sendingAttachment} onClick={() => photoInputRef.current?.click()}><ImageOutlinedIcon />Photo sharing</button><button type="button" disabled={sendingAttachment} onClick={() => documentInputRef.current?.click()}><DescriptionOutlinedIcon />Document sharing</button><button type="button" onClick={() => setAttachOpen(false)}>Cancel</button></div> : null}
+                {pendingPhoto ? <div className="chat-photo-composer" role="dialog" aria-modal="true" aria-label="Attachment preview"><header><strong>{pendingPhoto.file.type.startsWith("video/") ? "Send video" : "Send photo"}</strong><button type="button" onClick={clearPendingPhoto} aria-label="Close attachment preview"><CloseOutlinedIcon /></button></header>{pendingPhoto.file.type.startsWith("video/") ? <video src={pendingPhoto.url} controls playsInline preload="metadata" /> : <img src={pendingPhoto.url} alt="Selected photo preview" />}<div><input value={pendingPhotoCaption} maxLength={1000} onChange={(event) => setPendingPhotoCaption(event.target.value)} placeholder="Write a message..." /><button type="button" className="chat-send-button" disabled={sendingAttachment} onClick={() => void sendPendingPhoto()} aria-label="Send attachment"><SendOutlinedIcon /></button></div></div> : null}
+                {attachOpen ? <ChatAttachmentSheet onClose={() => setAttachOpen(false)} onChoose={file => void preparePhotoAttachment(file)} onDocument={() => { setAttachOpen(false); documentInputRef.current?.click(); }} busy={sendingAttachment} /> : null}
                 {reportOpen ? <div className="chat-action-sheet" role="dialog" aria-modal="true" aria-label="Report conversation"><strong>Report conversation</strong><select value={reportReason} onChange={(event) => setReportReason(event.target.value)}><option>Spam or scam</option><option>Harassment</option><option>Unsafe payment request</option><option>Misleading product information</option><option>Other</option></select><button type="button" className="chat-report-submit" onClick={() => void submitConversationReport()}>Submit report</button><button type="button" onClick={() => setReportOpen(false)}>Cancel</button></div> : null}
                 {selectedMessages.length ? <div className="chat-action-sheet chat-selection-sheet" role="dialog" aria-modal="true" aria-label="Selected messages"><strong>{selectedMessages.length} selected</strong><button type="button" disabled={deletingMessage} onClick={() => void deleteSelectedMessages("me")}>Delete for me</button>{canDeleteSelectedForEveryone ? <button type="button" className="chat-delete-everyone" disabled={deletingMessage} onClick={() => void deleteSelectedMessages("everyone")}>Delete for everyone</button> : null}<button type="button" disabled={deletingMessage} onClick={() => setSelectedMessageIds(new Set())}>Cancel</button></div> : null}
                 {deleteTarget && !selectedMessages.length ? <div className="chat-action-sheet" role="dialog" aria-modal="true" aria-label="Delete message"><strong>Delete message</strong><button type="button" disabled={deletingMessage} onClick={() => void deleteMessage("me")}>Delete for me</button>{deleteTarget.senderId === user?.uid && Date.now() - new Date(deleteTarget.createdAt).getTime() <= 15 * 60 * 1000 ? <button type="button" className="chat-delete-everyone" disabled={deletingMessage} onClick={() => void deleteMessage("everyone")}>Delete for everyone</button> : null}<button type="button" disabled={deletingMessage} onClick={() => setDeleteTarget(null)}>Cancel</button></div> : null}
