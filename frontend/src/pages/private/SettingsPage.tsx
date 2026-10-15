@@ -327,7 +327,6 @@ const SettingsPage = () => {
           </button>
           <div className="settings-action-row">
             <button type="button" className="private-secondary-button" onClick={replayWelcomeTour}>Replay welcome tour</button>
-            <button type="button" className="private-secondary-button danger" onClick={() => setShowSignOut(true)}>Logout</button>
           </div>
         </section>
 
@@ -356,6 +355,10 @@ const SettingsPage = () => {
         {message ? <div className="private-alert success">{message}</div> : null}
         <button className="private-primary-button">Save changes</button>
       </form>
+      <footer className="settings-signout-footer">
+        <button type="button" onClick={() => setShowSignOut(true)}><span>Log Out</span><ChevronRightOutlinedIcon aria-hidden="true" /></button>
+        <p>SMAJ PI HUB v{APP_VERSION}</p>
+      </footer>
 
       {updateInfo ? <dialog ref={updateDialog} className="settings-update-sheet" aria-labelledby="settings-update-title" onCancel={() => setUpdateInfo(null)}>
         <h2 id="settings-update-title">{updateInfo.available ? "New Version" : "Up to date"}</h2>

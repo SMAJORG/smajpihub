@@ -22,6 +22,8 @@ import { useAuthContext } from "../../contexts/AuthContext";
 import type { ChatMessage, Conversation } from "../../types/marketplace";
 import TrustBadge from "../../components/TrustBadge";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
+import VoiceNoteComposer from "../../components/VoiceNoteComposer";
+import { VoiceRecordingClock } from "../../lib/voiceRecordingClock";
 import { uploadImage } from "../../lib/uploadImage";
 
 type RichConversation = Conversation & {
@@ -105,6 +107,9 @@ const MessagesPage = () => {
   const [conversationSearch, setConversationSearch] = useState("");
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [recordingPaused, setRecordingPaused] = useState(false);
+  const recordingClockRef = useRef<VoiceRecordingClock | null>(null);
+  const sendAfterStopRef = useRef(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [voicePreview, setVoicePreview] = useState<VoicePreview | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
@@ -135,7 +140,6 @@ const MessagesPage = () => {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingStartingRef = useRef(false);
   const recordingChunksRef = useRef<Blob[]>([]);
-  const recordingStartedAtRef = useRef(0);
   const recordingTimerRef = useRef<number | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const keepRecordingRef = useRef(true);
@@ -291,6 +295,9 @@ const MessagesPage = () => {
   }, [loadMessages]);
 
   useEffect(() => () => {
+    keepRecordingRef.current = false;
+    sendAfterStopRef.current = false;
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
     if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
     if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
@@ -705,18 +712,27 @@ const MessagesPage = () => {
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recorderRef.current = recorder;
       recordingChunksRef.current = [];
-      recordingStartedAtRef.current = Date.now();
+      recordingClockRef.current = new VoiceRecordingClock();
+      setRecordingPaused(false);
+      sendAfterStopRef.current = false;
       keepRecordingRef.current = true;
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+        if (recorder.state === "paused") {
+          const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+          setVoicePreview(current => {
+            if (current) URL.revokeObjectURL(current.url);
+            return { blob, url: URL.createObjectURL(blob), mimeType: blob.type, durationSeconds: Math.max(1, recordingClockRef.current?.seconds() || 0) };
+          });
+        }
       };
 
       recorder.onstop = () => {
         stopRecordingTimer();
         stopRecordingTracks();
         setRecording(false);
-        const durationSeconds = Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000));
+        const durationSeconds = Math.max(1, recordingClockRef.current?.seconds() || 0);
         const chunks = recordingChunksRef.current;
         recordingChunksRef.current = [];
         if (!keepRecordingRef.current) return;
@@ -725,12 +741,10 @@ const MessagesPage = () => {
           setVoiceError("Could not capture audio. Please try again.");
           return;
         }
-        setVoicePreview({
-          blob,
-          url: URL.createObjectURL(blob),
-          mimeType: blob.type || "audio/webm",
-          durationSeconds,
-        });
+        const preview = { blob, url: URL.createObjectURL(blob), mimeType: blob.type || "audio/webm", durationSeconds };
+        setVoicePreview(current => { if (current) URL.revokeObjectURL(current.url); return preview; });
+        setRecordingPaused(false);
+        if (sendAfterStopRef.current) { sendAfterStopRef.current = false; void sendVoiceNote(preview); }
       };
 
       recorder.onerror = (event) => {
@@ -745,7 +759,7 @@ const MessagesPage = () => {
       setRecording(true);
       setRecordingSeconds(0);
       recordingTimerRef.current = window.setInterval(() => {
-        setRecordingSeconds(Math.max(0, Math.round((Date.now() - recordingStartedAtRef.current) / 1000)));
+        setRecordingSeconds(recordingClockRef.current?.seconds() || 0);
       }, 500);
     } catch (error) {
       stopRecordingTimer();
@@ -755,34 +769,55 @@ const MessagesPage = () => {
     } finally { recordingStartingRef.current = false; }
   };
 
-  const stopVoiceRecording = () => {
-    keepRecordingRef.current = true;
-    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+  const pauseVoiceRecording = () => {
+    const recorder = recorderRef.current;
+    if (recorder?.state !== "recording") return;
+    recorder.pause();
+    recordingClockRef.current?.pause();
+    setRecordingPaused(true);
+    recorder.requestData();
+  };
+  const resumeVoiceRecording = () => {
+    if (recorderRef.current?.state !== "paused") return;
+    recorderRef.current.resume();
+    recordingClockRef.current?.resume();
+    clearVoicePreview();
+    setRecordingPaused(false);
+  };
+  const finishAndSendVoice = () => {
+    if (sendAfterStopRef.current || sendingVoice) return;
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      sendAfterStopRef.current = true;
+      keepRecordingRef.current = true;
+      recorderRef.current.stop();
+    } else void sendVoiceNote();
   };
 
   const cancelVoiceRecording = () => {
     keepRecordingRef.current = false;
-    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    sendAfterStopRef.current = false;
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     stopRecordingTimer();
     stopRecordingTracks();
     setRecording(false);
     setRecordingSeconds(0);
+    setRecordingPaused(false);
     clearVoicePreview();
     setVoiceError("");
   };
 
-  const sendVoiceNote = async () => {
-    if (!activeId || !voicePreview || sendingVoice) return;
+  const sendVoiceNote = async (preview = voicePreview) => {
+    if (!activeId || !preview || sendingVoice) return;
     setSendingVoice(true);
     setVoiceError("");
     try {
-      const audioDataUrl = await blobToDataUrl(voicePreview.blob);
+      const audioDataUrl = await blobToDataUrl(preview.blob);
       await axiosClient.post(`/messages/${activeId}`, {
         productId: pendingProductId,
         messageType: "voice",
         audioDataUrl,
-        audioMimeType: voicePreview.mimeType,
-        audioDurationSeconds: voicePreview.durationSeconds,
+        audioMimeType: preview.mimeType,
+        audioDurationSeconds: preview.durationSeconds,
       });
       clearProductContext();
       clearVoicePreview();
@@ -869,7 +904,7 @@ const MessagesPage = () => {
                 </span>
                 <div>
                   <strong className="conversation-name">{getConversationName(item, user?.uid)}<TrustBadge level={item.verificationLevel} status={item.verificationStatus} /></strong>
-                  <p className="conversation-meta-line">{getConversationMeta(item, user?.uid)}</p>
+                  <p className="conversation-meta-line">{/^Voice (message|note)/.test(item.lastMessage || "") ? <><MicNoneOutlinedIcon aria-hidden="true" />{item.lastMessage}</> : getConversationMeta(item, user?.uid)}</p>
                   <small>{formatLastSeen(item)}</small>
                 </div>
                 {user?.uid && item.unreadBy?.includes(user.uid) ? <b>1</b> : null}
@@ -989,25 +1024,7 @@ const MessagesPage = () => {
                   </button>
                 ) : null}
                 {recording || voicePreview ? (
-                  <div className="voice-recorder-bar">
-                    <button type="button" onClick={cancelVoiceRecording} aria-label="Cancel voice note">Cancel</button>
-                    <span className={recording ? "recording-live" : ""}>
-                      <MicNoneOutlinedIcon />
-                      {recording ? `Recording ${formatVoiceTime(recordingSeconds)}` : `Voice note ${formatVoiceTime(voicePreview?.durationSeconds || 0)}`}
-                    </span>
-                    {voicePreview ? (
-                      <audio controls src={voicePreview.url}>
-                        <track kind="captions" />
-                      </audio>
-                    ) : null}
-                    {recording ? (
-                      <button type="button" className="chat-send-button" onClick={stopVoiceRecording} aria-label="Stop recording">Stop</button>
-                    ) : (
-                      <button type="button" className="chat-send-button" onClick={sendVoiceNote} disabled={sendingVoice} aria-label="Send voice note">
-                        <SendOutlinedIcon />
-                      </button>
-                    )}
-                  </div>
+                  <VoiceNoteComposer recording={recording} paused={recordingPaused} seconds={recording ? recordingSeconds : voicePreview?.durationSeconds || 0} previewUrl={voicePreview?.url} busy={sendingVoice} onPause={pauseVoiceRecording} onResume={resumeVoiceRecording} onDelete={cancelVoiceRecording} onSend={finishAndSendVoice} />
                 ) : (
                   <form onSubmit={send}>
                     <input ref={photoInputRef} className="chat-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { void preparePhotoAttachment(event.target.files?.[0]); event.currentTarget.value = ""; }} />
@@ -1147,25 +1164,7 @@ const MessagesPage = () => {
                   </button>
                 ) : null}
                 {recording || voicePreview ? (
-                  <div className="voice-recorder-bar">
-                    <button type="button" onClick={cancelVoiceRecording} aria-label="Cancel voice note">Cancel</button>
-                    <span className={recording ? "recording-live" : ""}>
-                      <MicNoneOutlinedIcon />
-                      {recording ? `Recording ${formatVoiceTime(recordingSeconds)}` : `Voice note ${formatVoiceTime(voicePreview?.durationSeconds || 0)}`}
-                    </span>
-                    {voicePreview ? (
-                      <audio controls src={voicePreview.url}>
-                        <track kind="captions" />
-                      </audio>
-                    ) : null}
-                    {recording ? (
-                      <button type="button" className="chat-send-button" onClick={stopVoiceRecording} aria-label="Stop recording">Stop</button>
-                    ) : (
-                      <button type="button" className="chat-send-button" onClick={sendVoiceNote} disabled={sendingVoice} aria-label="Send voice note">
-                        <SendOutlinedIcon />
-                      </button>
-                    )}
-                  </div>
+                  <VoiceNoteComposer recording={recording} paused={recordingPaused} seconds={recording ? recordingSeconds : voicePreview?.durationSeconds || 0} previewUrl={voicePreview?.url} busy={sendingVoice} onPause={pauseVoiceRecording} onResume={resumeVoiceRecording} onDelete={cancelVoiceRecording} onSend={finishAndSendVoice} />
                 ) : (
                   <form onSubmit={send}>
                     <input ref={photoInputRef} className="chat-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { void preparePhotoAttachment(event.target.files?.[0]); event.currentTarget.value = ""; }} />

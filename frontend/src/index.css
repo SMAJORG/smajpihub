@@ -22581,3 +22581,26 @@ svg {
   .chat-panel-fullscreen > form > button { flex: 0 0 36px; width: 36px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--smaj-text-secondary); }
   .chat-panel-fullscreen > form > .chat-send-button { flex-basis: 42px; width: 42px; height: 42px; background: var(--smaj-primary); color: #fff; }
 }
+
+.voice-note-composer { flex: 0 0 auto; padding: 14px 16px max(12px, env(safe-area-inset-bottom, 0px)); background: var(--smaj-card); color: var(--smaj-text); }
+.voice-note-track { display: flex; align-items: center; gap: 14px; min-height: 46px; }
+.voice-note-track time { flex-shrink: 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+.voice-note-track > button { display: grid; place-items: center; width: 36px; height: 40px; padding: 0; border: 0; background: transparent; color: inherit; }
+.voice-note-wave { display: flex; flex: 1; align-items: center; justify-content: center; gap: 3px; height: 40px; overflow: hidden; }
+.voice-note-wave i { display: block; flex: 0 1 3px; min-width: 2px; border-radius: 3px; background: var(--smaj-text-secondary); opacity: .6; }
+.voice-note-wave.active i { animation: smaj-voice-pulse .8s ease-in-out infinite alternate; }
+@keyframes smaj-voice-pulse { from { transform: scaleY(.4); } to { transform: scaleY(1); } }
+.voice-note-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.voice-note-actions button { display: flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 14px; border: 0; border-radius: 999px; font: inherit; cursor: pointer; }
+.voice-note-actions .voice-note-delete { flex: 0 0 48px; padding: 0; color: #c52249; background: #fff0f3; }
+.voice-note-actions .voice-note-toggle, .voice-note-ready { flex: 1; justify-content: center; background: var(--smaj-secondary-bg); color: var(--smaj-text); }
+.voice-note-actions .voice-note-toggle.paused { color: var(--smaj-primary); }
+.voice-note-ready { display: flex; background: transparent; font-size: 14px; }
+.voice-note-actions .voice-note-send { flex: 0 0 48px; padding: 0; color: #fff; background: var(--smaj-primary); }
+.voice-note-actions button:disabled { opacity: .5; cursor: default; }
+.settings-signout-footer { margin-top: 28px; }
+.settings-signout-footer > button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 20px 4px; border: 0; border-top: 1px solid var(--smaj-border); background: transparent; color: var(--smaj-text); font: inherit; font-size: 18px; text-align: left; cursor: pointer; }
+.settings-signout-footer > p { margin: 40px 0 20px; color: var(--smaj-text-secondary); text-align: center; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .voice-note-wave.active i { animation: none; } }
+
+.conversation-meta-line > svg { width: 16px; height: 16px; margin-right: 4px; vertical-align: middle; color: var(--smaj-primary); }
