@@ -22543,3 +22543,13 @@ svg {
  .chat-panel-fullscreen .chat-product-preview { display: none; }
  .chat-panel-fullscreen > form { flex-shrink: 0; background: var(--smaj-card); }
 }
+
+/* Fullscreen chat lives in a portal outside messages-page. */
+.chat-panel .chat-scroll-bottom { position: absolute; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 11; width: 44px; height: 44px; min-width: 44px; padding: 0; display: grid; place-items: center; flex: none; color: var(--smaj-text); background: var(--smaj-card); border: 1px solid var(--smaj-border); border-radius: 50%; box-shadow: 0 4px 14px rgb(15 23 42 / .14); cursor: pointer; }
+.chat-panel .chat-product-mobile[hidden] { display: none; }
+.chat-panel .private-skeleton-chat { width: 100%; box-sizing: border-box; padding: 0; gap: 14px; }
+.chat-panel .private-skeleton-chat-row { width: 68%; min-width: 140px; max-width: 80%; }
+.chat-panel .private-skeleton-chat-row:nth-child(3n) { width: 48%; }
+.chat-panel .private-skeleton-chat-row .chat-bubble { width: 100%; height: 56px; background: color-mix(in srgb, var(--smaj-text-secondary, #94a3b8) 16%, var(--smaj-card, #fff)); }
+
+.chat-panel .private-skeleton-chat-row { padding: 0; background: transparent; border: 0; box-shadow: none; }

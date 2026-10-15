@@ -96,7 +96,7 @@ const ProductDetailPage = () => {
         setSaved(data.saved);
       } else if (kind === "message") {
         const { data } = await axiosClient.post("/messages/start", { productId: product._id });
-        navigate(`/messages?conversation=${data.conversation._id}`);
+        navigate(`/messages?conversation=${data.conversation._id}&product=${encodeURIComponent(product._id)}`);
       }
     } catch (err: unknown) {
       setError(

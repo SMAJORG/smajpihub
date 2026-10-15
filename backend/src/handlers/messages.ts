@@ -268,11 +268,19 @@ export default function mountMessageEndpoints(router: Router) {
     const receiverId = conversation.buyerId === user.uid ? conversation.sellerId : conversation.buyerId;
     const imageCaption = messageType === "image" && message ? message.slice(0, 1000) : "";
     const displayMessage = messageType === "voice" ? "Voice note" : messageType === "image" ? imageCaption || "Photo" : messageType === "document" ? `Document: ${attachmentName}` : message;
+    // Product context belongs to an explicit enquiry, not every reply in the thread.
+    let productContext = {};
+    const enquiryProductId = String(req.body?.productId || "");
+    if (enquiryProductId) {
+      if (!ObjectId.isValid(enquiryProductId)) return res.status(400).json({ message: "Invalid enquiry product." });
+      const product = await req.app.locals.productCollection.findOne({ _id: new ObjectId(enquiryProductId) });
+      const otherParticipant = conversation.participants.find((id: string) => id !== user.uid);
+      if (!product || product.sellerId !== otherParticipant || conversation.contextType === "jobs") return res.status(400).json({ message: "Product does not belong to this conversation's seller." });
+      productContext = { productContextExplicit: true, productId: enquiryProductId, productTitle: product.title, productImage: product.image };
+    }
     const document = {
       conversationId: req.params.id,
-      productId: conversation.productId || "",
-      productTitle: conversation.productTitle || "",
-      productImage: conversation.productImage || "",
+      ...productContext,
       senderId: user.uid,
       senderName: user.displayName || user.username,
       message: displayMessage,

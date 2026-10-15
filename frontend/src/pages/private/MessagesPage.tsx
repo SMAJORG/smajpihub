@@ -185,6 +185,18 @@ const MessagesPage = () => {
     ].join(" ").toLowerCase().includes(query));
   }, [conversationSearch, conversations, inboxFilter, user?.uid]);
   const activeId = selectedId || filteredConversations[0]?._id;
+  const messageCache = useRef(new Map<string, ChatMessage[]>());
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+  const [loadedMessageId, setLoadedMessageId] = useState<string>();
+  const visibleMessages = loadedMessageId === activeId ? messages : messageCache.current.get(activeId || "") || [];
+  useEffect(() => {
+    if (loadedMessageId) messageCache.current.set(loadedMessageId, messages);
+  }, [loadedMessageId, messages]);
+  const pendingProductId = params.get("product") || undefined;
+  const clearProductContext = () => {
+    if (pendingProductId) setParams(current => { const next = new URLSearchParams(current); next.delete("product"); return next; }, { replace: true });
+  };
   const active = useMemo(() => conversations.find((item) => item._id === activeId), [activeId, conversations]);
   const selectedMessages = useMemo(
     () => messages.filter((item) => selectedMessageIds.has(item._id) && !item.deletedForEveryone),
@@ -240,17 +252,25 @@ const MessagesPage = () => {
       setLoadingMessages(false);
       return;
     }
-    setLoadingMessages(true);
+    const cached = messageCache.current.get(activeId);
+    setLoadingMessages(!cached);
+    if (cached) { setMessages(cached); setLoadedMessageId(activeId); }
     try {
       const { data } = await axiosClient.get<{ conversation?: RichConversation; messages: ChatMessage[] }>(`/messages/${activeId}`);
+      messageCache.current.set(activeId, data.messages || []);
+      if (activeIdRef.current !== activeId) return;
       setMessages(data.messages || []);
+      setLoadedMessageId(activeId);
       if (data.conversation) {
-        setConversations((current) => current.map((item) => item._id === data.conversation?._id ? { ...item, ...data.conversation } : item));
+        const conversation = data.conversation;
+        setConversations(current => current.some(item => item._id === conversation._id)
+          ? current.map(item => item._id === conversation._id ? { ...item, ...conversation } : item)
+          : [conversation, ...current]);
       }
     } catch {
-      setMessages([]);
+      if (activeIdRef.current === activeId) setVoiceError("Could not refresh messages. Please try again.");
     } finally {
-      setLoadingMessages(false);
+      if (activeIdRef.current === activeId) setLoadingMessages(false);
     }
   }, [activeId]);
 
@@ -360,8 +380,13 @@ const MessagesPage = () => {
     setTyping(false);
     nearBottomRef.current = true;
     try {
-      const { data } = await axiosClient.post<{ message: ChatMessage }>(`/messages/${activeId}`, { message });
-      if (data.message) setMessages((current) => [...current, data.message]);
+      const { data } = await axiosClient.post<{ message: ChatMessage }>(`/messages/${activeId}`, { message, productId: pendingProductId });
+      clearProductContext();
+      if (data.message) {
+        const next = [...(messageCache.current.get(activeId) || []), data.message];
+        messageCache.current.set(activeId, next);
+        setMessages(next);
+      }
       await Promise.all([loadMessages(), loadConversations()]);
     } catch {
       setText(message);
@@ -630,6 +655,7 @@ const MessagesPage = () => {
     try {
       const attachmentUrl = await uploadImage(pendingPhoto.dataUrl, "message-photos");
       await axiosClient.post(`/messages/${activeId}`, {
+        productId: pendingProductId,
         messageType: "image",
         message: pendingPhotoCaption.trim(),
         attachmentUrl,
@@ -637,6 +663,7 @@ const MessagesPage = () => {
         attachmentMimeType: pendingPhoto.file.type,
         attachmentSize: pendingPhoto.file.size,
       });
+      clearProductContext();
       clearPendingPhoto();
       await Promise.all([loadMessages(), loadConversations()]);
     } catch (err) {
@@ -751,11 +778,13 @@ const MessagesPage = () => {
     try {
       const audioDataUrl = await blobToDataUrl(voicePreview.blob);
       await axiosClient.post(`/messages/${activeId}`, {
+        productId: pendingProductId,
         messageType: "voice",
         audioDataUrl,
         audioMimeType: voicePreview.mimeType,
         audioDurationSeconds: voicePreview.durationSeconds,
       });
+      clearProductContext();
       clearVoicePreview();
       nearBottomRef.current = true;
       await Promise.all([loadMessages(), loadConversations()]);
@@ -779,12 +808,14 @@ const MessagesPage = () => {
       }
       const attachmentDataUrl = await blobToDataUrl(file);
       await axiosClient.post(`/messages/${activeId}`, {
+        productId: pendingProductId,
         messageType,
         attachmentDataUrl,
         attachmentName: file.name,
         attachmentMimeType: file.type || "application/octet-stream",
         attachmentSize: file.size,
       });
+      clearProductContext();
       await Promise.all([loadMessages(), loadConversations()]);
     } catch (err) {
       setVoiceError(err instanceof Error ? err.message : "Attachment could not be sent. Try a smaller file.");
@@ -889,18 +920,18 @@ const MessagesPage = () => {
                   </div>
                 </header>
                 <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
-                  <div className="chat-product-mobile">
+                  <div className="chat-product-mobile" hidden={!pendingProductId}>
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
                     <div>
                       <strong>{active.productTitle}</strong>
                       <span>Marketplace product</span>
                     </div>
                   </div>
-                  {loadingMessages ? (
+                  {(loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
                     <PrivateSkeleton variant="chat" count={6} />
                   ) : (
                     <>
-                      {messages.map((item) => (
+                      {visibleMessages.map((item) => (
                         <article
                           className={`${item.senderId === user?.uid ? "mine" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
@@ -911,7 +942,7 @@ const MessagesPage = () => {
                           onTouchCancel={clearLongPressTimer}
                           onTouchEnd={(event) => handleMessageTouchEnd(item, event)}
                         >
-                          {!item.deletedForEveryone && item.productId && item.productTitle ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
+                          {!item.deletedForEveryone && item.productContextExplicit && item.productId && item.productTitle ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
                             {item.productImage ? <img src={item.productImage} alt="" /> : <ImageOutlinedIcon />}
                             <span><small>About this product</small><strong>{item.productTitle}</strong></span>
                           </Link> : null}
@@ -1047,18 +1078,18 @@ const MessagesPage = () => {
                   </div>
                 </header>
                 <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
-                  <div className="chat-product-mobile">
+                  <div className="chat-product-mobile" hidden={!pendingProductId}>
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
                     <div>
                       <strong>{active.productTitle}</strong>
                       <span>Marketplace product</span>
                     </div>
                   </div>
-                  {loadingMessages ? (
+                  {(loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
                     <PrivateSkeleton variant="chat" count={6} />
                   ) : (
                     <>
-                      {messages.map((item) => (
+                      {visibleMessages.map((item) => (
                         <article
                           className={`${item.senderId === user?.uid ? "mine" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
@@ -1069,7 +1100,7 @@ const MessagesPage = () => {
                           onTouchCancel={clearLongPressTimer}
                           onTouchEnd={(event) => handleMessageTouchEnd(item, event)}
                         >
-                          {!item.deletedForEveryone && item.productId && item.productTitle ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
+                          {!item.deletedForEveryone && item.productContextExplicit && item.productId && item.productTitle ? <Link className="chat-message-product" to={`/product/${item.productId}`}>
                             {item.productImage ? <img src={item.productImage} alt="" /> : <ImageOutlinedIcon />}
                             <span><small>About this product</small><strong>{item.productTitle}</strong></span>
                           </Link> : null}
