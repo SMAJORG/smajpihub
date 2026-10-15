@@ -113,12 +113,14 @@ const NotificationsPage = () => {
         </button>
       </section>
 
-      <nav className="notification-tabs">
-        {tabs.map((item) => (
-          <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item}>
-            {item}
-          </button>
-        ))}
+      <nav className="notification-tabs" aria-label="Notification categories">
+        {tabs.map((item) => {
+          const unread = items.filter(entry => !entry.read && (item === "All" || category(entry.type) === item)).length;
+          return <button className={tab === item ? "active" : ""} aria-pressed={tab === item} onClick={() => setTab(item)} key={item}>
+            <span>{item}</span>
+            {unread > 0 ? <span className="notification-tab-count" aria-label={`${unread} unread`}>{unread}</span> : null}
+          </button>;
+        })}
       </nav>
 
       <section className="notification-list rich">

@@ -22553,3 +22553,31 @@ svg {
 .chat-panel .private-skeleton-chat-row .chat-bubble { width: 100%; height: 56px; background: color-mix(in srgb, var(--smaj-text-secondary, #94a3b8) 16%, var(--smaj-card, #fff)); }
 
 .chat-panel .private-skeleton-chat-row { padding: 0; background: transparent; border: 0; box-shadow: none; }
+
+/* Compact notification tabs and floating mobile conversation controls. */
+.notification-tab-count { min-width: 20px; height: 20px; padding: 0 5px; display: inline-grid; place-items: center; border-radius: 999px; background: var(--smaj-secondary-bg); font-size: 11px; line-height: 1; font-weight: 700; }
+@media (max-width: 1023px) {
+  .notifications-page > .private-page-head { min-height: 0; padding: 12px 14px; gap: 10px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .notifications-page > .private-page-head h1 { margin: 0; font-size: clamp(22px, 6vw, 28px); }
+  .notifications-page > .private-page-head .private-kicker { display: none; }
+  .notifications-page > .private-page-head > button { min-height: 36px; padding: 7px 10px; font-size: 12px; white-space: nowrap; }
+  .notifications-page .notification-tabs { gap: 4px; margin: 0 10px 10px; padding: 5px; align-items: center; background: var(--smaj-card); border: 1px solid var(--smaj-border); border-radius: 999px; box-shadow: 0 2px 6px rgb(15 23 42 / .05); scrollbar-width: none; }
+  .notifications-page .notification-tabs::-webkit-scrollbar { display: none; }
+  .notifications-page .notification-tabs > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: 0 0 auto; min-height: 36px; padding: 7px 12px; border: 0; background: transparent; color: var(--smaj-text-secondary); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .notifications-page .notification-tabs > button.active { color: var(--smaj-primary); background: var(--smaj-secondary-bg); }
+  .notifications-page .notification-tabs > button.active .notification-tab-count { color: #fff; background: var(--smaj-primary); }
+  .chat-panel-fullscreen { background: var(--smaj-secondary-bg); }
+  .chat-panel-fullscreen > header { gap: 7px; padding: 8px; border: 0; background: transparent; }
+  .chat-panel-fullscreen .chat-mobile-back { flex-basis: 44px; width: 44px; height: 52px; border-radius: 999px; background: var(--smaj-card); }
+  .chat-panel-fullscreen .chat-person { min-height: 52px; padding: 4px 10px 4px 4px; gap: 8px; border-radius: 999px; background: var(--smaj-card); }
+  .chat-panel-fullscreen .chat-person > div { flex: 1; overflow: hidden; }
+  .chat-panel-fullscreen .chat-person strong { font-size: 15px; line-height: 1.25; }
+  .chat-panel-fullscreen .chat-person small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .chat-panel-fullscreen .chat-header-actions { flex-shrink: 0; align-items: center; min-height: 52px; padding: 4px; gap: 0; border-radius: 999px; background: var(--smaj-card); }
+  .chat-panel-fullscreen .chat-header-actions > button { flex-basis: 32px; width: 32px; height: 40px; }
+  .chat-panel-fullscreen .chat-messages { padding-top: 8px; }
+  .chat-panel-fullscreen > form { box-sizing: border-box; width: calc(100% - 16px); margin: 0 8px max(8px, env(safe-area-inset-bottom, 0px)); padding: 5px 6px; min-height: 54px; align-items: center; gap: 4px; border: 1px solid var(--smaj-border); border-radius: 999px; background: var(--smaj-card); box-shadow: 0 2px 8px rgb(15 23 42 / .06); }
+  .chat-panel-fullscreen > form input:not([type="file"]) { min-width: 0; padding: 8px 4px; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-size: 16px; }
+  .chat-panel-fullscreen > form > button { flex: 0 0 36px; width: 36px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--smaj-text-secondary); }
+  .chat-panel-fullscreen > form > .chat-send-button { flex-basis: 42px; width: 42px; height: 42px; background: var(--smaj-primary); color: #fff; }
+}
