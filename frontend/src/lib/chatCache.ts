@@ -37,3 +37,9 @@ export function chatLink(recipient: { uid: string; displayName?: string; avatar?
   if (product) { query.set("product", product._id); query.set("title", product.title || ""); query.set("image", product.image || ""); }
   return "/messages?" + query;
 }
+
+export function savedChatHistory(uid: string | undefined, id: string, memory: Map<string, ChatMessage[]>) {
+  const saved = memory.get(id) ?? readChatCache<ChatMessage[] | null>(uid, id, null);
+  if (saved) memory.set(id, saved);
+  return saved;
+}

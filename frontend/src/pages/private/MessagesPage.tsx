@@ -1,5 +1,6 @@
+import { warmChatHistory } from "../../lib/chatWarmup";
 import { fetchChatHistory } from "../../lib/chatHistory";
-import { readChatCache, writeChatCache, mergeChatMessages } from "../../lib/chatCache";
+import { readChatCache, writeChatCache, mergeChatMessages, savedChatHistory } from "../../lib/chatCache";
 import { ensureVoicePermission, voiceRecordingError } from "../../lib/voiceRecording";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
@@ -141,6 +142,7 @@ const MessagesPageContent = () => {
   const [deletingConversations, setDeletingConversations] = useState(false);
   const [conversationActionError, setConversationActionError] = useState("");
   const chatMessagesRef = useRef<HTMLDivElement>(null);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const nearBottomRef = useRef(true);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -227,6 +229,42 @@ const MessagesPageContent = () => {
   };
   const active = useMemo(() => conversations.find((item) => item._id === activeId) || (selectedId ? readChatCache<RichConversation | null>(user?.uid, "conversation:" + selectedId, null) : null) || (recipientId ? { _id: "draft:" + recipientId, buyerId: user?.uid || "", sellerId: recipientId, participantId: recipientId, participantName: params.get("name") || "SMAJ user", profileImage: params.get("avatar") || "", productId: pendingProductId || "", productTitle: params.get("title") || "", productImage: params.get("image") || "", updatedAt: "" } : undefined), [activeId, conversations, params, pendingProductId, recipientId, selectedId, user?.uid]);
   const activeUpdatedAt = active?.updatedAt;
+  const warmIds = conversations.filter(item => !item.archived).slice(0, 12).map(item => item._id).join(",");
+  useEffect(() => {
+    if (!user?.uid || !navigator.onLine) return;
+    const controller = new AbortController();
+    void warmChatHistory(warmIds.split(",").filter(Boolean), {
+      read: id => savedChatHistory(user.uid, id, messageCache.current),
+      fetch: async id => {
+        const { data } = await axiosClient.get<{ messages: ChatMessage[] }>("/messages/" + id, { params: { preview: "true" }, signal: controller.signal, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user.uid } });
+        return data.messages;
+      },
+      save: (id, history) => {
+        messageCache.current.set(id, history);
+        writeChatCache(user.uid, id, history.slice(-100));
+        if (activeIdRef.current === id) { setMessages(history); setLoadedMessageId(id); }
+      },
+      current: () => alive.current && !controller.signal.aborted,
+    });
+    return () => controller.abort();
+  }, [warmIds, user?.uid]);
+
+  useEffect(() => {
+    const panel = chatPanelRef.current;
+    if (!panel) return;
+    const header = panel.querySelector(":scope > header");
+    const composer = panel.querySelector(":scope > form, :scope > .voice-note-composer");
+    const update = () => {
+      panel.style.setProperty("--chat-header-height", (header?.getBoundingClientRect().height || 76) + "px");
+      panel.style.setProperty("--chat-composer-height", (composer?.getBoundingClientRect().height || 60) + "px");
+    };
+    update();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    if (header) observer?.observe(header);
+    if (composer) observer?.observe(composer);
+    window.addEventListener("resize", update);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", update); };
+  }, [chatFullscreen, activeId, recording, voicePreview]);
   const selectedMessages = useMemo(
     () => messages.filter((item) => selectedMessageIds.has(item._id) && !item.deletedForEveryone),
     [messages, selectedMessageIds]
@@ -333,7 +371,7 @@ const MessagesPageContent = () => {
       setConversations(current => [conversation, ...current.filter(item => item._id !== conversation._id)]);
       if (!conversation._id.startsWith("draft:")) {
         const draftId = "draft:" + recipientId;
-        const history = mergeChatMessages(messageCache.current.get(conversation._id) || [], messageCache.current.get(draftId) || []);
+        const history = mergeChatMessages(savedChatHistory(user?.uid, conversation._id, messageCache.current) || [], savedChatHistory(user?.uid, draftId, messageCache.current) || []);
         messageCache.current.set(conversation._id, history);
         writeChatCache(user?.uid, conversation._id, history.slice(-100));
         outbox.current.forEach(item => { if (item.chatId === draftId) { item.chatId = conversation._id; delete item.recipient; } });
@@ -385,7 +423,7 @@ const MessagesPageContent = () => {
         if (!alive.current) break;
         try {
           const endpoint = entry.recipient ? "/messages/direct/" + encodeURIComponent(entry.recipient) : "/messages/" + entry.chatId;
-          const { data } = await axiosClient.post<{ message: ChatMessage; conversation: RichConversation }>(endpoint, { ...entry.payload, clientMessageId: entry.id }, { headers: { "X-SMAJ-Silent": "true" } });
+          const { data } = await axiosClient.post<{ message: ChatMessage; conversation: RichConversation }>(endpoint, { ...entry.payload, clientMessageId: entry.id }, { headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user.uid } });
           if (!alive.current) break;
           const id = data.message.conversationId;
           const history = mergeChatMessages(mergeChatMessages(messageCache.current.get(id) || [], messageCache.current.get(entry.chatId) || []), [data.message]);
@@ -1085,7 +1123,7 @@ const MessagesPageContent = () => {
           {selectedConversations.length ? <div className="conversation-selection-sheet" role="dialog" aria-modal="true" aria-label="Selected chats"><strong>{selectedConversations.length} selected</strong><button type="button" disabled={deletingConversations} onClick={() => void archiveSelectedConversations(inboxFilter !== "archived")}>{inboxFilter === "archived" ? "Unarchive" : "Archive"}</button><button type="button" className="conversation-delete-button" disabled={deletingConversations} onClick={() => void deleteSelectedConversations()}>{deletingConversations ? "Deleting…" : "Delete"}</button><button type="button" disabled={deletingConversations} onClick={() => { setSelectedConversationIds(new Set()); setConversationActionError(""); }}>Cancel</button>{conversationActionError ? <span className="conversation-selection-error" role="alert">{conversationActionError}</span> : null}</div> : null}
         </aside>
         {chatFullscreen && active ? createPortal(
-          <div className="chat-panel chat-panel-fullscreen" role="dialog" aria-modal="true" aria-label="Chat">
+          <div ref={chatPanelRef} className="chat-panel chat-panel-fullscreen" role="dialog" aria-modal="true" aria-label="Chat">
             {active ? (
               <>
                 <header>

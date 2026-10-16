@@ -239,7 +239,7 @@ export default function mountMessageEndpoints(router: Router) {
     const records = await req.app.locals.messageCollection.find({ conversationId: req.params.id, hiddenFor: { $ne: uid }, ...(before ? { _id: { $lt: new ObjectId(before) } } : {}) }).sort({ _id: -1 }).limit(limit + 1).toArray();
     const hasMore = records.length > limit;
     const messages = records.slice(0, limit).reverse();
-    if (!before) {
+    if (!before && req.query.preview !== "true") {
       const readAt = new Date();
       await req.app.locals.messageCollection.updateMany({ conversationId: req.params.id, senderId: { $ne: uid }, hiddenFor: { $ne: uid }, readAt: { $exists: false } }, { $set: { readAt } });
       await req.app.locals.conversationCollection.updateOne({ _id: conversation._id, unreadBy: uid }, { $pull: { unreadBy: uid }, $set: { readUpdatedAt: readAt } });

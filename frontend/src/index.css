@@ -22674,9 +22674,13 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .chat-video-message figcaption, .chat-video-message > a { display: block; padding-top: 6px; font-size: 13px; color: inherit; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .chat-gallery-sheet { transition: none; } .chat-gallery-skeleton { animation: none; } }
 
-.chat-panel.chat-panel-fullscreen > header { background: var(--smaj-card); }
-.chat-panel.chat-panel-fullscreen > form { width: 100%; margin: 0; padding: 8px 12px max(8px, env(safe-area-inset-bottom, 0px)); border: 0; border-radius: 0; background: var(--smaj-card); box-shadow: none; }
-.chat-panel-fullscreen .voice-note-composer { margin: 0; border-radius: 0; background: var(--smaj-card); }
 .chat-history-more { display: block; margin: 8px auto; padding: 8px 16px; border-radius: 20px; background: var(--smaj-card); color: var(--smaj-primary); }
 
 .chat-connection-status { flex-shrink: 0; padding: 5px 12px; text-align: center; font-size: 12px; color: var(--smaj-text-secondary); background: var(--smaj-card); }
+
+/* History scrolls beneath floating controls; the wallpaper stays on the panel. */
+.chat-panel.chat-panel-fullscreen > header { position: relative; z-index: 12; flex-direction: row; background: transparent; }
+.chat-panel.chat-panel-fullscreen .chat-messages { position: absolute; inset: 0; mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--chat-header-height, 76px) - 8px), #000 calc(var(--chat-header-height, 76px) + 8px), #000 calc(100% - var(--chat-composer-height, 60px) - 24px), transparent calc(100% - var(--chat-composer-height, 60px) - 8px), transparent 100%); padding-top: calc(var(--chat-header-height, 76px) + 12px); padding-bottom: calc(var(--chat-composer-height, 60px) + 24px + env(safe-area-inset-bottom, 0px)); scroll-padding-top: var(--chat-header-height, 76px); scroll-padding-bottom: calc(var(--chat-composer-height, 60px) + 24px); }
+.chat-panel.chat-panel-fullscreen > form, .chat-panel-fullscreen > .voice-note-composer { position: relative; z-index: 12; margin-top: auto; }
+.chat-panel-fullscreen .chat-connection-status { position: absolute; top: var(--chat-header-height, 76px); left: 12px; right: 12px; z-index: 13; border-radius: 14px; }
+.chat-panel-fullscreen .chat-scroll-bottom { bottom: calc(var(--chat-composer-height, 60px) + 24px + env(safe-area-inset-bottom, 0px)); }
