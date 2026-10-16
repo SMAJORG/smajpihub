@@ -165,7 +165,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       ? savedRoute
       : "";
   });
-  const isConversationOpen = location.pathname === "/messages" && Boolean(new URLSearchParams(location.search).get("conversation"));
+  const isConversationOpen = location.pathname === "/messages" && Boolean(new URLSearchParams(location.search).get("conversation") || new URLSearchParams(location.search).get("recipient"));
   const isStoreShell = location.pathname === "/store";
   const isHeaderHiddenPage = location.pathname === "/settings/preferences" || location.pathname === "/app/services" || location.pathname === "/search" || location.pathname === "/messages";
   const dashboardTab = new URLSearchParams(location.search).get("tab");

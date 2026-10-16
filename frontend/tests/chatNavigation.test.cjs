@@ -1,0 +1,34 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const ts=require('typescript');
+const React=require('react');
+const {renderToString}=require('react-dom/server');
+const storage=new Map();
+const localStorage={getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)};
+function compile(path,modules,extra={}) {
+ const exports={};const code=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+ vm.runInNewContext(code,{exports,require:name=>modules[name],localStorage,document:{body:{}},navigator:{onLine:true},Date,Map,Set,URLSearchParams,console,...extra});return exports;
+}
+const cache=compile('frontend/src/lib/chatCache.ts',{});
+const history=compile('frontend/src/lib/chatHistory.ts',{});
+function render(query,uid='alice') {
+ let requests=0;
+ const modules={react:React,'react/jsx-runtime':require('react/jsx-runtime'),'react-dom':{createPortal:children=>children},'react-router-dom':{useSearchParams:()=>[new URLSearchParams(query),()=>{}],Link:({children,...props})=>React.createElement('a',props,children)},axios:{isAxiosError:()=>false},'../../contexts/AuthContext':{useAuthContext:()=>({user:{uid}})},'../../lib/chatCache':cache,'../../lib/axiosClient':{axiosClient:{get:()=>{requests++;return new Promise(()=>{});}}}};
+ const empty=()=>null;
+ const page=compile('frontend/src/pages/private/MessagesPage.tsx',new Proxy(modules,{get:(items,key)=>key in items?items[key]:{default:empty}}));
+ const html=renderToString(React.createElement(page.default));return{html,requests};
+}
+test.beforeEach(()=>storage.clear());
+test('new profile chat renders recipient and composer without conversation creation or network',()=>{const result=render('recipient=bob&name=Bob');assert.match(result.html,/Bob/);assert.match(result.html,/Message.../);assert.doesNotMatch(result.html,/chat-message-skeleton/);assert.equal(result.requests,0);});
+test('existing recipient chat renders cached history immediately even with an unresolved network',()=>{cache.writeChatCache('alice','inbox',[{_id:'existing',buyerId:'alice',sellerId:'bob',participantId:'bob',participantName:'Bob',updatedAt:'',productId:'',productTitle:''}]);cache.writeChatCache('alice','existing',[{_id:'message1',conversationId:'existing',senderId:'bob',message:'Saved history appears instantly',createdAt:new Date().toISOString()}]);const result=render('recipient=bob&name=Bob');assert.match(result.html,/Saved history appears instantly/);assert.equal(result.requests,0);});
+test('refresh restores the saved conversation profile and history',()=>{cache.writeChatCache('alice','conversation:thread',{_id:'thread',buyerId:'alice',sellerId:'bob',participantName:'Bob',updatedAt:'',productId:'',productTitle:''});cache.writeChatCache('alice','thread',[{_id:'m',conversationId:'thread',senderId:'bob',message:'Restored on refresh',createdAt:new Date().toISOString()}]);assert.match(render('conversation=thread').html,/Restored on refresh/);});
+test('switching accounts cannot display another accounts history or queued sends',()=>{cache.writeChatCache('alice','thread',[{_id:'secret',message:'Alice private message'}]);cache.writeChatCache('alice','outbox',[{id:'private-send'}]);assert.deepEqual(cache.readChatCache('bob','outbox',[]),[]);const result=render('conversation=thread','bob');assert.doesNotMatch(result.html,/Alice private message/);});
+test('optimistic acknowledgement reconciles by client identifier, including retries',()=>{const pending={_id:'local',clientMessageId:'send-1234',senderId:'alice',conversationId:'draft:bob',message:'Hello',createdAt:'2026-10-16T00:00:00Z',deliveryState:'pending'};const received={...pending,_id:'server',conversationId:'actual',deliveryState:undefined};const once=cache.mergeChatMessages([pending],[received]);const twice=cache.mergeChatMessages(once,[received]);assert.equal(twice.length,1);assert.equal(twice[0]._id,'server');assert.equal(twice[0].deliveryState,undefined);});
+test('offline queue and optimistic history survive a page reload within the same account',()=>{cache.writeChatCache('alice','outbox',[{id:'send-1234',chatId:'thread',payload:{message:'Offline draft'}}]);cache.writeChatCache('alice','thread',[{_id:'local',message:'Offline draft',deliveryState:'pending'}]);assert.equal(cache.readChatCache('alice','outbox',[])[0].payload.message,'Offline draft');assert.equal(cache.readChatCache('alice','thread',[])[0].deliveryState,'pending');});
+test('normal profile links omit product context; product enquiries explicitly include it',()=>{assert.equal(new URLSearchParams(cache.chatLink({uid:'bob',displayName:'Bob'}).split('?')[1]).has('product'),false);assert.equal(new URLSearchParams(cache.chatLink({uid:'bob'},{_id:'product',title:'Item'}).split('?')[1]).get('product'),'product');});
+
+test('reconnect fills a history gap spanning multiple pages without dropping cached messages',async()=>{const pages={recent:{messages:[{_id:'08'},{_id:'09'}],nextCursor:'08'},'08':{messages:[{_id:'06'},{_id:'07'}],nextCursor:'06'},'06':{messages:[{_id:'04'},{_id:'05'}],nextCursor:'04'}};const fetched=[];const result=await history.fetchChatHistory(async before=>{fetched.push(before);return structuredClone(pages[before||'recent']);},'05',()=>true);assert.equal(result.messages.length,6);assert.deepEqual(fetched,[undefined,'08','06']);});
+test('a slow response is discarded after switching chats or accounts',async()=>{let resolve;let current=true;const task=history.fetchChatHistory(()=>new Promise(done=>{resolve=done;}),undefined,()=>current);current=false;resolve({messages:[{_id:'private'}]});assert.equal(await task,null);});
+test('new history loads only a single bounded page without a cache',async()=>{let requests=0;await history.fetchChatHistory(async()=>{requests++;return{messages:[{_id:'50'}],nextCursor:'50'};},undefined,()=>true);assert.equal(requests,1);});

@@ -1,3 +1,4 @@
+import { chatLink } from "../../lib/chatCache";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
@@ -67,8 +68,8 @@ const OrdersPage = () => {
   };
 
   const messageSeller = async (productId: string) => {
-    const { data } = await axiosClient.post("/messages/start", { productId });
-    navigate(`/messages?conversation=${data.conversation._id}`);
+    const order = orders.find(item => item.productId === productId);
+    if (order) navigate(chatLink({ uid: order.sellerId, displayName: order.sellerName }));
   };
 
   const submitReview = async () => {

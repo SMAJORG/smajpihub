@@ -30,8 +30,11 @@ const pairKeyFor = (firstId: string, secondId: string) => [firstId, secondId].so
 const mergePairConversations = async (req: any, conversations: Array<Record<string, any>>): Promise<Record<string, any> | null> => {
   if (!conversations.length) return null;
   const sorted = [...conversations].sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+  const canonical = sorted.find(item => item.pairKey);
+  if (canonical && sorted[0] !== canonical) { sorted.splice(sorted.indexOf(canonical), 1); sorted.unshift(canonical); }
   const primary = sorted[0];
   const duplicates = sorted.slice(1);
+  if (!duplicates.length && primary.pairKey) return primary;
   const pairKey = primary.contextType === "jobs" && primary.pairKey
     ? primary.pairKey
     : pairKeyFor(primary.buyerId, primary.sellerId);
@@ -46,9 +49,6 @@ const mergePairConversations = async (req: any, conversations: Array<Record<stri
         { conversationId },
         { $set: {
           conversationId: primary._id.toString(),
-          productId: conversation.productId || "",
-          productTitle: conversation.productTitle || "",
-          productImage: conversation.productImage || "",
         } },
       );
     }
@@ -92,10 +92,62 @@ const enrichConversations = async (req: any, currentUser: Record<string, any>, c
   });
 };
 
+const directConversation = async (req: any, user: any, recipientId: string, create: boolean) => {
+  if (!recipientId || recipientId === user.uid) return null;
+  const recipient = await req.app.locals.userCollection.findOne({ uid: recipientId });
+  if (!recipient) return null;
+  const pairKey = pairKeyFor(user.uid, recipientId);
+  const matches = await req.app.locals.conversationCollection.find({ contextType: { $ne: "jobs" }, $or: [{ pairKey }, { buyerId: user.uid, sellerId: recipientId }, { buyerId: recipientId, sellerId: user.uid }] }).toArray();
+  let conversation = await mergePairConversations(req, matches);
+  if (!conversation && create) {
+    const document = { pairKey, buyerId: user.uid, buyerName: user.displayName || user.username, sellerId: recipientId, sellerName: recipient.displayName || recipient.username, participants: [user.uid, recipientId], lastMessage: "", unreadBy: [], createdAt: new Date(), updatedAt: new Date() };
+    try {
+      await req.app.locals.conversationCollection.updateOne({ pairKey }, { $setOnInsert: document }, { upsert: true });
+    } catch (error: any) { if (error?.code !== 11000) throw error; }
+    conversation = await req.app.locals.conversationCollection.findOne({ pairKey, participants: user.uid });
+  }
+  return conversation || { _id: "draft:" + recipientId, buyerId: user.uid, sellerId: recipientId, sellerName: recipient.displayName || recipient.username, participants: [user.uid, recipientId], updatedAt: new Date() };
+};
+
 export default function mountMessageEndpoints(router: Router) {
+  router.use(async (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    const owner = req.get("X-SMAJ-Chat-Owner");
+    if (owner) {
+      const user = await resolveCurrentUser(req);
+      if (!user || user.uid !== owner) return res.status(401).json({ error: "account_changed" });
+    }
+    next();
+  });
+  // Authenticated long polling works with Pi/native bearer headers and cookie sessions.
+  // The database signature also observes changes made by other server instances.
+  router.get("/sync", async (req, res) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    res.setHeader("Cache-Control", "no-store");
+    let closed = false;
+    res.on("close", () => { closed = true; });
+    const deadline = Date.now() + 24000;
+    while (!closed) {
+      const records = await req.app.locals.conversationCollection.find({ participants: user.uid, deletedBy: { $ne: user.uid }, contextType: { $ne: "jobs" } }).sort({ updatedAt: -1 }).toArray();
+      const conversations = await enrichConversations(req, user, records);
+      const { createHash } = await import("crypto");
+      const cursor = createHash("sha256").update(JSON.stringify(conversations)).digest("hex");
+      if (cursor !== req.query.cursor || Date.now() >= deadline) return res.json({ cursor, conversations });
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  });
+  router.get("/direct/:recipientId", async (req, res) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const conversation = await directConversation(req, user, req.params.recipientId, false);
+    if (!conversation) return res.status(404).json({ message: "Recipient not found" });
+    const [enriched] = await enrichConversations(req, user, [conversation]);
+    return res.json({ conversation: enriched });
+  });
   router.get("/", async (req, res) => {
     const currentUser = await resolveCurrentUser(req);
-    if (!currentUser) return res.status(200).json({ conversations: [] });
+    if (!currentUser) return res.status(401).json({ error: "unauthorized" });
     const uid = currentUser.uid;
     const contextType = req.query.context === "jobs" ? "jobs" : "marketplace";
     const conversations = await req.app.locals.conversationCollection.find({
@@ -171,7 +223,7 @@ export default function mountMessageEndpoints(router: Router) {
   router.get("/:id", async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid conversation id" });
     const currentUser = await resolveCurrentUser(req);
-    if (!currentUser) return res.status(200).json({ conversation: null, messages: [] });
+    if (!currentUser) return res.status(401).json({ error: "unauthorized" });
     const uid = currentUser.uid;
     const conversation = await req.app.locals.conversationCollection.findOne({ _id: new ObjectId(req.params.id), participants: uid, deletedBy: { $ne: uid } });
     if (!conversation) return res.status(404).json({ error: "not_found", message: "Conversation not found" });
@@ -181,12 +233,20 @@ export default function mountMessageEndpoints(router: Router) {
       if (!conversation.lastMessage && conversation.sellerId !== uid)
         return res.status(403).json({ error: "employer_message_required", message: "The employer must send the first Jobs message." });
     }
-    await req.app.locals.messageCollection.updateMany({ conversationId: req.params.id, senderId: { $ne: uid }, readAt: { $exists: false } }, { $set: { readAt: new Date() } });
-    const messages = (await req.app.locals.messageCollection.find({ conversationId: req.params.id }).sort({ createdAt: 1 }).toArray())
-      .filter((message: Record<string, any>) => !Array.isArray(message.hiddenFor) || !message.hiddenFor.includes(uid));
-    await req.app.locals.conversationCollection.updateOne({ _id: conversation._id }, { $pull: { unreadBy: uid } });
+    const before = String(req.query.before || "");
+    if (before && !ObjectId.isValid(before)) return res.status(400).json({ message: "Invalid history cursor" });
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
+    const records = await req.app.locals.messageCollection.find({ conversationId: req.params.id, hiddenFor: { $ne: uid }, ...(before ? { _id: { $lt: new ObjectId(before) } } : {}) }).sort({ _id: -1 }).limit(limit + 1).toArray();
+    const hasMore = records.length > limit;
+    const messages = records.slice(0, limit).reverse();
+    if (!before) {
+      const readAt = new Date();
+      await req.app.locals.messageCollection.updateMany({ conversationId: req.params.id, senderId: { $ne: uid }, hiddenFor: { $ne: uid }, readAt: { $exists: false } }, { $set: { readAt } });
+      await req.app.locals.conversationCollection.updateOne({ _id: conversation._id, unreadBy: uid }, { $pull: { unreadBy: uid }, $set: { readUpdatedAt: readAt } });
+    }
     const [enrichedConversation] = await enrichConversations(req, currentUser, [conversation]);
-    return res.status(200).json({ conversation: enrichedConversation, messages: messages.map(serialize) });
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({ conversation: enrichedConversation, messages: messages.map(serialize), hasMore, nextCursor: hasMore ? messages[0]?._id.toString() : null });
   });
 
   router.post("/:id/typing", async (req, res) => {
@@ -231,13 +291,13 @@ export default function mountMessageEndpoints(router: Router) {
     return res.status(200).json({ deleted: true, conversationId: req.params.id });
   });
 
-  router.post("/:id", async (req, res) => {
-    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid conversation id" });
+  router.post(["/direct/:recipientId", "/:id"], async (req, res) => {
+    if (!req.params.recipientId && !ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid conversation id" });
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ error: "unauthorized", message: "User needs to sign in first" });
-    const conversation = await req.app.locals.conversationCollection.findOne({ _id: new ObjectId(req.params.id), participants: user.uid });
-    if (!conversation) return res.status(404).json({ error: "not_found", message: "Conversation not found" });
-    if (conversation.contextType === "jobs" && !conversation.lastMessage && conversation.sellerId !== user.uid)
+    let conversation = req.params.recipientId ? null : await req.app.locals.conversationCollection.findOne({ _id: new ObjectId(req.params.id), participants: user.uid });
+    if (!conversation && !req.params.recipientId) return res.status(404).json({ error: "not_found", message: "Conversation not found" });
+    if (conversation?.contextType === "jobs" && !conversation.lastMessage && conversation.sellerId !== user.uid)
       return res.status(403).json({ error: "employer_message_required", message: "The employer must send the first Jobs message." });
     const message = String(req.body?.message || "").trim();
     const requestedType = String(req.body?.messageType || "text");
@@ -262,6 +322,13 @@ export default function mountMessageEndpoints(router: Router) {
     if (messageType === "document" && (!documentDataPattern.test(attachmentDataUrl) || attachmentDataUrl.length > MAX_MESSAGE_DOCUMENT_BYTES)) {
       return res.status(400).json({ error: "bad_request", message: "Document must be a valid file under 3.5MB." });
     }
+    if (req.params.recipientId) {
+      conversation = await directConversation(req, user, req.params.recipientId, false);
+      if (!conversation) return res.status(404).json({ message: "Recipient not found" });
+      req.params.id = conversation._id.toString();
+    }
+    const clientMessageId = String(req.body?.clientMessageId || "");
+    if (clientMessageId && !/^[a-zA-Z0-9_-]{8,100}$/.test(clientMessageId)) return res.status(400).json({ message: "Invalid send identifier" });
     const receiverId = conversation.buyerId === user.uid ? conversation.sellerId : conversation.buyerId;
     const imageCaption = messageType === "image" && message ? message.slice(0, 1000) : "";
     const displayMessage = messageType === "voice" ? `Voice message (${Math.floor(audioDurationSeconds / 60)}:${String(audioDurationSeconds % 60).padStart(2, "0")})` : messageType === "image" ? imageCaption || "Photo" : messageType === "document" ? (attachmentMimeType.startsWith("video/") ? message.slice(0, 1000) || "Video" : `Document: ${attachmentName}`) : message;
@@ -275,8 +342,19 @@ export default function mountMessageEndpoints(router: Router) {
       if (!product || product.sellerId !== otherParticipant || conversation.contextType === "jobs") return res.status(400).json({ message: "Product does not belong to this conversation's seller." });
       productContext = { productContextExplicit: true, productId: enquiryProductId, productTitle: product.title, productImage: product.image };
     }
+    if (req.params.recipientId && typeof conversation._id === "string") {
+      conversation = await directConversation(req, user, req.params.recipientId, true);
+      if (!conversation || typeof conversation._id === "string") return res.status(404).json({ message: "Recipient not found" });
+      req.params.id = conversation._id.toString();
+    }
+    const previous = clientMessageId ? await req.app.locals.messageCollection.findOne({ conversationId: req.params.id, senderId: user.uid, clientMessageId }) : null;
+    if (previous) {
+      await req.app.locals.conversationCollection.updateOne({ _id: conversation._id, lastMessageId: { $exists: false } }, { $set: { lastMessage: previous.message, lastMessageId: previous._id.toString(), updatedAt: previous.createdAt }, $addToSet: { unreadBy: receiverId }, $pull: { deletedBy: receiverId } });
+      return res.json({ message: serialize(previous), conversation: (await enrichConversations(req, user, [conversation]))[0] });
+    }
     const document = {
       conversationId: req.params.id,
+      ...(clientMessageId ? { clientMessageId } : {}),
       ...productContext,
       senderId: user.uid,
       senderName: user.displayName || user.username,
@@ -287,10 +365,17 @@ export default function mountMessageEndpoints(router: Router) {
       ...(messageType === "document" ? { attachmentDataUrl, attachmentName, attachmentMimeType, attachmentSize } : {}),
       createdAt: new Date(),
     };
-    const result = await req.app.locals.messageCollection.insertOne(document);
-    await req.app.locals.conversationCollection.updateOne({ _id: conversation._id }, { $set: { lastMessage: document.message, lastMessageId: result.insertedId.toString(), updatedAt: new Date() }, $addToSet: { unreadBy: receiverId }, $pull: { deletedBy: receiverId } });
-    await createNotification(req.app, { userId: receiverId, type: "new_message", title: "New message", message: `${document.senderName}: ${document.message.slice(0, 100)}`, relatedId: req.params.id, image: user.avatar || "" });
-    return res.status(201).json({ message: serialize({ ...document, _id: result.insertedId }) });
+    let result;
+    try { result = await req.app.locals.messageCollection.insertOne(document); }
+    catch (error: any) {
+      if (error?.code !== 11000 || !clientMessageId) throw error;
+      const existing = await req.app.locals.messageCollection.findOne({ conversationId: req.params.id, senderId: user.uid, clientMessageId });
+      if (!existing) throw error;
+      return res.json({ message: serialize(existing), conversation: (await enrichConversations(req, user, [conversation]))[0] });
+    }
+    await req.app.locals.conversationCollection.updateOne({ _id: conversation._id, $or: [{ lastMessageId: { $exists: false } }, { lastMessageId: { $lt: result.insertedId.toString() } }] }, { $set: { lastMessage: document.message, lastMessageId: result.insertedId.toString(), updatedAt: document.createdAt }, $addToSet: { unreadBy: receiverId }, $pull: { deletedBy: { $in: [user.uid, receiverId] } } });
+    void createNotification(req.app, { userId: receiverId, type: "new_message", title: "New message", message: `${document.senderName}: ${document.message.slice(0, 100)}`, relatedId: req.params.id, image: user.avatar || "" }).catch((error: unknown) => console.error("Message notification failed", error));
+    return res.status(201).json({ message: serialize({ ...document, _id: result.insertedId }), conversation: (await enrichConversations(req, user, [{ ...conversation, lastMessage: document.message, lastMessageId: result.insertedId.toString(), updatedAt: document.createdAt }]))[0] });
   });
 
   router.delete("/:id/messages/:messageId", async (req, res) => {
@@ -312,9 +397,11 @@ export default function mountMessageEndpoints(router: Router) {
       if (conversation.lastMessageId === req.params.messageId || conversation.lastMessage === message.message) {
         await req.app.locals.conversationCollection.updateOne({ _id: conversation._id }, { $set: { lastMessage: deletedMessage, updatedAt: deletedAt } });
       }
+      await req.app.locals.conversationCollection.updateOne({ _id: conversation._id }, { $set: { messageUpdatedAt: deletedAt } });
       return res.status(200).json({ message: serialize({ ...message, ...deletedFields }) });
     }
     await req.app.locals.messageCollection.updateOne({ _id: message._id }, { $addToSet: { hiddenFor: user.uid } });
+    await req.app.locals.conversationCollection.updateOne({ _id: conversation._id }, { $set: { messageUpdatedAt: new Date() } });
     return res.status(200).json({ hidden: true, messageId: req.params.messageId });
   });
 }

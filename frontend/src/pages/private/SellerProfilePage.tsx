@@ -1,3 +1,5 @@
+import { chatLink } from "../../lib/chatCache";
+import { useAuthContext } from "../../contexts/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
@@ -19,6 +21,7 @@ const categories = ["Deals", "Grocery", "Electronics", "Mobiles", "Laptops", "Fa
 
 const SellerProfilePage = () => {
   const { id } = useParams();
+  const { user } = useAuthContext();
   const [data, setData] = useState<SellerProfileResponse | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -74,6 +77,7 @@ const SellerProfilePage = () => {
             <TrustBadge level={data.seller.verificationLevel} status={data.seller.verificationStatus} />
           </h1>
           <p className="seller-profile-username">@{data.seller.piUsername || data.seller.username}</p>
+          {data.seller.uid !== user?.uid ? <Link className="private-primary-button" to={chatLink(data.seller)}>Message</Link> : null}
           <Link className="private-secondary-button seller-report-button" to="/report-abuse">Report seller</Link>
         </div>
         <div className="seller-profile-stats">

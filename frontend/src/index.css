@@ -22673,3 +22673,10 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .chat-video-message video { display: block; width: 100%; max-height: 360px; border-radius: 12px; background: #111; }
 .chat-video-message figcaption, .chat-video-message > a { display: block; padding-top: 6px; font-size: 13px; color: inherit; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .chat-gallery-sheet { transition: none; } .chat-gallery-skeleton { animation: none; } }
+
+.chat-panel.chat-panel-fullscreen > header { background: var(--smaj-card); }
+.chat-panel.chat-panel-fullscreen > form { width: 100%; margin: 0; padding: 8px 12px max(8px, env(safe-area-inset-bottom, 0px)); border: 0; border-radius: 0; background: var(--smaj-card); box-shadow: none; }
+.chat-panel-fullscreen .voice-note-composer { margin: 0; border-radius: 0; background: var(--smaj-card); }
+.chat-history-more { display: block; margin: 8px auto; padding: 8px 16px; border-radius: 20px; background: var(--smaj-card); color: var(--smaj-primary); }
+
+.chat-connection-status { flex-shrink: 0; padding: 5px 12px; text-align: center; font-size: 12px; color: var(--smaj-text-secondary); background: var(--smaj-card); }

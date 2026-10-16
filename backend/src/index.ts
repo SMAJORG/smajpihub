@@ -526,6 +526,8 @@ const start = async () => {
             partialFilterExpression: { pairKey: { $type: "string" } },
           },
         ),
+        app.locals.messageCollection.createIndex({ conversationId: 1, senderId: 1, clientMessageId: 1 }, { unique: true, partialFilterExpression: { clientMessageId: { $type: "string" } } }),
+        app.locals.messageCollection.createIndex({ conversationId: 1, _id: -1 }),
         app.locals.messageCollection.createIndex({
           conversationId: 1,
           createdAt: 1,

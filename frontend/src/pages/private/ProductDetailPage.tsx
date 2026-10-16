@@ -1,3 +1,4 @@
+import { chatLink } from "../../lib/chatCache";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -95,8 +96,7 @@ const ProductDetailPage = () => {
         const { data } = await axiosClient.post(`/marketplace/products/${product._id}/favorite`);
         setSaved(data.saved);
       } else if (kind === "message") {
-        const { data } = await axiosClient.post("/messages/start", { productId: product._id });
-        navigate(`/messages?conversation=${data.conversation._id}&product=${encodeURIComponent(product._id)}`);
+        navigate(chatLink({ uid: product.sellerId, displayName: product.sellerName, avatar: product.sellerAvatar }, product));
       }
     } catch (err: unknown) {
       setError(

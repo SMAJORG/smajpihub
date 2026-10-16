@@ -8,9 +8,9 @@ const code = ts.transpileModule(fs.readFileSync('backend/src/handlers/messages.t
 async function send({context=false, owner='seller', messageType='text', video=false}={}) {
  const conversationId = new ObjectId(), productId = new ObjectId(); let stored, response;
  const conversation = {_id:conversationId,buyerId:'buyer',sellerId:'seller',participants:['buyer','seller'],productId:String(productId),productTitle:'Old product',productImage:'old.jpg'};
- const modules = {mongodb:{ObjectId},'../services/auth':{resolveCurrentUser:async()=>({uid:'buyer',displayName:'Buyer'})},'../services/notifications':{createNotification:async()=>{}}};
+ const modules = {mongodb:{ObjectId},'../services/userPresence':{readUserPresence:()=>({online:false})},'../services/auth':{resolveCurrentUser:async()=>({uid:'buyer',displayName:'Buyer'})},'../services/notifications':{createNotification:async()=>{}}};
  const exports={};vm.runInNewContext(code,{exports,require:name=>modules[name],Date,Set});
- const routes={}; const router={get:()=>{},post:(path,handler)=>routes[path]=handler,patch:()=>{},delete:()=>{}}; exports.default(router);
+ const routes={}; const router={use:()=>{},get:()=>{},post:(path,handler)=>{ for(const item of [].concat(path)) routes[item]=handler; },patch:()=>{},delete:()=>{}}; exports.default(router);
  const body={message:'Hello',messageType,...(video?{attachmentDataUrl:'data:video/mp4;base64,AQID',attachmentMimeType:'video/mp4',attachmentName:'clip.mp4',attachmentSize:3}:{}),...(context?{productId:String(productId)}:{}),...(messageType==='voice'?{audioDataUrl:'data:audio/webm;base64,AAAA',audioDurationSeconds:2}:{})};
  await routes['/:id']({params:{id:String(conversationId)},body,app:{locals:{conversationCollection:{findOne:async()=>conversation,updateOne:async()=>({matchedCount:1})},productCollection:{findOne:async()=>({_id:productId,sellerId:owner,title:'Requested product',image:'product.jpg'})},messageCollection:{insertOne:async doc=>{stored=doc;return{insertedId:new ObjectId()}}}}}}, {status:status=>({json:body=>{response={status,body}}})});
  return{stored,response};

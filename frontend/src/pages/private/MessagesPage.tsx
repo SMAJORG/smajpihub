@@ -1,3 +1,5 @@
+import { fetchChatHistory } from "../../lib/chatHistory";
+import { readChatCache, writeChatCache, mergeChatMessages } from "../../lib/chatCache";
 import { ensureVoicePermission, voiceRecordingError } from "../../lib/voiceRecording";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
@@ -101,12 +103,13 @@ const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_CHAT_VIDEO_BYTES = 2_500_000;
 const MAX_CHAT_DOCUMENT_BYTES = 3 * 1024 * 1024;
 
-const MessagesPage = () => {
+const MessagesPageContent = () => {
   const { user } = useAuthContext();
   const [params, setParams] = useSearchParams();
-  const [conversations, setConversations] = useState<RichConversation[]>([]);
+  const [conversations, setConversations] = useState<RichConversation[]>(() => readChatCache(user?.uid, "inbox", []));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingConversations, setLoadingConversations] = useState(() => !readChatCache<RichConversation[]>(user?.uid, "inbox", []).length);
+  const [connectionState, setConnectionState] = useState(navigator.onLine ? "syncing" : "offline");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [text, setText] = useState("");
   const [conversationSearch, setConversationSearch] = useState("");
@@ -153,7 +156,8 @@ const MessagesPage = () => {
   const conversationLongPressTriggeredRef = useRef(false);
   const ignoreMousePressRef = useRef(false);
   const ignoreConversationMousePressRef = useRef(false);
-  const selectedId = params.get("conversation");
+  const recipientId = params.get("recipient");
+  const selectedId = params.get("conversation") || (recipientId ? conversations.find(item => item.participantId === recipientId || (item.buyerId === user?.uid ? item.sellerId : item.buyerId) === recipientId)?._id || "draft:" + recipientId : null);
   const [chatFullscreen, setChatFullscreen] = useState(Boolean(selectedId));
   useEffect(() => {
     setChatFullscreen(Boolean(selectedId));
@@ -194,18 +198,34 @@ const MessagesPage = () => {
   }, [conversationSearch, conversations, inboxFilter, user?.uid]);
   const activeId = selectedId || filteredConversations[0]?._id;
   const messageCache = useRef(new Map<string, ChatMessage[]>());
+  if (activeId && !messageCache.current.has(activeId)) {
+    const cached = readChatCache<ChatMessage[] | null>(user?.uid, activeId, null);
+    if (cached) messageCache.current.set(activeId, cached);
+  }
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const messageRequest = useRef(0);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  type Outgoing = { id: string; chatId: string; payload: Partial<ChatMessage>; recipient?: string };
+  const outbox = useRef<Outgoing[]>(readChatCache(user?.uid, "outbox", []));
+  const flushing = useRef(false);
+  const refreshRef = useRef<() => void>(() => undefined);
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
   const [loadedMessageId, setLoadedMessageId] = useState<string>();
   const visibleMessages = loadedMessageId === activeId ? messages : messageCache.current.get(activeId || "") || [];
   useEffect(() => {
-    if (loadedMessageId) messageCache.current.set(loadedMessageId, messages);
-  }, [loadedMessageId, messages]);
+    if (loadedMessageId) {
+      messageCache.current.set(loadedMessageId, messages);
+      writeChatCache(user?.uid, loadedMessageId, messages.slice(-100));
+    }
+  }, [loadedMessageId, messages, user?.uid]);
   const pendingProductId = params.get("product") || undefined;
   const clearProductContext = () => {
     if (pendingProductId) setParams(current => { const next = new URLSearchParams(current); next.delete("product"); return next; }, { replace: true });
   };
-  const active = useMemo(() => conversations.find((item) => item._id === activeId), [activeId, conversations]);
+  const active = useMemo(() => conversations.find((item) => item._id === activeId) || (selectedId ? readChatCache<RichConversation | null>(user?.uid, "conversation:" + selectedId, null) : null) || (recipientId ? { _id: "draft:" + recipientId, buyerId: user?.uid || "", sellerId: recipientId, participantId: recipientId, participantName: params.get("name") || "SMAJ user", profileImage: params.get("avatar") || "", productId: pendingProductId || "", productTitle: params.get("title") || "", productImage: params.get("image") || "", updatedAt: "" } : undefined), [activeId, conversations, params, pendingProductId, recipientId, selectedId, user?.uid]);
   const activeUpdatedAt = active?.updatedAt;
   const selectedMessages = useMemo(
     () => messages.filter((item) => selectedMessageIds.has(item._id) && !item.deletedForEveryone),
@@ -221,6 +241,7 @@ const MessagesPage = () => {
 
   const archiveConversation = async (conversationId: string, archive: boolean) => {
     setMoreOpen(false);
+    if (conversationId.startsWith("draft:")) return;
     try {
       const { data } = await axiosClient.patch<{ conversation?: RichConversation }>(`/messages/${conversationId}/archive`, { archive });
       if (data.conversation) {
@@ -247,13 +268,15 @@ const MessagesPage = () => {
   const loadConversations = useCallback(async () => {
     try {
       const { data } = await axiosClient.get<{ conversations: RichConversation[] }>("/messages");
+      if (!alive.current) return;
       setConversations(data.conversations || []);
+      writeChatCache(user?.uid, "inbox", data.conversations || []);
     } catch {
-      setConversations([]);
+      // Keep the saved inbox visible while offline.
     } finally {
       setLoadingConversations(false);
     }
-  }, []);
+  }, [user?.uid]);
 
   const loadMessages = useCallback(async () => {
     if (!activeId) {
@@ -261,36 +284,160 @@ const MessagesPage = () => {
       setLoadingMessages(false);
       return;
     }
+    if (activeId.startsWith("draft:")) { setMessages(messageCache.current.get(activeId) || []); setLoadedMessageId(activeId); setLoadingMessages(false); setHistoryCursor(null); return; }
     const cached = messageCache.current.get(activeId);
     setLoadingMessages(!cached);
     if (cached) { setMessages(cached); setLoadedMessageId(activeId); }
     try {
-      const { data } = await axiosClient.get<{ conversation?: RichConversation; messages: ChatMessage[] }>(`/messages/${activeId}`);
-      messageCache.current.set(activeId, data.messages || []);
+      const request = ++messageRequest.current;
+      const confirmed = cached?.filter(item => !item.deliveryState) || [];
+      const newestKnown = confirmed[confirmed.length - 1]?._id;
+      const data = await fetchChatHistory(async before => {
+        const response = await axiosClient.get<{ conversation?: RichConversation; messages: ChatMessage[]; nextCursor?: string }>(`/messages/${activeId}`, { params: { before }, headers: { "X-SMAJ-Chat-Owner": user?.uid || "" } });
+        return response.data;
+      }, newestKnown, () => alive.current && request === messageRequest.current);
+      if (!data) return;
+      if (!alive.current) return;
+      const history = messageCache.current.get(activeId) || [];
+      const oldest = data.messages?.[0]?._id;
+      const retained = history.filter(item => item.deliveryState || (oldest && item._id < oldest));
+      const merged = mergeChatMessages(retained, data.messages || []);
+      messageCache.current.set(activeId, merged);
+      writeChatCache(user?.uid, activeId, merged.slice(-100));
       if (activeIdRef.current !== activeId) return;
-      setMessages(data.messages || []);
+      setHistoryCursor(data.nextCursor || null);
+      setMessages(merged);
       setLoadedMessageId(activeId);
       if (data.conversation) {
         const conversation = data.conversation;
+        writeChatCache(user?.uid, "conversation:" + conversation._id, conversation);
         setConversations(current => current.some(item => item._id === conversation._id)
           ? current.map(item => item._id === conversation._id ? { ...item, ...conversation } : item)
           : [conversation, ...current]);
       }
     } catch {
-      if (activeIdRef.current === activeId) setVoiceError("Could not refresh messages. Please try again.");
+      if (alive.current && activeIdRef.current === activeId) setVoiceError("Could not refresh messages. Please try again.");
     } finally {
-      if (activeIdRef.current === activeId) setLoadingMessages(false);
+      if (alive.current && activeIdRef.current === activeId) setLoadingMessages(false);
     }
-  }, [activeId]);
+  }, [activeId, user?.uid]);
+
+  refreshRef.current = () => { void loadMessages(); void loadConversations(); };
+  useEffect(() => {
+    if (!recipientId || params.get("conversation")) return;
+    const controller = new AbortController();
+    axiosClient.get<{ conversation: RichConversation }>("/messages/direct/" + encodeURIComponent(recipientId), { signal: controller.signal }).then(({ data }) => {
+      if (!alive.current || controller.signal.aborted) return;
+      const conversation = { ...data.conversation, ...(pendingProductId ? { productId: pendingProductId, productTitle: params.get("title") || "", productImage: params.get("image") || "" } : {}) };
+      writeChatCache(user?.uid, "conversation:" + conversation._id, conversation);
+      setConversations(current => [conversation, ...current.filter(item => item._id !== conversation._id)]);
+      if (!conversation._id.startsWith("draft:")) {
+        const draftId = "draft:" + recipientId;
+        const history = mergeChatMessages(messageCache.current.get(conversation._id) || [], messageCache.current.get(draftId) || []);
+        messageCache.current.set(conversation._id, history);
+        writeChatCache(user?.uid, conversation._id, history.slice(-100));
+        outbox.current.forEach(item => { if (item.chatId === draftId) { item.chatId = conversation._id; delete item.recipient; } });
+        writeChatCache(user?.uid, "outbox", outbox.current);
+      }
+      if (!conversation._id.startsWith("draft:")) setParams(current => { const next = new URLSearchParams(current); next.set("conversation", conversation._id); return next; }, { replace: true });
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [recipientId, params, pendingProductId, setParams, user?.uid]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => void loadConversations(), 0);
-    const timer = window.setInterval(() => { if (!document.hidden) void loadConversations(); }, 5000);
-    return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
+    if (!user?.uid) return;
+    void loadConversations();
+    let stopped = false;
+    let cursor = "";
+    let timer: ReturnType<typeof setTimeout>;
+    let controller: AbortController;
+    let generation = 0;
+    const synchronize = async (run = generation) => {
+      if (stopped || run !== generation || document.hidden || !navigator.onLine) return;
+      controller = new AbortController();
+      try {
+        const { data } = await axiosClient.get<{ cursor: string; conversations: RichConversation[] }>("/messages/sync", { params: { cursor }, timeout: 30000, signal: controller.signal, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user?.uid || "" } });
+        if (stopped || run !== generation) return;
+        setConnectionState("live");
+        const changed = cursor !== data.cursor;
+        cursor = data.cursor;
+        setConversations(data.conversations);
+        writeChatCache(user.uid, "inbox", data.conversations);
+        data.conversations.forEach(item => writeChatCache(user.uid, "conversation:" + item._id, item));
+        if (changed) refreshRef.current();
+        timer = setTimeout(() => void synchronize(run), 50);
+      } catch { if (!stopped && run === generation) { setConnectionState(navigator.onLine ? "syncing" : "offline"); timer = setTimeout(() => void synchronize(run), 3000); } }
     };
-  }, [loadConversations]);
+    const reconnect = () => { setConnectionState(navigator.onLine ? "syncing" : "offline"); generation++; clearTimeout(timer); controller?.abort(); cursor = ""; void synchronize(); };
+    void synchronize();
+    window.addEventListener("offline", reconnect);
+    window.addEventListener("online", reconnect);
+    document.addEventListener("visibilitychange", reconnect);
+    return () => { stopped = true; clearTimeout(timer); controller?.abort(); window.removeEventListener("offline", reconnect); window.removeEventListener("online", reconnect); document.removeEventListener("visibilitychange", reconnect); };
+  }, [loadConversations, user?.uid]);
+
+  const flushOutbox = useCallback(async () => {
+    if (flushing.current || !navigator.onLine || !user?.uid) return;
+    flushing.current = true;
+    try {
+      while (outbox.current.length) {
+        const entry = outbox.current[0];
+        if (!alive.current) break;
+        try {
+          const endpoint = entry.recipient ? "/messages/direct/" + encodeURIComponent(entry.recipient) : "/messages/" + entry.chatId;
+          const { data } = await axiosClient.post<{ message: ChatMessage; conversation: RichConversation }>(endpoint, { ...entry.payload, clientMessageId: entry.id }, { headers: { "X-SMAJ-Silent": "true" } });
+          if (!alive.current) break;
+          const id = data.message.conversationId;
+          const history = mergeChatMessages(mergeChatMessages(messageCache.current.get(id) || [], messageCache.current.get(entry.chatId) || []), [data.message]);
+          messageCache.current.set(entry.chatId, history);
+          messageCache.current.set(id, history);
+          writeChatCache(user.uid, id, history.slice(-100));
+          writeChatCache(user.uid, "conversation:" + id, data.conversation);
+          outbox.current = outbox.current.filter(item => item.id !== entry.id);
+          outbox.current.forEach(item => { if (item.chatId === entry.chatId) { item.chatId = id; delete item.recipient; } });
+          writeChatCache(user.uid, "outbox", outbox.current);
+          if (activeIdRef.current === entry.chatId || activeIdRef.current === id) {
+            setMessages(history); setLoadedMessageId(id);
+            if (entry.recipient) setParams(current => { const next = new URLSearchParams(current); next.set("conversation", id); next.delete("product"); return next; }, { replace: true });
+          }
+          setConversations(current => [data.conversation, ...current.filter(item => item._id !== id && item._id !== entry.chatId)]);
+          refreshRef.current();
+        } catch (error) {
+          if (!alive.current) break;
+          const failed = (messageCache.current.get(entry.chatId) || []).map(item => item.clientMessageId === entry.id ? { ...item, deliveryState: "failed" as const } : item);
+          messageCache.current.set(entry.chatId, failed);
+          if (activeIdRef.current === entry.chatId) setMessages(failed);
+          if (isAxiosError(error) && error.response && error.response.status >= 400 && error.response.status < 500 && ![401, 408, 409, 429].includes(error.response.status)) {
+            outbox.current = outbox.current.filter(item => item.id !== entry.id);
+            writeChatCache(user.uid, "outbox", outbox.current);
+            setVoiceError(error.response.data?.message || "Message was rejected. Please try again.");
+          }
+          break;
+        }
+      }
+    } finally { flushing.current = false; }
+  }, [setParams, user?.uid]);
+  useEffect(() => {
+    const retry = () => { void flushOutbox(); };
+    retry();
+    const timer = window.setInterval(retry, 5000);
+    window.addEventListener("online", retry);
+    return () => { window.clearInterval(timer); window.removeEventListener("online", retry); };
+  }, [flushOutbox]);
+
+  const sendMessage = async (payload: Partial<ChatMessage>) => {
+    if (!activeId || !user?.uid) return;
+    const id = globalThis.crypto?.randomUUID?.() || "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    const entry: Outgoing = { id, chatId: activeId, payload, ...(activeId.startsWith("draft:") ? { recipient: activeId.slice(6) } : {}) };
+    const optimistic: ChatMessage = { ...payload, _id: id, clientMessageId: id, conversationId: activeId, senderId: user.uid, message: payload.message || (payload.messageType === "voice" ? "Voice message" : "Attachment"), createdAt: new Date().toISOString(), deliveryState: "pending" };
+    const next = mergeChatMessages(messageCache.current.get(activeId) || [], [optimistic]);
+    messageCache.current.set(activeId, next);
+    setMessages(next); setLoadedMessageId(activeId);
+    writeChatCache(user.uid, activeId, next.slice(-100));
+    outbox.current.push(entry);
+    if (!writeChatCache(user.uid, "outbox", outbox.current)) setVoiceError("Device storage is unavailable. Keep this chat open until your message is sent.");
+    await flushOutbox();
+  };
 
   useEffect(() => {
     const initial = window.setTimeout(() => void loadMessages(), 0);
@@ -322,9 +469,10 @@ const MessagesPage = () => {
   }, []);
 
   useEffect(() => {
+    setText(readChatCache(user?.uid, "draft-text:" + activeId, ""));
     setSelectedMessageIds(new Set());
     setSelectedConversationIds(new Set());
-  }, [activeId]);
+  }, [activeId, user?.uid]);
 
   useEffect(() => {
     setSelectedMessageIds((current) => {
@@ -343,12 +491,13 @@ const MessagesPage = () => {
   }, [filteredConversations]);
 
   const setTyping = useCallback((typing: boolean) => {
-    if (!activeId) return;
+    if (!activeId || activeId.startsWith("draft:")) return;
     axiosClient.post(`/messages/${activeId}/typing`, { typing }).catch(() => undefined);
   }, [activeId]);
 
   const handleTextChange = (value: string) => {
     setText(value);
+    if (activeId) writeChatCache(user?.uid, "draft-text:" + activeId, value);
     if (!value.trim()) {
       if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
       setTyping(false);
@@ -367,6 +516,21 @@ const MessagesPage = () => {
     setShowScrollBottom(false);
   }, []);
 
+  const loadOlder = async () => {
+    if (!activeId || !historyCursor || loadingOlder) return;
+    const id = activeId;
+    const container = chatMessagesRef.current;
+    const height = container?.scrollHeight || 0;
+    setLoadingOlder(true);
+    try {
+      const { data } = await axiosClient.get<{ messages: ChatMessage[]; nextCursor: string | null }>("/messages/" + id, { params: { before: historyCursor } });
+      if (!alive.current || activeIdRef.current !== id) return;
+      setMessages(mergeChatMessages(data.messages, messageCache.current.get(id) || []));
+      setHistoryCursor(data.nextCursor);
+      requestAnimationFrame(() => { if (container) container.scrollTop += container.scrollHeight - height; });
+    } catch { setVoiceError("Could not load older messages. Try again."); }
+    finally { if (alive.current) setLoadingOlder(false); }
+  };
   const handleChatScroll = () => {
     const container = chatMessagesRef.current;
     if (!container) return;
@@ -391,25 +555,16 @@ const MessagesPage = () => {
     if (!activeId || !text.trim()) return;
     const message = text.trim();
     setText("");
+    writeChatCache(user?.uid, "draft-text:" + activeId, "");
     if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
     setTyping(false);
     nearBottomRef.current = true;
-    try {
-      const { data } = await axiosClient.post<{ message: ChatMessage }>(`/messages/${activeId}`, { message, productId: pendingProductId });
-      clearProductContext();
-      if (data.message) {
-        const next = [...(messageCache.current.get(activeId) || []), data.message];
-        messageCache.current.set(activeId, next);
-        setMessages(next);
-      }
-      await Promise.all([loadMessages(), loadConversations()]);
-    } catch {
-      setText(message);
-    }
+    await sendMessage({ message, productId: pendingProductId });
+    clearProductContext();
   };
 
   const deleteMessage = async (scope: "me" | "everyone") => {
-    if (!activeId || !deleteTarget) return;
+    if (!activeId || activeId.startsWith("draft:") || !deleteTarget || deleteTarget.deliveryState) return;
     setDeletingMessage(true);
     setVoiceError("");
     try {
@@ -671,7 +826,7 @@ const MessagesPage = () => {
     try {
       const video = pendingPhoto.file.type.startsWith("video/");
       const attachmentUrl = video ? "" : await uploadImage(pendingPhoto.dataUrl, "message-photos");
-      await axiosClient.post(`/messages/${activeId}`, {
+      await sendMessage({
         productId: pendingProductId,
         messageType: video ? "document" : "image",
         message: pendingPhotoCaption.trim(),
@@ -822,7 +977,7 @@ const MessagesPage = () => {
     setVoiceError("");
     try {
       const audioDataUrl = await blobToDataUrl(preview.blob);
-      await axiosClient.post(`/messages/${activeId}`, {
+      await sendMessage({
         productId: pendingProductId,
         messageType: "voice",
         audioDataUrl,
@@ -852,7 +1007,7 @@ const MessagesPage = () => {
         return;
       }
       const attachmentDataUrl = await blobToDataUrl(file);
-      await axiosClient.post(`/messages/${activeId}`, {
+      await sendMessage({
         productId: pendingProductId,
         messageType,
         attachmentDataUrl,
@@ -964,7 +1119,9 @@ const MessagesPage = () => {
                     </span>
                   </div>
                 </header>
+                {connectionState !== "live" ? <div className="chat-connection-status" role="status">{connectionState === "offline" ? "Offline. Messages will send when you reconnect." : "Connecting..."}</div> : null}
                 <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
+                  {historyCursor ? <button type="button" className="chat-history-more" disabled={loadingOlder} onClick={() => void loadOlder()}>{loadingOlder ? "Loading earlier messages..." : "Earlier messages"}</button> : null}
                   <div className="chat-product-mobile" hidden={!pendingProductId}>
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
                     <div>
@@ -972,7 +1129,7 @@ const MessagesPage = () => {
                       <span>Marketplace product</span>
                     </div>
                   </div>
-                  {(loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
+                  {!activeId?.startsWith("draft:") && (loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
                     <PrivateSkeleton variant="chat" count={6} />
                   ) : (
                     <>
@@ -1021,7 +1178,7 @@ const MessagesPage = () => {
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-                            {item.senderId === user?.uid ? <span className={`message-checks ${item.readAt ? "read" : "sent"}`} aria-label={item.readAt ? "Read" : "Sent"}>{item.readAt ? "✓✓" : "✓"}</span> : null}
+                            {item.senderId === user?.uid ? <span className={`message-checks ${item.readAt ? "read" : "sent"}`} aria-label={item.deliveryState === "failed" ? "Send failed" : item.deliveryState ? "Waiting to send" : item.readAt ? "Read" : "Sent"}>{item.readAt ? "✓✓" : "✓"}</span> : null}
                           </small>
                           {!item.deletedForEveryone ? <button type="button" className="chat-message-delete" onClick={() => setDeleteTarget(item)} aria-label="Delete message" title="Delete message"><DeleteOutlineRoundedIcon /></button> : null}
                         </article>
@@ -1105,7 +1262,9 @@ const MessagesPage = () => {
                     </span>
                   </div>
                 </header>
+                {connectionState !== "live" ? <div className="chat-connection-status" role="status">{connectionState === "offline" ? "Offline. Messages will send when you reconnect." : "Connecting..."}</div> : null}
                 <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
+                  {historyCursor ? <button type="button" className="chat-history-more" disabled={loadingOlder} onClick={() => void loadOlder()}>{loadingOlder ? "Loading earlier messages..." : "Earlier messages"}</button> : null}
                   <div className="chat-product-mobile" hidden={!pendingProductId}>
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
                     <div>
@@ -1113,7 +1272,7 @@ const MessagesPage = () => {
                       <span>Marketplace product</span>
                     </div>
                   </div>
-                  {(loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
+                  {!activeId?.startsWith("draft:") && (loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
                     <PrivateSkeleton variant="chat" count={6} />
                   ) : (
                     <>
@@ -1162,7 +1321,7 @@ const MessagesPage = () => {
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-                            {item.senderId === user?.uid ? <span className={`message-checks ${item.readAt ? "read" : "sent"}`} aria-label={item.readAt ? "Read" : "Sent"}>{item.readAt ? "✓✓" : "✓"}</span> : null}
+                            {item.senderId === user?.uid ? <span className={`message-checks ${item.readAt ? "read" : "sent"}`} aria-label={item.deliveryState === "failed" ? "Send failed" : item.deliveryState ? "Waiting to send" : item.readAt ? "Read" : "Sent"}>{item.readAt ? "✓✓" : "✓"}</span> : null}
                           </small>
                           {!item.deletedForEveryone ? <button type="button" className="chat-message-delete" onClick={() => setDeleteTarget(item)} aria-label="Delete message" title="Delete message"><DeleteOutlineRoundedIcon /></button> : null}
                         </article>
@@ -1217,4 +1376,8 @@ const MessagesPage = () => {
   );
 };
 
+const MessagesPage = () => {
+  const { user } = useAuthContext();
+  return <MessagesPageContent key={user?.uid || "signed-out"} />;
+};
 export default MessagesPage;
