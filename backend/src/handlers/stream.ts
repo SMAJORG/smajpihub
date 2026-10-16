@@ -13,6 +13,8 @@ const TMDB_API_URL = "https://api.themoviedb.org/3";
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const cache = new Map<string, { expiresAt: number; value: unknown }>();
 const STREAM_PI_RATE = 314159;
+// Cloudflare MP4 exports are prepared on demand for published subscription titles.
+const downloadableSourceFilter = { $or: [{ contentSource: "cloudflare_stream" }, { downloadAllowed: true }] };
 const streamPlans = {
   free: { id: "free", name: "Free", priceUsd: 0, features: ["Standard creator videos", "Basic My List", "Community channels"] },
   plus: { id: "plus", name: "Plus", priceUsd: 8, features: ["HD streaming", "Downloads list", "No advertising"] },
@@ -416,8 +418,12 @@ const mountStreamEndpoints = (router: Router) => {
     const mediaType = req.body?.mediaType === "tv" ? "tv" : req.body?.mediaType === "movie" ? "movie" : null;
     const title = String(req.body?.title || "").trim().slice(0, 180);
     if (!Number.isInteger(tmdbId) || tmdbId <= 0 || !mediaType || !title) return res.status(400).json({ error: "bad_request", message: "A valid TMDB title is required." });
-    const licensedVideo = await req.app.locals.streamContentCollection?.findOne({ "catalogAttachment.tmdbId": tmdbId, "catalogAttachment.mediaType": mediaType, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", downloadAllowed: true });
-    if (!licensedVideo) return res.status(403).json({ error: "download_not_permitted", message: "This title is not licensed for download." });
+    const storedViewer = await req.app.locals.userCollection.findOne({ _id: user._id });
+    const subscription = normalizeStreamSubscription(storedViewer?.streamSubscription);
+    if (subscription.status !== "active" || (subscription.plan !== "plus" && subscription.plan !== "family"))
+      return res.status(403).json({ error: "download_plan_required", message: "Downloads require an active Plus or Family plan." });
+    const licensedVideo = await req.app.locals.streamContentCollection?.findOne({ "catalogAttachment.tmdbId": tmdbId, "catalogAttachment.mediaType": mediaType, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", ...downloadableSourceFilter });
+    if (!licensedVideo) return res.status(403).json({ error: "download_not_permitted", message: "A downloadable video source is not available for this title." });
     const downloadStatus = ["downloading", "ready", "failed"].includes(req.body?.downloadStatus) ? req.body.downloadStatus : "ready";
     const item = { tmdbId, id: String(tmdbId), mediaType, title, overview: String(req.body?.overview || "").slice(0, 1200), posterUrl: req.body?.posterUrl ? String(req.body.posterUrl).slice(0, 500) : null, backdropUrl: req.body?.backdropUrl ? String(req.body.backdropUrl).slice(0, 500) : null, releaseDate: req.body?.releaseDate ? String(req.body.releaseDate).slice(0, 20) : null, rating: Number.isFinite(Number(req.body?.rating)) ? Number(req.body.rating) : null, downloadStatus, downloadedAt: downloadStatus === "ready" ? new Date() : null, updatedAt: new Date() };
     await req.app.locals.userCollection.updateOne({ _id: user._id }, { $pull: { streamDownloads: { tmdbId, mediaType } } });
@@ -1447,7 +1453,7 @@ const mountStreamEndpoints = (router: Router) => {
     const subscription = normalizeStreamSubscription(storedViewer?.streamSubscription);
     if (subscription.status !== "active" || (subscription.plan !== "plus" && subscription.plan !== "family"))
       return res.status(403).json({ error: "download_plan_required", message: "Downloads require an active Plus or Family plan." });
-    const video = await req.app.locals.streamContentCollection?.findOne({ cloudflareUid: uid, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", downloadAllowed: true });
+    const video = await req.app.locals.streamContentCollection?.findOne({ cloudflareUid: uid, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", ...downloadableSourceFilter });
     if (!video) return res.status(404).json({ error: "download_not_available", message: "This movie is not available for download." });
     if (video.contentSource === "internet_archive") {
       const downloadUrl = String(video.downloadUrl || video.playback?.mp4 || "");
