@@ -3029,7 +3029,13 @@ html.sw-player-is-fullscreen body { overflow: hidden; }
 .sw-search-page .sw-search-field button:not(.filter) svg{color:#ddd;border-radius:0}
 .sw-search-page .sw-search-field button.filter{border-left:0}
 @media(max-width:600px){.sw-downloads-page .sw-page-content{padding:14px 16px 16px}.sw-search-page .sw-search-field{margin-top:24px}}
-.sw-downloads-page{min-height:0}
+.sw-downloads-page{min-height:100dvh;box-sizing:border-box}
+.stream-private-shell:has(.sw-downloads-page),
+.stream-private-shell:has(.sw-downloads-page) .private-content{background:#101114!important}
+@media(max-width:1023px){
+  .stream-private-shell:has(.sw-downloads-page) .private-content{padding-bottom:0}
+  .sw-downloads-page{padding-bottom:calc(74px + env(safe-area-inset-bottom,0px))}
+}
 
 /* Player corners and visible channel action controls. */
 .sw-player-page .sw-player-close{left:16px!important;right:auto!important}
