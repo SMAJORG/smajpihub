@@ -9,7 +9,7 @@ const storage=new Map();
 const localStorage={getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)};
 function compile(path,modules,extra={}) {
  const exports={};const code=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
- vm.runInNewContext(code,{exports,require:name=>modules[name],localStorage,document:{body:{}},navigator:{onLine:true},Date,Map,Set,URLSearchParams,console,...extra});return exports;
+ vm.runInNewContext(code,{exports,require:name=>modules[name],localStorage,document:{body:{}},navigator:{onLine:true},Date,Map,Set,URLSearchParams,AbortController,console,...extra});return exports;
 }
 const cache=compile('frontend/src/lib/chatCache.ts',{});
 const history=compile('frontend/src/lib/chatHistory.ts',{});
@@ -37,3 +37,5 @@ test('recipient resolution reads saved history before creating a memory entry',(
 const warmup=compile('frontend/src/lib/chatWarmup.ts',{});
 test('inbox history warms with at most two concurrent requests, skipping saved chats',async()=>{const memory=new Map([['saved',[]]]);let running=0,max=0;const fetched=[];await warmup.warmChatHistory(['one','two','three','saved','one','draft:bob'],{read:id=>memory.get(id),fetch:async id=>{running++;max=Math.max(max,running);fetched.push(id);await new Promise(resolve=>setTimeout(resolve,5));running--;return[{_id:id}];},save:(id,items)=>memory.set(id,items),current:()=>true});assert.equal(max,2);assert.equal(fetched.length,3);assert.equal(memory.get('three')[0]._id,'three');});
 test('late previews never overwrite active chat sends or a switched account',async()=>{const memory=new Map();let current=true;await warmup.warmChatHistory(['active','old-account'],{read:id=>memory.get(id),fetch:async id=>{if(id==='active')memory.set(id,[{_id:'optimistic'}]);else current=false;return[{_id:'stale'}];},save:(id,items)=>memory.set(id,items),current:()=>current});assert.equal(memory.get('active')[0]._id,'optimistic');assert.equal(memory.has('old-account'),false);});
+
+test('visible-row warmup prioritizes tapped chats beyond row twenty and cancels obsolete jobs',async()=>{const waiting=new Map(),signals=new Map(),seen=[],saved=new Map();const queue=warmup.createChatWarmup({read:id=>saved.get(id),fetch:(id,signal)=>{seen.push(id);signals.set(id,signal);return new Promise(resolve=>waiting.set(id,resolve));},save:(id,items)=>saved.set(id,items),current:()=>true});queue.enqueue(Array.from({length:25},(_,i)=>String(i+1)));assert.deepEqual(seen,['1','2']);queue.enqueue(['25'],true);waiting.get('1')([{_id:'one'}]);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(seen,['1','2','25']);queue.dispose();assert.ok(signals.get('2').aborted);assert.ok(signals.get('25').aborted);waiting.get('25')([{_id:'late'}]);await new Promise(resolve=>setImmediate(resolve));assert.equal(saved.has('25'),false);});

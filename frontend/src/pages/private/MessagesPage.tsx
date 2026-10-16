@@ -1,4 +1,6 @@
-import { warmChatHistory } from "../../lib/chatWarmup";
+import VoiceMessagePlayer from "../../components/VoiceMessagePlayer";
+import ChatMessageAttachment from "../../components/ChatMessageAttachment";
+import { createChatWarmup } from "../../lib/chatWarmup";
 import { fetchChatHistory } from "../../lib/chatHistory";
 import { readChatCache, writeChatCache, mergeChatMessages, savedChatHistory } from "../../lib/chatCache";
 import { ensureVoicePermission, voiceRecordingError } from "../../lib/voiceRecording";
@@ -12,7 +14,6 @@ import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDown
 import MicNoneOutlinedIcon from "@mui/icons-material/MicNoneOutlined";
 import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import SentimentSatisfiedAltOutlinedIcon from "@mui/icons-material/SentimentSatisfiedAltOutlined";
@@ -87,12 +88,6 @@ const formatLastSeen = (conversation: RichConversation) => {
   return `Last seen ${new Date(value).toLocaleDateString()}`;
 };
 
-const formatVoiceTime = (seconds: number) => {
-  const safeSeconds = Math.max(0, Math.round(seconds));
-  const minutes = Math.floor(safeSeconds / 60);
-  return `${minutes}:${String(safeSeconds % 60).padStart(2, "0")}`;
-};
-
 const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result || ""));
@@ -126,6 +121,8 @@ const MessagesPageContent = () => {
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
   const [imagePreviewFullscreen, setImagePreviewFullscreen] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [historyError, setHistoryError] = useState("");
+  const [inboxError, setInboxError] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -207,6 +204,16 @@ const MessagesPageContent = () => {
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const messageRequest = useRef(0);
+  const historyRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyRetryAttempt = useRef(0);
+  const historyRefresh = useRef<() => void>(() => undefined);
+  const historyFlight = useRef<{ id: string; controller: AbortController; promise: Promise<void> } | null>(null);
+  const inboxFlight = useRef<Promise<void> | null>(null);
+  const inboxController = useRef<AbortController | null>(null);
+  const inboxBootstrapped = useRef(false);
+  const warmQueue = useRef<ReturnType<typeof createChatWarmup> | null>(null);
+  const visibleChatIds = useRef(new Set<string>());
+  const conversationListRef = useRef<HTMLElement>(null);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   type Outgoing = { id: string; chatId: string; payload: Partial<ChatMessage>; recipient?: string };
@@ -228,15 +235,14 @@ const MessagesPageContent = () => {
     if (pendingProductId) setParams(current => { const next = new URLSearchParams(current); next.delete("product"); return next; }, { replace: true });
   };
   const active = useMemo(() => conversations.find((item) => item._id === activeId) || (selectedId ? readChatCache<RichConversation | null>(user?.uid, "conversation:" + selectedId, null) : null) || (recipientId ? { _id: "draft:" + recipientId, buyerId: user?.uid || "", sellerId: recipientId, participantId: recipientId, participantName: params.get("name") || "SMAJ user", profileImage: params.get("avatar") || "", productId: pendingProductId || "", productTitle: params.get("title") || "", productImage: params.get("image") || "", updatedAt: "" } : undefined), [activeId, conversations, params, pendingProductId, recipientId, selectedId, user?.uid]);
-  const activeUpdatedAt = active?.updatedAt;
-  const warmIds = conversations.filter(item => !item.archived).slice(0, 12).map(item => item._id).join(",");
+  const inboxIds = conversations.map(item => item._id).join(",");
   useEffect(() => {
-    if (!user?.uid || !navigator.onLine) return;
-    const controller = new AbortController();
-    void warmChatHistory(warmIds.split(",").filter(Boolean), {
+    if (!user?.uid) return;
+    const queue = createChatWarmup({
       read: id => savedChatHistory(user.uid, id, messageCache.current),
-      fetch: async id => {
-        const { data } = await axiosClient.get<{ messages: ChatMessage[] }>("/messages/" + id, { params: { preview: "true" }, signal: controller.signal, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user.uid } });
+      fetch: async (id, signal) => {
+        const { data } = await axiosClient.get<{ messages: ChatMessage[]; nextCursor: string | null }>("/messages/" + id, { params: { preview: "true", light: "1", limit: 12 }, signal, timeout: 10000, smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user.uid } });
+        if (!signal.aborted) writeChatCache(user.uid, "page:" + id, { nextCursor: data.nextCursor });
         return data.messages;
       },
       save: (id, history) => {
@@ -244,10 +250,29 @@ const MessagesPageContent = () => {
         writeChatCache(user.uid, id, history.slice(-100));
         if (activeIdRef.current === id) { setMessages(history); setLoadedMessageId(id); }
       },
-      current: () => alive.current && !controller.signal.aborted,
+      current: () => alive.current && navigator.onLine,
     });
-    return () => controller.abort();
-  }, [warmIds, user?.uid]);
+    warmQueue.current = queue;
+    const reconnect = () => queue.enqueue([...visibleChatIds.current]);
+    window.addEventListener("online", reconnect);
+    return () => { queue.dispose(); warmQueue.current = null; window.removeEventListener("online", reconnect); };
+  }, [user?.uid]);
+  useEffect(() => {
+    const list = conversationListRef.current;
+    if (!list) return;
+    const nodes = list.querySelectorAll<HTMLElement>("[data-conversation-id]");
+    if (typeof IntersectionObserver === "undefined") { warmQueue.current?.enqueue(inboxIds.split(",").filter(Boolean)); return; }
+    const visible = visibleChatIds.current;
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).dataset.conversationId!;
+        if (entry.isIntersecting) visible.add(id); else visible.delete(id);
+      }
+      warmQueue.current?.enqueue([...visibleChatIds.current]);
+    }, { rootMargin: "300px" });
+    nodes.forEach(node => observer.observe(node));
+    return () => { observer.disconnect(); visible.clear(); };
+  }, [inboxIds, loadingConversations]);
 
   useEffect(() => {
     const panel = chatPanelRef.current;
@@ -303,39 +328,61 @@ const MessagesPageContent = () => {
     }
   };
 
-  const loadConversations = useCallback(async () => {
-    try {
-      const { data } = await axiosClient.get<{ conversations: RichConversation[] }>("/messages");
-      if (!alive.current) return;
-      setConversations(data.conversations || []);
-      writeChatCache(user?.uid, "inbox", data.conversations || []);
-    } catch {
-      // Keep the saved inbox visible while offline.
-    } finally {
-      setLoadingConversations(false);
-    }
+  const loadConversations = useCallback(() => {
+    if (inboxFlight.current) return inboxFlight.current;
+    const controller = new AbortController(); inboxController.current = controller;
+    const request = (async () => {
+      try {
+        const { data } = await axiosClient.get<{ conversations: RichConversation[]; previews?: Record<string, { messages: ChatMessage[]; nextCursor: string | null }> }>("/messages", { params: { includePreviews: inboxBootstrapped.current ? "0" : "1" }, signal: controller.signal, smajSkipReadRetry: true, headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" } });
+        if (!alive.current) return;
+        for (const [id, page] of Object.entries(data.previews || {})) {
+          const merged = mergeChatMessages(savedChatHistory(user?.uid, id, messageCache.current) || [], page.messages);
+          messageCache.current.set(id, merged);
+          writeChatCache(user?.uid, id, merged.slice(-100));
+          writeChatCache(user?.uid, "page:" + id, { nextCursor: page.nextCursor });
+        }
+        inboxBootstrapped.current = true;
+        setInboxError(false);
+        for (const item of data.conversations || []) writeChatCache(user?.uid, "conversation:" + item._id, item);
+        setConversations(data.conversations || []);
+        writeChatCache(user?.uid, "inbox", data.conversations || []);
+      } catch { if (alive.current && !controller.signal.aborted) setInboxError(true); }
+      finally { if (alive.current) setLoadingConversations(false); }
+    })().finally(() => { inboxFlight.current = null; });
+    inboxFlight.current = request;
+    return request;
   }, [user?.uid]);
 
   const loadMessages = useCallback(async () => {
+    if (!selectedId && !chatFullscreen) return;
     if (!activeId) {
       setMessages([]);
       setLoadingMessages(false);
       return;
     }
     if (activeId.startsWith("draft:")) { setMessages(messageCache.current.get(activeId) || []); setLoadedMessageId(activeId); setLoadingMessages(false); setHistoryCursor(null); return; }
-    const cached = messageCache.current.get(activeId);
+    if (historyFlight.current?.id === activeId) return historyFlight.current.promise;
+    historyFlight.current?.controller.abort();
+    const controller = new AbortController();
+    const request = ++messageRequest.current;
+    const cached = savedChatHistory(user?.uid, activeId, messageCache.current);
+    const run = async () => {
+    setHistoryError("");
+    setHistoryCursor(readChatCache<{ nextCursor: string | null }>(user?.uid, "page:" + activeId, { nextCursor: null }).nextCursor);
     setLoadingMessages(!cached);
     if (cached) { setMessages(cached); setLoadedMessageId(activeId); }
     try {
-      const request = ++messageRequest.current;
       const confirmed = cached?.filter(item => !item.deliveryState) || [];
       const newestKnown = confirmed[confirmed.length - 1]?._id;
       const data = await fetchChatHistory(async before => {
-        const response = await axiosClient.get<{ conversation?: RichConversation; messages: ChatMessage[]; nextCursor?: string }>(`/messages/${activeId}`, { params: { before }, headers: { "X-SMAJ-Chat-Owner": user?.uid || "" } });
+        const response = await axiosClient.get<{ conversation?: RichConversation; messages: ChatMessage[]; nextCursor?: string }>(`/messages/${activeId}`, { params: { before, light: "1" }, signal: controller.signal, timeout: 10000, smajSkipReadRetry: true, headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" } });
         return response.data;
-      }, newestKnown, () => alive.current && request === messageRequest.current);
+      }, newestKnown, () => alive.current && !controller.signal.aborted && request === messageRequest.current && activeIdRef.current === activeId);
       if (!data) return;
       if (!alive.current) return;
+      if (historyRetryTimer.current) clearTimeout(historyRetryTimer.current);
+      historyRetryAttempt.current = 0;
+      setConnectionState("live");
       const history = messageCache.current.get(activeId) || [];
       const oldest = data.messages?.[0]?._id;
       const retained = history.filter(item => item.deliveryState || (oldest && item._id < oldest));
@@ -344,6 +391,7 @@ const MessagesPageContent = () => {
       writeChatCache(user?.uid, activeId, merged.slice(-100));
       if (activeIdRef.current !== activeId) return;
       setHistoryCursor(data.nextCursor || null);
+      writeChatCache(user?.uid, "page:" + activeId, { nextCursor: data.nextCursor || null });
       setMessages(merged);
       setLoadedMessageId(activeId);
       if (data.conversation) {
@@ -353,13 +401,29 @@ const MessagesPageContent = () => {
           ? current.map(item => item._id === conversation._id ? { ...item, ...conversation } : item)
           : [conversation, ...current]);
       }
-    } catch {
-      if (alive.current && activeIdRef.current === activeId) setVoiceError("Could not refresh messages. Please try again.");
+    } catch (error) {
+      if (!alive.current || controller.signal.aborted || request !== messageRequest.current || activeIdRef.current !== activeId) return;
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (status === 401 || status === 403 || status === 404) {
+        setHistoryError(status === 401 ? "Please sign in again to open this chat." : "This conversation is unavailable.");
+        if (status !== 401) { messageCache.current.delete(activeId); writeChatCache(user?.uid, activeId, []); setMessages([]); setLoadedMessageId(activeId); }
+      }
+      else if (!messageCache.current.get(activeId)?.length) setHistoryError(navigator.onLine ? "Messages could not load. Please retry." : "Connect to load this conversation.");
+      else {
+        setConnectionState(navigator.onLine ? "syncing" : "offline");
+        if (historyRetryTimer.current) clearTimeout(historyRetryTimer.current);
+        historyRetryTimer.current = setTimeout(() => { if (alive.current && !document.hidden && activeIdRef.current === activeId) historyRefresh.current(); }, Math.min(30000, 1000 * 2 ** historyRetryAttempt.current++));
+      }
     } finally {
-      if (alive.current && activeIdRef.current === activeId) setLoadingMessages(false);
+      if (alive.current && !controller.signal.aborted && request === messageRequest.current && activeIdRef.current === activeId) setLoadingMessages(false);
     }
-  }, [activeId, user?.uid]);
+    };
+    const promise = run().finally(() => { if (historyFlight.current?.controller === controller) historyFlight.current = null; });
+    historyFlight.current = { id: activeId, controller, promise };
+    return promise;
+  }, [activeId, selectedId, chatFullscreen, user?.uid]);
 
+  historyRefresh.current = () => { void loadMessages(); };
   refreshRef.current = () => { void loadMessages(); void loadConversations(); };
   useEffect(() => {
     if (!recipientId || params.get("conversation")) return;
@@ -384,7 +448,6 @@ const MessagesPageContent = () => {
 
   useEffect(() => {
     if (!user?.uid) return;
-    void loadConversations();
     let stopped = false;
     let cursor = "";
     let timer: ReturnType<typeof setTimeout>;
@@ -394,7 +457,7 @@ const MessagesPageContent = () => {
       if (stopped || run !== generation || document.hidden || !navigator.onLine) return;
       controller = new AbortController();
       try {
-        const { data } = await axiosClient.get<{ cursor: string; conversations: RichConversation[] }>("/messages/sync", { params: { cursor }, timeout: 30000, signal: controller.signal, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user?.uid || "" } });
+        const { data } = await axiosClient.get<{ cursor: string; conversations: RichConversation[] }>("/messages/sync", { params: { cursor }, timeout: 30000, signal: controller.signal, smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user?.uid || "" } });
         if (stopped || run !== generation) return;
         setConnectionState("live");
         const changed = cursor !== data.cursor;
@@ -407,7 +470,7 @@ const MessagesPageContent = () => {
       } catch { if (!stopped && run === generation) { setConnectionState(navigator.onLine ? "syncing" : "offline"); timer = setTimeout(() => void synchronize(run), 3000); } }
     };
     const reconnect = () => { setConnectionState(navigator.onLine ? "syncing" : "offline"); generation++; clearTimeout(timer); controller?.abort(); cursor = ""; void synchronize(); };
-    void synchronize();
+    void loadConversations().then(() => { if (!stopped) void synchronize(); });
     window.addEventListener("offline", reconnect);
     window.addEventListener("online", reconnect);
     document.addEventListener("visibilitychange", reconnect);
@@ -478,17 +541,26 @@ const MessagesPageContent = () => {
   };
 
   useEffect(() => {
+    historyFlight.current?.controller.abort();
+    historyFlight.current = null;
+    if (historyRetryTimer.current) clearTimeout(historyRetryTimer.current);
+    historyRetryAttempt.current = 0;
+    setHistoryError("");
     const initial = window.setTimeout(() => void loadMessages(), 0);
     const refresh = () => { if (!document.hidden) void loadMessages(); };
     document.addEventListener("visibilitychange", refresh);
     return () => {
       window.clearTimeout(initial);
       document.removeEventListener("visibilitychange", refresh);
+      if (historyRetryTimer.current) clearTimeout(historyRetryTimer.current);
+      historyFlight.current?.controller.abort();
+      historyFlight.current = null;
     };
-  }, [loadMessages, activeUpdatedAt]);
+  }, [loadMessages]);
 
   useEffect(() => () => {
     keepRecordingRef.current = false;
+    inboxController.current?.abort();
     sendAfterStopRef.current = false;
     if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
@@ -561,12 +633,12 @@ const MessagesPageContent = () => {
     const height = container?.scrollHeight || 0;
     setLoadingOlder(true);
     try {
-      const { data } = await axiosClient.get<{ messages: ChatMessage[]; nextCursor: string | null }>("/messages/" + id, { params: { before: historyCursor } });
+      const { data } = await axiosClient.get<{ messages: ChatMessage[]; nextCursor: string | null }>("/messages/" + id, { params: { before: historyCursor, light: "1" }, smajSkipReadRetry: true, headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" } });
       if (!alive.current || activeIdRef.current !== id) return;
       setMessages(mergeChatMessages(data.messages, messageCache.current.get(id) || []));
       setHistoryCursor(data.nextCursor);
       requestAnimationFrame(() => { if (container) container.scrollTop += container.scrollHeight - height; });
-    } catch { setVoiceError("Could not load older messages. Try again."); }
+    } catch { setHistoryError("Earlier messages could not load. Please retry."); }
     finally { if (alive.current) setLoadingOlder(false); }
   };
   const handleChatScroll = () => {
@@ -1077,18 +1149,21 @@ const MessagesPageContent = () => {
         </div>
       </section>
       <section className="messages-layout rich">
-        <aside className="conversation-list">
+        <aside ref={conversationListRef} className="conversation-list">
           <label className="conversation-search">
             <SearchOutlinedIcon />
             <input value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder="Search conversations" />
           </label>
           <div className="conversation-filters">
 <button type="button" className={inboxFilter === "inbox" ? "active" : ""} onClick={() => setInboxFilter("inbox")}>Inbox</button><button type="button" className={inboxFilter === "archived" ? "active" : ""} onClick={() => setInboxFilter("archived")}>Archived</button></div>
-          {loadingConversations ? <PrivateSkeleton variant="messages" count={6} /> : filteredConversations.length ? (
+          {loadingConversations ? <PrivateSkeleton variant="messages" count={6} /> : inboxError && !conversations.length ? <div className="chat-history-error" role="status">Chats could not load.<button type="button" onClick={() => void loadConversations()}>Retry</button></div> : filteredConversations.length ? (
             filteredConversations.map((item) => (
               <button
                 className={`${item._id === activeId ? "active" : ""}${selectedConversationIds.has(item._id) ? " selected" : ""}`}
                 key={item._id}
+                data-conversation-id={item._id}
+                onPointerDown={() => warmQueue.current?.enqueue([item._id], true)}
+                onFocus={() => warmQueue.current?.enqueue([item._id], true)}
                 onClick={() => {
                   if (selectedConversationIds.size > 0 || conversationLongPressTriggeredRef.current) return;
                   setParams({ conversation: item._id });
@@ -1137,7 +1212,7 @@ const MessagesPageContent = () => {
                     </span>
                     <div>
                       <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge level={active.verificationLevel} status={active.verificationStatus} /></strong>
-                      <small>{active.typing ? "Typing..." : formatLastSeen(active)}</small>
+                      <small>{active.typing ? "Typing..." : connectionState === "live" ? formatLastSeen(active) : connectionState === "offline" ? "Offline" : "Connecting..."}</small>
                     </div>
                   </div>
                   <div className="chat-header-actions">
@@ -1157,8 +1232,8 @@ const MessagesPageContent = () => {
                     </span>
                   </div>
                 </header>
-                {connectionState !== "live" ? <div className="chat-connection-status" role="status">{connectionState === "offline" ? "Offline. Messages will send when you reconnect." : "Connecting..."}</div> : null}
                 <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
+                  {historyError ? <div className="chat-history-error" role="status">{historyError}<button type="button" onClick={() => void (historyError.startsWith("Earlier") ? loadOlder() : loadMessages())}>Retry</button></div> : null}
                   {historyCursor ? <button type="button" className="chat-history-more" disabled={loadingOlder} onClick={() => void loadOlder()}>{loadingOlder ? "Loading earlier messages..." : "Earlier messages"}</button> : null}
                   <div className="chat-product-mobile" hidden={!pendingProductId}>
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
@@ -1167,13 +1242,13 @@ const MessagesPageContent = () => {
                       <span>Marketplace product</span>
                     </div>
                   </div>
-                  {!activeId?.startsWith("draft:") && (loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
-                    <PrivateSkeleton variant="chat" count={6} />
+                  {!historyError && !activeId?.startsWith("draft:") && (loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
+                    <div className="chat-initial-loading" role="status">Loading messages...</div>
                   ) : (
                     <>
                       {visibleMessages.map((item) => (
                         <article
-                          className={`${item.senderId === user?.uid ? "mine" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
+                          className={`${item.senderId === user?.uid ? "mine" : ""}${item.messageType === "voice" ? " voice-bubble" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
                           onMouseDown={() => handleMessageMouseDown(item)}
                           onMouseLeave={clearLongPressTimer}
@@ -1186,31 +1261,10 @@ const MessagesPageContent = () => {
                             {item.productImage ? <img src={item.productImage} alt="" /> : <ImageOutlinedIcon />}
                             <span><small>About this product</small><strong>{item.productTitle}</strong></span>
                           </Link> : null}
-                          {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" && item.audioDataUrl ? (
-                            <div className="voice-message">
-                              <MicNoneOutlinedIcon />
-                              <audio controls src={item.audioDataUrl}>
-                                <track kind="captions" />
-                              </audio>
-                              <span>{formatVoiceTime(item.audioDurationSeconds || 0)}</span>
-                            </div>
-                          ) : item.messageType === "image" && (item.attachmentUrl || item.attachmentDataUrl) ? (
-                            <figure className="chat-attachment chat-photo-message">
-                              <button type="button" onClick={() => setImagePreview({ src: item.attachmentUrl || item.attachmentDataUrl || "", caption: item.message, message: item })} aria-label="Open photo">
-                                <img src={item.attachmentUrl || item.attachmentDataUrl} alt={item.attachmentName || item.message || "Shared photo"} />
-                              </button>
-                              <figcaption>{item.message && item.message !== "Photo" ? item.message : item.attachmentName || "Photo"}</figcaption>
-                            </figure>
-                          ) : item.messageType === "document" && item.attachmentMimeType?.startsWith("video/") && item.attachmentDataUrl ? (
-                            <figure className="chat-attachment chat-video-message"><video controls playsInline preload="metadata" src={item.attachmentDataUrl} /><figcaption>{item.message && item.message !== "Video" ? item.message : item.attachmentName || "Video"}</figcaption><a href={item.attachmentDataUrl} download={item.attachmentName || "video"}>Save video</a></figure>
-                          ) : item.messageType === "document" && item.attachmentDataUrl ? (
-                            <a className="chat-attachment chat-document-message" href={item.attachmentDataUrl} download={item.attachmentName || "document"} target="_blank" rel="noreferrer">
-                              <DescriptionOutlinedIcon />
-                              <span>
-                                <strong>{item.attachmentName || "Document"}</strong>
-                                <small>{item.attachmentMimeType || "File"}</small>
-                              </span>
-                            </a>
+                          {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" ? (
+                            <VoiceMessagePlayer message={item} owner={user?.uid || ""} mine={item.senderId === user?.uid} avatar={item.senderId === user?.uid ? user?.avatar : active.profileImage} name={item.senderId === user?.uid ? user?.displayName || "You" : getConversationName(active, user?.uid)} />
+                          ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
+                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={() => { if (nearBottomRef.current) scrollToBottom("auto"); }} />
                           ) : (
                             <p>{item.message || "Message"}</p>
                           )}
@@ -1280,7 +1334,7 @@ const MessagesPageContent = () => {
                     </span>
                     <div>
                       <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge level={active.verificationLevel} status={active.verificationStatus} /></strong>
-                      <small>{active.typing ? "Typing..." : formatLastSeen(active)}</small>
+                      <small>{active.typing ? "Typing..." : connectionState === "live" ? formatLastSeen(active) : connectionState === "offline" ? "Offline" : "Connecting..."}</small>
                     </div>
                   </div>
                   <div className="chat-header-actions">
@@ -1300,8 +1354,8 @@ const MessagesPageContent = () => {
                     </span>
                   </div>
                 </header>
-                {connectionState !== "live" ? <div className="chat-connection-status" role="status">{connectionState === "offline" ? "Offline. Messages will send when you reconnect." : "Connecting..."}</div> : null}
                 <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
+                  {historyError ? <div className="chat-history-error" role="status">{historyError}<button type="button" onClick={() => void (historyError.startsWith("Earlier") ? loadOlder() : loadMessages())}>Retry</button></div> : null}
                   {historyCursor ? <button type="button" className="chat-history-more" disabled={loadingOlder} onClick={() => void loadOlder()}>{loadingOlder ? "Loading earlier messages..." : "Earlier messages"}</button> : null}
                   <div className="chat-product-mobile" hidden={!pendingProductId}>
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
@@ -1310,13 +1364,13 @@ const MessagesPageContent = () => {
                       <span>Marketplace product</span>
                     </div>
                   </div>
-                  {!activeId?.startsWith("draft:") && (loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
-                    <PrivateSkeleton variant="chat" count={6} />
+                  {!historyError && !activeId?.startsWith("draft:") && (loadingMessages || loadedMessageId !== activeId) && !visibleMessages.length ? (
+                    <div className="chat-initial-loading" role="status">Loading messages...</div>
                   ) : (
                     <>
                       {visibleMessages.map((item) => (
                         <article
-                          className={`${item.senderId === user?.uid ? "mine" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
+                          className={`${item.senderId === user?.uid ? "mine" : ""}${item.messageType === "voice" ? " voice-bubble" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
                           onMouseDown={() => handleMessageMouseDown(item)}
                           onMouseLeave={clearLongPressTimer}
@@ -1329,31 +1383,10 @@ const MessagesPageContent = () => {
                             {item.productImage ? <img src={item.productImage} alt="" /> : <ImageOutlinedIcon />}
                             <span><small>About this product</small><strong>{item.productTitle}</strong></span>
                           </Link> : null}
-                          {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" && item.audioDataUrl ? (
-                            <div className="voice-message">
-                              <MicNoneOutlinedIcon />
-                              <audio controls src={item.audioDataUrl}>
-                                <track kind="captions" />
-                              </audio>
-                              <span>{formatVoiceTime(item.audioDurationSeconds || 0)}</span>
-                            </div>
-                          ) : item.messageType === "image" && (item.attachmentUrl || item.attachmentDataUrl) ? (
-                            <figure className="chat-attachment chat-photo-message">
-                              <button type="button" onClick={() => setImagePreview({ src: item.attachmentUrl || item.attachmentDataUrl || "", caption: item.message, message: item })} aria-label="Open photo">
-                                <img src={item.attachmentUrl || item.attachmentDataUrl} alt={item.attachmentName || item.message || "Shared photo"} />
-                              </button>
-                              <figcaption>{item.message && item.message !== "Photo" ? item.message : item.attachmentName || "Photo"}</figcaption>
-                            </figure>
-                          ) : item.messageType === "document" && item.attachmentMimeType?.startsWith("video/") && item.attachmentDataUrl ? (
-                            <figure className="chat-attachment chat-video-message"><video controls playsInline preload="metadata" src={item.attachmentDataUrl} /><figcaption>{item.message && item.message !== "Video" ? item.message : item.attachmentName || "Video"}</figcaption><a href={item.attachmentDataUrl} download={item.attachmentName || "video"}>Save video</a></figure>
-                          ) : item.messageType === "document" && item.attachmentDataUrl ? (
-                            <a className="chat-attachment chat-document-message" href={item.attachmentDataUrl} download={item.attachmentName || "document"} target="_blank" rel="noreferrer">
-                              <DescriptionOutlinedIcon />
-                              <span>
-                                <strong>{item.attachmentName || "Document"}</strong>
-                                <small>{item.attachmentMimeType || "File"}</small>
-                              </span>
-                            </a>
+                          {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" ? (
+                            <VoiceMessagePlayer message={item} owner={user?.uid || ""} mine={item.senderId === user?.uid} avatar={item.senderId === user?.uid ? user?.avatar : active.profileImage} name={item.senderId === user?.uid ? user?.displayName || "You" : getConversationName(active, user?.uid)} />
+                          ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
+                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={() => { if (nearBottomRef.current) scrollToBottom("auto"); }} />
                           ) : (
                             <p>{item.message || "Message"}</p>
                           )}

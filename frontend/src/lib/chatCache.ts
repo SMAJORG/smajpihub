@@ -7,6 +7,12 @@ export function readChatCache<T>(uid: string | undefined, key: string, fallback:
 export function writeChatCache(uid: string | undefined, key: string, value: unknown) {
   if (!uid) return false;
   const storageKey = prefix + uid + ":" + key;
+  // Confirmed history stores metadata; binary downloads live in the media cache.
+  if (Array.isArray(value) && key !== "outbox") value = value.map(item => {
+    if (!item?.conversationId || item.deliveryState) return item;
+    const { audioDataUrl, attachmentDataUrl, ...metadata } = item;
+    return { ...metadata, ...(audioDataUrl || attachmentDataUrl ? { mediaAvailable: true } : {}) };
+  });
   try { localStorage.setItem(storageKey, JSON.stringify(value)); return true; }
   catch {
     // Give unsent messages priority over replaceable history when storage is full.

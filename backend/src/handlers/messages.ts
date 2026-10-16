@@ -5,6 +5,16 @@ import { createNotification } from "../services/notifications";
 import { resolveCurrentUser } from "../services/auth";
 
 const serialize = (item: Record<string, any>) => ({ ...item, _id: item._id.toString() });
+const lightMessage = (item: Record<string, any>) => {
+  const { audioDataUrl, attachmentDataUrl, ...metadata } = item;
+  return { ...serialize(metadata), mediaAvailable: !item.deletedForEveryone && (Boolean(audioDataUrl || attachmentDataUrl) || item.messageType === "voice" || item.messageType === "document" || (item.messageType === "image" && !item.attachmentUrl)) };
+};
+const historyPage = async (req: any, id: string, uid: string, limit: number, before = "", light = false) => {
+  const records = await req.app.locals.messageCollection.find({ conversationId: id, hiddenFor: { $ne: uid }, ...(before ? { _id: { $lt: new ObjectId(before) } } : {}) }, light ? { projection: { audioDataUrl: 0, attachmentDataUrl: 0 } } : {}).sort({ _id: -1 }).limit(limit + 1).toArray();
+  const hasMore = records.length > limit;
+  const messages = records.slice(0, limit).reverse();
+  return { messages: messages.map(light ? lightMessage : serialize), hasMore, nextCursor: hasMore ? messages[0]?._id.toString() : null };
+};
 const TYPING_WINDOW_MS = 5 * 1000;
 const verificationStatus = (user: any) => ["none", "pending", "approved", "rejected"].includes(user?.verificationStatus) ? user.verificationStatus : user?.verificationRequested ? "pending" : "none";
 const hasCompletePiProfile = (user: any) => Boolean(user?.displayName && user?.piUsername && user?.country && user?.contactPhone && user?.avatar && user?.bio);
@@ -169,7 +179,13 @@ export default function mountMessageEndpoints(router: Router) {
     });
     const merged = (await Promise.all([...grouped.values()].map((items) => mergePairConversations(req, items)))).filter(Boolean) as Array<Record<string, any>>;
     merged.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-    return res.status(200).json({ conversations: await enrichConversations(req, currentUser, merged) });
+    const previews: Record<string, any> = {};
+    if (req.query.includePreviews === "1") {
+      const queue = merged.slice(0, 20);
+      const worker = async () => { while (queue.length) { const item = queue.shift()!; const id = item._id.toString(); previews[id] = await historyPage(req, id, uid, 12, "", true); } };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+    }
+    return res.status(200).json({ conversations: await enrichConversations(req, currentUser, merged), ...(req.query.includePreviews === "1" ? { previews } : {}) });
   });
 
   router.post("/start", async (req, res) => {
@@ -236,9 +252,7 @@ export default function mountMessageEndpoints(router: Router) {
     const before = String(req.query.before || "");
     if (before && !ObjectId.isValid(before)) return res.status(400).json({ message: "Invalid history cursor" });
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
-    const records = await req.app.locals.messageCollection.find({ conversationId: req.params.id, hiddenFor: { $ne: uid }, ...(before ? { _id: { $lt: new ObjectId(before) } } : {}) }).sort({ _id: -1 }).limit(limit + 1).toArray();
-    const hasMore = records.length > limit;
-    const messages = records.slice(0, limit).reverse();
+    const page = await historyPage(req, req.params.id, uid, limit, before, req.query.light === "1");
     if (!before && req.query.preview !== "true") {
       const readAt = new Date();
       await req.app.locals.messageCollection.updateMany({ conversationId: req.params.id, senderId: { $ne: uid }, hiddenFor: { $ne: uid }, readAt: { $exists: false } }, { $set: { readAt } });
@@ -246,7 +260,26 @@ export default function mountMessageEndpoints(router: Router) {
     }
     const [enrichedConversation] = await enrichConversations(req, currentUser, [conversation]);
     res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json({ conversation: enrichedConversation, messages: messages.map(serialize), hasMore, nextCursor: hasMore ? messages[0]?._id.toString() : null });
+    return res.status(200).json({ conversation: enrichedConversation, ...page });
+  });
+
+  router.get("/:id/messages/:messageId/media", async (req, res) => {
+    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.messageId)) return res.status(400).json({ message: "Invalid media id" });
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const conversation = await req.app.locals.conversationCollection.findOne({ _id: new ObjectId(req.params.id), participants: user.uid, deletedBy: { $ne: user.uid } });
+    if (!conversation || (conversation.contextType === "jobs" && (!conversation.applicationId || !conversation.jobId || (!conversation.lastMessage && conversation.sellerId !== user.uid)))) return res.status(404).json({ message: "Media not found" });
+    const message = await req.app.locals.messageCollection.findOne({ _id: new ObjectId(req.params.messageId), conversationId: req.params.id, hiddenFor: { $ne: user.uid }, deletedForEveryone: { $ne: true } });
+    if (!message) return res.status(404).json({ message: "Media not found" });
+    const value = String(message.audioDataUrl || message.attachmentDataUrl || "");
+    const match = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+)(?:;codecs=[a-z0-9-]+)?;base64,([a-z0-9+/=]+)$/i.exec(value);
+    if (!match || value.length > MAX_MESSAGE_DOCUMENT_BYTES) return res.status(404).json({ message: "Media not found" });
+    const mime = match[1].toLowerCase();
+    const inline = /^(audio\/(webm|mp4|mpeg|ogg|wav)|video\/(mp4|webm|ogg)|image\/(png|jpeg|jpg|webp|gif))$/.test(mime);
+    res.setHeader("Content-Type", inline ? mime : "application/octet-stream");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", (inline ? "inline" : "attachment") + "; filename*=UTF-8''" + encodeURIComponent(safeAttachmentName(message.attachmentName || "voice-note")));
+    return res.send(Buffer.from(match[2], "base64"));
   });
 
   router.post("/:id/typing", async (req, res) => {

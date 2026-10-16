@@ -10,6 +10,8 @@ const RETRY_DELAYS_MS = [1_500, 3_000] as const;
 const STARTUP_NOTICE_COOLDOWN_MS = 15_000;
 let lastStartupNoticeAt = 0;
 
+declare module "axios" { interface AxiosRequestConfig { smajSkipReadRetry?: boolean } }
+
 type RetryableRequestConfig = AxiosRequestConfig & {
   __smajRetryCount?: number;
 };
@@ -90,6 +92,7 @@ axiosClient.interceptors.response.use(
   },
   async error => {
     const config = error?.config as RetryableRequestConfig | undefined;
+    if (axios.isCancel(error) || config?.signal?.aborted) return Promise.reject(error);
     const method = String(config?.method || "get").toLowerCase();
     const status = Number(error?.response?.status || 0);
     if (status === 401 && error?.response?.data?.error === "session_revoked" && typeof window !== "undefined") {
@@ -115,7 +118,7 @@ axiosClient.interceptors.response.use(
       }
     }
 
-    if (config && isReadRequest && isTemporaryFailure && retryCount < MAX_READ_RETRIES) {
+    if (config && !config.smajSkipReadRetry && isReadRequest && isTemporaryFailure && retryCount < MAX_READ_RETRIES) {
       config.__smajRetryCount = retryCount + 1;
       await new Promise(resolve => window.setTimeout(resolve, RETRY_DELAYS_MS[retryCount]));
       return axiosClient.request(config);

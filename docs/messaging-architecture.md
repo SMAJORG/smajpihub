@@ -21,3 +21,24 @@ Run from the repository root:
 The backend route harness simulates Mongo query/update behavior and unique-key conflicts. It covers concurrent first sends, retry deduplication, participant access, account mismatch, pagination, reconnect signatures, read receipts, deleted inbox restoration, and Jobs restrictions. Frontend tests render the actual chat page before effects/network work, check cached/new chat rendering and refresh/account isolation, and exercise reconnect pagination and delayed-response cancellation.
 
 These tests do not run against a deployed MongoDB cluster or physical devices. Verify production index creation on deployment and smoke-test web, Pi Browser and the rebuilt Capacitor application, including native background/resume and airplane-mode send/reconnect. No Android native code or authentication implementation changes are required by this change.
+
+
+## Lightweight previews and voice players
+
+The updated client opts into GET /messages?includePreviews=1 for the initial inbox. The response includes a previews map containing the latest 12 messages for up to 20 conversations. It hydrates account-scoped metadata caches before publishing inbox rows. Additional visible/nearby rows use a two-request priority queue; focus or pointer interaction promotes the chosen row. Preview reads never mark messages read. Active GET /messages/:id requests use light=1, have a ten-second timeout, share in-flight work, and cancel on chat/account changes. Older clients retain the full response by default.
+
+Lightweight responses omit audioDataUrl and attachmentDataUrl and expose mediaAvailable. Message IDs, stored duration, attachment metadata, and pagination remain available immediately. Confirmed local history also excludes base64 payloads; unsent outbox payloads remain intact. First-ever uncached history still requires network access and shows compact loading or a retry card. Background failures retain history and indicate reconnecting in the participant header instead of a recording-error footer. Axios cancellation bypasses retries and global feedback.
+
+GET /messages/:id/messages/:messageId/media returns binary inline media using the existing session/bearer authentication. It checks conversation membership, deleted inbox state, hidden/deleted messages, and Jobs visibility. It uses no-store and nosniff headers and forces non-media documents to download. Remote attachment URLs and legacy inline client responses remain supported.
+
+VoiceMessagePlayer is shared by both chat layouts. It shows a stored total duration before downloading, elapsed time during playback/pause, total duration at completion, a seek slider, sender avatar, and real decoded waveform samples where the codec is supported. Neutral bars are used until decoding succeeds. Playback is exclusive across players. Downloads use Axios blob responses with an expected account header, never credentials in URLs. IndexedDB stores downloaded media under owner/conversation/message keys, with least-recently-used eviction at 25 MB per account. Offline uncached files show an explicit download message; object URLs and pending requests are cleaned up on unmount.
+
+Additional unit checks:
+
+    node --test frontend/tests/chatMedia.test.cjs frontend/tests/chatNavigation.test.cjs backend/tests/messaging.test.cjs
+
+The browser interaction test bundles the actual chat page/player, substituting only test authentication and decorative icon assets. It uses a local HTTP API fixture and never contacts production. Install playwright-core in a development environment or set PLAYWRIGHT_CORE_PATH to an available package; set CHAT_TEST_BROWSER to an existing Chromium/Edge executable when needed, then run:
+
+    node --test frontend/tests/chatInteraction.test.cjs
+
+It covers cached rows beyond the old preload limit, delayed-response cancellation, row-25 warming, duration/elapsed time, seeking, exclusive playback, keyboard-sized viewports, cached refresh failures, uncached retry, offline downloaded playback, and account isolation. Without Playwright the browser test reports a skip; the unit tests do not require it. Physical Pi Browser/Android playback and native keyboard behavior still require device smoke testing.
