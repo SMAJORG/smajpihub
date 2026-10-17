@@ -1,3 +1,4 @@
+import { buildWalletActivity } from "../services/walletActivity";
 import { verifyIncomingPayment, bindPayment, validPaymentId } from "../services/financialIntegrity";
 import { Request, Response, Router } from "express";
 import { ObjectId } from "mongodb";
@@ -93,6 +94,13 @@ export default function mountPaymentsEndpoints(router: Router) {
     }, { total: 0, paid: 0, pending: 0, cancelled: 0 });
     return res.status(200).json({ payments, summary, serverTime: new Date().toISOString() });
   });
+
+  router.get("/activity", paymentRoute(async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(await buildWalletActivity(req.app.locals, user, req.query));
+  }));
 
   router.post("/incomplete", paymentRoute(async (req, res) => {
     const user = await requireUser(req, res);
