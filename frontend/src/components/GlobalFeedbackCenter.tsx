@@ -18,11 +18,18 @@ const feedbackSelector = [
   ".sw-profile-message",
 
   ".stream-download-error",
+  ".voice-recorder-error",
+  ".conversation-selection-error",
+  ".voice-player-error",
+  ".chat-attachment small[role=status]",
 ].join(",");
 
 const typeForNode = (node: Element): FeedbackType => {
   const text = (node.textContent || "").toLowerCase();
   if (["could not", "failed", "unable", "unavailable", "cannot", "expired", "not found", "try again"].some(term => text.includes(term))) return "error";
+  if (text === "report sent for review.") return "success";
+  if (node.classList.contains("voice-recorder-error")) return text === "conversation muted." || text.startsWith("user blocked locally.") ? "info" : "error";
+  if (node.classList.contains("conversation-selection-error") || node.classList.contains("voice-player-error") || node.matches(".chat-attachment small[role=status]")) return "error";
   if (node.classList.contains("error") || node.classList.contains("stream-download-error")) return "error";
   if (node.classList.contains("success")) return "success";
   if (node.classList.contains("warning")) return "warning";
