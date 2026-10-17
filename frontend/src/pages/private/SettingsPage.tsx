@@ -280,7 +280,6 @@ const SettingsPage = () => {
 
   return (
     <main className="private-page settings-page">
-      <AdPrivacyControls />
       <LanguageSoonButton />
       <header className="settings-topbar">
         <button type="button" aria-label="Back to account" onClick={() => navigate("/settings")}><ArrowBackIosNewOutlinedIcon /></button>
@@ -350,6 +349,7 @@ const SettingsPage = () => {
 
         <section>
           <h2>Privacy & Security</h2>
+          <AdPrivacyControls />
           <Link className="settings-device-link" to="/settings/security/app-lock"><span className="settings-device-icon" aria-hidden="true"><LockOutlinedIcon /></span><span><strong>App Lock</strong><small>Fingerprint, face, or device credential protection</small></span><ChevronRightOutlinedIcon aria-hidden="true" /></Link>
           <Link className="settings-device-link" to="/settings/devices"><span className="settings-device-icon" aria-hidden="true"><DevicesOutlinedIcon /></span><span><strong>Devices & Sessions</strong><small>Manage active web and Android logins</small></span><ChevronRightOutlinedIcon aria-hidden="true" /></Link>
           <label className="setting-line toggle-line"><span><strong>Show profile publicly</strong><small>Allow marketplace users to see your public seller or buyer profile.</small></span><input type="checkbox" role="switch" checked={form.publicProfile} onChange={(event) => setField("publicProfile", event.target.checked)} /></label>

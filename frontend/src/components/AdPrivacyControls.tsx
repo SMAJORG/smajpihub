@@ -18,8 +18,9 @@ export default function AdPrivacyControls() {
     }
   };
   return (
-    <section aria-label="Advertising privacy" style={{ padding: 16 }}>
-      <h2>Advertising privacy</h2>
+    <details className="settings-ad-privacy">
+      <summary className="setting-line"><span><strong>Advertising privacy</strong><small>Manage optional ads and consent on this device</small></span><span className="settings-ad-chevron" aria-hidden="true">&#8250;</span></summary>
+      <section aria-label="Advertising privacy options" className="settings-ad-options">
       <p>Optional ads help support SMAJ PI HUB. You can use every app feature with ads disabled.</p>
       <button type="button" disabled={busy} onClick={() => void change(!consent.allowed)}>
         {consent.allowed ? "Disable ads on this device" : "Review consent and allow test ads"}
@@ -49,6 +50,7 @@ export default function AdPrivacyControls() {
         </button>
       ) : null}
       <p role="status">{message}</p>
-    </section>
+      </section>
+    </details>
   );
 }
