@@ -14,6 +14,7 @@ const AdminHeroBannersPage = () => {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [busyId, setBusyId] = useState("");
 
   const load = useCallback(async () => {
     setError("");
@@ -71,14 +72,24 @@ const AdminHeroBannersPage = () => {
 
   const remove = async (banner: HeroBanner) => {
     if (!window.confirm(`Delete ${banner.title || "this banner"}?`)) return;
-    await axiosClient.delete(`/admin/hero-banners/${banner._id}`);
-    setMessage("Banner deleted.");
-    await load();
+    setBusyId(banner._id); setError(""); setMessage("");
+    try {
+      await axiosClient.delete(`/admin/hero-banners/${banner._id}`);
+      if (editingId === banner._id) { setEditingId(""); setForm(emptyForm); }
+      setMessage("Banner deleted.");
+      await load();
+    } catch (reason: any) { setError(reason?.response?.data?.message || "Could not delete banner. Please retry."); }
+    finally { setBusyId(""); }
   };
 
   const toggle = async (banner: HeroBanner) => {
-    await axiosClient.patch(`/admin/hero-banners/${banner._id}`, { active: !banner.active });
-    await load();
+    setBusyId(banner._id); setError(""); setMessage("");
+    try {
+      await axiosClient.patch(`/admin/hero-banners/${banner._id}`, { active: !banner.active });
+      setMessage(banner.active ? "Banner hidden." : "Banner shown.");
+      await load();
+    } catch (reason: any) { setError(reason?.response?.data?.message || "Could not change banner visibility. Please retry."); }
+    finally { setBusyId(""); }
   };
 
   const importExisting = async () => {
@@ -93,7 +104,7 @@ const AdminHeroBannersPage = () => {
   };
 
   return <main className="private-page admin-hero-page">
-    <section className="private-page-head"><div><p className="private-kicker">ADMIN PANEL</p><h1>Hero Banners</h1><p>Manage Dashboard and Store carousel images.</p></div><button type="button" className="private-secondary-button" disabled={importing} onClick={() => void importExisting()}>{importing ? "Importing..." : "Import existing banners"}</button></section>
+    <section className="private-page-head"><div><p className="private-kicker">ADMIN PANEL</p><h1>Dashboard &amp; Store Banners</h1><p>Add banners, replace images, edit or clear text, change colors and order, or hide and delete banners.</p></div><button type="button" className="private-secondary-button" disabled={importing} onClick={() => void importExisting()}>{importing ? "Importing..." : "Import existing banners"}</button></section>
     {message ? <div className="private-alert success">{message}</div> : null}
     {error ? <div className="private-alert error admin-hero-load-error"><span>{error}</span><button type="button" onClick={() => void load()}>Retry</button></div> : null}
     <form className="admin-hero-form" onSubmit={submit}>
@@ -111,8 +122,8 @@ const AdminHeroBannersPage = () => {
       </div>
     </form>
     <section className="admin-hero-list">
-      {banners.map((banner) => <article key={banner._id}><img src={banner.image} alt={banner.title || `${banner.placement} banner`} /><div><span>{banner.placement} · order {banner.order}{banner.sourceKey ? " · built-in" : ""}</span><h2>{banner.title || "Untitled banner"}</h2><p>{banner.subtitle || "No description"}</p><strong className={banner.active ? "active" : "inactive"}>{banner.active ? "Active" : "Hidden"}</strong></div><div><button onClick={() => edit(banner)}>Edit</button><button onClick={() => void toggle(banner)}>{banner.active ? "Hide" : "Show"}</button><button className="danger" onClick={() => void remove(banner)}>Delete</button></div></article>)}
-      {!banners.length ? <div className="private-state"><h2>No managed banners yet</h2><p>The existing built-in images remain visible until you add active banners.</p></div> : null}
+      {banners.map((banner) => <article key={banner._id}><img src={banner.image} alt={banner.title || `${banner.placement} banner`} /><div><span>{banner.placement} · order {banner.order}{banner.sourceKey ? " · built-in" : ""}</span><h2>{banner.title || "Untitled banner"}</h2><p>{banner.subtitle || "No description"}</p><strong className={banner.active ? "active" : "inactive"}>{banner.active ? "Active" : "Hidden"}</strong></div><div><button disabled={Boolean(busyId) || saving} onClick={() => edit(banner)}>Edit</button><button disabled={Boolean(busyId) || saving} onClick={() => void toggle(banner)}>{banner.active ? "Hide" : "Show"}</button><button className="danger" disabled={Boolean(busyId) || saving} onClick={() => void remove(banner)}>Delete</button></div></article>)}
+      {!banners.length ? <div className="private-state"><h2>No managed banners yet</h2><p>Add a banner above, or import the built-in banners to edit them. Hidden and deleted banners stay off the page.</p></div> : null}
     </section>
   </main>;
 };

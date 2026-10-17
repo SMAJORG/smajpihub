@@ -131,7 +131,7 @@ export default function mountAdminEndpoints(router: Router) {
   router.get("/hero-banners", async (req, res) => {
     const collection = req.app.locals.heroBannerCollection;
     if (!collection) return res.status(503).json({ error: "service_unavailable", message: "Hero banner storage is still starting." });
-    const banners = await collection.find({}).sort({ order: 1 }).toArray();
+    const banners = await collection.find({ deleted: { $ne: true } }).sort({ order: 1 }).toArray();
     return res.status(200).json({ banners: banners.map(serialize) });
   });
 
@@ -145,7 +145,7 @@ export default function mountAdminEndpoints(router: Router) {
       { upsert: true },
     )));
     const imported = results.filter((result: Record<string, any>) => result.upsertedId).length;
-    const banners = await collection.find({}).sort({ order: 1 }).toArray();
+    const banners = await collection.find({ deleted: { $ne: true } }).sort({ order: 1 }).toArray();
     return res.status(200).json({ message: imported ? `Imported ${imported} existing banner${imported === 1 ? "" : "s"}.` : "Existing banners are already imported.", imported, banners: banners.map(serialize) });
   });
 
@@ -163,8 +163,8 @@ export default function mountAdminEndpoints(router: Router) {
   router.patch("/hero-banners/:id", async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid banner id." });
     try {
-      await req.app.locals.heroBannerCollection.updateOne({ _id: new ObjectId(req.params.id) }, { $set: { ...heroUpdates(req.body || {}, true), updatedAt: new Date() } });
-      const banner = await req.app.locals.heroBannerCollection.findOne({ _id: new ObjectId(req.params.id) });
+      await req.app.locals.heroBannerCollection.updateOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } }, { $set: { ...heroUpdates(req.body || {}, true), updatedAt: new Date() } });
+      const banner = await req.app.locals.heroBannerCollection.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } });
       if (!banner) return res.status(404).json({ error: "not_found", message: "Banner not found." });
       return res.status(200).json({ message: "Hero banner updated.", banner: serialize(banner) });
     } catch (error: any) {
@@ -174,8 +174,8 @@ export default function mountAdminEndpoints(router: Router) {
 
   router.delete("/hero-banners/:id", async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid banner id." });
-    const result = await req.app.locals.heroBannerCollection.deleteOne({ _id: new ObjectId(req.params.id) });
-    if (!result.deletedCount) return res.status(404).json({ error: "not_found", message: "Banner not found." });
+    const result = await req.app.locals.heroBannerCollection.updateOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } }, { $set: { deleted: true, active: false, updatedAt: new Date() } });
+    if (!result.matchedCount) return res.status(404).json({ error: "not_found", message: "Banner not found." });
     return res.status(200).json({ message: "Hero banner deleted." });
   });
 

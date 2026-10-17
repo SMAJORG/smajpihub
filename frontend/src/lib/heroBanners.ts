@@ -13,7 +13,7 @@ export type HeroBanner = {
   order: number;
 };
 
-export const getHeroBanners = async (placement: HeroBanner["placement"]) => {
-  const { data } = await axiosClient.get<{ banners: HeroBanner[] }>("/hero-banners", { params: { placement } });
-  return data.banners;
+export const getHeroBannerState = async (placement: HeroBanner["placement"]) => {
+  const { data } = await axiosClient.get<{ banners: HeroBanner[]; managed?: boolean }>("/hero-banners", { params: { placement } });
+  return { banners: data.banners, managed: data.managed ?? data.banners.length > 0 };
 };

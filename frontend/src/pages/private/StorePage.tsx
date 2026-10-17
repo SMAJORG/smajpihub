@@ -17,7 +17,7 @@ import { CART_UPDATED_EVENT, getCartQuantity, setBuyNowItem } from "../../lib/st
 import { useAddToCartToast } from "../../hooks/useAddToCartToast";
 import type { Product } from "../../types/marketplace";
 import { heroSlides, promoStripItems } from "../../content/storefront";
-import { getHeroBanners } from "../../lib/heroBanners";
+import { getHeroBannerState } from "../../lib/heroBanners";
 import logoImage from "/assets/services/store.png";
 import { PI_USDT_RATE } from "../../lib/piPricing";
 
@@ -135,14 +135,15 @@ const StorePage = () => {
   }, [mobileMenuOpen]);
 
   useEffect(() => {
+    if (displayHeroSlides.length < 2) return;
     const timer = window.setInterval(() => setHeroIndex((value) => (value + 1) % displayHeroSlides.length), 4800);
     return () => window.clearInterval(timer);
   }, [displayHeroSlides.length]);
 
   useEffect(() => {
-    void getHeroBanners("store").then((banners) => {
-      if (banners.length) {
-        setDisplayHeroSlides(banners.map((banner) => ({ title: banner.title || "SMAJ Store", subtitle: banner.subtitle || "Discover products from SMAJ sellers.", image: banner.image, search: banner.search || banner.title, textColor: banner.textColor || "#ffffff" })));
+    void getHeroBannerState("store").then(({ banners, managed }) => {
+      if (managed) {
+        setDisplayHeroSlides(banners.map((banner) => ({ title: banner.title || "", subtitle: banner.subtitle || "", image: banner.image, search: banner.search || banner.title, textColor: banner.textColor || "#ffffff" })));
         setHeroIndex(0);
       }
     }).catch(() => undefined);
@@ -500,11 +501,11 @@ const StorePage = () => {
           <div>{[...promoStripItems, ...promoStripItems, ...promoStripItems].map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}</div>
         </section>
 
-        <section className="storefront-hero">
+        {displayHeroSlides.length > 0 ? <section className="storefront-hero">
           <button type="button" className="storefront-arrow left" onClick={() => setHeroIndex((value) => (value - 1 + displayHeroSlides.length) % displayHeroSlides.length)} aria-label="Previous banner"><ArrowBackIosNewOutlinedIcon /></button>
           <div className="storefront-hero-track" style={{ transform: `translateX(-${heroIndex * 100}%)` }}>
             {displayHeroSlides.map((slide) => (
-              <article className="storefront-hero-slide" key={slide.title} style={{ color: slide.textColor || "#ffffff" }}>
+              <article className="storefront-hero-slide" key={slide.image + slide.title} style={{ color: slide.textColor || "#ffffff" }}>
                 <img src={slide.image} alt={slide.title} />
                 <div>
                   <span>SMAJ Store</span>
@@ -517,7 +518,7 @@ const StorePage = () => {
           </div>
           <button type="button" className="storefront-arrow right" onClick={() => setHeroIndex((value) => (value + 1) % displayHeroSlides.length)} aria-label="Next banner"><ArrowForwardIosOutlinedIcon /></button>
           <div className="storefront-hero-dots">{displayHeroSlides.map((slide, index) => <button type="button" key={slide.title} className={heroIndex === index ? "active" : ""} onClick={() => setHeroIndex(index)} aria-label={`Go to ${slide.title}`} />)}</div>
-        </section>
+        </section> : null}
 
         {catalogError ? <div className="private-alert error">{catalogError}</div> : null}
         {loading ? <PrivateSkeleton variant="grid" count={6} /> : null}
