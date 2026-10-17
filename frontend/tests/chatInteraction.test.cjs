@@ -31,7 +31,7 @@ test('chat navigation, cancellation, media playback and offline browser interact
   const messages = id => id === conversations[0]._id ? [
     { _id: '100000000000000000000001', conversationId: id, senderId: 'person1', messageType: 'voice', mediaAvailable: true, message: 'Voice message', audioDurationSeconds: 22, createdAt: '2026-10-16T10:00:00Z' },
     { _id: '100000000000000000000002', conversationId: id, senderId: 'alice', messageType: 'voice', mediaAvailable: true, message: 'Voice message', audioDurationSeconds: 11, createdAt: '2026-10-16T10:01:00Z' },
-  ] : [{ _id: `200000000000${id.slice(-12)}`, conversationId: id, senderId: 'alice', message: `Cached history ${Number.parseInt(id, 16)}`, createdAt: '2026-10-16T10:00:00Z' }];
+  ] : id === conversations[13]._id ? Array.from({length: 40}, (_, i) => ({_id: '300000000000' + String(i).padStart(12, '0'), conversationId:id, senderId:i % 2 ? 'alice' : 'person14', message:i === 39 ? 'Cached history 14' : 'Earlier message ' + i, ...(i === 38 ? {messageType:'image',mediaAvailable:true,attachmentName:'fixture-photo'} : {}), createdAt:'2026-10-16T10:00:00Z'})) : [{ _id: `200000000000${id.slice(-12)}`, conversationId: id, senderId: 'alice', message: `Cached history ${Number.parseInt(id, 16)}`, createdAt: '2026-10-16T10:00:00Z' }];
   let delay = 0, failHistory = false;
   const requests = [];
   const wave = Buffer.alloc(44 + 22 * 8000 * 2);
@@ -51,7 +51,7 @@ test('chat navigation, cancellation, media playback and offline browser interact
       const previews = Object.fromEntries(conversations.slice(0, 20).map(item => [item._id, { messages: messages(item._id), nextCursor: null }]));
       return json({ conversations, ...(url.searchParams.get('includePreviews') === '1' ? { previews } : {}) });
     }
-    if (/\/messages\/[^/]+\/messages\/[^/]+\/media$/.test(url.pathname)) { res.writeHead(200, { 'Content-Type': 'audio/wav' }); return res.end(wave); }
+    if (/\/messages\/[^/]+\/messages\/[^/]+\/media$/.test(url.pathname)) { if (url.pathname.includes('/300000')) { res.writeHead(200, {'Content-Type':'image/svg+xml'}); return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="purple"/></svg>'); } res.writeHead(200, { 'Content-Type': 'audio/wav' }); return res.end(wave); }
     if (/^\/messages\/[a-f0-9]{24}$/.test(url.pathname)) {
       if (failHistory) return json({ message: 'Temporary failure' }, 503);
       if (delay) await new Promise(resolve => setTimeout(resolve, delay));
@@ -76,6 +76,21 @@ test('chat navigation, cancellation, media playback and offline browser interact
     await page.getByRole('button', { name: 'Back to messages' }).click();
     await page.locator(`[data-conversation-id="${conversations[13]._id}"]`).click();
     await page.getByText('Cached history 14', { exact: true }).waitFor({ state: 'visible', timeout: 1000 });
+    await page.locator('.chat-photo-frame img').waitFor();
+    await page.waitForFunction(() => document.querySelector('.chat-photo-frame img')?.naturalWidth > 0);
+    const photoUrl = await page.locator('.chat-photo-frame img').getAttribute('src');
+    await page.locator('.chat-messages').evaluate(node => { node.scrollTop = 700; node.dispatchEvent(new Event('scroll')); });
+    const anchorBefore = await page.locator('.chat-messages').evaluate(node => {
+      const item = [...node.querySelectorAll('[data-message-id]')].find(item => item.getBoundingClientRect().bottom > 150);
+      return { id: item.dataset.messageId, top: item.getBoundingClientRect().top };
+    });
+    await page.getByRole('button', { name: 'Back to messages' }).click();
+    await page.locator('[data-conversation-id="' + conversations[13]._id + '"]').click();
+    await page.getByRole('dialog', { name: 'Chat', exact: true }).waitFor();
+    assert.equal(await page.locator('.chat-photo-frame img').getAttribute('src'), photoUrl, 'Reopening reuses the downloaded photo immediately');
+    const anchorAfter = await page.locator('[data-message-id="' + anchorBefore.id + '"]').evaluate(node => node.getBoundingClientRect().top);
+    assert.ok(Math.abs(anchorAfter - anchorBefore.top) < 3, 'Reopening restores the visible message before history refresh: ' + JSON.stringify({anchorBefore,anchorAfter}));
+    assert.equal(await page.locator('.chat-panel-inline:visible').count(), 0);
     await page.waitForTimeout(3200);
     assert.equal(await page.getByText('Cached history 13', { exact: true }).count(), 0);
     assert.equal(await page.locator('.voice-recorder-error').count(), 0);
@@ -90,7 +105,7 @@ test('chat navigation, cancellation, media playback and offline browser interact
     await page.locator(`[data-conversation-id="${conversations[0]._id}"]`).click();
     await page.getByText('0:22', { exact: true }).waitFor({ state: "visible", timeout: 1000 });
     assert.equal(await page.locator('audio[controls]').count(), 0);
-    assert.equal(requests.filter(item => item.path.endsWith('/media')).length, 0);
+    assert.equal(requests.filter(item => item.path.endsWith('/media') && item.path.includes('/100000')).length, 0);
     await page.getByRole('button', { name: 'Play voice note', exact: true }).first().click();
     await page.getByRole('button', { name: 'Pause voice note', exact: true }).waitFor();
     const audio = page.locator('.voice-player audio').first();

@@ -42,3 +42,11 @@ The browser interaction test bundles the actual chat page/player, substituting o
     node --test frontend/tests/chatInteraction.test.cjs
 
 It covers cached rows beyond the old preload limit, delayed-response cancellation, row-25 warming, duration/elapsed time, seeking, exclusive playback, keyboard-sized viewports, cached refresh failures, uncached retry, offline downloaded playback, and account isolation. Without Playwright the browser test reports a skip; the unit tests do not require it. Physical Pi Browser/Android playback and native keyboard behavior still require device smoke testing.
+
+
+### Conversation viewport restoration
+Chat fullscreen state now follows the selected route directly; opening and closing from the inbox commit navigation synchronously. The mobile inbox does not render the alternate inline conversation panel.
+
+The viewport stores an account-scoped message anchor and offset (or a follow-latest flag). Layout effects restore it before paint on opening and history updates. Resize observation retains the anchor as media, the composer, and the keyboard change size. Closing persists the last captured position rather than measuring detached elements. Photos reserve an aspect-ratio frame while downloading; recently viewed object URLs and measured ratios survive navigation in a bounded 25 MB memory cache. Active URLs are leased until their views release them; inactive entries are revoked on eviction. Persistent binary storage remains account-scoped IndexedDB.
+
+The local browser fixture verifies delayed history refresh, reopen-at-anchor behavior, cached photo URL reuse, mobile layout consistency, playback, offline access, and account switching. Native Pi Browser and physical Android behavior still require device verification.

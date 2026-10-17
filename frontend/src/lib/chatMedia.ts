@@ -9,6 +9,74 @@ type Entry = {
   size: number;
   accessed: number;
 };
+// Keep recently viewed photos ready across conversation navigation.
+const photoUrls = new Map<
+  string,
+  { url: string; size: number; users: number; accessed: number }
+>();
+const mediaKey = (owner: string, message: ChatMessage) =>
+  owner + ":" + message.conversationId + ":" + message._id;
+export function cachedPhotoUrl(owner: string, message: ChatMessage) {
+  return photoUrls.get(mediaKey(owner, message))?.url || "";
+}
+export function retainPhotoUrl(
+  owner: string,
+  message: ChatMessage,
+  blob?: Blob,
+) {
+  const key = mediaKey(owner, message);
+  let entry = photoUrls.get(key);
+  if (!entry && blob) {
+    entry = {
+      url: URL.createObjectURL(blob),
+      size: blob.size,
+      users: 0,
+      accessed: Date.now(),
+    };
+    photoUrls.set(key, entry);
+  }
+  if (!entry) return null;
+  entry.users++;
+  entry.accessed = Date.now();
+  const held = entry;
+  const trim = () => {
+    let total = [...photoUrls.values()].reduce(
+      (sum, item) => sum + item.size,
+      0,
+    );
+    for (const [id, item] of [...photoUrls.entries()].sort(
+      (a, b) => a[1].accessed - b[1].accessed,
+    )) {
+      if (total <= CHAT_MEDIA_LIMIT) break;
+      if (item.users) continue;
+      URL.revokeObjectURL(item.url);
+      photoUrls.delete(id);
+      total -= item.size;
+    }
+  };
+  trim();
+  let released = false;
+  return {
+    url: held.url,
+    release: () => {
+      if (released) return;
+      released = true;
+      held.users--;
+      trim();
+    },
+  };
+}
+const photoSizes = new Map<string, number>();
+export function photoRatio(
+  owner: string,
+  message: ChatMessage,
+  ratio?: number,
+) {
+  const key = mediaKey(owner, message);
+  if (ratio && Number.isFinite(ratio))
+    photoSizes.set(key, Math.max(0.65, Math.min(2, ratio)));
+  return photoSizes.get(key) || 4 / 3;
+}
 const openMedia = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open("smaj-chat-media", 1);

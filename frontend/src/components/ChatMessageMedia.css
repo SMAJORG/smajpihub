@@ -162,3 +162,8 @@
   margin-top: 6px;
   font-size: 12px;
 }
+
+/* Reserve the same photo area before and after decoding. */
+.chat-photo-message button.chat-photo-frame { position:relative; display:grid; place-items:center; min-height:0; width:100%; overflow:hidden; background:rgba(127,127,127,.12); }
+.chat-photo-message button.chat-photo-frame img { position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:contain; }
+@media(max-width:1023px) { .chat-panel-inline { display:none !important; } .conversation-item { touch-action:manipulation; } }

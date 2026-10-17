@@ -12,10 +12,11 @@ function compile(path,modules,extra={}) {
  vm.runInNewContext(code,{exports,require:name=>modules[name],localStorage,document:{body:{}},navigator:{onLine:true},Date,Map,Set,URLSearchParams,AbortController,console,...extra});return exports;
 }
 const cache=compile('frontend/src/lib/chatCache.ts',{});
+const viewport=compile('frontend/src/hooks/useChatViewport.ts',{react:React,'../lib/chatCache':cache});
 const history=compile('frontend/src/lib/chatHistory.ts',{});
 function render(query,uid='alice') {
  let requests=0;
- const modules={react:React,'react/jsx-runtime':require('react/jsx-runtime'),'react-dom':{createPortal:children=>children},'react-router-dom':{useSearchParams:()=>[new URLSearchParams(query),()=>{}],Link:({children,...props})=>React.createElement('a',props,children)},axios:{isAxiosError:()=>false},'../../contexts/AuthContext':{useAuthContext:()=>({user:{uid}})},'../../lib/chatCache':cache,'../../lib/axiosClient':{axiosClient:{get:()=>{requests++;return new Promise(()=>{});}}}};
+ const modules={'../../hooks/useChatViewport':viewport,react:React,'react/jsx-runtime':require('react/jsx-runtime'),'react-dom':{createPortal:children=>children},'react-router-dom':{useSearchParams:()=>[new URLSearchParams(query),()=>{}],Link:({children,...props})=>React.createElement('a',props,children)},axios:{isAxiosError:()=>false},'../../contexts/AuthContext':{useAuthContext:()=>({user:{uid}})},'../../lib/chatCache':cache,'../../lib/axiosClient':{axiosClient:{get:()=>{requests++;return new Promise(()=>{});}}}};
  const empty=()=>null;
  const page=compile('frontend/src/pages/private/MessagesPage.tsx',new Proxy(modules,{get:(items,key)=>key in items?items[key]:{default:empty}}));
  const html=renderToString(React.createElement(page.default));return{html,requests};
@@ -39,3 +40,15 @@ test('inbox history warms with at most two concurrent requests, skipping saved c
 test('late previews never overwrite active chat sends or a switched account',async()=>{const memory=new Map();let current=true;await warmup.warmChatHistory(['active','old-account'],{read:id=>memory.get(id),fetch:async id=>{if(id==='active')memory.set(id,[{_id:'optimistic'}]);else current=false;return[{_id:'stale'}];},save:(id,items)=>memory.set(id,items),current:()=>current});assert.equal(memory.get('active')[0]._id,'optimistic');assert.equal(memory.has('old-account'),false);});
 
 test('visible-row warmup prioritizes tapped chats beyond row twenty and cancels obsolete jobs',async()=>{const waiting=new Map(),signals=new Map(),seen=[],saved=new Map();const queue=warmup.createChatWarmup({read:id=>saved.get(id),fetch:(id,signal)=>{seen.push(id);signals.set(id,signal);return new Promise(resolve=>waiting.set(id,resolve));},save:(id,items)=>saved.set(id,items),current:()=>true});queue.enqueue(Array.from({length:25},(_,i)=>String(i+1)));assert.deepEqual(seen,['1','2']);queue.enqueue(['25'],true);waiting.get('1')([{_id:'one'}]);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(seen,['1','2','25']);queue.dispose();assert.ok(signals.get('2').aborted);assert.ok(signals.get('25').aborted);waiting.get('25')([{_id:'late'}]);await new Promise(resolve=>setImmediate(resolve));assert.equal(saved.has('25'),false);});
+
+test('viewport restoration keeps a message anchored when earlier content changes height',()=>{
+ const viewport=compile('frontend/src/hooks/useChatViewport.ts',{react:React,'../lib/chatCache':cache},{getComputedStyle:()=>({getPropertyValue:()=> '76'})});
+ const node={parentElement:{},scrollHeight:3000,clientHeight:600,scrollTop:500,getBoundingClientRect:()=>({top:0})};
+ let contentTop=600;
+ const message={dataset:{messageId:'anchor'},getBoundingClientRect:()=>({top:contentTop-node.scrollTop,bottom:contentTop-node.scrollTop+100})};
+ node.querySelectorAll=()=>[message];
+ const saved=viewport.captureChatPosition(node);
+ assert.equal(saved.atBottom,false);assert.equal(saved.messageId,'anchor');
+ contentTop+=250;viewport.applyChatPosition(node,saved);assert.equal(node.scrollTop,750);
+ viewport.applyChatPosition(node,{atBottom:true,offset:0,scrollTop:0});assert.equal(node.scrollTop,3000);
+});

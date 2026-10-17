@@ -1,11 +1,12 @@
+import { useChatViewport } from "../../hooks/useChatViewport";
 import VoiceMessagePlayer from "../../components/VoiceMessagePlayer";
 import ChatMessageAttachment from "../../components/ChatMessageAttachment";
 import { createChatWarmup } from "../../lib/chatWarmup";
 import { fetchChatHistory } from "../../lib/chatHistory";
 import { readChatCache, writeChatCache, mergeChatMessages, savedChatHistory } from "../../lib/chatCache";
 import { ensureVoicePermission, voiceRecordingError } from "../../lib/voiceRecording";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type TouchEvent } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type TouchEvent } from "react";
+import { createPortal, flushSync } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
@@ -95,6 +96,7 @@ const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   reader.readAsDataURL(blob);
 });
 
+const EMPTY_CHAT_MESSAGES: ChatMessage[] = [];
 const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_CHAT_VIDEO_BYTES = 2_500_000;
 const MAX_CHAT_DOCUMENT_BYTES = 3 * 1024 * 1024;
@@ -157,11 +159,8 @@ const MessagesPageContent = () => {
   const ignoreConversationMousePressRef = useRef(false);
   const recipientId = params.get("recipient");
   const selectedId = params.get("conversation") || (recipientId ? conversations.find(item => item.participantId === recipientId || (item.buyerId === user?.uid ? item.sellerId : item.buyerId) === recipientId)?._id || "draft:" + recipientId : null);
-  const [chatFullscreen, setChatFullscreen] = useState(Boolean(selectedId));
-  useEffect(() => {
-    setChatFullscreen(Boolean(selectedId));
-  }, [selectedId]);
-  useEffect(() => {
+  const chatFullscreen = Boolean(selectedId);
+  useLayoutEffect(() => {
     if (!chatFullscreen && !selectedId) return;
     const viewport = window.visualViewport;
     const updateChatViewport = () => {
@@ -223,7 +222,7 @@ const MessagesPageContent = () => {
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
   const [loadedMessageId, setLoadedMessageId] = useState<string>();
-  const visibleMessages = loadedMessageId === activeId ? messages : messageCache.current.get(activeId || "") || [];
+  const visibleMessages = loadedMessageId === activeId ? messages : messageCache.current.get(activeId || "") || EMPTY_CHAT_MESSAGES;
   useEffect(() => {
     if (loadedMessageId) {
       messageCache.current.set(loadedMessageId, messages);
@@ -274,7 +273,7 @@ const MessagesPageContent = () => {
     return () => { observer.disconnect(); visible.clear(); };
   }, [inboxIds, loadingConversations]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const panel = chatPanelRef.current;
     if (!panel) return;
     const header = panel.querySelector(":scope > header");
@@ -578,7 +577,7 @@ const MessagesPageContent = () => {
     return () => query.removeEventListener("change", update);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setText(readChatCache(user?.uid, "draft-text:" + activeId, ""));
     setSelectedMessageIds(new Set());
     setSelectedConversationIds(new Set());
@@ -618,48 +617,20 @@ const MessagesPageContent = () => {
     typingTimeoutRef.current = window.setTimeout(() => setTyping(false), 1800);
   };
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const container = chatMessagesRef.current;
-    if (!container) return;
-    container.scrollTo({ top: container.scrollHeight, behavior });
-    nearBottomRef.current = true;
-    setShowScrollBottom(false);
-  }, []);
+  const { onScroll: handleChatScroll, restore: restoreChatViewport, save: saveChatViewport, jump: scrollToBottom } = useChatViewport(user?.uid, activeId, chatFullscreen, visibleMessages, chatMessagesRef, nearBottomRef, setShowScrollBottom);
 
   const loadOlder = async () => {
     if (!activeId || !historyCursor || loadingOlder) return;
     const id = activeId;
-    const container = chatMessagesRef.current;
-    const height = container?.scrollHeight || 0;
     setLoadingOlder(true);
     try {
       const { data } = await axiosClient.get<{ messages: ChatMessage[]; nextCursor: string | null }>("/messages/" + id, { params: { before: historyCursor, light: "1" }, smajSkipReadRetry: true, headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" } });
       if (!alive.current || activeIdRef.current !== id) return;
       setMessages(mergeChatMessages(data.messages, messageCache.current.get(id) || []));
       setHistoryCursor(data.nextCursor);
-      requestAnimationFrame(() => { if (container) container.scrollTop += container.scrollHeight - height; });
     } catch { setHistoryError("Earlier messages could not load. Please retry."); }
     finally { if (alive.current) setLoadingOlder(false); }
   };
-  const handleChatScroll = () => {
-    const container = chatMessagesRef.current;
-    if (!container) return;
-    const awayFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight > 90;
-    nearBottomRef.current = !awayFromBottom;
-    setShowScrollBottom(awayFromBottom);
-  };
-
-  useEffect(() => {
-    nearBottomRef.current = true;
-    const timer = window.setTimeout(() => setShowScrollBottom(false), 0);
-    window.requestAnimationFrame(() => scrollToBottom("auto"));
-    return () => window.clearTimeout(timer);
-  }, [activeId, scrollToBottom]);
-
-  useEffect(() => {
-    if (nearBottomRef.current) window.requestAnimationFrame(() => scrollToBottom("auto"));
-  }, [messages, scrollToBottom]);
-
   const send = async (event: FormEvent) => {
     event.preventDefault();
     if (!activeId || !text.trim()) return;
@@ -1166,8 +1137,7 @@ const MessagesPageContent = () => {
                 onFocus={() => warmQueue.current?.enqueue([item._id], true)}
                 onClick={() => {
                   if (selectedConversationIds.size > 0 || conversationLongPressTriggeredRef.current) return;
-                  setParams({ conversation: item._id });
-                  setChatFullscreen(true);
+                  flushSync(() => setParams({ conversation: item._id }));
                 }}
                 onMouseDown={() => handleConversationMouseDown(item)}
                 onMouseLeave={clearConversationLongPressTimer}
@@ -1198,11 +1168,11 @@ const MessagesPageContent = () => {
           {selectedConversations.length ? <div className="conversation-selection-sheet" role="dialog" aria-modal="true" aria-label="Selected chats"><strong>{selectedConversations.length} selected</strong><button type="button" disabled={deletingConversations} onClick={() => void archiveSelectedConversations(inboxFilter !== "archived")}>{inboxFilter === "archived" ? "Unarchive" : "Archive"}</button><button type="button" className="conversation-delete-button" disabled={deletingConversations} onClick={() => void deleteSelectedConversations()}>{deletingConversations ? "Deleting…" : "Delete"}</button><button type="button" disabled={deletingConversations} onClick={() => { setSelectedConversationIds(new Set()); setConversationActionError(""); }}>Cancel</button>{conversationActionError ? <span className="conversation-selection-error" role="alert">{conversationActionError}</span> : null}</div> : null}
         </aside>
         {chatFullscreen && active ? createPortal(
-          <div ref={chatPanelRef} className="chat-panel chat-panel-fullscreen" role="dialog" aria-modal="true" aria-label="Chat">
+          <div key={activeId} ref={chatPanelRef} className="chat-panel chat-panel-fullscreen" role="dialog" aria-modal="true" aria-label="Chat">
             {active ? (
               <>
                 <header>
-                  <button className="chat-mobile-back" onClick={() => { setParams({}); setChatFullscreen(false); }} aria-label="Back to messages">
+                  <button className="chat-mobile-back" onClick={() => { saveChatViewport(); flushSync(() => setParams({})); }} aria-label="Back to messages">
                     <ArrowBackOutlinedIcon />
                   </button>
                   <div className="chat-person">
@@ -1250,6 +1220,7 @@ const MessagesPageContent = () => {
                         <article
                           className={`${item.senderId === user?.uid ? "mine" : ""}${item.messageType === "voice" ? " voice-bubble" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
+                          data-message-id={item._id}
                           onMouseDown={() => handleMessageMouseDown(item)}
                           onMouseLeave={clearLongPressTimer}
                           onMouseUp={(event) => handleMessageMouseUp(item, event)}
@@ -1264,7 +1235,7 @@ const MessagesPageContent = () => {
                           {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" ? (
                             <VoiceMessagePlayer message={item} owner={user?.uid || ""} mine={item.senderId === user?.uid} avatar={item.senderId === user?.uid ? user?.avatar : active.profileImage} name={item.senderId === user?.uid ? user?.displayName || "You" : getConversationName(active, user?.uid)} />
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
-                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={() => { if (nearBottomRef.current) scrollToBottom("auto"); }} />
+                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} />
                           ) : (
                             <p>{item.message || "Message"}</p>
                           )}
@@ -1320,7 +1291,7 @@ const MessagesPageContent = () => {
           </div>,
           document.body
         ) : (
-          <div className="chat-panel">
+          <div className="chat-panel chat-panel-inline">
             {active ? (
               <>
                 <header>
@@ -1372,6 +1343,7 @@ const MessagesPageContent = () => {
                         <article
                           className={`${item.senderId === user?.uid ? "mine" : ""}${item.messageType === "voice" ? " voice-bubble" : ""}${selectedMessageIds.has(item._id) ? " selected" : ""}`}
                           key={item._id}
+                          data-message-id={item._id}
                           onMouseDown={() => handleMessageMouseDown(item)}
                           onMouseLeave={clearLongPressTimer}
                           onMouseUp={(event) => handleMessageMouseUp(item, event)}
@@ -1386,7 +1358,7 @@ const MessagesPageContent = () => {
                           {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" ? (
                             <VoiceMessagePlayer message={item} owner={user?.uid || ""} mine={item.senderId === user?.uid} avatar={item.senderId === user?.uid ? user?.avatar : active.profileImage} name={item.senderId === user?.uid ? user?.displayName || "You" : getConversationName(active, user?.uid)} />
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
-                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={() => { if (nearBottomRef.current) scrollToBottom("auto"); }} />
+                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} />
                           ) : (
                             <p>{item.message || "Message"}</p>
                           )}

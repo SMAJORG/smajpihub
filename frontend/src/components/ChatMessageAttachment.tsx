@@ -1,6 +1,11 @@
 import "./ChatMessageMedia.css";
 import { useEffect, useRef, useState } from "react";
-import { getMessageBlob } from "../lib/chatMedia";
+import {
+  getMessageBlob,
+  cachedPhotoUrl,
+  retainPhotoUrl,
+  photoRatio,
+} from "../lib/chatMedia";
 import type { ChatMessage } from "../types/marketplace";
 
 type Props = {
@@ -15,12 +20,15 @@ export default function ChatMessageAttachment({
   onImage,
   onLoad,
 }: Props) {
-  const [src, setSrc] = useState(message.attachmentUrl || "");
+  const [src, setSrc] = useState(
+    () => cachedPhotoUrl(owner, message) || message.attachmentUrl || "",
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const root = useRef<HTMLElement>(null);
   const controller = useRef<AbortController | null>(null);
-  const objectUrl = useRef("");
+  const lease = useRef<ReturnType<typeof retainPhotoUrl>>(null);
+  const [ratio, setRatio] = useState(() => photoRatio(owner, message));
   const load = async () => {
     if (src || busy) return;
     setBusy(true);
@@ -30,8 +38,8 @@ export default function ChatMessageAttachment({
     try {
       const blob = await getMessageBlob(owner, message, request.signal);
       if (!request.signal.aborted) {
-        objectUrl.current = URL.createObjectURL(blob);
-        setSrc(objectUrl.current);
+        lease.current = retainPhotoUrl(owner, message, blob);
+        setSrc(lease.current?.url || "");
       }
     } catch {
       if (!request.signal.aborted)
@@ -62,13 +70,16 @@ export default function ChatMessageAttachment({
     // Loading is tied to this immutable message, not unrelated parent renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message._id]);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    if (cachedPhotoUrl(owner, message))
+      lease.current = retainPhotoUrl(owner, message);
+    return () => {
       controller.current?.abort();
-      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
-    },
-    [],
-  );
+      lease.current?.release();
+    };
+    // The parent keys this component by immutable message ID.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const image = message.messageType === "image";
   const video = message.attachmentMimeType?.startsWith("video/");
   return (
@@ -82,13 +93,25 @@ export default function ChatMessageAttachment({
         image ? (
           <button
             type="button"
+            className="chat-photo-frame"
+            style={{ aspectRatio: ratio }}
             aria-label="Open photo"
             onClick={() => onImage(src)}
           >
             <img
               src={src}
               alt={message.attachmentName || "Shared photo"}
-              onLoad={onLoad}
+              onLoad={(event) => {
+                const image = event.currentTarget;
+                setRatio(
+                  photoRatio(
+                    owner,
+                    message,
+                    image.naturalWidth / image.naturalHeight,
+                  ),
+                );
+                onLoad();
+              }}
             />
           </button>
         ) : video ? (
@@ -105,7 +128,13 @@ export default function ChatMessageAttachment({
           </a>
         )
       ) : (
-        <button type="button" disabled={busy} onClick={() => void load()}>
+        <button
+          className={image ? "chat-photo-frame" : undefined}
+          style={image ? { aspectRatio: ratio } : undefined}
+          type="button"
+          disabled={busy}
+          onClick={() => void load()}
+        >
           {busy
             ? "Downloading..."
             : image
