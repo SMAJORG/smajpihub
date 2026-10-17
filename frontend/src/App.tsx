@@ -1,3 +1,4 @@
+import SiteContentLoader from "./components/SiteContentLoader";
 import NativeUpdatePrompt from "./components/NativeUpdatePrompt";
 import { useLayoutEffect } from "react";
 import { RouterProvider } from "react-router-dom";
@@ -26,6 +27,7 @@ function App() {
   return (
     <>
       <OfflineStatus />
+      <SiteContentLoader />
       <NativeWelcomeGate>
         <NativeAppLockGate>
         <NativeRuntimeBridge />

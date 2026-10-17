@@ -1,3 +1,4 @@
+import ServiceImage from "../../components/ServiceImage";
 import { useState, type FormEvent } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -53,7 +54,7 @@ const EducationHeader = ({
         <span>Hub</span>
       </Link>
       <Link to="/services/education" className="education-brand">
-        <img src="/assets/services/education.png" alt="" />
+        <ServiceImage slug="education" src="/assets/services/education.png" alt="" />
         <b>SMAJ Education</b>
       </Link>
       <nav className={menuOpen ? "open" : ""} aria-label="Education navigation">

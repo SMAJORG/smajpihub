@@ -1,3 +1,4 @@
+import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
@@ -1234,6 +1235,10 @@ export const router = createBrowserRouter([
         </AdminLayout>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/admin/home-content",
+    element: <ProtectedRoute><AdminLayout><AdminHomeContentPage /></AdminLayout></ProtectedRoute>,
   },
   {
     path: "/admin/heroes",

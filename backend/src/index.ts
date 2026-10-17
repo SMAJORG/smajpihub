@@ -269,6 +269,14 @@ app.use("/marketplace", marketplaceRouter);
 const heroBannerRouter = express.Router();
 mountHeroBannerEndpoints(heroBannerRouter);
 app.use("/hero-banners", heroBannerRouter);
+app.get("/site-content", async (req, res) => {
+  try {
+    if (!req.app.locals.siteContentCollection) return res.status(503).json({message:"Home content storage is starting."});
+    const document = await req.app.locals.siteContentCollection.findOne({_id:"home"});
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({content:document?.content || {services:[],sections:[]},revision:document?.updatedAt || null});
+  } catch { return res.status(503).json({message:"Home content is temporarily unavailable."}); }
+});
 
 const adminRouter = express.Router();
 mountAdminEndpoints(adminRouter);
@@ -409,6 +417,7 @@ const start = async () => {
       );
       app.locals.supportCollection = db.collection("support_requests");
       app.locals.heroBannerCollection = db.collection("hero_banners");
+      app.locals.siteContentCollection = db.collection("site_content");
       app.locals.ambassadorCollection = db.collection(
         "ambassador_applications",
       );

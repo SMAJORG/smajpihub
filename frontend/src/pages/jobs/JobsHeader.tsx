@@ -1,3 +1,4 @@
+import ServiceImage from "../../components/ServiceImage";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -64,7 +65,7 @@ const JobsHeader = ({
         ← Hub
       </Link>
       <NavLink end to="/services/jobs" className="jobs-brand" onClick={() => setMenuOpen(false)}>
-        <img src="/assets/services/jobs.png" alt="" />
+        <ServiceImage slug="jobs" src="/assets/services/jobs.png" alt="" />
         <span>SMAJ Jobs</span>
       </NavLink>
       <nav className={menuOpen ? "open" : ""} aria-label="Jobs navigation">

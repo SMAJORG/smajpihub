@@ -1,3 +1,4 @@
+import { useSiteContent } from "../lib/siteContent";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getServiceLaunchStatus } from "../content/serviceCatalog";
@@ -26,6 +27,7 @@ const displayServiceName = (slug: string) => {
 };
 
 const ServiceLaunchGate = () => {
+  const content = useSiteContent();
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as { serviceLaunch?: string; inProgressEntry?: string } | null;
@@ -60,8 +62,8 @@ const ServiceLaunchGate = () => {
 
   return (
     <ServiceLaunchSplash
-      serviceName={config.name}
-      icon={config.icon}
+      serviceName={content.services.find(service => service.slug === slug)?.name || config.name}
+      icon={content.services.find(service => service.slug === slug)?.icon || config.icon}
       tagline={config.tagline}
       loadingText={`Opening ${config.name.replace("SMAJ ", "")}...`}
       loading={false}

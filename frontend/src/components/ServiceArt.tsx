@@ -1,3 +1,5 @@
+import { useSiteContent } from "../lib/siteContent";
+import { serviceCatalog } from "../content/serviceCatalog";
 import type { CSSProperties } from "react";
 
 const standaloneServiceArt: Record<number, string> = {
@@ -9,7 +11,9 @@ const standaloneServiceArt: Record<number, string> = {
 };
 
 const ServiceArt = ({ index, className = "" }: { index: number; className?: string }) => {
-  const standaloneAsset = standaloneServiceArt[index];
+  const content = useSiteContent();
+  const slug = serviceCatalog.find(service => service.atlasIndex === index)?.slug;
+  const standaloneAsset = content.services.find(service => service.slug === slug)?.icon || standaloneServiceArt[index];
   const column = index % 5;
   const row = Math.floor(index / 5);
   const style = standaloneAsset

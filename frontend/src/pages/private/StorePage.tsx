@@ -1,3 +1,4 @@
+import ServiceImage from "../../components/ServiceImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
@@ -368,7 +369,7 @@ const StorePage = () => {
               <span>Services</span>
             </Link>
             <Link to="/store" className="storefront-brand storefront-brand-link">
-              <img className="storefront-brand-logo" src={logoImage} alt="" />
+              <ServiceImage slug="store" className="storefront-brand-logo" src={logoImage} alt="" />
               <strong>SMAJ Store</strong>
               <span className="environment-badge storefront-environment-badge" aria-label="Testnet beta environment">Testnet / Beta</span>
             </Link>
@@ -394,7 +395,7 @@ const StorePage = () => {
               <MenuOutlinedIcon />
             </button>
             <Link to="/store" className="storefront-mobile-logo" aria-label="SMAJ Store">
-              <img src={logoImage} alt="SMAJ Store" />
+              <ServiceImage slug="store" src={logoImage} alt="SMAJ Store" />
             </Link>
             <span className="environment-badge storefront-mobile-environment-badge" aria-label="Testnet beta environment">Beta</span>
             <div className="storefront-mobile-actions">
@@ -417,7 +418,7 @@ const StorePage = () => {
                 <div className="storefront-mobile-drawer-panels" style={{ transform: mobileMenuPanel === "subcategories" ? "translateX(-50%)" : "translateX(0)" }}>
                   <section className="storefront-mobile-drawer-panel">
                     <header>
-                      <Link to="/store" aria-label="SMAJ Store" onClick={() => setMobileMenuOpen(false)}><img src={logoImage} alt="SMAJ Store" /></Link>
+                      <Link to="/store" aria-label="SMAJ Store" onClick={() => setMobileMenuOpen(false)}><ServiceImage slug="store" src={logoImage} alt="SMAJ Store" /></Link>
                       <button type="button" aria-label="Close menu" onClick={() => setMobileMenuOpen(false)}><CloseOutlinedIcon /></button>
                     </header>
                     <h3>Categories</h3>

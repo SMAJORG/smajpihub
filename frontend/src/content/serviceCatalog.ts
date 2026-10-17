@@ -1,3 +1,4 @@
+import { getSiteContent } from "../lib/siteContent";
 export type ServiceDefinition = {
   slug: string;
   name: string;
@@ -32,6 +33,8 @@ export type ServiceLaunchStatus = "live" | "in-progress" | "coming-soon";
 const liveServiceSlugs = new Set(["store", "stream", "jobs"]);
 
 export const getServiceLaunchStatus = (slug: string): ServiceLaunchStatus => {
+  const configured = getSiteContent().services.find(service => service.slug === slug);
+  if (configured) return configured.status;
   if (liveServiceSlugs.has(slug)) return "live";
   if (slug === "education") return "coming-soon";
   return "in-progress";
@@ -49,3 +52,15 @@ export const serviceAppPath = (slug: string) => {
   if (slug === "food") return "/services/food-delivery";
   return `/services/${slug}`;
 };
+
+// Every existing catalogue consumer reads the same administrator-managed service fields.
+export const defaultServiceCatalog = serviceCatalog.map(service => ({...service,items:[...service.items]}));
+for (const service of serviceCatalog) {
+  const original = {...service};
+  for (const field of ["name","experience","description","items"] as const) Object.defineProperty(service,field,{enumerable:true,get:()=>getSiteContent().services.find(item=>item.slug===service.slug)?.[field] ?? original[field]});
+}
+
+for (const service of serviceCatalog) {
+  Object.defineProperty(service,"live",{enumerable:true,get:()=>getServiceLaunchStatus(service.slug)==="live"});
+  Object.defineProperty(service,"inProgress",{enumerable:true,get:()=>getServiceLaunchStatus(service.slug)==="in-progress"});
+}

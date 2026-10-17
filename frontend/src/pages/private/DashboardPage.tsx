@@ -1,3 +1,4 @@
+import ManagedHomeFeed from "../../components/ManagedHomeFeed";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Hls from "hls.js";
@@ -55,7 +56,6 @@ const lifestyleGroups = [
   { title: "Learning & growth", description: "Build skills and find your next opportunity.", slugs: ["education", "jobs", "agro"] },
   { title: "Entertainment & community", description: "Watch, play, attend, and support causes.", slugs: ["stream", "sports", "events", "charity"] },
 ] as const;
-const serviceGroups = Array.from({ length: 5 }, (_, index) => serviceCatalog.slice(index * 3, index * 3 + 3));
 const popularSearches = ["Electronics", "Phones", "Food", "Cars", "Jobs", "Housing", "Health", "Education", "Transport"];
 const trustedFallbackSellers = [
   { id: "beta-seller-1", name: "SMAJ Verified Market", location: "Global", rating: "4.8", listings: 12 },
@@ -458,17 +458,15 @@ const MobileHome = ({ activeTab, onTabChange, products, productsLoading, product
       <div className="mobile-home-hero-dots" aria-label="Hero slides">{heroImages.map((_, index) => <button type="button" className={index === heroSlide ? "active" : ""} aria-label={`Show hero image ${index + 1}`} aria-current={index === heroSlide ? "true" : undefined} onClick={() => setHeroSlide(index)} key={index} />)}</div>
     </section> : null}
     <div ref={tabsAnchorRef} className={`mobile-home-tabs-anchor ${tabsPinned ? "is-pinned" : ""}`}><DiscoveryTabButtons className="mobile-home-tabs" activeTab={activeTab} onTabChange={handleTabChange} /></div>
-    {activeTab === "for-you" ? <>
-      <RecentlyAddedSection compact products={products} loading={productsLoading} error={productsError} />
-      <FeaturedSellersSection compact sellers={sellers} loading={productsLoading} error={productsError} />
-      <ActivityFeedSection compact products={products} loading={productsLoading} error={productsError} />
-      <TrustSection compact />
-      <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Suggested for you</h2><Link to="/app/services">See all</Link></div><div className="mobile-service-groups">{serviceGroups.map((group, index) => <div className="mobile-service-group" key={index}>{group.map((service) => <Link to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className="mobile-service-app" key={service.slug}><ServiceArt index={service.atlasIndex} /><div><strong>{service.name}</strong><span>{service.items.slice(0, 2).join(" - ")}</span><small className={serviceBadgeClass(service, "rating")}>{getServiceLaunchLabel(service.slug)}</small></div></Link>)}</div>)}</div></section>
-      <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Discover what's new</h2></div><div className="mobile-feature-strip">{featureCards.map((card) => <Link className="mobile-feature-card" to={card.slug === "store" ? "/store" : `/app/services/${card.slug}`} key={card.slug}><img src={card.image} alt="" />{card.slug === "store" ? <b className="live-card-badge feature-live-badge">LIVE</b> : null}<div><h3>{card.title}</h3><p>{card.text}</p><span>Explore <ArrowForwardOutlinedIcon /></span></div></Link>)}</div></section>
-      <DashboardStreamSections rows={streamRows} loading={streamLoading} compact />
-      <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact />
-      {mediaSections.filter((section) => section.slug !== "sports").map((section) => <section className="mobile-feed-section" key={section.slug}><div className="mobile-section-heading"><h2>{section.title}</h2></div><div className="mobile-media-strip">{section.items.map((item, index) => <Link to={`/app/services/${section.slug}`} className="mobile-media-card" key={item}><img src={section.image} alt="" /><div>{section.badges ? <b>{section.badges[index]}</b> : null}<span>{item}</span><small>SMAJ Events</small></div></Link>)}</div></section>)}
-    </> : activeTab === "trending" ? <TrendingMobileContent products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /> : activeTab === "lifestyle" ? <LifestyleMobileContent products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /> : <CategoriesMobileContent products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} />}
+    {activeTab === "for-you" ? <ManagedHomeFeed entries={[
+ {id:"recent",content:<RecentlyAddedSection compact={true} products={products} loading={productsLoading} error={productsError}/>},
+ {id:"sellers",content:<FeaturedSellersSection compact={true} sellers={sellers} loading={productsLoading} error={productsError}/>},
+ {id:"activity",content:<ActivityFeedSection compact={true} products={products} loading={productsLoading} error={productsError}/>},
+ {id:"trust",content:<TrustSection compact={true}/>},
+ {id:"suggested"},{id:"discover"},
+ ...["trending","series","releases"].map((id,index)=>({id,content:<DashboardStreamSections rows={streamRows.filter(row=>row.title===["Trending now","Popular series","New releases"][index])} loading={streamLoading} compact={true}/>})),
+ {id:"sports",content:<DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact={true}/>},{id:"events"}
+]}/> : activeTab === "trending" ? <TrendingMobileContent products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /> : activeTab === "lifestyle" ? <LifestyleMobileContent products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /> : <CategoriesMobileContent products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} />}
     <footer className="mobile-private-footer"><small>Part of the SMAJ Ecosystem</small><small>© 2026 SMAJ PI HUB. All rights reserved.</small></footer>
   </div>;
 };
@@ -476,25 +474,15 @@ const MobileHome = ({ activeTab, onTabChange, products, productsLoading, product
 const DesktopFeedHome = ({ activeTab, onTabChange, products, productsLoading, productsError, sellers, recentItems, streamRows, streamLoading, sportsCatalog, sportsLoading }: { activeTab: DiscoveryTab; onTabChange: (tab: DiscoveryTab) => void; products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => <div className="desktop-private-home desktop-feed-home">
   <section className="desktop-feed-hero"><div><p className="private-kicker">SMAJ PI HUB</p><h1>Everything you need.<br />One place.</h1><p>Discover services, products, media, support, and everyday tools from one connected dashboard.</p><div className="desktop-feed-hero-actions"><Link className="private-primary-button" to="/app/services">Explore Services <ArrowForwardOutlinedIcon /></Link><Link className="private-secondary-button" to="/store">Open SMAJ Store</Link></div></div><div className="desktop-feed-hero-icons">{serviceCatalog.slice(0, 6).map((service) => <Link key={service.slug} to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} title={service.name}><ServiceArt index={service.atlasIndex} /><em className={serviceBadgeClass(service)}>{getServiceLaunchLabel(service.slug)}</em></Link>)}</div></section>
   <DiscoveryTabButtons className="desktop-feed-tabs" activeTab={activeTab} onTabChange={onTabChange} />
-  {activeTab === "for-you" ? <>
-    <div className="desktop-feed-priority-grid">
-      <ContinueSection items={recentItems} />
-      <PopularSearchSection />
-    </div>
-    <RecentlyAddedSection products={products} loading={productsLoading} error={productsError} />
-    <div className="desktop-feed-priority-grid">
-      <FeaturedSellersSection sellers={sellers} loading={productsLoading} error={productsError} />
-      <TrustSection />
-    </div>
-    <div className="desktop-feed-layout"><div className="desktop-feed-main">
-      <ActivityFeedSection products={products} loading={productsLoading} error={productsError} />
-      <section className="desktop-feed-section"><div className="desktop-feed-section-head"><div><h2>Suggested for you</h2><p>Fast access to the core SMAJ services.</p></div><Link to="/app/services">See all</Link></div><ServiceList services={serviceCatalog.slice(0, 6)} mode="desktop" /></section>
-      <section className="desktop-feed-section"><div className="desktop-feed-section-head"><div><h2>Discover what's new</h2><p>Fresh entry points into useful services.</p></div></div><div className="desktop-feature-grid">{featureCards.map((card) => <Link className="desktop-feature-card" to={card.slug === "store" ? "/store" : `/app/services/${card.slug}`} key={card.slug}><img src={card.image} alt="" />{card.slug === "store" ? <b className="live-card-badge feature-live-badge">LIVE</b> : null}<div><h3>{card.title}</h3><p>{card.text}</p><span>Explore <ArrowForwardOutlinedIcon /></span></div></Link>)}</div></section>
-      <DashboardStreamSections rows={streamRows} loading={streamLoading} compact={false} />
-      <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact={false} />
-      {mediaSections.filter((section) => section.slug !== "sports").map((section) => <section className="desktop-feed-section" key={section.slug}><div className="desktop-feed-section-head"><div><h2>{section.title}</h2><p>Tickets, events, and local experiences.</p></div></div><div className="desktop-media-grid">{section.items.map((item, index) => <Link to={`/app/services/${section.slug}`} className="desktop-media-card" key={item}><img src={section.image} alt="" /><div>{section.badges ? <b>{section.badges[index]}</b> : null}<span>{item}</span><small>SMAJ Events</small></div></Link>)}</div></section>)}
-    </div><aside className="desktop-feed-side"><section><strong>Why SMAJ PI HUB?</strong><div>{why.map(([Icon, title, text]) => <article key={title}><Icon /><span><b>{title}</b><small>{text}</small></span></article>)}</div></section></aside></div>
-  </> : <div className="desktop-discovery-content"><DesktopDiscoveryContent activeTab={activeTab} products={products} productsLoading={productsLoading} productsError={productsError} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /></div>}
+  {activeTab === "for-you" ? <><div className="desktop-feed-priority-grid"><ContinueSection items={recentItems}/><PopularSearchSection/></div><ManagedHomeFeed compact={false} entries={[
+ {id:"recent",content:<RecentlyAddedSection compact={false} products={products} loading={productsLoading} error={productsError}/>},
+ {id:"sellers",content:<FeaturedSellersSection compact={false} sellers={sellers} loading={productsLoading} error={productsError}/>},
+ {id:"activity",content:<ActivityFeedSection compact={false} products={products} loading={productsLoading} error={productsError}/>},
+ {id:"trust",content:<TrustSection compact={false}/>},
+ {id:"suggested"},{id:"discover"},
+ ...["trending","series","releases"].map((id,index)=>({id,content:<DashboardStreamSections rows={streamRows.filter(row=>row.title===["Trending now","Popular series","New releases"][index])} loading={streamLoading} compact={false}/>})),
+ {id:"sports",content:<DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact={false}/>},{id:"events"}
+]}/><aside className="desktop-feed-side"><section><strong>Why SMAJ PI HUB?</strong>{why.map(([Icon,title,text])=><article key={title}><Icon/><b>{title}</b><p>{text}</p></article>)}</section></aside></> : <div className="desktop-discovery-content"><DesktopDiscoveryContent activeTab={activeTab} products={products} productsLoading={productsLoading} productsError={productsError} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /></div>}
   <section className="desktop-feed-experience"><div><p className="private-kicker">ONE SIMPLE EXPERIENCE</p><h2>Experience SMAJ PI HUB</h2><p>Everything connected in one simple experience.</p></div><div>{[["Discover", "Explore services in one place"], ["Connect", "Use services and manage activities"], ["Manage", "Your profile, wallet, and settings"]].map(([title, text], index) => <article key={title}><ServiceArt index={[0, 8, 14][index]} /><h3>{title}</h3><p>{text}</p></article>)}</div></section>
   <footer className="private-home-footer"><span>Part of the SMAJ Ecosystem</span><span>(c) 2026 SMAJ PI HUB. All rights reserved.</span></footer>
 </div>;

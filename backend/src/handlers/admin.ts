@@ -1,3 +1,4 @@
+import { parseSiteContent } from "../services/siteContent";
 import { recordMerchantSettlement } from "../services/merchantSettlement";
 import { verifyOutboundPayment, bindPayment, financialTransaction } from "../services/financialIntegrity";
 import { Request, Response, Router } from "express";
@@ -103,6 +104,26 @@ export default function mountAdminEndpoints(router: Router) {
     next();
   });
   router.use(async (req, res, next) => { if (await requireAdmin(req, res)) next(); });
+
+  router.get("/site-content", async (req,res) => {
+    if (!req.app.locals.siteContentCollection) return res.status(503).json({message:"Home content storage is starting."});
+    const document=await req.app.locals.siteContentCollection.findOne({_id:"home"});
+    return res.json({content:document?.content || {services:[],sections:[]},revision:document?.updatedAt || null});
+  });
+  router.put("/site-content", async (req,res) => {
+    if (!req.app.locals.siteContentCollection) return res.status(503).json({message:"Home content storage is starting."});
+    let content;try {content=parseSiteContent(req.body?.content);} catch(error:any){return res.status(400).json({message:error.message});}
+    const previous=await req.app.locals.siteContentCollection.findOne({_id:"home"});
+    if (String(previous?.updatedAt?.toISOString?.() || previous?.updatedAt || "") !== String(req.body?.revision || "")) return res.status(409).json({message:"Another administrator updated this content. Reload before saving."});
+    const updatedAt=new Date(Math.max(Date.now(), new Date(previous?.updatedAt || 0).getTime() + 1));
+    if (previous) {
+      const result=await req.app.locals.siteContentCollection.updateOne({_id:"home",updatedAt:previous.updatedAt},{$set:{content,updatedAt,updatedBy:String((await resolveCurrentUser(req))?._id || "")}});
+      if (!result.matchedCount) return res.status(409).json({message:"Content changed. Reload before saving."});
+    } else {
+      try {await req.app.locals.siteContentCollection.insertOne({_id:"home",content,updatedAt});} catch {return res.status(409).json({message:"Content changed. Reload before saving."});}
+    }
+    return res.json({content,revision:updatedAt});
+  });
 
   const heroUpdates = (body: Record<string, any>, partial = false) => {
     const updates: Record<string, any> = {};
