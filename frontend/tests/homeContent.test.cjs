@@ -112,7 +112,7 @@ test("managed home sections honor reordering, hidden sections, card text, images
   ])
     assert.ok(html.includes(text), text);
 });
-test("suggested service order, live status and progress use the shared configuration", () => {
+test("suggested services keep shared order and status with the original badges and no progress bars", () => {
   const app = setup();
   app.set({
     sections: [],
@@ -131,7 +131,8 @@ test("suggested service order, live status and progress use the shared configura
   const Suggested = app.load("components/ManagedHomeFeed.tsx").SuggestedServices,
     html = renderToStaticMarkup(React.createElement(Suggested));
   assert.ok(html.indexOf("SMAJ Jobs") < html.indexOf("Custom Store"));
-  assert.ok(html.includes('value="64"'));
+  assert.ok(!html.includes("<progress"));
+  assert.ok(html.includes("service-in-progress-badge"));
   assert.ok(html.includes("Edited category"));
   assert.ok(html.includes("IN PROGRESS"));
 });

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { homeSectionDefaults } from "../content/homeContentDefaults";
 import { useSiteContent, type ContentCard, type HomeSection } from "../lib/siteContent";
-import { serviceCatalog, getServiceLaunchLabel, serviceAppPath } from "../content/serviceCatalog";
+import { serviceCatalog, getServiceLaunchLabel, getServiceLaunchStatus, serviceAppPath } from "../content/serviceCatalog";
 import ServiceArt from "./ServiceArt";
 export type HomeEntry = { id: string; content?: ReactNode };
 export function SuggestedServices() {
@@ -19,17 +19,14 @@ export function SuggestedServices() {
       {groups.map((group, i) => (
         <div className="mobile-service-group" key={i}>
           {group.map(service => {
-            const configured = services.find(s => s.slug === service.slug);
+            const status = getServiceLaunchStatus(service.slug);
             return (
               <Link to={serviceAppPath(service.slug)} className="mobile-service-app" key={service.slug}>
                 <ServiceArt index={service.atlasIndex} />
                 <div>
                   <strong>{service.name}</strong>
                   <span>{service.items.slice(0, 2).join(" - ")}</span>
-                  <small className="rating">{getServiceLaunchLabel(service.slug)}</small>
-                  {configured?.status === "in-progress" ? (
-                    <progress max={100} value={configured.progress} aria-label={service.name + " progress"} />
-                  ) : null}
+                  <small className={status === "live" ? "live-rating-badge service-live-boil" : status === "coming-soon" ? "service-coming-soon-badge" : "service-in-progress-badge"}>{getServiceLaunchLabel(service.slug)}</small>
                 </div>
               </Link>
             );
@@ -102,7 +99,7 @@ export function ManagedHomeSection({
       <div className={compact ? "mobile-section-heading" : "desktop-feed-section-head"}>
         <div>
           {section.title ? <h2>{section.title}</h2> : null}
-          {section.subtitle ? <p>{section.subtitle}</p> : null}
+          {section.subtitle && !(compact && section.id === "suggested") ? <p>{section.subtitle}</p> : null}
         </div>
         {section.to ? <Link to={section.to}>See all</Link> : null}
       </div>
