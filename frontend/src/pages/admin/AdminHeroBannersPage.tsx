@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 import { isAxiosError } from "axios";
 import { axiosClient } from "../../lib/axiosClient";
 import { uploadImage } from "../../lib/uploadImage";
-import type { HeroBanner } from "../../lib/heroBanners";
+import { getHeroBannerLabel, type HeroBanner } from "../../lib/heroBanners";
 
-const emptyForm = { placement: "dashboard" as HeroBanner["placement"], image: "", title: "", subtitle: "", search: "", textColor: "#ffffff", active: true, order: 0 };
+const emptyForm = { placement: "dashboard" as HeroBanner["placement"], image: "", label: "", title: "", subtitle: "", search: "", textColor: "#ffffff", active: true, order: 0 };
 
 const AdminHeroBannersPage = () => {
   const [banners, setBanners] = useState<HeroBanner[]>([]);
@@ -66,7 +66,7 @@ const AdminHeroBannersPage = () => {
 
   const edit = (banner: HeroBanner) => {
     setEditingId(banner._id);
-    setForm({ placement: banner.placement, image: banner.image, title: banner.title || "", subtitle: banner.subtitle || "", search: banner.search || "", textColor: banner.textColor || "#ffffff", active: banner.active, order: banner.order || 0 });
+    setForm({ placement: banner.placement, image: banner.image, label: getHeroBannerLabel(banner), title: banner.title || "", subtitle: banner.subtitle || "", search: banner.search || "", textColor: banner.textColor || "#ffffff", active: banner.active, order: banner.order || 0 });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -112,6 +112,7 @@ const AdminHeroBannersPage = () => {
       <div className="admin-hero-fields">
         <label>Location<select value={form.placement} onChange={(e) => setForm({ ...form, placement: e.target.value as HeroBanner["placement"] })}><option value="dashboard">Dashboard</option><option value="store">Store</option></select></label>
         <label>Image<input type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseImage} /></label>
+        <label>Banner label (optional)<input value={form.label} maxLength={120} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="WELCOME TO or SMAJ Store - leave blank to hide" /></label>
         <label>Title<input value={form.title} maxLength={120} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Banner title" /></label>
         <label>Description<textarea value={form.subtitle} maxLength={300} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="Short banner description" /></label>
         <label>Store search keyword<input value={form.search} maxLength={120} onChange={(e) => setForm({ ...form, search: e.target.value })} placeholder="Example: Electronics" /></label>

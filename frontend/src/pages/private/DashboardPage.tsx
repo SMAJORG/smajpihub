@@ -24,7 +24,7 @@ import PullToRefresh from "../../components/PullToRefresh";
 import TrustBadge from "../../components/TrustBadge";
 import LanguageSoonButton from "../../components/LanguageSoonButton";
 import { useAuthContext } from "../../contexts/AuthContext";
-import { getHeroBannerState } from "../../lib/heroBanners";
+import { getHeroBannerState, getHeroBannerLabel } from "../../lib/heroBanners";
 import { getServiceLaunchLabel, getServiceLaunchStatus, serviceCatalog, type ServiceDefinition } from "../../content/serviceCatalog";
 import { axiosClient } from "../../lib/axiosClient";
 import { countryDisplayName, countryFlag, formatPiAmount } from "../../lib/formatters";
@@ -454,7 +454,7 @@ const MobileHome = ({ activeTab, onTabChange, products, productsLoading, product
       <div className="mobile-home-hero-track" style={{ transform: `translateX(-${heroSlide * 100}%)`, transition: heroReducedMotion ? "none" : undefined }} aria-hidden="true">
         {heroImages.map((image) => <div className="mobile-home-hero-slide" style={{ backgroundImage: `url("${image}")` }} key={image} />)}
       </div>
-      <div className={`mobile-home-hero-copy ${currentHero ? "managed-banner-copy" : ""}`} style={currentHero ? { color: currentHero.textColor } : undefined}><span>WELCOME TO</span><h1 style={currentHero ? { color: currentHero.textColor } : undefined}>{managedHeroBanners ? currentHero?.title : "SMAJ PI HUB"}</h1><p style={currentHero ? { color: currentHero.textColor } : undefined}>{managedHeroBanners ? currentHero?.subtitle : "Everything you need. One place."}</p><div className="mobile-hero-icons">{serviceCatalog.slice(0, 3).map((service) => <ServiceArt key={service.slug} index={service.atlasIndex} />)}<b>+12</b></div><Link to="/app/services">Explore <ArrowForwardOutlinedIcon /></Link></div>
+      <div className={`mobile-home-hero-copy ${currentHero ? "managed-banner-copy" : ""}`} style={currentHero ? { color: currentHero.textColor } : undefined}>{(!currentHero || getHeroBannerLabel(currentHero)) ? <span>{currentHero ? getHeroBannerLabel(currentHero) : "WELCOME TO"}</span> : null}<h1 style={currentHero ? { color: currentHero.textColor } : undefined}>{managedHeroBanners ? currentHero?.title : "SMAJ PI HUB"}</h1><p style={currentHero ? { color: currentHero.textColor } : undefined}>{managedHeroBanners ? currentHero?.subtitle : "Everything you need. One place."}</p><div className="mobile-hero-icons">{serviceCatalog.slice(0, 3).map((service) => <ServiceArt key={service.slug} index={service.atlasIndex} />)}<b>+12</b></div><Link to="/app/services">Explore <ArrowForwardOutlinedIcon /></Link></div>
       <div className="mobile-home-hero-dots" aria-label="Hero slides">{heroImages.map((_, index) => <button type="button" className={index === heroSlide ? "active" : ""} aria-label={`Show hero image ${index + 1}`} aria-current={index === heroSlide ? "true" : undefined} onClick={() => setHeroSlide(index)} key={index} />)}</div>
     </section> : null}
     <div ref={tabsAnchorRef} className={`mobile-home-tabs-anchor ${tabsPinned ? "is-pinned" : ""}`}><DiscoveryTabButtons className="mobile-home-tabs" activeTab={activeTab} onTabChange={handleTabChange} /></div>

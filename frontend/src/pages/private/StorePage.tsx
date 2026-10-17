@@ -17,7 +17,7 @@ import { CART_UPDATED_EVENT, getCartQuantity, setBuyNowItem } from "../../lib/st
 import { useAddToCartToast } from "../../hooks/useAddToCartToast";
 import type { Product } from "../../types/marketplace";
 import { heroSlides, promoStripItems } from "../../content/storefront";
-import { getHeroBannerState } from "../../lib/heroBanners";
+import { getHeroBannerState, getHeroBannerLabel } from "../../lib/heroBanners";
 import logoImage from "/assets/services/store.png";
 import { PI_USDT_RATE } from "../../lib/piPricing";
 
@@ -82,7 +82,7 @@ const StorePage = () => {
   const [detectedLocation, setDetectedLocation] = useState(() => window.localStorage.getItem(STORE_LOCATION_STORAGE_KEY) || detectApproximateBrowserLocation());
   const shoppingToolsRef = useRef<HTMLElement | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
-  const [displayHeroSlides, setDisplayHeroSlides] = useState(heroSlides);
+  const [displayHeroSlides, setDisplayHeroSlides] = useState(heroSlides.map(slide => ({ ...slide, label: "SMAJ Store" })));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileMenuPanel, setMobileMenuPanel] = useState<"categories" | "subcategories">("categories");
   const [mobileMenuCategory, setMobileMenuCategory] = useState(mobileMenuCategories[0]);
@@ -143,7 +143,7 @@ const StorePage = () => {
   useEffect(() => {
     void getHeroBannerState("store").then(({ banners, managed }) => {
       if (managed) {
-        setDisplayHeroSlides(banners.map((banner) => ({ title: banner.title || "", subtitle: banner.subtitle || "", image: banner.image, search: banner.search || banner.title, textColor: banner.textColor || "#ffffff" })));
+        setDisplayHeroSlides(banners.map((banner) => ({ label: getHeroBannerLabel(banner), title: banner.title || "", subtitle: banner.subtitle || "", image: banner.image, search: banner.search || banner.title, textColor: banner.textColor || "#ffffff" })));
         setHeroIndex(0);
       }
     }).catch(() => undefined);
@@ -508,7 +508,7 @@ const StorePage = () => {
               <article className="storefront-hero-slide" key={slide.image + slide.title} style={{ color: slide.textColor || "#ffffff" }}>
                 <img src={slide.image} alt={slide.title} />
                 <div>
-                  <span>SMAJ Store</span>
+                  {slide.label ? <span>{slide.label}</span> : null}
                   <h1>{slide.title}</h1>
                   <p>{slide.subtitle}</p>
                   <button type="button" onClick={() => updateSearch(slide.search)}>Shop now</button>

@@ -22686,5 +22686,6 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .chat-panel-fullscreen .chat-scroll-bottom { bottom: calc(var(--chat-composer-height, 60px) + 24px + env(safe-area-inset-bottom, 0px)); }
 
 /* Honor the administrator's banner text color over theme heading defaults. */
+.mobile-home-shell .mobile-home-hero-copy.managed-banner-copy > span,
 .mobile-home-shell .mobile-home-hero-copy.managed-banner-copy > h1,
 .mobile-home-shell .mobile-home-hero-copy.managed-banner-copy > p { color: inherit !important; }

@@ -115,6 +115,7 @@ export default function mountAdminEndpoints(router: Router) {
       if (!image) throw new Error("Banner image is required.");
       updates.image = image.slice(0, 2048);
     }
+    if (body.label !== undefined) updates.label = String(body.label || "").trim().slice(0, 120);
     if (body.title !== undefined) updates.title = String(body.title || "").trim().slice(0, 120);
     if (body.subtitle !== undefined) updates.subtitle = String(body.subtitle || "").trim().slice(0, 300);
     if (body.search !== undefined) updates.search = String(body.search || "").trim().slice(0, 120);
