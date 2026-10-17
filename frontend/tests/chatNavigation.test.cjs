@@ -63,3 +63,6 @@ test('pending sends show a clock, failures offer retry, and only confirmed messa
  assert.match(render({}),/aria-label="Sent"/);
  assert.match(render({readAt:'now'}),/aria-label="Read"/);
 });
+
+test('latest messages are delivered before a slow older-history gap finishes',async()=>{let release,ready,latest,calls=0,finished=false;const gate=new Promise(resolve=>release=resolve),firstPage=new Promise(resolve=>ready=resolve);const result=history.fetchChatHistory(async()=>{calls++;return calls===1?{messages:[{_id:'300'}],nextCursor:'older'}:await gate;},'100',()=>true,page=>{latest=[...page.messages];ready();}).then(value=>{finished=true;return value;});await firstPage;assert.equal(latest[0]._id,'300');assert.equal(finished,false);release({messages:[{_id:'100'}],nextCursor:null});assert.equal((await result).messages.length,2);});
+test('presence and typing updates do not trigger message-history invalidation',()=>{const base={lastMessageId:'a',lastMessage:'Hello',updatedAt:'one',readUpdatedAt:'zero'};const key=history.conversationHistoryVersion(base);assert.equal(history.conversationHistoryVersion({...base,online:true,typing:true,lastSeenAt:'new'}),key);assert.notEqual(history.conversationHistoryVersion({...base,lastMessageId:'b'}),key);assert.notEqual(history.conversationHistoryVersion({...base,readUpdatedAt:'two'}),key);});

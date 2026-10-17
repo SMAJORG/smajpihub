@@ -9,7 +9,7 @@ const getBearerToken = (authorization = "") => {
   return match?.[1]?.trim() || "";
 };
 
-export const resolveCurrentUser = async (req: Request): Promise<UserData | null> => {
+const resolveUser = async (req: Request): Promise<UserData | null> => {
   const userCollection = req.app.locals.userCollection;
   if (!userCollection) return null;
 
@@ -26,11 +26,19 @@ export const resolveCurrentUser = async (req: Request): Promise<UserData | null>
   if (!currentUser || currentUser.blocked || (currentUser as any).accessTokenRevokedAt) return null;
 
   try {
-    const verified = (await getUserPlatformAPIClient().get("/v2/me", { headers: { Authorization: "Bearer " + accessToken } })).data;
+    const verified = (await getUserPlatformAPIClient().get("/v2/me", { headers: { Authorization: "Bearer " + accessToken }, timeout: 6000 })).data;
     if (verified?.uid !== currentUser.uid) return null;
     if (verified.credentials?.valid_until?.timestamp && verified.credentials.valid_until.timestamp * 1000 <= Date.now()) return null;
   } catch { return null; }
   return currentUser;
+};
+
+// Share verification only within the same HTTP request; never reuse authentication across requests.
+const resolvedRequests = new WeakMap<Request, Promise<UserData | null>>();
+export const resolveCurrentUser = (req: Request): Promise<UserData | null> => {
+  let result = resolvedRequests.get(req);
+  if (!result) { result = resolveUser(req); resolvedRequests.set(req, result); }
+  return result;
 };
 
 export const minimalSessionUser = (user: UserData | Record<string, any>): AuthSessionUser => ({

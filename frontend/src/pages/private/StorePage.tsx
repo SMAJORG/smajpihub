@@ -1,3 +1,4 @@
+import HeroBannerAction from "../../components/HeroBannerAction";
 import ServiceImage from "../../components/ServiceImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -18,7 +19,7 @@ import { CART_UPDATED_EVENT, getCartQuantity, setBuyNowItem } from "../../lib/st
 import { useAddToCartToast } from "../../hooks/useAddToCartToast";
 import type { Product } from "../../types/marketplace";
 import { heroSlides, promoStripItems } from "../../content/storefront";
-import { getHeroBannerState, getHeroBannerLabel } from "../../lib/heroBanners";
+import { getHeroBannerState, getHeroBannerLabel, getHeroBannerTarget, getHeroBannerButtonText } from "../../lib/heroBanners";
 import logoImage from "/assets/services/store.png";
 import { PI_USDT_RATE } from "../../lib/piPricing";
 
@@ -83,7 +84,7 @@ const StorePage = () => {
   const [detectedLocation, setDetectedLocation] = useState(() => window.localStorage.getItem(STORE_LOCATION_STORAGE_KEY) || detectApproximateBrowserLocation());
   const shoppingToolsRef = useRef<HTMLElement | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
-  const [displayHeroSlides, setDisplayHeroSlides] = useState(heroSlides.map(slide => ({ ...slide, label: "SMAJ Store" })));
+  const [displayHeroSlides, setDisplayHeroSlides] = useState(heroSlides.map(slide => ({ ...slide, label: "SMAJ Store", targetUrl: undefined as string | undefined, buttonText: "Shop now" })));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileMenuPanel, setMobileMenuPanel] = useState<"categories" | "subcategories">("categories");
   const [mobileMenuCategory, setMobileMenuCategory] = useState(mobileMenuCategories[0]);
@@ -144,7 +145,7 @@ const StorePage = () => {
   useEffect(() => {
     void getHeroBannerState("store").then(({ banners, managed }) => {
       if (managed) {
-        setDisplayHeroSlides(banners.map((banner) => ({ label: getHeroBannerLabel(banner), title: banner.title || "", subtitle: banner.subtitle || "", image: banner.image, search: banner.search || banner.title, textColor: banner.textColor || "#ffffff" })));
+        setDisplayHeroSlides(banners.map((banner) => ({ label: getHeroBannerLabel(banner), targetUrl: getHeroBannerTarget(banner), buttonText: getHeroBannerButtonText(banner), title: banner.title || "", subtitle: banner.subtitle || "", image: banner.image, search: banner.search || banner.title, textColor: banner.textColor || "#ffffff" })));
         setHeroIndex(0);
       }
     }).catch(() => undefined);
@@ -512,7 +513,7 @@ const StorePage = () => {
                   {slide.label ? <span>{slide.label}</span> : null}
                   <h1>{slide.title}</h1>
                   <p>{slide.subtitle}</p>
-                  <button type="button" onClick={() => updateSearch(slide.search)}>Shop now</button>
+                  {slide.targetUrl === undefined ? <button type="button" onClick={() => updateSearch(slide.search)}>Shop now</button> : slide.buttonText ? <HeroBannerAction to={slide.targetUrl}>{slide.buttonText}</HeroBannerAction> : null}
                 </div>
               </article>
             ))}

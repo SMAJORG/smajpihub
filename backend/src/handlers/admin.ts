@@ -136,6 +136,16 @@ export default function mountAdminEndpoints(router: Router) {
       if (!image) throw new Error("Banner image is required.");
       updates.image = image.slice(0, 2048);
     }
+    if (body.targetUrl !== undefined) {
+      const targetUrl = String(body.targetUrl || "").trim();
+      if (targetUrl.length > 2048 || targetUrl.includes(String.fromCharCode(92)) || /[\u0000-\u001f]/.test(targetUrl)) throw new Error("Use a valid destination URL up to 2048 characters.");
+      if (targetUrl && !/^\/(?!\/)/.test(targetUrl)) {
+        try { const parsed = new URL(targetUrl); if(parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) throw new Error(); }
+        catch { throw new Error("Use an app path beginning with / or a valid HTTPS URL."); }
+      }
+      updates.targetUrl = targetUrl.slice(0,2048);
+    }
+    if (body.buttonText !== undefined) updates.buttonText = String(body.buttonText || "").trim().slice(0,80);
     if (body.label !== undefined) updates.label = String(body.label || "").trim().slice(0, 120);
     if (body.title !== undefined) updates.title = String(body.title || "").trim().slice(0, 120);
     if (body.subtitle !== undefined) updates.subtitle = String(body.subtitle || "").trim().slice(0, 300);

@@ -3,7 +3,7 @@ import { useChatViewport } from "../../hooks/useChatViewport";
 import VoiceMessagePlayer from "../../components/VoiceMessagePlayer";
 import ChatMessageAttachment from "../../components/ChatMessageAttachment";
 import { createChatWarmup } from "../../lib/chatWarmup";
-import { fetchChatHistory } from "../../lib/chatHistory";
+import { fetchChatHistory, conversationHistoryVersion } from "../../lib/chatHistory";
 import { readChatCache, writeChatCache, mergeChatMessages, savedChatHistory } from "../../lib/chatCache";
 import { ensureVoicePermission, voiceRecordingError } from "../../lib/voiceRecording";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type TouchEvent } from "react";
@@ -206,6 +206,7 @@ const MessagesPageContent = () => {
   const historyRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyRetryAttempt = useRef(0);
   const historyRefresh = useRef<() => void>(() => undefined);
+  const historyRefreshPending = useRef(false);
   const historyFlight = useRef<{ id: string; controller: AbortController; promise: Promise<void> } | null>(null);
   const inboxFlight = useRef<Promise<void> | null>(null);
   const inboxController = useRef<AbortController | null>(null);
@@ -362,7 +363,7 @@ const MessagesPageContent = () => {
       return;
     }
     if (activeId.startsWith("draft:")) { setMessages(messageCache.current.get(activeId) || []); setLoadedMessageId(activeId); setLoadingMessages(false); setHistoryCursor(null); return; }
-    if (historyFlight.current?.id === activeId) return historyFlight.current.promise;
+    if (historyFlight.current?.id === activeId) { historyRefreshPending.current = true; return historyFlight.current.promise; }
     historyFlight.current?.controller.abort();
     const controller = new AbortController();
     const request = ++messageRequest.current;
@@ -378,7 +379,16 @@ const MessagesPageContent = () => {
       const data = await fetchChatHistory(async before => {
         const response = await axiosClient.get<{ conversation?: RichConversation; messages: ChatMessage[]; nextCursor?: string }>(`/messages/${activeId}`, { params: { before, light: "1" }, signal: controller.signal, timeout: 10000, smajSkipReadRetry: true, headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" } });
         return response.data;
-      }, newestKnown, () => alive.current && !controller.signal.aborted && request === messageRequest.current && activeIdRef.current === activeId);
+      }, newestKnown, () => alive.current && !controller.signal.aborted && request === messageRequest.current && activeIdRef.current === activeId, latest => {
+        const previous = messageCache.current.get(activeId) || [];
+        const oldest = latest.messages[0]?._id;
+        const retained = previous.filter(item => item.deliveryState || (oldest && item._id < oldest));
+        const merged = mergeChatMessages(retained, latest.messages);
+        messageCache.current.set(activeId, merged);
+        writeChatCache(user?.uid, activeId, merged.slice(-100));
+        setMessages(merged); setLoadedMessageId(activeId); setLoadingMessages(false); setConnectionState("live");
+        if (latest.conversation) setConversations(current => current.map(item => item._id === latest.conversation!._id ? {...item,...latest.conversation} : item));
+      });
       if (!data) return;
       if (!alive.current) return;
       if (historyRetryTimer.current) clearTimeout(historyRetryTimer.current);
@@ -419,7 +429,14 @@ const MessagesPageContent = () => {
       if (alive.current && !controller.signal.aborted && request === messageRequest.current && activeIdRef.current === activeId) setLoadingMessages(false);
     }
     };
-    const promise = run().finally(() => { if (historyFlight.current?.controller === controller) historyFlight.current = null; });
+    const promise = run().finally(() => {
+      if (historyFlight.current?.controller !== controller) return;
+      historyFlight.current = null;
+      if (historyRefreshPending.current && alive.current && !controller.signal.aborted && activeIdRef.current === activeId) {
+        historyRefreshPending.current = false;
+        historyRefresh.current();
+      }
+    });
     historyFlight.current = { id: activeId, controller, promise };
     return promise;
   }, [activeId, selectedId, chatFullscreen, user?.uid]);
@@ -451,6 +468,7 @@ const MessagesPageContent = () => {
     if (!user?.uid) return;
     let stopped = false;
     let cursor = "";
+    let historyVersions = new Map(readChatCache<RichConversation[]>(user.uid, "inbox", []).map(item => [item._id, conversationHistoryVersion(item)]));
     let timer: ReturnType<typeof setTimeout>;
     let controller: AbortController;
     let generation = 0;
@@ -466,7 +484,12 @@ const MessagesPageContent = () => {
         setConversations(data.conversations);
         writeChatCache(user.uid, "inbox", data.conversations);
         data.conversations.forEach(item => writeChatCache(user.uid, "conversation:" + item._id, item));
-        if (changed) refreshRef.current();
+        if (changed) {
+          const nextVersions = new Map(data.conversations.map(item => [item._id, conversationHistoryVersion(item)]));
+          const currentId = activeIdRef.current;
+          if (currentId && nextVersions.has(currentId) && nextVersions.get(currentId) !== historyVersions.get(currentId)) historyRefresh.current();
+          historyVersions = nextVersions;
+        }
         timer = setTimeout(() => void synchronize(run), 50);
       } catch { if (!stopped && run === generation) { setConnectionState(navigator.onLine ? "syncing" : "offline"); timer = setTimeout(() => void synchronize(run), 3000); } }
     };
@@ -593,6 +616,7 @@ const MessagesPageContent = () => {
     if (historyRetryTimer.current) clearTimeout(historyRetryTimer.current);
     historyRetryAttempt.current = 0;
     setHistoryError("");
+    historyRefreshPending.current = false;
     const initial = window.setTimeout(() => void loadMessages(), 0);
     const refresh = () => { if (!document.hidden) void loadMessages(); };
     document.addEventListener("visibilitychange", refresh);
@@ -1293,7 +1317,7 @@ const MessagesPageContent = () => {
                           {!item.deletedForEveryone ? <button type="button" className="chat-message-delete" onClick={() => setDeleteTarget(item)} aria-label="Delete message" title="Delete message"><DeleteOutlineRoundedIcon /></button> : null}
                         </article>
                       ))}
-                      {active.typing ? <div className="typing-indicator"><span />Typing...</div> : null}
+                      {active.typing ? <div className="typing-indicator" role="status"><span aria-hidden="true"><i/><i/><i/></span>Typing...</div> : null}
                     </>
                   )}
                 </div>
@@ -1416,7 +1440,7 @@ const MessagesPageContent = () => {
                           {!item.deletedForEveryone ? <button type="button" className="chat-message-delete" onClick={() => setDeleteTarget(item)} aria-label="Delete message" title="Delete message"><DeleteOutlineRoundedIcon /></button> : null}
                         </article>
                       ))}
-                      {active.typing ? <div className="typing-indicator"><span />Typing...</div> : null}
+                      {active.typing ? <div className="typing-indicator" role="status"><span aria-hidden="true"><i/><i/><i/></span>Typing...</div> : null}
                     </>
                   )}
                 </div>
