@@ -7,6 +7,7 @@ import { publishSiteContent, type SiteContent, type ContentCard, type HomeSectio
 import { getStreamCatalog } from "../../lib/streamCatalog";
 import { getSportsCatalog } from "../../lib/sportsApi";
 import ServiceArt from "../../components/ServiceArt";
+import { adPlacements, defaultAdSettings, type AdPlacement } from "../../lib/adPolicy";
 import { ManagedHomeSection } from "../../components/ManagedHomeFeed";
 import "./AdminHomeContentPage.css";
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -108,6 +109,7 @@ export default function AdminHomeContentPage() {
       const { data } = await axiosClient.get<{ content: SiteContent; revision: string | null }>("/admin/site-content");
       const base = defaults();
       setDraft({
+        ads: data.content.ads || defaultAdSettings,
         services: base.services.map(s => data.content.services.find(v => v.slug === s.slug) || s),
         sections: [
           ...base.sections.map(s => data.content.sections.find(v => v.id === s.id) || s),
@@ -221,6 +223,18 @@ export default function AdminHomeContentPage() {
   return (
     <UploadContext.Provider value={active => setUploads(n => Math.max(0, n + (active ? 1 : -1)))}>
       <main className="private-page home-cms">
+        <fieldset disabled={!ready || busy} style={{ padding: 16, marginBottom: 16 }}>
+          <legend>Android test ad placements</legend>
+          <p>Only Google test ads are available. Web and Pi Browser remain ad-free. Save changes to publish these switches.</p>
+          <label style={{ display: "block" }}>
+            <input type="checkbox" checked={draft.ads?.enabled === true} onChange={e => setDraft(d => ({ ...d, ads: { ...(d.ads || defaultAdSettings), enabled: e.target.checked } }))} />
+            Enable Android test ads
+          </label>
+          {(Object.keys(adPlacements) as AdPlacement[]).map(key => <label key={key} style={{ display: "block" }}>
+            <input type="checkbox" checked={draft.ads?.placements?.[key] === true} onChange={e => setDraft(d => ({ ...d, ads: { ...(d.ads || defaultAdSettings), placements: { ...d.ads?.placements, [key]: e.target.checked } } }))} />
+            {adPlacements[key].label}
+          </label>)}
+        </fieldset>
         <section className="private-page-head">
           <div>
             <p className="private-kicker">CONTENT &amp; CMS</p>

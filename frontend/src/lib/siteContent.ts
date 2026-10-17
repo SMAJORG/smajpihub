@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { apiFetch } from "./axiosClient";
+import type { AdSettings } from "./adPolicy";
 export type ContentCard = {
   id: string;
   title: string;
@@ -38,7 +39,7 @@ export type ServiceContent = {
   progress: number;
   order: number;
 };
-export type SiteContent = { services: ServiceContent[]; sections: HomeSection[] };
+export type SiteContent = { services: ServiceContent[]; sections: HomeSection[]; ads?: AdSettings };
 let content: SiteContent = { services: [], sections: [] };
 const listeners = new Set<() => void>();
 let contentVersion = 0;

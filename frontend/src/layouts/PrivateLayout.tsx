@@ -28,6 +28,7 @@ import LiveTvOutlinedIcon from "@mui/icons-material/LiveTvOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
+import NativeAdSlot from "../components/NativeAdSlot";
 import { axiosClient } from "../lib/axiosClient";
 import ConfirmSignOutModal from "../components/ConfirmSignOutModal";
 import WelcomeTour from "../components/WelcomeTour";
@@ -470,6 +471,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           ) : null}
           <div className={`private-tab-page${fullScreen ? " full-screen-tab-page" : ""}`}>
             {children}
+            <NativeAdSlot />
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import UpdateProgress from "../../components/UpdateProgress";
+import AdPrivacyControls from "../../components/AdPrivacyControls";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ConfirmSignOutModal from "../../components/ConfirmSignOutModal";
@@ -279,6 +280,7 @@ const SettingsPage = () => {
 
   return (
     <main className="private-page settings-page">
+      <AdPrivacyControls />
       <LanguageSoonButton />
       <header className="settings-topbar">
         <button type="button" aria-label="Back to account" onClick={() => navigate("/settings")}><ArrowBackIosNewOutlinedIcon /></button>

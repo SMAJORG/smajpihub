@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import AppLayout from "../layouts/AppLayout";
+import RewardedAdPlacement from "../components/RewardedAdPlacement";
 import ServiceArt from "../components/ServiceArt";
 import { serviceLaunchNavigationState } from "../components/ServiceLaunchGate";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
@@ -131,6 +132,7 @@ const ServicesPage = () => {
             })}
           </div>
         </section>
+        <RewardedAdPlacement />
       </main>
     </AppLayout>
   );

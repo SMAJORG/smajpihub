@@ -1,6 +1,7 @@
 import { useLayoutEffect, type ReactNode } from "react";
 import { useAuthContext } from "../contexts/AuthContext";
 import Header from "../components/Header";
+import NativeAdSlot from "../components/NativeAdSlot";
 import Footer from "../components/Footer";
 import SignIn from "../components/SignIn";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +35,7 @@ const AppLayout = ({ children, showFooter = true, showHeader = true }: AppLayout
       <ServiceLaunchGate />
       {showHeader ? <Header /> : null}
       {children}
+      <NativeAdSlot />
       {showFooter ? <Footer /> : null}
       <AndroidDownloadPrompt />
       <CookieConsent />

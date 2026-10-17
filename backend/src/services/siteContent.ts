@@ -110,5 +110,12 @@ export function parseSiteContent(input: any) {
       }),
     };
   });
-  return { services, sections };
+  // Fixed placement registry: remote content can switch test placements, never supply IDs.
+  const ads = {
+    enabled: input.ads?.enabled === true,
+    placements: Object.fromEntries(
+      ["homeBanner", "storeNative", "streamNative", "discoveryReward"].map(key => [key, input.ads?.placements?.[key] === true]),
+    ),
+  };
+  return { services, sections, ads };
 }

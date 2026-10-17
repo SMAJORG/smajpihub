@@ -23,6 +23,7 @@ public class MainActivity extends BridgeActivity {
     };
     @Override public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SmajPermissionsPlugin.class);
+        registerPlugin(SmajAdsPlugin.class);
         registerPlugin(SmajMediaPlugin.class);
         registerPlugin(SmajGalleryPlugin.class);
         registerPlugin(SmajUpdaterPlugin.class);

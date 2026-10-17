@@ -1,4 +1,5 @@
 import SiteContentLoader from "./components/SiteContentLoader";
+import NativeAdsController from "./components/NativeAdsController";
 import NativeUpdatePrompt from "./components/NativeUpdatePrompt";
 import { useLayoutEffect } from "react";
 import { RouterProvider } from "react-router-dom";
@@ -31,6 +32,7 @@ function App() {
       <NativeWelcomeGate>
         <NativeAppLockGate>
         <NativeRuntimeBridge />
+        <NativeAdsController />
         <NativeUpdatePrompt />
         {!isAdminRoute ? (
           <main className="desktop-access-block" aria-labelledby="desktop-access-title">

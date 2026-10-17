@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import RewardedAdPlacement from "../../components/RewardedAdPlacement";
 import { Link } from "react-router-dom";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
@@ -54,6 +55,7 @@ const ServicesHubPage = () => {
       <AmbassadorServicesPanel />
       <div className="mobile-services-grid">{orderedServices.map((service) => <Link key={service.slug} to={servicePath(service.slug, service.live)} state={serviceLaunchNavigationState(service.slug)}><ServiceArt index={service.atlasIndex} />{getServiceLaunchStatus(service.slug) === "live" ? <em className="live-card-badge service-live-boil">LIVE</em> : <em className={getServiceLaunchStatus(service.slug) === "coming-soon" ? "service-coming-soon-badge" : "service-in-progress-badge"}>{getServiceLaunchLabel(service.slug)}</em>}<strong>{service.name.replace("SMAJ ", "")}</strong><span>{serviceHints[service.slug]}</span></Link>)}</div>
     </section>
+    <RewardedAdPlacement />
   </main>;
 };
 
