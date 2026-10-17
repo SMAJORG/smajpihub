@@ -50,7 +50,7 @@ export const walletStatusLabel = (status: string) =>
   })[status] || "Recorded";
 export const walletAmount = (value: number | null, visible = true) =>
   !visible
-    ? "\u2022".repeat(4)
+    ? "****"
     : value === null
       ? "Amount unavailable"
       : new Intl.NumberFormat(undefined, { maximumFractionDigits: 7 }).format(value);

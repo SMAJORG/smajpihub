@@ -229,9 +229,9 @@ export default function WalletPage() {
             {visible ? "Hide" : "Show"}
           </button>
         </div>
-        <strong className="wallet-balance-value">{visible ? "Balance unavailable" : "Hidden"}</strong>
+        <strong className="wallet-balance-value">{visible ? "0.000 \u03c0" : "****"}</strong>
         <div className="wallet-balance-note">
-          <p>Open Pi Wallet to view your balance.</p>
+          <p>Not synced. Zero is a placeholder. Open Pi Wallet to view your actual balance.</p>
           {selectedNetwork ? <span>{walletNetworkLabel(selectedNetwork)}</span> : null}
         </div>
         <nav className="wallet-quick-actions" aria-label="Wallet actions">
