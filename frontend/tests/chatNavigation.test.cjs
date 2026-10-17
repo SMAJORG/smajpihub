@@ -52,3 +52,14 @@ test('viewport restoration keeps a message anchored when earlier content changes
  contentTop+=250;viewport.applyChatPosition(node,saved);assert.equal(node.scrollTop,750);
  viewport.applyChatPosition(node,{atBottom:true,offset:0,scrollTop:0});assert.equal(node.scrollTop,3000);
 });
+
+test('pending sends show a clock, failures offer retry, and only confirmed messages show checks',()=>{
+ const component=compile('frontend/src/components/MessageDeliveryStatus.tsx',{'react/jsx-runtime':require('react/jsx-runtime'),'./MessageDeliveryStatus.css':{}}).default;
+ const render=message=>renderToString(React.createElement(component,{message,onRetry:()=>{}}));
+ assert.match(render({deliveryState:'pending'}),/Waiting to send/);
+ assert.doesNotMatch(render({deliveryState:'pending'}),/message-checks/);
+ assert.match(render({deliveryState:'failed'}),/Retry sending message/);
+ assert.doesNotMatch(render({deliveryState:'failed'}),/message-checks/);
+ assert.match(render({}),/aria-label="Sent"/);
+ assert.match(render({readAt:'now'}),/aria-label="Read"/);
+});

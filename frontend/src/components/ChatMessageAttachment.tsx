@@ -13,15 +13,21 @@ type Props = {
   owner: string;
   onImage: (url: string) => void;
   onLoad: () => void;
+  uploadPercent?: number;
+  onRetry?: () => void;
+  onCancel?: () => void;
 };
 export default function ChatMessageAttachment({
   message,
   owner,
   onImage,
   onLoad,
+  uploadPercent,
+  onRetry,
+  onCancel,
 }: Props) {
   const [src, setSrc] = useState(
-    () => cachedPhotoUrl(owner, message) || message.attachmentUrl || "",
+    () => cachedPhotoUrl(owner, message) || message.attachmentUrl || message.attachmentDataUrl || "",
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,7 +60,7 @@ export default function ChatMessageAttachment({
   };
   useEffect(() => {
     const node = root.current;
-    if (message.messageType !== "image" || src || !node) return;
+    if (message.deliveryState || message.messageType !== "image" || src || !node) return;
     if (typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -89,6 +95,7 @@ export default function ChatMessageAttachment({
       onMouseDown={(event) => event.stopPropagation()}
       onTouchStart={(event) => event.stopPropagation()}
     >
+      <div className="chat-upload-frame">
       {src ? (
         image ? (
           <button
@@ -142,6 +149,12 @@ export default function ChatMessageAttachment({
               : `Download ${message.attachmentName || "file"}`}
         </button>
       )}
+      {message.deliveryState ? <div className="chat-upload-overlay">
+        <button type="button" className="chat-upload-action" aria-label={message.deliveryState === "failed" ? "Retry uploading attachment" : "Cancel uploading attachment"} onClick={message.deliveryState === "failed" ? onRetry : onCancel}>
+          {message.deliveryState === "failed" ? <><span aria-hidden="true">&#8593;</span> Retry</> : <><span className="chat-upload-spinner" aria-hidden="true"/><span aria-hidden="true">&#215;</span>{uploadPercent !== undefined && uploadPercent < 100 ? <small>{uploadPercent}%</small> : null}</>}
+        </button>
+      </div> : null}
+      </div>
       {src && video ? (
         <a href={src} download={message.attachmentName || "video"}>
           Save video

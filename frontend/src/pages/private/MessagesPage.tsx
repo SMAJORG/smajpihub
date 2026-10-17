@@ -1,3 +1,4 @@
+import MessageDeliveryStatus from "../../components/MessageDeliveryStatus";
 import { useChatViewport } from "../../hooks/useChatViewport";
 import VoiceMessagePlayer from "../../components/VoiceMessagePlayer";
 import ChatMessageAttachment from "../../components/ChatMessageAttachment";
@@ -30,7 +31,6 @@ import PrivateSkeleton from "../../components/PrivateSkeleton";
 import VoiceNoteComposer from "../../components/VoiceNoteComposer";
 import ChatAttachmentSheet from "../../components/ChatAttachmentSheet";
 import { VoiceRecordingClock } from "../../lib/voiceRecordingClock";
-import { uploadImage } from "../../lib/uploadImage";
 
 type RichConversation = Conversation & {
   profileImage?: string;
@@ -215,7 +215,9 @@ const MessagesPageContent = () => {
   const conversationListRef = useRef<HTMLElement>(null);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  type Outgoing = { id: string; chatId: string; payload: Partial<ChatMessage>; recipient?: string };
+  type Outgoing = { id: string; chatId: string; payload: Partial<ChatMessage>; recipient?: string; paused?: boolean };
+  const uploadRequest = useRef<{ id: string; controller: AbortController } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const outbox = useRef<Outgoing[]>(readChatCache(user?.uid, "outbox", []));
   const flushing = useRef(false);
   const refreshRef = useRef<() => void>(() => undefined);
@@ -480,12 +482,31 @@ const MessagesPageContent = () => {
     if (flushing.current || !navigator.onLine || !user?.uid) return;
     flushing.current = true;
     try {
-      while (outbox.current.length) {
-        const entry = outbox.current[0];
+      while (outbox.current.some(item => !item.paused)) {
+        const entry = outbox.current.find(item => !item.paused)!;
         if (!alive.current) break;
+        const controller = new AbortController();
+        uploadRequest.current = { id: entry.id, controller };
+        setUploadProgress(current => { const next = { ...current }; delete next[entry.id]; return next; });
+        const pending = (messageCache.current.get(entry.chatId) || []).map(item => item.clientMessageId === entry.id ? { ...item, deliveryState: "pending" as const } : item);
+        messageCache.current.set(entry.chatId, pending);
+        if (activeIdRef.current === entry.chatId) setMessages(pending);
         try {
           const endpoint = entry.recipient ? "/messages/direct/" + encodeURIComponent(entry.recipient) : "/messages/" + entry.chatId;
-          const { data } = await axiosClient.post<{ message: ChatMessage; conversation: RichConversation }>(endpoint, { ...entry.payload, clientMessageId: entry.id }, { headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user.uid } });
+          if (entry.payload.messageType === "image" && entry.payload.attachmentDataUrl && !entry.payload.attachmentUrl) {
+            const uploaded = await axiosClient.post<{url: string}>("/uploads/image", {image: entry.payload.attachmentDataUrl, purpose: "message-photos"}, {
+              signal: controller.signal, timeout: 60000,
+              headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user.uid },
+              onUploadProgress: event => { if (alive.current && event.total) setUploadProgress(current => ({...current, [entry.id]: Math.min(100, Math.floor(event.loaded / event.total! * 100))})); },
+            });
+            if (!alive.current || controller.signal.aborted) break;
+            entry.payload = {...entry.payload, attachmentUrl: uploaded.data.url};
+            delete entry.payload.attachmentDataUrl;
+            writeChatCache(user.uid, "outbox", outbox.current);
+          }
+          const { data } = await axiosClient.post<{ message: ChatMessage; conversation: RichConversation }>(endpoint, { ...entry.payload, clientMessageId: entry.id }, { signal: controller.signal, timeout: 60000, onUploadProgress: event => {
+            if (alive.current && event.total) setUploadProgress(current => ({ ...current, [entry.id]: Math.min(100, Math.floor(event.loaded / event.total! * 100)) }));
+          }, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user.uid } });
           if (!alive.current) break;
           const id = data.message.conversationId;
           const history = mergeChatMessages(mergeChatMessages(messageCache.current.get(id) || [], messageCache.current.get(entry.chatId) || []), [data.message]);
@@ -504,8 +525,11 @@ const MessagesPageContent = () => {
           refreshRef.current();
         } catch (error) {
           if (!alive.current) break;
+          entry.paused = true;
+          writeChatCache(user.uid, "outbox", outbox.current);
           const failed = (messageCache.current.get(entry.chatId) || []).map(item => item.clientMessageId === entry.id ? { ...item, deliveryState: "failed" as const } : item);
           messageCache.current.set(entry.chatId, failed);
+          writeChatCache(user.uid, entry.chatId, failed.slice(-100));
           if (activeIdRef.current === entry.chatId) setMessages(failed);
           if (isAxiosError(error) && error.response && error.response.status >= 400 && error.response.status < 500 && ![401, 408, 409, 429].includes(error.response.status)) {
             outbox.current = outbox.current.filter(item => item.id !== entry.id);
@@ -515,7 +539,7 @@ const MessagesPageContent = () => {
           break;
         }
       }
-    } finally { flushing.current = false; }
+    } finally { uploadRequest.current = null; flushing.current = false; }
   }, [setParams, user?.uid]);
   useEffect(() => {
     const retry = () => { void flushOutbox(); };
@@ -524,6 +548,30 @@ const MessagesPageContent = () => {
     window.addEventListener("online", retry);
     return () => { window.clearInterval(timer); window.removeEventListener("online", retry); };
   }, [flushOutbox]);
+
+  const retryMessage = (message: ChatMessage) => {
+    const entry = outbox.current.find(item => item.id === message.clientMessageId);
+    if (!entry) { setVoiceError("This message cannot be retried. Please send it again."); return; }
+    entry.paused = false;
+    const pending = (messageCache.current.get(entry.chatId) || []).map(item => item.clientMessageId === entry.id ? { ...item, deliveryState: "pending" as const } : item);
+    messageCache.current.set(entry.chatId, pending);
+    writeChatCache(user?.uid, entry.chatId, pending.slice(-100));
+    if (activeIdRef.current === entry.chatId) setMessages(pending);
+    writeChatCache(user?.uid, "outbox", outbox.current);
+    void flushOutbox();
+  };
+  const cancelMessage = (message: ChatMessage) => {
+    const entry = outbox.current.find(item => item.id === message.clientMessageId);
+    if (!entry) return;
+    entry.paused = true;
+    writeChatCache(user?.uid, "outbox", outbox.current);
+    const failed = (messageCache.current.get(entry.chatId) || []).map(item => item.clientMessageId === entry.id ? { ...item, deliveryState: "failed" as const } : item);
+    messageCache.current.set(entry.chatId, failed);
+    writeChatCache(user?.uid, entry.chatId, failed.slice(-100));
+    if (activeIdRef.current === entry.chatId) setMessages(failed);
+    if (uploadRequest.current?.id === entry.id) uploadRequest.current.controller.abort();
+  };
+  useEffect(() => () => { uploadRequest.current?.controller.abort(); }, []);
 
   const sendMessage = async (payload: Partial<ChatMessage>) => {
     if (!activeId || !user?.uid) return;
@@ -536,7 +584,7 @@ const MessagesPageContent = () => {
     writeChatCache(user.uid, activeId, next.slice(-100));
     outbox.current.push(entry);
     if (!writeChatCache(user.uid, "outbox", outbox.current)) setVoiceError("Device storage is unavailable. Keep this chat open until your message is sent.");
-    await flushOutbox();
+    void flushOutbox();
   };
 
   useEffect(() => {
@@ -906,12 +954,11 @@ const MessagesPageContent = () => {
     nearBottomRef.current = true;
     try {
       const video = pendingPhoto.file.type.startsWith("video/");
-      const attachmentUrl = video ? "" : await uploadImage(pendingPhoto.dataUrl, "message-photos");
       await sendMessage({
         productId: pendingProductId,
         messageType: video ? "document" : "image",
         message: pendingPhotoCaption.trim(),
-        ...(video ? { attachmentDataUrl: pendingPhoto.dataUrl } : { attachmentUrl }),
+        attachmentDataUrl: pendingPhoto.dataUrl,
         attachmentName: pendingPhoto.file.name,
         attachmentMimeType: pendingPhoto.file.type,
         attachmentSize: pendingPhoto.file.size,
@@ -1235,13 +1282,13 @@ const MessagesPageContent = () => {
                           {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" ? (
                             <VoiceMessagePlayer message={item} owner={user?.uid || ""} mine={item.senderId === user?.uid} avatar={item.senderId === user?.uid ? user?.avatar : active.profileImage} name={item.senderId === user?.uid ? user?.displayName || "You" : getConversationName(active, user?.uid)} />
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
-                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} />
+                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
                             <p>{item.message || "Message"}</p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-                            {item.senderId === user?.uid ? <span className={`message-checks ${item.readAt ? "read" : "sent"}`} aria-label={item.deliveryState === "failed" ? "Send failed" : item.deliveryState ? "Waiting to send" : item.readAt ? "Read" : "Sent"}>{item.readAt ? "✓✓" : "✓"}</span> : null}
+                            {item.senderId === user?.uid ? <MessageDeliveryStatus message={item} onRetry={() => retryMessage(item)} /> : null}
                           </small>
                           {!item.deletedForEveryone ? <button type="button" className="chat-message-delete" onClick={() => setDeleteTarget(item)} aria-label="Delete message" title="Delete message"><DeleteOutlineRoundedIcon /></button> : null}
                         </article>
@@ -1358,13 +1405,13 @@ const MessagesPageContent = () => {
                           {item.deletedForEveryone ? <p className="chat-deleted-message">This message was deleted.</p> : item.messageType === "voice" ? (
                             <VoiceMessagePlayer message={item} owner={user?.uid || ""} mine={item.senderId === user?.uid} avatar={item.senderId === user?.uid ? user?.avatar : active.profileImage} name={item.senderId === user?.uid ? user?.displayName || "You" : getConversationName(active, user?.uid)} />
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
-                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} />
+                            <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
                             <p>{item.message || "Message"}</p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-                            {item.senderId === user?.uid ? <span className={`message-checks ${item.readAt ? "read" : "sent"}`} aria-label={item.deliveryState === "failed" ? "Send failed" : item.deliveryState ? "Waiting to send" : item.readAt ? "Read" : "Sent"}>{item.readAt ? "✓✓" : "✓"}</span> : null}
+                            {item.senderId === user?.uid ? <MessageDeliveryStatus message={item} onRetry={() => retryMessage(item)} /> : null}
                           </small>
                           {!item.deletedForEveryone ? <button type="button" className="chat-message-delete" onClick={() => setDeleteTarget(item)} aria-label="Delete message" title="Delete message"><DeleteOutlineRoundedIcon /></button> : null}
                         </article>

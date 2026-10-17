@@ -32,6 +32,7 @@ test('chat navigation, cancellation, media playback and offline browser interact
     { _id: '100000000000000000000001', conversationId: id, senderId: 'person1', messageType: 'voice', mediaAvailable: true, message: 'Voice message', audioDurationSeconds: 22, createdAt: '2026-10-16T10:00:00Z' },
     { _id: '100000000000000000000002', conversationId: id, senderId: 'alice', messageType: 'voice', mediaAvailable: true, message: 'Voice message', audioDurationSeconds: 11, createdAt: '2026-10-16T10:01:00Z' },
   ] : id === conversations[13]._id ? Array.from({length: 40}, (_, i) => ({_id: '300000000000' + String(i).padStart(12, '0'), conversationId:id, senderId:i % 2 ? 'alice' : 'person14', message:i === 39 ? 'Cached history 14' : 'Earlier message ' + i, ...(i === 38 ? {messageType:'image',mediaAvailable:true,attachmentName:'fixture-photo'} : {}), createdAt:'2026-10-16T10:00:00Z'})) : [{ _id: `200000000000${id.slice(-12)}`, conversationId: id, senderId: 'alice', message: `Cached history ${Number.parseInt(id, 16)}`, createdAt: '2026-10-16T10:00:00Z' }];
+  const sent = new Map();
   let delay = 0, failHistory = false;
   const requests = [];
   const wave = Buffer.alloc(44 + 22 * 8000 * 2);
@@ -45,6 +46,16 @@ test('chat navigation, cancellation, media playback and offline browser interact
     }
     if (url.pathname === '/fixture.js' || url.pathname === '/fixture.css') { res.setHeader('Content-Type', url.pathname.endsWith('.js') ? 'application/javascript' : 'text/css'); return res.end(fs.readFileSync(path.join(output, url.pathname.slice(1)))); }
     if (url.pathname === '/chat-doodles.svg') { res.setHeader('Content-Type', 'image/svg+xml'); return res.end(fs.readFileSync(path.join(root, 'public/chat-doodles.svg'))); }
+    if (req.method === 'POST' && url.pathname === '/uploads/image') return json({url:address+'/photo.png'});
+    if (url.pathname === '/photo.png') { res.setHeader('Content-Type','image/png'); return res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9eQAAAAASUVORK5CYII=','base64')); }
+    if (req.method === 'POST' && /^\/messages\/[a-f0-9]{24}$/.test(url.pathname)) {
+      let body=''; for await (const chunk of req) body+=chunk;
+      const payload=JSON.parse(body), id=url.pathname.split('/')[2];
+      const history=sent.get(id)||[];
+      const message=history.find(item=>item.clientMessageId===payload.clientMessageId)||{...payload,_id:'400000000000'+String(history.length).padStart(12,'0'),conversationId:id,senderId:'alice',createdAt:new Date().toISOString()};
+      if(!history.includes(message))history.push(message);sent.set(id,history);
+      return json({message,conversation:conversations.find(item=>item._id===id)});
+    }
     if (url.pathname === '/messages/sync') return; // Held until cancelled, like an unchanged long poll.
     if (url.pathname === '/messages') {
       if (req.headers['x-smaj-chat-owner'] === 'bob') return json({ conversations: [] });
@@ -55,7 +66,7 @@ test('chat navigation, cancellation, media playback and offline browser interact
     if (/^\/messages\/[a-f0-9]{24}$/.test(url.pathname)) {
       if (failHistory) return json({ message: 'Temporary failure' }, 503);
       if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-      const id = url.pathname.split('/')[2]; return json({ conversation: conversations.find(item => item._id === id), messages: messages(id), nextCursor: null });
+      const id = url.pathname.split('/')[2]; return json({ conversation: conversations.find(item => item._id === id), messages: [...messages(id),...(sent.get(id)||[])], nextCursor: null });
     }
     json({ message: 'Not found' }, 404);
   });
@@ -142,6 +153,30 @@ test('chat navigation, cancellation, media playback and offline browser interact
     await context.setOffline(true);
     await page.getByRole('button', { name: 'Play voice note', exact: true }).first().click();
     await page.getByRole('button', { name: 'Pause voice note', exact: true }).waitFor();
+    await page.getByPlaceholder('Message...', {exact:true}).fill('Waiting offline');
+    await page.getByRole('button',{name:'Send',exact:true}).click();
+    const waitingText=page.locator('[data-message-id]').filter({hasText:'Waiting offline'});
+    await waitingText.getByLabel('Waiting to send',{exact:true}).waitFor();
+    assert.equal(await waitingText.getByLabel('Sent',{exact:true}).count(),0);
+    await page.getByRole('button',{name:'Attach file',exact:true}).click();
+    await page.locator('input[accept="image/*,video/*"]').setInputFiles({name:'offline.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9eQAAAAASUVORK5CYII=','base64')});
+    await page.getByRole('button',{name:'offline.png',exact:true}).click();
+    await page.getByRole('button',{name:'Next',exact:true}).click();
+    await page.getByRole('button',{name:'Send attachment',exact:true}).click();
+    await page.getByRole('button',{name:'Cancel uploading attachment',exact:true}).waitFor();
+    const pendingPhoto=page.locator('.chat-upload-frame').filter({has:page.getByRole('button',{name:'Cancel uploading attachment',exact:true})});
+    assert.equal(await pendingPhoto.locator('img').count(),1);
+    await page.getByRole('button',{name:'Cancel uploading attachment',exact:true}).click();
+    await page.getByRole('button',{name:'Retry uploading attachment',exact:true}).waitFor();
+    await page.waitForTimeout(5200);
+    assert.equal(await page.getByRole('button',{name:'Retry uploading attachment',exact:true}).count(),1,'Cancelled uploads stay paused');
+    await page.getByRole('button',{name:'Retry uploading attachment',exact:true}).click();
+    await page.getByRole('button',{name:'Cancel uploading attachment',exact:true}).waitFor();
+    await context.setOffline(false);
+    await waitingText.getByLabel('Sent',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'Cancel uploading attachment',exact:true}).waitFor({state:'detached'});
+    assert.equal([...sent.values()].flat().length,2,'Reconnect sends each queued message once');
+    await context.setOffline(true);
     await page.evaluate(() => { window.fixture.user = { uid: 'bob', displayName: 'Bob' }; localStorage.setItem('smaj_pi_user', JSON.stringify({ uid: 'bob', accessToken: 'bob-token' })); window.dispatchEvent(new Event('fixture-account')); });
     await page.waitForTimeout(200);
     assert.equal(await page.getByText('Cached history 13', { exact: true }).count(), 0);
