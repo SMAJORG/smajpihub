@@ -1,4 +1,7 @@
 .wallet-dashboard {
+  --wallet-success: color-mix(in srgb, var(--smaj-success, #10b981) 70%, var(--smaj-text));
+  --wallet-pending: color-mix(in srgb, #c99724 70%, var(--smaj-text));
+  --wallet-cancelled: color-mix(in srgb, #dc596c 70%, var(--smaj-text));
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
@@ -63,9 +66,14 @@
   padding: 24px;
   border-radius: 28px;
   background:
-    radial-gradient(ellipse at 15% 0%, #754cbd 0%, transparent 65%), linear-gradient(135deg, #4d2c86, #27144d);
+    radial-gradient(ellipse at 15% 0%, color-mix(in srgb, var(--smaj-primary) 80%, white) 0%, transparent 65%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--smaj-primary) 65%, #18102c),
+      color-mix(in srgb, var(--smaj-primary) 32%, #18102c)
+    );
   color: #fff;
-  box-shadow: 0 12px 28px rgba(65, 31, 113, 0.16);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--smaj-primary) 16%, transparent);
 }
 .wallet-balance-top {
   display: flex;
@@ -215,13 +223,13 @@
 }
 .wallet-stat svg {
   font-size: 19px;
-  color: #20946b;
+  color: var(--wallet-success);
 }
 .wallet-stat.pending svg {
-  color: #ac902b;
+  color: var(--wallet-pending);
 }
 .wallet-stat.cancelled svg {
-  color: #bc5964;
+  color: var(--wallet-cancelled);
 }
 .wallet-stat > strong {
   display: block;
@@ -395,18 +403,18 @@
   overflow-wrap: anywhere;
 }
 .wallet-status.completed {
-  color: #16734b;
-  background: #37b97c1a;
+  color: var(--wallet-success);
+  background: color-mix(in srgb, var(--wallet-success) 12%, var(--smaj-card));
 }
 .wallet-status.pending,
 .wallet-status.unverified {
-  color: #a77821;
-  background: #dfa92a18;
+  color: var(--wallet-pending);
+  background: color-mix(in srgb, var(--wallet-pending) 12%, var(--smaj-card));
 }
 .wallet-status.cancelled,
 .wallet-status.failed {
-  color: #c05262;
-  background: #db64781a;
+  color: var(--wallet-cancelled);
+  background: color-mix(in srgb, var(--wallet-cancelled) 12%, var(--smaj-card));
 }
 .wallet-activity-details {
   padding: 0 0 18px 0;
