@@ -52,6 +52,7 @@ public class SmajUpdaterPlugin extends Plugin {
             busy.set(false); call.reject("Verified update information is missing. Check for updates again.", "INVALID_UPDATE"); return;
         }
         if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
+            progress("permission", 0, size);
             pendingPermission = call;
             try { getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()))); }
             catch (Exception error) { pendingPermission = null; busy.set(false); call.reject("Allow SMAJ PI HUB to install updates in Android settings.", "INSTALL_PERMISSION"); }
@@ -70,6 +71,11 @@ public class SmajUpdaterPlugin extends Plugin {
         downloads.shutdownNow();
         super.handleOnDestroy();
     }
+    private void progress(String stage, long received, long total) {
+        JSObject event = new JSObject();
+        event.put("stage", stage); event.put("received", received); event.put("total", total);
+        notifyListeners("progress", event);
+    }
     private void download(PluginCall call) {
         downloads.execute(() -> {
             File apk = new File(getContext().getCacheDir(), "smaj-verified-update-" + UUID.randomUUID() + ".apk");
@@ -80,6 +86,7 @@ public class SmajUpdaterPlugin extends Plugin {
                 long expectedSize = call.getInt("size").longValue();
                 MessageDigest hash = MessageDigest.getInstance("SHA-256");
                 long received = 0;
+                progress("downloading", 0, expectedSize);
                 try (FileOutputStream output = new FileOutputStream(apk, false)) {
                     while (received < expectedSize) {
                         if (Thread.currentThread().isInterrupted()) throw new java.io.IOException("Update cancelled");
@@ -93,6 +100,7 @@ public class SmajUpdaterPlugin extends Plugin {
                     }
                     output.getFD().sync();
                 }
+                progress("verifying", received, expectedSize);
                 if (received != expectedSize || !hex(hash.digest()).equalsIgnoreCase(call.getString("sha256"))) throw new UpdateFailure("The update download is incomplete or damaged. Retry on a stable connection.", "DOWNLOAD_INVALID");
                 PackageManager manager = getContext().getPackageManager();
                 PackageInfo candidate = manager.getPackageArchiveInfo(apk.getAbsolutePath(), signingFlags());
@@ -102,6 +110,7 @@ public class SmajUpdaterPlugin extends Plugin {
                     try {
                         Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", apk);
                         Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        progress("installing", expectedSize, expectedSize);
                         getActivity().startActivity(intent);
                         JSObject result = new JSObject(); result.put("installerOpened", true); call.resolve(result);
                     } catch (Exception error) { apk.delete(); call.reject("Android could not open the update installer. Try again.", "INSTALL_UNAVAILABLE"); }
@@ -116,10 +125,15 @@ public class SmajUpdaterPlugin extends Plugin {
         byte[] bytes = new byte[(int) (end - start + 1)];
         try (InputStream input = connection.getInputStream()) {
             int received = 0;
+            long lastProgress = 0;
             while (received < bytes.length) {
                 int count = input.read(bytes, received, bytes.length - received);
                 if (count < 0) throw new java.io.IOException("Incomplete update download");
                 received += count;
+                long now = android.os.SystemClock.elapsedRealtime();
+                if (now - lastProgress >= 200 || received == bytes.length) {
+                    progress("downloading", start + received, total); lastProgress = now;
+                }
             }
             if (input.read() != -1) throw new UpdateFailure("The update download has an unexpected size.", "DOWNLOAD_INVALID");
             return bytes;

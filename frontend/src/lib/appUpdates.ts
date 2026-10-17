@@ -1,10 +1,11 @@
-﻿import { Capacitor, registerPlugin } from "@capacitor/core";
+﻿import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 export type AndroidUpdatePackage = { url: string; size: number; sha256: string; versionCode: number };
 export type AppUpdate = { available: boolean; version: string; details: string; native: boolean; apk?: AndroidUpdatePackage };
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION || "1.0.2";
 export const APP_BUILD_ID = import.meta.env.VITE_APP_BUILD_ID || "development";
 const RELEASE_API = "https://api.github.com/repos/SMAJORG/smajpihub/releases/tags/android-latest";
-const updater = registerPlugin<{ install(update: AndroidUpdatePackage): Promise<{ installerOpened: boolean }> }>("SmajUpdater");
+export type UpdateProgress = { stage: "preparing" | "permission" | "downloading" | "verifying" | "installing" | "browser"; received?: number; total?: number };
+const updater = registerPlugin<{ addListener(event: "progress", listener: (progress: UpdateProgress) => void): Promise<PluginListenerHandle>; install(update: AndroidUpdatePackage): Promise<{ installerOpened: boolean }> }>("SmajUpdater");
 let installation: Promise<void> | null = null;
 export const isNewerVersion = (latest: string, current: string) => {
   const a = latest.split(".").map(Number), b = current.split(".").map(Number);
@@ -40,13 +41,17 @@ export const checkAppUpdate = async (native: boolean, currentVersion = APP_VERSI
   } catch (error) { if (error instanceof Error && error.name === "AbortError") throw new Error("Version check timed out. Please try again."); throw error; }
   finally { window.clearTimeout(timer); }
 };
-export function installAppUpdate(update: AppUpdate): Promise<void> {
+export function installAppUpdate(update: AppUpdate, onProgress?: (progress: UpdateProgress) => void): Promise<void> {
   if (installation) return installation;
+  onProgress?.({ stage: "preparing" });
   if (!update.native || !update.apk || !update.available) return Promise.reject(new Error("Check for an available verified Android update first."));
   const apk = parseAndroidUpdate({ ...update.apk, version: update.version }, update.version);
   installation = (async () => {
-    if (Capacitor.isPluginAvailable("SmajUpdater")) await updater.install(apk);
-    else { const { Browser } = await import("@capacitor/browser"); await Browser.open({ url: apk.url }); }
+    if (Capacitor.isPluginAvailable("SmajUpdater")) {
+      const listener = await updater.addListener("progress", progress => onProgress?.(progress));
+      try { await updater.install(apk); } finally { await listener.remove(); }
+    }
+    else { onProgress?.({ stage: "browser" }); const { Browser } = await import("@capacitor/browser"); await Browser.open({ url: apk.url }); }
   })().finally(() => { installation = null; });
   return installation;
 }

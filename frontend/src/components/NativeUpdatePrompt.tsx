@@ -1,10 +1,12 @@
-﻿import { useEffect, useRef, useState } from "react";
+import UpdateProgress from "./UpdateProgress";
+import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { checkAppUpdate, installAppUpdate, type AppUpdate } from "../lib/appUpdates";
+import { checkAppUpdate, installAppUpdate, type AppUpdate, type UpdateProgress as Progress } from "../lib/appUpdates";
 import "./NativeUpdatePrompt.css";
 export default function NativeUpdatePrompt() {
   const [update, setUpdate] = useState<AppUpdate | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const dismissed = useRef("");
@@ -45,9 +47,9 @@ export default function NativeUpdatePrompt() {
   const close = () => { dismissed.current = update.version; setUpdate(null); setError(""); };
   const install = async () => {
     setBusy(true); setError("");
-    try { await installAppUpdate(update); close(); }
+    try { await installAppUpdate(update, setProgress); close(); }
     catch (error) { setError(error instanceof Error ? error.message : "The update could not be installed. Please retry."); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setProgress(null); }
   };
-  return <div className="native-update-backdrop"><section ref={dialog} className="native-update-card" role="dialog" aria-modal="true" aria-labelledby="native-update-title"><span className="native-update-label">SMAJ PI HUB</span><h2 id="native-update-title">Update available</h2><p>Version {update.version} is ready.</p><p>{busy ? "Downloading and checking the update. Android will ask you to confirm installation." : "Install the latest fixes and improvements."}</p>{error ? <p role="alert">{error}</p> : null}<div><button type="button" disabled={busy} onClick={close}>Later</button><button autoFocus type="button" disabled={busy} className="primary" onClick={() => void install()}>{busy ? "Preparing update..." : "Update now"}</button></div></section></div>;
+  return <div className="native-update-backdrop"><section ref={dialog} className="native-update-card" role="dialog" aria-modal="true" aria-labelledby="native-update-title"><span className="native-update-label">SMAJ PI HUB</span><h2 id="native-update-title">Update available</h2><p>Version {update.version} is ready.</p><p>{busy ? "Downloading and checking the update. Android will ask you to confirm installation." : "Install the latest fixes and improvements."}</p><UpdateProgress progress={progress} />{error ? <p role="alert">{error}</p> : null}<div><button type="button" disabled={busy} onClick={close}>Later</button><button autoFocus type="button" disabled={busy} className="primary" onClick={() => void install()}>{busy ? "Preparing update..." : "Update now"}</button></div></section></div>;
 }

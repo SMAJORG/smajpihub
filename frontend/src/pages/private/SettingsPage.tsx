@@ -1,3 +1,4 @@
+import UpdateProgress from "../../components/UpdateProgress";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ConfirmSignOutModal from "../../components/ConfirmSignOutModal";
@@ -5,7 +6,7 @@ import LanguageSoonButton from "../../components/LanguageSoonButton";
 import TrustBadge from "../../components/TrustBadge";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import { Capacitor } from "@capacitor/core";
-import { APP_VERSION, checkAppUpdate, installAppUpdate, type AppUpdate } from "../../lib/appUpdates";
+import { APP_VERSION, checkAppUpdate, installAppUpdate, type AppUpdate, type UpdateProgress as Progress } from "../../lib/appUpdates";
 import "./SettingsPage.css";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
@@ -80,6 +81,7 @@ const SettingsPage = () => {
   });
   const [checkingVersion, setCheckingVersion] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<AppUpdate | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<Progress | null>(null);
   const [updatingApp, setUpdatingApp] = useState(false);
   const updateDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { if (updateInfo) updateDialog.current?.showModal(); }, [updateInfo]);
@@ -95,9 +97,10 @@ const SettingsPage = () => {
     setUpdatingApp(true);
     try {
       if (updateInfo?.native) {
-        await installAppUpdate(updateInfo);
+        await installAppUpdate(updateInfo, setUpdateProgress);
         closeUpdate();
       } else {
+        setUpdateProgress({ stage: "preparing" });
         if ("serviceWorker" in navigator) {
           const registration = await navigator.serviceWorker.getRegistration();
           await registration?.update();
@@ -105,7 +108,7 @@ const SettingsPage = () => {
         window.location.reload();
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not open the update. Please try again."); closeUpdate(); }
-    finally { setUpdatingApp(false); }
+    finally { setUpdatingApp(false); setUpdateProgress(null); }
   };
   const [message, setMessage] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -360,11 +363,11 @@ const SettingsPage = () => {
         <p>SMAJ PI HUB v{APP_VERSION}</p>
       </footer>
 
-      {updateInfo ? <dialog ref={updateDialog} className="settings-update-sheet" aria-labelledby="settings-update-title" onCancel={() => setUpdateInfo(null)}>
+      {updateInfo ? <dialog ref={updateDialog} className="settings-update-sheet" aria-labelledby="settings-update-title" onCancel={event => { if (updatingApp) event.preventDefault(); else setUpdateInfo(null); }}>
         <h2 id="settings-update-title">{updateInfo.available ? "New Version" : "Up to date"}</h2>
         <div className="settings-update-app"><img src="/icon-192x192.png" alt="" /><div><strong>SMAJ PI HUB</strong><p>Version: {updateInfo.version}</p></div></div>
         <strong>Details</strong><p>{updateInfo.available ? updateInfo.details : "You are using the latest version."}</p>
-        <div className="settings-update-actions"><button type="button" onClick={closeUpdate}>{updateInfo.available ? "Later" : "Close"}</button>{updateInfo.available ? <button type="button" disabled={updatingApp} onClick={() => void installUpdate()}>{updatingApp ? "Updating..." : "Update"}</button> : null}</div>
+        <UpdateProgress progress={updateProgress} /><div className="settings-update-actions"><button type="button" disabled={updatingApp} onClick={closeUpdate}>{updateInfo.available ? "Later" : "Close"}</button>{updateInfo.available ? <button type="button" disabled={updatingApp} onClick={() => void installUpdate()}>{updatingApp ? "Updating..." : "Update"}</button> : null}</div>
       </dialog> : null}
       <ConfirmSignOutModal open={showSignOut} onCancel={() => setShowSignOut(false)} onConfirm={() => void logout()} />
       {deleteRequested ? (
