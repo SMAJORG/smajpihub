@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import AppLayout from "../layouts/AppLayout";
 import RewardedAdPlacement from "../components/RewardedAdPlacement";
 import ServiceArt from "../components/ServiceArt";
-import { serviceLaunchNavigationState } from "../components/ServiceLaunchGate";
+import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";

@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 import ServiceArt from "../../components/ServiceArt";
-import { serviceLaunchNavigationState } from "../../components/ServiceLaunchGate";
+import { serviceLaunchNavigationState } from "../../lib/serviceLaunch";
 import { serviceAppPath, serviceCatalog, type ServiceDefinition } from "../../content/serviceCatalog";
 
 type DiscoveryMode = "trending" | "lifestyle" | "categories";

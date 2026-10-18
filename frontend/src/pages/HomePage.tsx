@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import ServiceArt from "../components/ServiceArt";
 import LiveTransactions from "../components/LiveTransactions";
-import { serviceLaunchNavigationState } from "../components/ServiceLaunchGate";
+import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 import {
   getServiceLaunchLabel,
   getServiceLaunchStatus,

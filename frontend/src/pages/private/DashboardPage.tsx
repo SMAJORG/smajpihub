@@ -20,7 +20,7 @@ import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import ServiceArt from "../../components/ServiceArt";
-import { serviceLaunchNavigationState } from "../../components/ServiceLaunchGate";
+import { serviceLaunchNavigationState } from "../../lib/serviceLaunch";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import PullToRefresh from "../../components/PullToRefresh";
 import TrustBadge from "../../components/TrustBadge";

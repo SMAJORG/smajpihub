@@ -1,3 +1,4 @@
+import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
@@ -21,7 +22,7 @@ export function SuggestedServices() {
           {group.map(service => {
             const status = getServiceLaunchStatus(service.slug);
             return (
-              <Link to={serviceAppPath(service.slug)} className="mobile-service-app" key={service.slug}>
+              <Link to={serviceAppPath(service.slug)} state={serviceLaunchNavigationState(service.slug)} className="mobile-service-app" key={service.slug}>
                 <ServiceArt index={service.atlasIndex} />
                 <div>
                   <strong>{service.name}</strong>
@@ -73,7 +74,7 @@ function Card({ card, sports, trust }: { card: ContentCard; sports: boolean; tru
     </>
   );
   return card.to ? (
-    <Link className="managed-content-card" to={card.to}>
+    <Link className="managed-content-card" to={card.to} state={card.serviceSlug ? serviceLaunchNavigationState(card.serviceSlug) : undefined}>
       {body}
     </Link>
   ) : (

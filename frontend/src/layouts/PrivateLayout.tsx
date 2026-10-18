@@ -37,7 +37,8 @@ import { serviceAppPath, serviceCatalog } from "../content/serviceCatalog";
 import useRouteScrollTop from "../hooks/useRouteScrollTop";
 import CommunityFollowPrompt from "../components/CommunityFollowPrompt";
 import { getStreamDownloads, STREAM_DOWNLOADS_CHANGED_EVENT } from "../lib/streamCatalog";
-import ServiceLaunchGate, { serviceLaunchNavigationState } from "../components/ServiceLaunchGate";
+import ServiceLaunchGate from "../components/ServiceLaunchGate";
+import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 
 type PrivateLayoutProps = { children: ReactNode; fullScreen?: boolean };
 type LiveConversation = {

@@ -6,7 +6,7 @@ import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import ServiceArt from "../../components/ServiceArt";
 import { getServiceLaunchLabel, getServiceLaunchStatus, serviceAppPath, serviceCatalog } from "../../content/serviceCatalog";
 import AmbassadorServicesPanel from "../../components/AmbassadorServicesPanel";
-import { serviceLaunchNavigationState } from "../../components/ServiceLaunchGate";
+import { serviceLaunchNavigationState } from "../../lib/serviceLaunch";
 
 const serviceHints: Record<string, string> = {
   store: "Shopping • Deals",
