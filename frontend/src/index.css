@@ -22697,3 +22697,28 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 
 .storefront-hero-slide>div>a{display:inline-flex;align-items:center;justify-content:center;width:fit-content;min-height:38px;padding:9px 18px;border-radius:999px;background:var(--smaj-primary);color:#fff!important;text-decoration:none;font-weight:750}
 .chat-messages .typing-indicator{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;max-width:calc(100% - 16px);box-sizing:border-box}.chat-messages .typing-indicator>span{position:static;display:inline-flex;gap:3px;flex:0 0 auto;width:auto;height:auto;margin:0;background:transparent;box-shadow:none;animation:none}.chat-messages .typing-indicator>span>i{width:5px;height:5px;flex:0 0 5px;background:currentColor;border-radius:50%;animation:typing-dot 1s infinite alternate}
+
+/* Compact dashboard sports cards, including managed custom content. */
+.private-home [data-home-section="sports"] .managed-content-strip{grid-auto-columns:240px;gap:12px;align-items:start}
+.private-home [data-home-section="sports"] .managed-content-card{border-radius:16px}
+.private-home [data-home-section="sports"] .managed-card-image{height:100px}
+.private-home [data-home-section="sports"] .managed-card-copy{padding:12px}
+.private-home [data-home-section="sports"] .managed-card-copy h3{font-size:15px;line-height:1.3;margin:7px 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.private-home [data-home-section="sports"] .managed-card-copy p{font-size:11px;line-height:1.4;margin:6px 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.private-home [data-home-section="sports"] .managed-card-copy>b{font-size:10px;padding:3px 7px}
+.private-home [data-home-section="sports"] .managed-score{margin:10px 0;gap:7px;font-size:11px}
+.private-home [data-home-section="sports"] .managed-score>span{gap:4px}
+.private-home [data-home-section="sports"] .managed-score img{width:25px;height:25px}
+.private-home .dashboard-sports-grid{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:240px;align-items:start;gap:12px;overflow-x:auto;padding-bottom:8px}
+.private-home .dashboard-sports-card{min-height:0;padding:12px;border-radius:16px}
+.private-home .dashboard-score-row{margin:12px 0 8px;gap:8px}
+.private-home .dashboard-score-row em{font-size:20px}
+.private-home .dashboard-sports-team-logo{width:28px;height:28px}
+.private-home .dashboard-top-team{margin:12px 0;gap:8px}
+.private-home .dashboard-team-stats{padding:8px 0}
+.private-home .dashboard-highlight-image{height:90px}
+.private-home .dashboard-highlight-copy{padding:10px}
+/* White category labels and counts remain readable in both themes. */
+.notifications-page .notification-tabs>button{background:#7056a5!important;color:#fff!important}
+.notifications-page .notification-tabs>button.active{background:#6d28d9!important;color:#fff!important}
+.notifications-page .notification-tabs>button .notification-tab-count{background:#ffffff26!important;color:#fff!important}

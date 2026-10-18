@@ -583,3 +583,11 @@
     height: 30px;
   }
 }
+
+/* Keep the wallet summary in SMAJ purple, independent of inherited card themes. */
+.wallet-dashboard .wallet-balance-card{background:linear-gradient(135deg,#57349b,#35205f);color:#fff;box-shadow:0 12px 28px #7352d629}
+.wallet-dashboard .wallet-balance-top,.wallet-dashboard .wallet-balance-top>span{color:#fff!important}
+.wallet-dashboard .wallet-balance-top button,.wallet-dashboard .wallet-balance-top button span{color:#f5efff!important}
+.wallet-dashboard .wallet-quick-actions>a,.wallet-dashboard .wallet-quick-actions>button,.wallet-dashboard .wallet-quick-actions span{color:#fff!important;background-color:transparent}
+.wallet-dashboard .wallet-quick-actions>a,.wallet-dashboard .wallet-quick-actions>button{background:#ffffff18}
+.wallet-dashboard .wallet-quick-actions>a:hover,.wallet-dashboard .wallet-quick-actions>button:hover{background:#ffffff30}
