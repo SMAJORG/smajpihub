@@ -33,7 +33,7 @@ export const isCacheableApiRead = (url = "") => {
     .split("?")[0]
     .toLowerCase();
   if (/^\/jobs\/(profile|applications|activity|employer|admin)(?:\/|$)/.test(path)) return false;
-  if (path === "/marketplace/seller/settlements") return false;
+  if (path === "/marketplace/seller/settlements" || path === "/marketplace/seller/dashboard") return false;
   const marketplaceRead = /^\/marketplace\/(feed|products|saved|seller(?:s)?)(?:\/|$)/.test(path);
   const jobsRead = path.startsWith("/jobs/") && !/^\/jobs\/(billing|earnings|employer\/payments)(?:\/|$)/.test(path);
   return (

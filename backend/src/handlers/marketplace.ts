@@ -1,3 +1,4 @@
+import { buildSellerDashboard } from "../services/sellerDashboard";
 import crypto from "crypto";
 import { financialTransaction, financialError } from "../services/financialIntegrity";
 import { enrichProfileAvatars } from "../services/profileAvatars";
@@ -625,6 +626,15 @@ export default function mountMarketplaceEndpoints(router: Router) {
     const user = await requireUser(req, res); if (!user) return;
     const settlements = await req.app.locals.settlementCollection.find({ sellerUid: user.uid }).sort({ createdAt: -1 }).limit(100).toArray();
     res.json({ settlements });
+  });
+  router.get("/seller/dashboard", async (req, res) => {
+    const user = await requireUser(req, res); if (!user) return;
+    res.setHeader("Cache-Control", "private, no-store");
+    try {
+      const snapshot = await buildSellerDashboard(req.app.locals, user);
+      return res.json({ ...snapshot, defaultNetwork: env.pi_network === "Pi Mainnet" ? "Pi Mainnet" : "Pi Testnet", products: await publicProducts(req, snapshot.products) });
+    }
+    catch { return res.status(503).json({ message: "Seller dashboard is temporarily unavailable. Please retry." }); }
   });
   router.get("/seller", async (req, res) => {
     const user = await resolveCurrentUser(req);
