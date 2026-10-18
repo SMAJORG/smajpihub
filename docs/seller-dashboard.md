@@ -20,7 +20,7 @@ Seller activation and identity verification are separate. Activation follows the
 
 One deduplicated snapshot request refreshes all cards every 20 seconds while visible and online, and on focus, visibility restoration and reconnect. Requests have a 15-second timeout and are cancelled on unmount or account change. Latest successful snapshots are kept in bounded account-scoped memory; no financial snapshot is written to persistent browser storage. Product mutations force a fresh read after any already-running request. Loading, offline, retry and partial-data states retain the last valid snapshot and its server timestamp.
 
-Mobile uses two statistics columns; desktop uses four. The SVG analytics chart supports filters, pointer exploration and a labelled keyboard-operable date slider. Product rows expand progressively, use real image thumbnails, and require confirmation for deletion and availability changes. Changes are scoped to /seller and the new API; other pages retain their existing interfaces.
+Mobile uses two statistics columns; desktop uses four. The SVG analytics chart supports filters, pointer exploration and a labelled keyboard-operable date slider. The dashboard previews only three products. View all and Manage Products open /seller/products, with title search, URL-preserved filters and 20 products per page. Product rows use real image thumbnails and require confirmation for deletion and availability changes. Seller styles use their own seller-ws namespace and restore padding and spacing inside the full-screen shell, avoiding collisions with streaming chart styles. Changes are scoped to /seller and the new API; other pages retain their existing interfaces.
 
 ## Validation
 

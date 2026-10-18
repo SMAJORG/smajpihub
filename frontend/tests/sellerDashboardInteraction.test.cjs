@@ -30,7 +30,7 @@ test(
     )(service);
     await require("esbuild").build({
       stdin: {
-        contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {MemoryRouter} from 'react-router-dom';import SellerPage from './src/pages/private/SellerPage';import './src/index.css';createRoot(document.getElementById('root')).render(<React.StrictMode><MemoryRouter><SellerPage/></MemoryRouter></React.StrictMode>);`,
+        contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {MemoryRouter,Routes,Route} from 'react-router-dom';import SellerPage,{SellerProductsPage} from './src/pages/private/SellerPage';import './src/index.css';import './src/pages/stream/StreamWorkspacePage.css';createRoot(document.getElementById('root')).render(<React.StrictMode><MemoryRouter><div className="private-shell full-screen-page"><div className="full-screen-tab-page"><Routes><Route path="/seller/products" element={<SellerProductsPage/>}/><Route path="*" element={<SellerPage/>}/></Routes></div></div></MemoryRouter></React.StrictMode>);`,
         resolveDir: root,
         loader: "tsx",
       },
@@ -220,7 +220,10 @@ test(
         );
       }
       if (url.pathname === "/marketplace/seller/dashboard") {
-        if (fail) { console.log("Serving seller 503"); return json({ message: "Unavailable" }, 503); }
+        if (fail) {
+          console.log("Serving seller 503");
+          return json({ message: "Unavailable" }, 503);
+        }
         return json({
           ...(await service.buildSellerDashboard(locals, {
             uid: owner,
@@ -234,7 +237,7 @@ test(
         });
       }
       if (url.pathname.startsWith("/marketplace/seller/products/")) {
-        console.log("Seller mutation",req.method,url.pathname);
+        console.log("Seller mutation", req.method, url.pathname);
         const id = url.pathname.split("/")[4],
           index = products.findIndex(
             (row) => row._id === id && row.sellerId === owner,
@@ -274,11 +277,11 @@ test(
       await page.getByText("Test Store", { exact: true }).waitFor();
       await page.getByText("Trusted Seller", { exact: true }).waitFor();
       await page.waitForFunction(
-        () => document.querySelector(".sw-stats")?.children.length === 4,
+        () => document.querySelector(".seller-ws-stats")?.children.length === 4,
       );
       assert.equal(
         await page
-          .locator(".sw-stats")
+          .locator(".seller-ws-stats")
           .evaluate(
             (node) =>
               getComputedStyle(node).gridTemplateColumns.split(" ").length,
@@ -307,36 +310,65 @@ test(
       );
       await page.getByRole("slider", { name: "Explore sales dates" }).fill("0");
       assert.match(
-        await page.locator(".sw-chart-readout").innerText(),
+        await page.locator(".seller-ws-chart-readout").innerText(),
         /0 verified payments/,
       );
       await page
         .getByLabel("Sales network", { exact: true })
         .selectOption("Pi Mainnet");
-      assert.match(await page.locator(".sw-sales-total").innerText(), /5/);
+      assert.match(
+        await page.locator(".seller-ws-sales-total").innerText(),
+        /5/,
+      );
       await page
         .getByLabel("Sales network", { exact: true })
         .selectOption("Pi Testnet");
-      assert.match(await page.locator(".sw-sales-total").innerText(), /2/);
+      assert.match(
+        await page.locator(".seller-ws-sales-total").innerText(),
+        /2/,
+      );
+      const geometry = await page.evaluate(() => {
+        const root = document.querySelector(".seller-workspace"),
+          chart = document.querySelector(".seller-ws-chart"),
+          filters = document.querySelector(".seller-ws-filters"),
+          svg = chart.querySelector("svg");
+        return {
+          padding: parseFloat(getComputedStyle(root).paddingLeft),
+          gap: parseFloat(getComputedStyle(root).gap),
+          chartDisplay: getComputedStyle(chart).display,
+          filterDirection: getComputedStyle(filters).flexDirection,
+          svgWidth: svg.getBoundingClientRect().width,
+          chartWidth: chart.getBoundingClientRect().width,
+          label: getComputedStyle(
+            document.querySelector(".seller-ws-periods span"),
+          ).color,
+        };
+      });
+      assert.ok(geometry.padding >= 12);
+      assert.ok(geometry.gap >= 12);
+      assert.equal(geometry.chartDisplay, "block");
+      assert.equal(geometry.filterDirection, "row");
+      assert.ok(geometry.svgWidth <= geometry.chartWidth);
+      assert.equal(geometry.label, "rgb(238, 229, 255)");
       console.log("Mobile and analytics verified");
       await page.setViewportSize({ width: 1280, height: 900 });
       assert.equal(
         await page
-          .locator(".sw-stats")
+          .locator(".seller-ws-stats")
           .evaluate(
             (node) =>
               getComputedStyle(node).gridTemplateColumns.split(" ").length,
           ),
         4,
       );
-      await page.locator(".sw-product-menu summary").first().click();
+      await page.locator(".seller-ws-product-menu summary").first().click();
       await page
         .getByRole("button", { name: "Mark Sold Out", exact: true })
         .click();
       await page.getByRole("dialog").waitFor();
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
       assert.equal(products[0].active, true);
-      await page.locator(".sw-product-menu summary").first().click();
+      await page.locator(".seller-ws-product-menu summary").first().click();
       await page
         .getByRole("button", { name: "Mark Sold Out", exact: true })
         .click();
@@ -345,17 +377,17 @@ test(
         .click();
       await page.waitForFunction(() =>
         document
-          .querySelector(".sw-products")
+          .querySelector(".seller-ws-products")
           ?.textContent.includes("Sold out"),
       );
       assert.equal(products[0].active, false);
-      await page.locator(".sw-product-menu summary").first().click();
+      await page.locator(".seller-ws-product-menu summary").first().click();
       await page.getByRole("button", { name: "Delete", exact: true }).click();
       await page
         .getByRole("button", { name: "Delete product", exact: true })
         .click();
       await page.waitForFunction(
-        () => document.querySelectorAll(".sw-products>li").length === 1,
+        () => document.querySelectorAll(".seller-ws-products>li").length === 1,
       );
       assert.equal(products.length, 1);
       console.log("Product actions verified");
@@ -386,13 +418,17 @@ test(
       await page.getByRole("button", { name: "Refresh", exact: true }).click();
       await page.getByText("processing", { exact: true }).waitFor();
       await page.waitForFunction(() =>
-        document.querySelector(".sw-sales-total").textContent.includes("3"),
+        document
+          .querySelector(".seller-ws-sales-total")
+          .textContent.includes("3"),
       );
 
       console.log("Payment and order updates verified");
       await context.setOffline(true);
       await page.waitForFunction(() =>
-        document.querySelector(".sw-sync").textContent.includes("Offline"),
+        document
+          .querySelector(".seller-ws-sync")
+          .textContent.includes("Offline"),
       );
       assert.equal(
         await page.getByText("Live new order", { exact: true }).count(),
@@ -401,11 +437,22 @@ test(
       await context.setOffline(false);
       await page.waitForFunction(
         () =>
-          !document.querySelector(".sw-sync").textContent.includes("Offline"),
+          !document
+            .querySelector(".seller-ws-sync")
+            .textContent.includes("Offline"),
       );
       fail = true;
       await page.getByRole("button", { name: "Refresh", exact: true }).click();
-      await page.getByRole("alert").waitFor({timeout:10000}).catch(async error=>{ console.error("Seller error state",await page.locator(".seller-workspace").innerText()); throw error; });
+      await page
+        .getByRole("alert")
+        .waitFor({ timeout: 10000 })
+        .catch(async (error) => {
+          console.error(
+            "Seller error state",
+            await page.locator(".seller-workspace").innerText(),
+          );
+          throw error;
+        });
       assert.equal(
         await page.getByText("Live new order", { exact: true }).count(),
         1,
@@ -419,7 +466,7 @@ test(
       });
       assert.notEqual(
         await page
-          .locator(".sw-card")
+          .locator(".seller-ws-card")
           .first()
           .evaluate((node) => getComputedStyle(node).backgroundColor),
         "rgb(255, 255, 255)",
@@ -433,6 +480,50 @@ test(
         path: path.join(output, "seller-mobile.png"),
         fullPage: true,
       });
+      for (let i = 0; i < 100; i++)
+        products.push({
+          _id: "extra" + i,
+          sellerId: "seller",
+          title: "Inventory item " + String(i).padStart(3, "0"),
+          pricePi: 1,
+          image: "/photo.svg",
+          quantity: 1,
+          active: true,
+          approved: true,
+          reviewStatus: "approved",
+          createdAt: iso,
+        });
+      await page.getByRole("button", { name: "Refresh", exact: true }).click();
+      await page.waitForFunction(
+        () => document.querySelectorAll(".seller-ws-products>li").length === 3,
+      );
+      await page.locator("a.seller-ws-view-all").click();
+      await page
+        .getByRole("heading", { name: "Product inventory", exact: true })
+        .waitFor();
+      assert.equal(await page.locator(".seller-ws-products>li").count(), 20);
+      assert.equal(
+        await page
+          .getByRole("heading", { name: "Sales analytics", exact: true })
+          .count(),
+        0,
+      );
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.getByText("Page 2 of 6", { exact: true }).waitFor();
+      assert.equal(await page.locator(".seller-ws-products>li").count(), 20);
+      await page
+        .getByPlaceholder("Search by product title")
+        .fill("Inventory item 099");
+      await page.waitForFunction(
+        () => document.querySelectorAll(".seller-ws-products>li").length === 1,
+      );
+      await page.getByText("Inventory item 099", { exact: true }).waitFor();
+      await page
+        .getByRole("link", { name: "Back to dashboard", exact: true })
+        .click();
+      await page
+        .getByRole("heading", { name: "Seller Dashboard", exact: true })
+        .waitFor();
       owner = "bob";
       await page.evaluate(() => {
         window.fixture.user = {

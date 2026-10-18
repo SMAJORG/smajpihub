@@ -47,7 +47,7 @@ import SettingsPage from "./pages/private/SettingsPage";
 import DeviceSessionsPage from "./pages/private/DeviceSessionsPage";
 import AppLockSettingsPage from "./pages/private/AppLockSettingsPage";
 import AccountDashboardPage from "./pages/private/AccountDashboardPage";
-import SellerPage from "./pages/private/SellerPage";
+import SellerPage, { SellerProductsPage } from "./pages/private/SellerPage";
 import EditProductPage from "./pages/private/EditProductPage";
 import SellerProfilePage from "./pages/private/SellerProfilePage";
 import SavedProductsPage from "./pages/private/SavedProductsPage";
@@ -1195,6 +1195,10 @@ export const router = createBrowserRouter([
         </PrivateLayout>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/seller/products",
+    element: <ProtectedRoute><PrivateLayout fullScreen><SellerProductsPage /></PrivateLayout></ProtectedRoute>,
   },
   {
     path: "/seller/:id",
