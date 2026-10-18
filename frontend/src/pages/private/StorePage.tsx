@@ -1,3 +1,4 @@
+import StoreFooter from "../../components/StoreFooter";
 import HeroBannerAction from "../../components/HeroBannerAction";
 import ServiceImage from "../../components/ServiceImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -579,34 +580,7 @@ const StorePage = () => {
           </section>
         ) : null}
 
-        <footer className="storefront-footer">
-          <div className="storefront-footer-grid">
-            <article>
-              <strong>SMAJ Store</strong>
-              <p>Real seller products, Pi checkout, and marketplace updates in one place.</p>
-            </article>
-            <article>
-              <strong>Shop</strong>
-              <button type="button" onClick={() => updateCategory("Deals")}>Deals</button>
-              <button type="button" onClick={() => updateCategory("Electronics")}>Electronics</button>
-              <button type="button" onClick={() => updateCategory("Fashion")}>Fashion</button>
-            </article>
-            <article>
-              <strong>Seller</strong>
-              <button type="button" onClick={() => navigate("/seller")}>Seller Dashboard</button>
-              <button type="button" onClick={() => navigate("/add-product")}>Add Product</button>
-            </article>
-            <article>
-              <strong>Account</strong>
-              <button type="button" onClick={() => navigate("/orders")}>Orders</button>
-              <button type="button" onClick={() => navigate("/saved")}>Saved Products</button>
-            </article>
-          </div>
-          <div className="storefront-footer-bottom">
-            <span>Part of SMAJ PI HUB</span>
-            <span>Secure marketplace for Pi users.</span>
-          </div>
-        </footer>
+        <StoreFooter onCategory={updateCategory} />
       </section>
     </main>
   );

@@ -27,7 +27,7 @@ const snapshot = { network: 'testnet', filter: 'all', service: '', offset: 0, li
 test('renders the real snapshot with compact actions, network warning and expandable details', () => {
   const html = render(snapshot);
   for (const text of ['My Wallet', '0.000 \u03c0', 'Not synced', 'Zero is a placeholder', 'Open Pi Wallet', 'Payment History', 'My Orders', 'Recent Activity', 'Actual meal receipt', 'SMAJ Food', 'actual-payment', 'not real funds or spendable Pi']) assert.ok(html.includes(text), text);
-  assert.match(html, /<details/); assert.match(html, /wallet-stat-grid/); assert.match(html, /0.1234567/);
+  assert.match(html, /<details/); assert.match(html, /pi-wallet-stat-grid/); assert.match(html, /0.1234567/);
 });
 test('network switching and account changes never flash a previous account or Testnet receipt', () => {
   const mainnet = render(snapshot, 'mainnet');
@@ -44,7 +44,7 @@ test('amount formatting preserves zero, unavailable records and hidden values', 
 
 test('hide masks the balance and transaction amounts with four stars', () => {
   const html = render(snapshot, 'testnet', 'alice', false);
-  assert.match(html, /wallet-balance-value">\*\*\*\*</);
+  assert.match(html, /pi-wallet-balance-value">\*\*\*\*</);
   assert.ok(!html.includes('0.000')); assert.ok(!html.includes('0.1234567'));
   assert.match(html, /Show wallet amounts/);
 });

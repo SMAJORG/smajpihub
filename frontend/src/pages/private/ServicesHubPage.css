@@ -1,0 +1,246 @@
+/* Only the service launcher's visual layout; routes, artwork and labels are unchanged. */
+.services-launcher {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.services-launcher
+  :is(
+    .services-mobile-view,
+    .services-desktop-view,
+    .mobile-services-grid,
+    .services-hub-grid
+  ) {
+  min-width: 0;
+  max-width: 100%;
+}
+.services-launcher .mobile-services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+.services-launcher .mobile-services-grid > a {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 58px 20px minmax(32px, auto) minmax(24px, auto);
+  justify-items: center;
+  align-content: start;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  min-height: 184px;
+  aspect-ratio: auto;
+  padding: 14px 8px 12px;
+  border: 1px solid var(--smaj-border);
+  border-radius: 18px;
+  box-shadow: 0 4px 14px #10182806;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+.services-launcher .mobile-services-grid .service-art {
+  width: 56px;
+  height: 56px;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 14px;
+  aspect-ratio: 1;
+}
+.services-launcher .mobile-services-grid > a > em {
+  position: static;
+  inset: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  max-width: 100%;
+  min-height: 18px;
+  margin: 0;
+  padding: 3px 5px;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+  border-radius: 999px;
+  box-sizing: border-box;
+  letter-spacing: 0.015em;
+  transform: none;
+}
+.services-launcher .mobile-services-grid > a > strong {
+  display: block;
+  width: 100%;
+  margin: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.services-launcher .mobile-services-grid > a > span {
+  display: block;
+  width: 100%;
+  margin: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  font-size: 10px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.services-launcher .mobile-services-grid .live-card-badge:before {
+  width: 4px;
+  height: 4px;
+  margin-inline-end: 4px;
+  flex: none;
+}
+.services-launcher .services-mobile-view > header {
+  margin-bottom: 16px;
+}
+.services-launcher .services-mobile-view > header h1 {
+  margin-bottom: 6px;
+}
+.services-launcher .services-mobile-view > header p {
+  line-height: 1.5;
+}
+.services-launcher .services-ambassador-card {
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: 17px;
+  gap: 8px 10px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  box-shadow: 0 6px 18px #4c1d951c;
+}
+.services-launcher .services-ambassador-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+.services-launcher .services-ambassador-icon svg {
+  font-size: 22px;
+}
+.services-launcher .services-ambassador-card h2 {
+  font-size: 15px;
+  line-height: 1.3;
+}
+.services-launcher .services-ambassador-card p {
+  line-height: 1.45;
+}
+.services-launcher .services-ambassador-actions {
+  gap: 8px;
+  min-width: 0;
+}
+.services-launcher .services-ambassador-actions button {
+  min-width: 0;
+  min-height: 36px;
+  height: auto;
+  padding: 8px;
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.services-launcher .services-ambassador-card::after {
+  pointer-events: none;
+}
+.services-launcher .services-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+.services-launcher .services-hub-grid > a {
+  display: grid;
+  grid-template-rows: auto 22px auto 1fr;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  padding: 18px;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px #10182806;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.services-launcher .services-hub-grid > a > .service-art {
+  width: 100%;
+  aspect-ratio: 2/1.15;
+  margin: 0;
+}
+.services-launcher .services-hub-grid > a > .service-status {
+  position: static;
+  justify-self: start;
+  max-width: 100%;
+  height: auto;
+  min-height: 20px;
+  margin: 0;
+  padding: 4px 7px;
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: normal;
+  border-radius: 999px;
+}
+.services-launcher .services-hub-grid > a > strong {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.services-launcher .services-hub-grid > a > p {
+  margin: 0;
+  padding-bottom: 22px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.services-launcher .services-hub-grid > a > i {
+  right: 15px;
+  bottom: 14px;
+}
+.services-launcher .mobile-services-grid > a:focus-visible,
+.services-launcher .services-hub-grid > a:focus-visible {
+  outline: 3px solid var(--smaj-primary);
+  outline-offset: 3px;
+}
+@media (max-width: 360px) {
+  .services-launcher .mobile-services-grid {
+    gap: 9px;
+  }
+  .services-launcher .mobile-services-grid > a {
+    padding-inline: 6px;
+    min-height: 180px;
+  }
+  .services-launcher .mobile-services-grid > a > strong {
+    font-size: 11px;
+  }
+  .services-launcher .mobile-services-grid > a > em {
+    font-size: 6.5px;
+    padding-inline: 4px;
+  }
+}
+@media (min-width: 700px) and (max-width: 1023px) {
+  .services-launcher .mobile-services-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .services-launcher .mobile-services-grid > a {
+    padding: 18px 12px;
+    min-height: 192px;
+  }
+  .services-launcher .mobile-services-grid > a > strong {
+    font-size: 14px;
+  }
+  .services-launcher .mobile-services-grid > a > span {
+    font-size: 11px;
+  }
+}
+@media (min-width: 1400px) {
+  .services-launcher .services-hub-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

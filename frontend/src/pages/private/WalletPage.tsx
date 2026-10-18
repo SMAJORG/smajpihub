@@ -49,17 +49,17 @@ const dateLabel = (value: string | null) => {
 function Activity({ item, service, visible }: { item: WalletActivityItem; service: string; visible: boolean }) {
   const definition = serviceCatalog.find(entry => entry.slug === item.service);
   return (
-    <details className="wallet-activity-item">
+    <details className="pi-wallet-activity-item">
       <summary>
-        <span className="wallet-service-icon">
+        <span className="pi-wallet-service-icon">
           {definition ? <ServiceArt index={definition.atlasIndex} /> : <ReceiptLongOutlinedIcon />}
         </span>
-        <span className="wallet-activity-copy">
+        <span className="pi-wallet-activity-copy">
           <strong>{item.title}</strong>
           <span>{service}</span>
           <small>{dateLabel(item.date)}</small>
         </span>
-        <span className="wallet-activity-value">
+        <span className="pi-wallet-activity-value">
           <strong>
             {item.direction === "incoming" && item.verified ? "+" : item.direction === "outgoing" ? "-" : ""}
             {item.amountPi === null ? (
@@ -70,11 +70,11 @@ function Activity({ item, service, visible }: { item: WalletActivityItem; servic
               </>
             )}
           </strong>
-          <span className={"wallet-status " + item.status}>{walletStatusLabel(item.status)}</span>
+          <span className={"pi-wallet-status " + item.status}>{walletStatusLabel(item.status)}</span>
           <small>Details</small>
         </span>
       </summary>
-      <div className="wallet-activity-details">
+      <div className="pi-wallet-activity-details">
         <dl>
           <div>
             <dt>Network</dt>
@@ -197,9 +197,9 @@ export default function WalletPage() {
     { key: "cancelled" as const, label: "Cancelled", Icon: HighlightOffRoundedIcon },
   ];
   return (
-    <main className="wallet-dashboard">
-      <header className="wallet-heading">
-        <span className="wallet-heading-icon">
+    <main className="pi-wallet-dashboard">
+      <header className="pi-wallet-heading">
+        <span className="pi-wallet-heading-icon">
           <AccountBalanceWalletOutlinedIcon />
         </span>
         <div>
@@ -208,7 +208,7 @@ export default function WalletPage() {
         </div>
         <button
           type="button"
-          className={loading ? "wallet-refresh is-loading" : "wallet-refresh"}
+          className={loading ? "pi-wallet-refresh is-loading" : "pi-wallet-refresh"}
           aria-label="Refresh wallet activity"
           disabled={loading}
           onClick={() => void load()}
@@ -216,8 +216,8 @@ export default function WalletPage() {
           <RefreshOutlinedIcon />
         </button>
       </header>
-      <section className="wallet-balance-card" aria-label="Pi wallet balance">
-        <div className="wallet-balance-top">
+      <section className="pi-wallet-balance-card" aria-label="Pi wallet balance">
+        <div className="pi-wallet-balance-top">
           <span>Pi Wallet Balance</span>
           <button
             type="button"
@@ -229,12 +229,12 @@ export default function WalletPage() {
             {visible ? "Hide" : "Show"}
           </button>
         </div>
-        <strong className="wallet-balance-value">{visible ? "0.000 \u03c0" : "****"}</strong>
-        <div className="wallet-balance-note">
+        <strong className="pi-wallet-balance-value">{visible ? "0.000 \u03c0" : "****"}</strong>
+        <div className="pi-wallet-balance-note">
           <p>Not synced. Zero is a placeholder. Open Pi Wallet to view your actual balance.</p>
           {selectedNetwork ? <span>{walletNetworkLabel(selectedNetwork)}</span> : null}
         </div>
-        <nav className="wallet-quick-actions" aria-label="Wallet actions">
+        <nav className="pi-wallet-quick-actions" aria-label="Wallet actions">
           <button
             type="button"
             onClick={() => {
@@ -245,7 +245,7 @@ export default function WalletPage() {
             <span>Open Pi Wallet</span>
           </button>
           <a
-            href="#wallet-activity"
+            href="#pi-wallet-activity"
             onClick={() => {
               setFilter("payments");
               setPage(0);
@@ -260,7 +260,7 @@ export default function WalletPage() {
           </Link>
         </nav>
       </section>
-      <div className="wallet-network-switch" aria-label="Activity network">
+      <div className="pi-wallet-network-switch" aria-label="Activity network">
         {(["mainnet", "testnet", "unknown"] as const).map(value => (
           <button
             type="button"
@@ -276,18 +276,18 @@ export default function WalletPage() {
         ))}
       </div>
       {selectedNetwork === "testnet" ? (
-        <p className="wallet-network-notice">
+        <p className="pi-wallet-network-notice">
           Testnet activity only. These amounts are not real funds or spendable Pi.
         </p>
       ) : selectedNetwork === "unknown" ? (
-        <p className="wallet-network-notice">
+        <p className="pi-wallet-network-notice">
           The network is not confirmed for these records. They are excluded from Mainnet and Testnet totals.
         </p>
       ) : (
-        <p className="wallet-network-notice">Recorded activity is not your Pi Wallet balance.</p>
+        <p className="pi-wallet-network-notice">Recorded activity is not your Pi Wallet balance.</p>
       )}
       {error ? (
-        <div className="wallet-error" role="alert">
+        <div className="pi-wallet-error" role="alert">
           {error}
           <button type="button" onClick={() => void load()} disabled={loading}>
             Retry
@@ -297,9 +297,9 @@ export default function WalletPage() {
       {!current && loading ? (
         <PrivateSkeleton variant="wallet" count={4} />
       ) : (
-        <section className="wallet-stat-grid" aria-label="Payment statistics">
+        <section className="pi-wallet-stat-grid" aria-label="Payment statistics">
           {stats.map(({ key, label, Icon }) => (
-            <article key={key} className={"wallet-stat " + key}>
+            <article key={key} className={"pi-wallet-stat " + key}>
               <span>
                 <Icon />
                 {label}
@@ -319,14 +319,14 @@ export default function WalletPage() {
         </section>
       )}
       {current && (current.partial || current.truncated) ? (
-        <p className="wallet-network-notice" role="status">
+        <p className="pi-wallet-network-notice" role="status">
           {current.truncated
             ? "This history exceeds the reporting limit. Totals are withheld rather than shown incomplete."
             : "Some service activity is unavailable. Totals are withheld until all records can refresh."}
         </p>
       ) : null}
-      <section className="wallet-recent" id="wallet-activity">
-        <div className="wallet-recent-heading">
+      <section className="pi-wallet-recent" id="pi-wallet-activity">
+        <div className="pi-wallet-recent-heading">
           <h2>Recent Activity</h2>
           <button
             type="button"
@@ -339,7 +339,7 @@ export default function WalletPage() {
             View all <span aria-hidden="true">{"\u2192"}</span>
           </button>
         </div>
-        <div className="wallet-filter-tabs" role="group" aria-label="Activity type">
+        <div className="pi-wallet-filter-tabs" role="group" aria-label="Activity type">
           {(snapshot?.supportedFilters || ["all", "payments", "orders"]).map(value => (
             <button
               type="button"
@@ -354,7 +354,7 @@ export default function WalletPage() {
             </button>
           ))}
         </div>
-        <label className="wallet-service-filter">
+        <label className="pi-wallet-service-filter">
           <span>Service</span>
           <select
             value={service}
@@ -374,7 +374,7 @@ export default function WalletPage() {
         {!current && loading ? (
           <PrivateSkeleton variant="list" count={3} />
         ) : current?.items.length ? (
-          <div className="wallet-activity-list">
+          <div className="pi-wallet-activity-list">
             {current.items.map(item => (
               <Activity
                 key={item.id}
@@ -385,7 +385,7 @@ export default function WalletPage() {
             ))}
           </div>
         ) : (
-          <div className="wallet-empty">
+          <div className="pi-wallet-empty">
             <ReceiptLongOutlinedIcon />
             <h3>{error ? "Activity unavailable" : "No activity to show"}</h3>
             <p>
@@ -396,7 +396,7 @@ export default function WalletPage() {
           </div>
         )}
         {current && current.total > 25 ? (
-          <nav className="wallet-pagination" aria-label="Activity pages">
+          <nav className="pi-wallet-pagination" aria-label="Activity pages">
             <button type="button" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>
               Previous
             </button>
@@ -413,7 +413,7 @@ export default function WalletPage() {
           </nav>
         ) : null}
       </section>
-      <footer className="wallet-footer">
+      <footer className="pi-wallet-footer">
         <p>
           SMAJ PI HUB tracks your activity without holding your Pi. No wallet passphrase or private key is required.
         </p>
