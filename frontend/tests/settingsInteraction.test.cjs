@@ -30,6 +30,8 @@ test(
         loader: "tsx",
       },
       bundle: true,
+      absWorkingDir: root,
+      alias: { "@mui/styled-engine": "@mui/styled-engine-sc" },
       outfile: path.join(output, "fixture.js"),
       platform: "browser",
       format: "iife",
