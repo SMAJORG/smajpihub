@@ -147,6 +147,24 @@ export default function mountMessageEndpoints(router: Router) {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   });
+  // Presence is independent of message history, including an unsent direct chat.
+  router.get("/presence", async (req, res) => {
+    try {
+      const user = await resolveCurrentUser(req);
+      if (!user) return res.status(401).json({ error: "unauthorized" });
+      const recipient = req.query.recipient;
+      if (recipient !== undefined && (typeof recipient !== "string" || recipient.length > 128)) return res.status(400).json({ error: "invalid_recipient" });
+      const conversations = await req.app.locals.conversationCollection.find({ participants: user.uid, deletedBy: { $ne: user.uid } }).toArray();
+      const ids = [...new Set(conversations.map((item: any) => item.buyerId === user.uid ? item.sellerId : item.buyerId).concat(recipient || []).filter((id: any) => typeof id === "string" && id !== user.uid))];
+      // A direct recipient has the same visibility as /direct/:recipientId.
+      const users = ids.length ? await req.app.locals.userCollection.find({ uid: { $in: ids } }, { projection: { uid: 1, lastSeenAt: 1, presenceSessions: 1 } }).toArray() : [];
+      const now = Date.now();
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({ serverTime: now, peers: users.map((peer: any) => ({ uid: peer.uid, ...readUserPresence(peer, now) })) });
+    } catch {
+      return res.status(503).json({ error: "presence_unavailable" });
+    }
+  });
   router.get("/direct/:recipientId", async (req, res) => {
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ error: "unauthorized" });

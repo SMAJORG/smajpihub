@@ -264,6 +264,7 @@ export default function mountUserEndpoints(router: Router) {
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Sign in to update presence." });
     const { sessionId, active } = req.body || {};
+    if (req.body?.owner && req.body.owner !== user.uid) return res.status(401).json({ message: "Presence account changed." });
     if (typeof sessionId !== "string" || !/^[a-zA-Z0-9_-]{20,80}$/.test(sessionId) || typeof active !== "boolean") return res.status(400).json({ message: "Invalid presence update." });
     const sessions = (user as any).presenceSessions || {};
     const currentSessions = Object.values(sessions).filter((entry: any) => new Date(entry?.expiresAt || 0).getTime() > Date.now());
@@ -373,7 +374,7 @@ export default function mountUserEndpoints(router: Router) {
 
     const nextVerificationLevel = !sellerActive && ["seller_verified", "trusted_seller"].includes(normalizeVerificationLevel(currentUser)) ? "pi_verified" : normalizeVerificationLevel(currentUser);
 
-    const profileUpdates = { displayName, country, contactPhone, avatar, coverImage, bio, language, sellerActive, role, roles: [role], verificationLevel: nextVerificationLevel, verificationStatus: currentUser.verificationStatus || "none", lastSeenAt: new Date() };
+    const profileUpdates = { displayName, country, contactPhone, avatar, coverImage, bio, language, sellerActive, role, roles: [role], verificationLevel: nextVerificationLevel, verificationStatus: currentUser.verificationStatus || "none" };
     assertNoBase64Images(profileUpdates, "user");
     await Promise.all([
       userCollection.updateOne(

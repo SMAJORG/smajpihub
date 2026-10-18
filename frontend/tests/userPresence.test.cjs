@@ -6,6 +6,10 @@ test('stale online flags and profile edits cannot manufacture live presence',()=
 test('authenticated heartbeat has a short server-assigned expiry',()=>{const update=presenceUpdate({},first,true,now);const entry=update.$set['presenceSessions.'+first];assert.equal(entry.expiresAt.getTime(),now+PRESENCE_TTL_MS);assert.equal(readUserPresence({lastSeenAt:new Date(now),presenceSessions:{[first]:entry}},now+1000).online,true);assert.equal(readUserPresence({lastSeenAt:new Date(now),presenceSessions:{[first]:entry}},now+PRESENCE_TTL_MS+1).online,false)});
 test('closing one tab leaves another active tab online',()=>{const sessions={[first]:{expiresAt:new Date(now+30000)},[second]:{expiresAt:new Date(now+30000)}};const update=presenceUpdate({presenceSessions:sessions},first,false,now);assert.equal(update.$unset['presenceSessions.'+first],'');assert.equal(update.$unset['presenceSessions.'+second],undefined);delete sessions[first];assert.equal(readUserPresence({presenceSessions:sessions},now).online,true)});
 test('explicit departure cannot fall back to login time and stay online',()=>{assert.equal(readUserPresence({lastSeenAt:new Date(now),presenceSessions:{}},now).online,false)});
+
+test('a recent login or profile edit without a live session cannot mark a user online',()=>{assert.equal(readUserPresence({lastSeenAt:new Date(now),updatedAt:new Date(now)},now).online,false)});
+
+test('late presence writes from a previous account are rejected',async()=>{const result=await presenceRequest({uid:'viewer'},{owner:'previous-account',sessionId:first,active:true});assert.equal(result.response.status,401);assert.equal(result.writes.length,0)});
 test('expired tabs are pruned without conflicting with an active heartbeat',()=>{const update=presenceUpdate({presenceSessions:{[first]:{expiresAt:new Date(now-1000)},[second]:{expiresAt:new Date(now-1000)}}},first,true,now);assert.equal(update.$unset['presenceSessions.'+first],undefined);assert.equal(update.$unset['presenceSessions.'+second],'')});
 function clientFixture(uid='buyer',options={}) {
  const requests=[],intervals=[],events={},nativeCallbacks=[];let cleanup,hidden=false;

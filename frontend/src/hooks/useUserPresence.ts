@@ -26,7 +26,7 @@ export function useUserPresence(uid?: string) {
           try {
             await axiosClient.post(
               "/user/presence",
-              { sessionId, active },
+              { sessionId, active, owner: uid },
               { timeout: 8000, headers: { "X-SMAJ-Silent": "true" } }
             );
           } catch {

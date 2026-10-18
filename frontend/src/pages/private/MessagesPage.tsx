@@ -73,16 +73,16 @@ const getConversationMeta = (conversation: RichConversation, currentUserId?: str
     conversation.productTitle,
   ].filter(Boolean).join(" · ");
 
-const isConversationOnline = (conversation: RichConversation) => Boolean(conversation.online && (!conversation.presenceExpiresAt || new Date(conversation.presenceExpiresAt).getTime() > Date.now()));
+const isPresenceOnline = (conversation: RichConversation, now: number) => Boolean(conversation.online && conversation.presenceExpiresAt && new Date(conversation.presenceExpiresAt).getTime() > now);
 
-const formatLastSeen = (conversation: RichConversation) => {
-  if (isConversationOnline(conversation)) return "Online";
+const formatPresenceLastSeen = (conversation: RichConversation, now: number) => {
+  if (isPresenceOnline(conversation, now)) return "Online";
   const value = conversation.lastSeenAt;
   if (!value) return "Offline";
   const then = new Date(value).getTime();
   if (!Number.isFinite(then)) return "Offline";
-  if (Date.now() - then < 60000) return "Last seen just now";
-  const diffMinutes = Math.max(1, Math.floor((Date.now() - then) / 60000));
+  if (now - then < 60000) return "Last seen just now";
+  const diffMinutes = Math.max(1, Math.floor((now - then) / 60000));
   if (diffMinutes < 60) return `Last seen ${diffMinutes}m ago`;
   const diffHours = Math.round(diffMinutes / 60);
   if (diffHours < 24) return `Last seen ${diffHours}h ago`;
@@ -237,6 +237,49 @@ const MessagesPageContent = () => {
     if (pendingProductId) setParams(current => { const next = new URLSearchParams(current); next.delete("product"); return next; }, { replace: true });
   };
   const active = useMemo(() => conversations.find((item) => item._id === activeId) || (selectedId ? readChatCache<RichConversation | null>(user?.uid, "conversation:" + selectedId, null) : null) || (recipientId ? { _id: "draft:" + recipientId, buyerId: user?.uid || "", sellerId: recipientId, participantId: recipientId, participantName: params.get("name") || "SMAJ user", profileImage: params.get("avatar") || "", productId: pendingProductId || "", productTitle: params.get("title") || "", productImage: params.get("image") || "", updatedAt: "" } : undefined), [activeId, conversations, params, pendingProductId, recipientId, selectedId, user?.uid]);
+  const [livePresence, setLivePresence] = useState<Record<string, Partial<RichConversation>>>({});
+  const [presenceNow, setPresenceNow] = useState(Date.now());
+  const presenceOffset = useRef(0);
+  const presenceRecipient = active ? (active.buyerId === user?.uid ? active.sellerId : active.buyerId) : recipientId;
+  useEffect(() => {
+    if (!user?.uid) return;
+    let stopped = false, flight = false;
+    let request: AbortController | undefined;
+    const refresh = async () => {
+      if (stopped) return;
+      setPresenceNow(Date.now() + presenceOffset.current);
+      if (flight || document.hidden || !navigator.onLine) return;
+      flight = true;
+      request = new AbortController();
+      try {
+        const { data } = await axiosClient.get<{ serverTime: number; peers: Array<Partial<RichConversation> & { uid: string }> }>("/messages/presence", {
+          params: { recipient: presenceRecipient || undefined }, signal: request.signal, timeout: 8000, smajSkipReadRetry: true,
+          headers: { "X-SMAJ-Chat-Owner": user.uid, "X-SMAJ-Silent": "true" },
+        });
+        if (stopped) return;
+        presenceOffset.current = data.serverTime - Date.now();
+        setPresenceNow(data.serverTime);
+        setLivePresence(Object.fromEntries(data.peers.map(peer => [peer.uid, peer])));
+      } catch { /* Existing leases still expire locally while reconnecting. */ }
+      finally { flight = false; }
+    };
+    void refresh();
+    const poll = window.setInterval(() => void refresh(), 5000);
+    const clock = window.setInterval(() => { if (!stopped && !document.hidden) setPresenceNow(Date.now() + presenceOffset.current); }, 1000);
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      stopped = true; request?.abort(); window.clearInterval(poll); window.clearInterval(clock);
+      window.removeEventListener("online", refresh); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [user?.uid, presenceRecipient]);
+  const withPresence = (conversation: RichConversation) => {
+    const peer = conversation.buyerId === user?.uid ? conversation.sellerId : conversation.buyerId;
+    return { ...conversation, ...livePresence[peer] };
+  };
+  const isConversationOnline = (conversation: RichConversation) => isPresenceOnline(withPresence(conversation), presenceNow);
+  const formatLastSeen = (conversation: RichConversation) => formatPresenceLastSeen(withPresence(conversation), presenceNow);
   const inboxIds = conversations.map(item => item._id).join(",");
   useEffect(() => {
     if (!user?.uid) return;

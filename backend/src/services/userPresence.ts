@@ -3,7 +3,7 @@ export function readUserPresence(user: any, now = Date.now()) {
   const sessions = user?.presenceSessions;
   const expiries = sessions && typeof sessions === "object"
     ? Object.values(sessions).map((entry: any) => new Date(entry?.expiresAt || 0).getTime()).filter(Number.isFinite)
-    : [user?.lastSeenAt ? new Date(user.lastSeenAt).getTime() + PRESENCE_TTL_MS : 0];
+    : [0];
   const expiresAt = Math.max(0, ...expiries);
   return { online: expiresAt > now, lastSeenAt: user?.lastSeenAt || null, presenceExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null };
 }

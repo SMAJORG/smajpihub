@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require('../node_modules/typescript');
 const { ObjectId } = require('../node_modules/mongodb');
+const presence = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('backend/src/services/userPresence.ts', 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText, {exports:presence,Date});
 const equal = (a,b) => String(a) === String(b);
 function matches(doc, query) {
   return Object.entries(query).every(([key,value]) => {
@@ -46,7 +48,7 @@ function harness() {
     userCollection:new Collection([{uid:'alice',displayName:'Alice'},{uid:'bob',displayName:'Bob'},{uid:'mallory',displayName:'Mallory'}]),
     productCollection:new Collection(),
   };
-  const modules={'mongodb':{ObjectId},'../services/auth':{resolveCurrentUser:async req=>locals.userCollection.findOne({uid:req.uid})},'../services/notifications':{createNotification:async()=>{}},'../services/userPresence':{readUserPresence:()=>({online:false})},crypto:require('node:crypto')};
+  const modules={'mongodb':{ObjectId},'../services/auth':{resolveCurrentUser:async req=>locals.userCollection.findOne({uid:req.uid})},'../services/notifications':{createNotification:async()=>{}},'../services/userPresence':presence,crypto:require('node:crypto')};
   const exports={};
   const code=ts.transpileModule(fs.readFileSync('backend/src/handlers/messages.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   vm.runInNewContext(code,{exports,require:name=>modules[name],Date,Set,Map,console,setTimeout,Buffer});
@@ -83,3 +85,25 @@ test('warming history does not mark messages read or clear inbox unread state',a
 test('lightweight history strips base64 media but preserves duration and legacy responses',async()=>{const h=harness();const sent=await h.send();const id=sent.body.message.conversationId;await h.locals.messageCollection.insertOne({conversationId:id,senderId:'bob',messageType:'voice',message:'Voice message',audioDataUrl:'data:audio/webm;base64,AQID',audioDurationSeconds:22,createdAt:new Date()});const light=await h.call('get','/:id',{params:{id},query:{light:'1',preview:'true'}});const item=light.body.messages.find(item=>item.messageType==='voice');assert.equal(item.audioDataUrl,undefined);assert.equal(item.mediaAvailable,true);assert.equal(item.audioDurationSeconds,22);const legacy=await h.call('get','/:id',{params:{id},query:{preview:'true'}});assert.equal(legacy.body.messages.find(item=>item.messageType==='voice').audioDataUrl,'data:audio/webm;base64,AQID');});
 test('inbox previews cover twenty conversations without marking any read',async()=>{const h=harness();for(let i=0;i<24;i++){const id=new ObjectId();await h.locals.conversationCollection.insertOne({_id:id,pairKey:'alice:user'+i,buyerId:'alice',sellerId:'user'+i,participants:['alice','user'+i],updatedAt:new Date(),unreadBy:['alice']});await h.locals.messageCollection.insertOne({conversationId:String(id),senderId:'user'+i,messageType:'voice',message:'Voice',audioDataUrl:'data:audio/webm;base64,AQID',audioDurationSeconds:5,createdAt:new Date()});}const result=await h.call('get','/',{query:{includePreviews:'1'}});assert.equal(Object.keys(result.body.previews).length,20);for(const page of Object.values(result.body.previews)){assert.equal(page.messages[0].audioDataUrl,undefined);assert.equal(page.messages[0].audioDurationSeconds,5);}assert.ok(h.locals.messageCollection.items.every(item=>!item.readAt));assert.ok(h.locals.conversationCollection.items.every(item=>item.unreadBy.includes('alice')));assert.equal((await h.call('get','/')).body.previews,undefined);});
 test('media endpoint checks participants, owner, message scope, hidden and deleted state',async()=>{const h=harness();const sent=await h.send();const id=sent.body.message.conversationId;const mediaId=new ObjectId();await h.locals.messageCollection.insertOne({_id:mediaId,conversationId:id,senderId:'bob',messageType:'voice',audioDataUrl:'data:audio/webm;base64,AQID'});const params={id,messageId:String(mediaId)};const own=await h.call('get','/:id/messages/:messageId/media',{params});assert.equal(own.status,200);assert.ok(Buffer.isBuffer(own.body));assert.equal(own.body.length,3);assert.equal(own.headers['Content-Type'],'audio/webm');assert.equal(own.headers['Cache-Control'],'no-store');assert.equal((await h.call('get','/:id/messages/:messageId/media',{uid:'mallory',params})).status,404);assert.equal((await h.call('get','/:id/messages/:messageId/media',{uid:'missing',params})).status,401);assert.equal((await h.call('get','/:id/messages/:messageId/media',{params,owner:'bob'})).status,401);const media=h.locals.messageCollection.items.find(item=>String(item._id)===String(mediaId));media.hiddenFor=['alice'];assert.equal((await h.call('get','/:id/messages/:messageId/media',{params})).status,404);delete media.hiddenFor;media.deletedForEveryone=true;assert.equal((await h.call('get','/:id/messages/:messageId/media',{params})).status,404);media.deletedForEveryone=false;media.conversationId=String(new ObjectId());assert.equal((await h.call('get','/:id/messages/:messageId/media',{params})).status,404);});
+
+test('presence refresh includes draft recipients and connected peers, without leaking private profiles', async () => {
+  const h = harness(); await h.send();
+  const bob = h.locals.userCollection.items.find(row => row.uid === 'bob');
+  bob.lastSeenAt = new Date(); bob.accessToken = 'private-token'; bob.presenceSessions = { session: { expiresAt: new Date(Date.now() + 45000) } };
+  const first = await h.call('get', '/presence', {query:{recipient:'mallory'}});
+  assert.equal(first.status, 200); assert.equal(first.headers['Cache-Control'], 'no-store');
+  assert.deepEqual(Array.from(first.body.peers, row => row.uid).sort(), ['bob','mallory']);
+  assert.equal(first.body.peers.find(row => row.uid === 'bob').online, true);
+  assert.ok(!JSON.stringify(first.body).includes('private-token')); assert.ok(!JSON.stringify(first.body).includes('presenceSessions'));
+  bob.presenceSessions = {};
+  const second = await h.call('get', '/presence');
+  assert.equal(second.body.peers[0].online, false); assert.ok(second.body.peers[0].lastSeenAt);
+  assert.equal((await h.call('get','/presence',{uid:'unknown'})).status,401);
+  assert.equal((await h.call('get','/presence',{query:{recipient:['bob']}})).status,400);
+});
+test('presence for an unsent profile chat needs no conversation or message writes', async () => {
+  const h = harness(); const result = await h.call('get','/presence',{query:{recipient:'bob'}});
+  assert.equal(result.body.peers[0].uid,'bob'); assert.equal(h.locals.conversationCollection.items.length,0); assert.equal(h.locals.messageCollection.items.length,0);
+  h.locals.userCollection.find = () => { throw Error('database unavailable'); };
+  assert.equal((await h.call('get','/presence',{query:{recipient:'bob'}})).status,503);
+});
