@@ -1,0 +1,294 @@
+.product-wizard {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 20px 16px calc(100px + env(safe-area-inset-bottom, 0px));
+  color: var(--smaj-text);
+  box-sizing: border-box;
+}
+.product-wizard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.product-wizard-header h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(24px, 5vw, 30px);
+  letter-spacing: -0.7px;
+  color: var(--smaj-text);
+}
+.product-wizard-header p {
+  margin: 0;
+  color: var(--smaj-text-secondary);
+  font-size: 13px;
+}
+.product-wizard .product-step-count {
+  flex-shrink: 0;
+  padding: 7px 11px;
+  border-radius: 30px;
+  background: var(--smaj-secondary-bg);
+  color: var(--smaj-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.product-wizard-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0;
+  margin: 20px 0;
+  list-style: none;
+}
+.product-wizard-progress li {
+  height: 5px;
+  border-radius: 8px;
+  background: var(--smaj-border);
+}
+.product-wizard-progress li.reached {
+  background: var(--smaj-primary);
+}
+.product-wizard-step-title {
+  scroll-margin-top: 85px;
+  margin: 0 0 14px;
+  font-size: 20px;
+  color: var(--smaj-text);
+}
+.product-wizard .smart-product-form {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.product-wizard .smart-product-form [data-product-step][hidden] {
+  display: none !important;
+}
+.product-wizard .smart-product-form .product-accordion {
+  padding: 16px;
+  border: 1px solid var(--smaj-border);
+  border-radius: 20px;
+  background: var(--smaj-card);
+  min-width: 0;
+}
+.product-wizard .smart-product-form .product-accordion[open] {
+  gap: 12px;
+}
+.product-wizard .product-accordion > summary strong {
+  font-size: 15px;
+  color: var(--smaj-text);
+}
+.product-wizard .product-accordion > summary small {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.product-wizard .product-accordion > summary {
+  min-height: 34px;
+}
+.product-wizard .private-form label {
+  font-size: 13px;
+  gap: 6px;
+  color: var(--smaj-text);
+}
+.product-wizard .private-form input,
+.product-wizard .private-form select,
+.product-wizard .private-form textarea {
+  border-radius: 12px;
+  font-size: 16px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.product-wizard .private-form input[type="checkbox"] {
+  width: 20px;
+  min-height: 20px;
+  flex-shrink: 0;
+}
+.product-wizard .private-form input[type="color"] {
+  width: 100%;
+}
+.product-wizard .private-form-row {
+  gap: 12px;
+  min-width: 0;
+}
+.product-wizard .product-name-guide {
+  padding: 10px 12px;
+}
+.product-wizard .product-name-guide p {
+  font-size: 12px;
+}
+.product-wizard .product-gallery-preview {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 0 8px;
+}
+.product-wizard .product-gallery-preview figure {
+  flex: 0 0 100px;
+  width: 100px;
+  min-width: 100px;
+}
+.product-wizard .product-variant-list > article {
+  min-width: 0;
+}
+.product-wizard-review {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--smaj-secondary-bg);
+}
+.product-wizard-review > div {
+  grid-column: 2 / -1;
+}
+.product-wizard .product-wizard-review > button {
+  min-width: 0;
+  padding: 8px;
+  font-size: 11px;
+}
+.product-wizard-review img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.product-wizard-review p {
+  margin: 6px 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.product-wizard .setting-line {
+  flex-wrap: wrap;
+}
+.product-wizard .setting-line > span {
+  flex: 1 1 180px;
+}
+.product-wizard .product-field-error {
+  color: var(--smaj-text);
+  font-size: 12px;
+  font-weight: 600;
+  border-left: 3px solid #d14a59;
+  padding-left: 8px;
+  line-height: 1.5;
+}
+.product-wizard [aria-invalid="true"] {
+  border-color: #d14a59;
+}
+.product-wizard-errors {
+  padding: 12px 14px;
+  background: var(--smaj-card);
+  border: 1px solid #d14a59;
+  border-radius: 14px;
+  font-size: 13px;
+}
+.product-wizard-errors ul {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+.product-wizard-errors button {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--smaj-primary);
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.product-wizard-actions {
+  position: sticky;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--smaj-border);
+  border-radius: 18px;
+  background: var(--smaj-card);
+  box-shadow: 0 4px 22px #0000000c;
+}
+.product-wizard .product-wizard-actions button {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.product-wizard .product-wizard-actions .private-primary-button,
+.product-wizard .product-leave-dialog .private-primary-button {
+  background: var(--smaj-primary) !important;
+  border: 1px solid var(--smaj-primary);
+  color: #fff !important;
+}
+.product-wizard .product-wizard-actions .private-secondary-button,
+.product-wizard .product-leave-dialog .private-secondary-button {
+  background: var(--smaj-card) !important;
+  border: 1px solid var(--smaj-border);
+  color: var(--smaj-primary) !important;
+}
+.product-wizard button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.product-wizard .private-alert {
+  position: static;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.product-wizard :focus-visible {
+  outline: 2px solid var(--smaj-primary);
+  outline-offset: 3px;
+}
+.product-leave-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: #0008;
+  padding: 20px;
+}
+.product-leave-dialog {
+  width: min(100%, 420px);
+  padding: 24px;
+  border-radius: 22px;
+  background: var(--smaj-card);
+  color: var(--smaj-text);
+  display: grid;
+  gap: 14px;
+}
+.product-leave-dialog h2,
+.product-leave-dialog p {
+  margin: 0;
+}
+.product-leave-dialog button {
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+@media (min-width: 1024px) {
+  .product-wizard-actions {
+    bottom: 16px;
+  }
+}
+@media (max-width: 440px) {
+  .product-wizard {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .product-wizard .private-form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .product-wizard-actions {
+    gap: 6px;
+    padding: 9px;
+  }
+  .product-wizard .product-wizard-actions button {
+    padding: 9px 6px;
+    font-size: 12px;
+  }
+}

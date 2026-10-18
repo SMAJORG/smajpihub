@@ -1,6 +1,6 @@
 import { isAxiosError } from "axios";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link, useBlocker, useNavigate } from "react-router-dom";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { axiosClient } from "../../lib/axiosClient";
 import { formatPiAmount, formatUsdAmount } from "../../lib/formatters";
@@ -8,10 +8,13 @@ import { formatPiRate, piFromUsdt, usdtFromPi } from "../../lib/piPricing";
 import { uploadImage, uploadImages } from "../../lib/uploadImage";
 import type { Product } from "../../types/marketplace";
 import { LocationFields } from "../../components/LocationFields";
+import { productSteps, productIssues, restoredProductStep, type ProductIssue } from "../../lib/productWizard";
+import "./AddProductPage.css";
 
 const MAX_PRODUCT_IMAGES = 12;
 const MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024;
 const PRODUCT_DRAFT_KEY = "smaj_add_product_draft";
+const PRODUCT_STEP_KEY = PRODUCT_DRAFT_KEY + "_step";
 const categoryNames = ["Fashion & Clothing", "Electronics", "Cars & Vehicles", "Home & Living", "Beauty & Health", "Sports & Outdoors", "Books & Education", "Digital Products", "Services"] as const;
 type CategoryName = (typeof categoryNames)[number];
 const categoryFields: Record<CategoryName, string[]> = {
@@ -145,6 +148,32 @@ const AddProductPage = () => {
   const navigate = useNavigate();
   const { user, updateProfile, refreshPiSession } = useAuthContext();
   const [form, setForm] = useState(loadProductDraft);
+  const [step, setStep] = useState(() => { try { return restoredProductStep(localStorage.getItem(PRODUCT_STEP_KEY)); } catch { return 0; } });
+  const [issues, setIssues] = useState<ProductIssue[]>([]);
+  const [draftError, setDraftError] = useState("");
+  const [processingImages, setProcessingImages] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const published = useRef(false);
+  const latest = useRef({ form, step });
+  latest.current = { form, step };
+  const saved = useRef("");
+  const serializeDraft = (value: typeof initialForm) => JSON.stringify({ ...value, sellerAgreementAccepted: false });
+  const saveDraft = () => {
+    if (published.current) return true;
+    try {
+      const value = serializeDraft(latest.current.form);
+      localStorage.setItem(PRODUCT_DRAFT_KEY, value);
+      localStorage.setItem(PRODUCT_STEP_KEY, String(latest.current.step));
+      saved.current = value;
+      setDraftError("");
+      return true;
+    } catch {
+      setDraftError("This device could not save your draft. Keep this page open; device storage may be full. Your entered data is still here.");
+      return false;
+    }
+  };
+  const hasListing = Boolean(form.title || form.description || form.images.length || form.pricePi || form.priceUsdt || form.variants.length);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
@@ -161,29 +190,55 @@ const AddProductPage = () => {
   const priceUsdt = Number(form.priceUsdt);
   const pricePi = Number(form.pricePi);
   const location = [form.country, form.stateRegion, form.city, form.areaAddress].map((item) => item.trim()).filter(Boolean).join(" - ");
-  const publishDisabled = submitting || !form.sellerAgreementAccepted;
+  const publishDisabled = submitting || processingImages > 0 || !form.sellerAgreementAccepted;
+  const blocker = useBlocker(() => !published.current && (submitting || processingImages > 0 || (hasListing && saved.current !== serializeDraft(latest.current.form))));
 
   useEffect(() => {
-    if (!success && !error) return;
+    if (!success) return;
     const timer = window.setTimeout(() => {
       setSuccess("");
-      setError("");
     }, 3000);
     return () => window.clearTimeout(timer);
-  }, [success, error]);
+  }, [success]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      localStorage.setItem(PRODUCT_DRAFT_KEY, JSON.stringify({ ...form, sellerAgreementAccepted: false }));
+      saveDraft();
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [form]);
+  }, [form, step]);
 
   useEffect(() => {
-    if (!window.matchMedia("(max-width: 1023px)").matches) return;
-    const sections = document.querySelectorAll<HTMLDetailsElement>(".smart-product-form .product-accordion");
-    sections.forEach((section, index) => { section.open = index === 0; });
-  }, []);
+    const leave = (event: BeforeUnloadEvent) => {
+      if (!published.current && (submitting || processingImages > 0 || (hasListing && !saveDraft()))) { event.preventDefault(); event.returnValue = ""; }
+    };
+    const flush = () => { if (document.hidden && hasListing) saveDraft(); };
+    window.addEventListener("beforeunload", leave);
+    document.addEventListener("visibilitychange", flush);
+    return () => { window.removeEventListener("beforeunload", leave); document.removeEventListener("visibilitychange", flush); };
+  }, [hasListing, processingImages, submitting]);
+
+  const goToStep = (next: number) => {
+    setStep(next);
+    window.setTimeout(() => { headingRef.current?.focus(); headingRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, 0);
+  };
+  const showIssues = (next: ProductIssue[]) => {
+    setIssues(next);
+    if (!next.length) return false;
+    goToStep(next[0].step);
+    window.setTimeout(() => {
+      const field = formRef.current?.querySelector<HTMLElement>(`[name="${next[0].field}"]`);
+      const section = field?.closest("details");
+      if (section) section.open = true;
+      field?.focus();
+    }, 0);
+    return true;
+  };
+  const nextStep = () => {
+    if (!showIssues(productIssues(form, sellerActive).filter(issue => issue.step === step))) goToStep(Math.min(3, step + 1));
+  };
+  const fieldProps = (field: string) => ({ name: field, id: "product-" + field, "aria-invalid": issues.some(issue => issue.field === field) || undefined, "aria-describedby": issues.some(issue => issue.field === field) ? "product-error-" + field : undefined });
+  const fieldError = (field: string) => issues.find(issue => issue.field === field) ? <small className="product-field-error" id={"product-error-" + field}>{issues.find(issue => issue.field === field)!.message}</small> : null;
 
   useEffect(() => {
     if (!user || !profileLocationLocked) return;
@@ -232,10 +287,11 @@ const AddProductPage = () => {
     const availableSlots = MAX_PRODUCT_IMAGES - form.images.length;
     if (availableSlots <= 0) return setError("You can add up to 12 product images.");
     if (selected.some((file) => !file.type.startsWith("image/") || file.size > MAX_SOURCE_IMAGE_BYTES)) return setError("Choose up to 12 images, each 10 MB or smaller. Large photos are compressed automatically.");
+    setProcessingImages(current => current + 1);
     Promise.all(selected.slice(0, availableSlots).map(compressProductImage)).then((images) => setForm((current) => {
       const gallery = [...current.images, ...images].slice(0, MAX_PRODUCT_IMAGES);
       return { ...current, image: gallery[0] || "", images: gallery };
-    })).catch(() => setError("Could not read the selected images."));
+    })).catch(() => setError("Could not read the selected images.")).finally(() => setProcessingImages(current => current - 1));
   };
 
   const removeImage = (index: number) => {
@@ -271,8 +327,10 @@ const AddProductPage = () => {
     if (!file) return;
     if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) return setError("Choose a variant image that is 2 MB or smaller.");
     const reader = new FileReader();
+    setProcessingImages(current => current + 1);
     reader.onload = () => updateVariant(index, { image: String(reader.result || "") });
     reader.onerror = () => setError("Could not read the selected variant image.");
+    reader.onloadend = () => setProcessingImages(current => current - 1);
     reader.readAsDataURL(file);
   };
 
@@ -306,19 +364,15 @@ const AddProductPage = () => {
     event.preventDefault();
     setError("");
     setSuccess("");
+    if (step !== 3) return nextStep();
+    if (processingImages) return setError("Please wait for the selected images to finish processing.");
+    if (showIssues(productIssues(form, sellerActive))) return;
     const quantity = Number(form.quantity);
-    if (!sellerActive) return setError("Activate seller tools before submitting a product.");
-    if (form.title.trim().length < 3) return setError("Product name must be at least 3 characters.");
-    if (!form.image) return setError("Choose a product image before publishing.");
-    if (!Number.isFinite(priceUsdt) || priceUsdt <= 0 || !Number.isFinite(pricePi) || pricePi <= 0) return setError("Enter a valid $ or π price greater than zero.");
-    if (!form.condition || !Number.isFinite(quantity) || quantity < 1) return setError("Condition and quantity are required.");
-    if (form.description.trim().length < 20) return setError("Description must be at least 20 characters.");
-    if (!form.country.trim() || !form.city.trim() || !form.areaAddress.trim() || !form.sellerContact.trim()) return setError("Location and seller contact are required.");
-    if (!form.deliveryOption) return setError("Choose a delivery or service method.");
-    if (!form.sellerAgreementAccepted) return setError("Accept the seller agreement before publishing.");
     setSubmitting(true);
+    let uploadField: { field: string; step: number } | null = { field: "images", step: 1 };
     try {
       const uploadedImages = await uploadImages(form.images.length ? form.images : [form.image], "products");
+      uploadField = { field: "variants", step: 2 };
       const uploadedVariants = await Promise.all(form.variants.map(async (variant) => {
         const variantUsdt = Number(variant.priceUsdt);
         return {
@@ -329,6 +383,7 @@ const AddProductPage = () => {
           image: variant.image ? await uploadImage(variant.image, "products") : "",
         };
       }));
+      uploadField = null;
       const payload = {
         title: form.title.trim(),
         image: uploadedImages[0],
@@ -370,31 +425,43 @@ const AddProductPage = () => {
         }
       }
       const { data } = response;
+      published.current = true;
       setSuccess(data.product.reviewStatus === "approved" ? "Product saved and is live in SMAJ Store." : "Product submitted for pending review.");
-      localStorage.removeItem(PRODUCT_DRAFT_KEY);
+      try {
+        localStorage.removeItem(PRODUCT_DRAFT_KEY);
+        localStorage.removeItem(PRODUCT_STEP_KEY);
+      } catch { /* The server has confirmed publication; device storage cannot undo it. */ }
       window.setTimeout(() => navigate("/seller"), 900);
     } catch (err: unknown) {
-      setError(isAxiosError<{ message?: string }>(err) ? err.response?.data?.message || "Could not add product." : err instanceof Error ? err.message : "Could not add product.");
+      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message || "Could not add product." : err instanceof Error ? err.message : "Could not add product.";
+      if (uploadField) { setError(""); showIssues([{ ...uploadField, message }]); }
+      else setError(message);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <main className="private-page add-product-page">
-      <section className="private-page-head">
-        <div><p className="private-kicker">SELLER TOOLS</p><h1>List Product</h1><p>Create a smart marketplace listing without filling one long form.</p></div>
-      </section>
+    <main className="add-product-page product-wizard">
+      <header className="product-wizard-header">
+        <div><p className="private-kicker">SELLER TOOLS</p><h1>Add Product</h1><p>Create a listing in SMAJ Store</p></div>
+        <span className="product-step-count" aria-live="polite">Step {step + 1} of 4</span>
+      </header>
+      <ol className="product-wizard-progress" aria-label="Listing progress">
+        {productSteps.map((title, index) => <li key={title} className={index <= step ? "reached" : ""}><span aria-current={index === step ? "step" : undefined} aria-label={`Step ${index + 1}: ${title}`} /></li>)}
+      </ol>
+      <h2 className="product-wizard-step-title" ref={headingRef} tabIndex={-1}>{productSteps[step]}</h2>
       {!sellerActive ? (
         <section className="private-form seller-activation-panel">
           <div><p className="private-kicker">SELLER ACCESS REQUIRED</p><h2>Activate seller tools first</h2><p>Listing is available for seller accounts connected to your Pi identity.</p></div>
-          <button className="private-primary-button" type="button" disabled={activatingSeller} onClick={() => void activateSeller()}>{activatingSeller ? "Activating..." : "Activate Seller Tools"}</button>
+          <button {...fieldProps("sellerActive")} className="private-primary-button" type="button" disabled={activatingSeller} onClick={() => void activateSeller()}>{activatingSeller ? "Activating..." : "Activate Seller Tools"}</button>
+          {fieldError("sellerActive")}
         </section>
       ) : null}
-      <form className="private-form product-form-accordions smart-product-form" noValidate onSubmit={(event) => void submit(event)}>
-        <details className="product-accordion" open>
-          <summary><span><strong>1. Product Search / Name</strong><small>Type the product name to suggest the best category and fields.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
-          <label>Product name<input required maxLength={120} value={form.title} onChange={(event) => setProductTitle(event.target.value)} placeholder="Example: Nike running shoes size 42" /></label>
+      <form ref={formRef} className="private-form product-form-accordions smart-product-form" aria-label={productSteps[step]} noValidate onChangeCapture={(event) => { const field = (event.target as HTMLElement).getAttribute("name"); if (field) setIssues(current => current.filter(issue => issue.field !== field)); }} onSubmit={(event) => void submit(event)}>
+        <details className="product-accordion" data-product-step="0" hidden={step !== 0} open>
+          <summary><span><strong>Product Search / Name</strong><small>Type the product name to suggest the best category and fields.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <label>Product name<input {...fieldProps("title")} required maxLength={120} value={form.title} onChange={(event) => setProductTitle(event.target.value)} placeholder="Example: Nike running shoes size 42" />{fieldError("title")}</label>
           <div className={`product-name-guide ${titleInsight ? "good" : "weak"}`}>
             <div><strong>{titleInsight ? `${titleInsight.category} detected` : "Add a clear product name"}</strong><p>{titleInsight ? "Only relevant details are shown below." : "Use brand, model, size, storage, or type so buyers can find it quickly."}</p></div>
             <div className="product-name-guide-chips">{activeFields.slice(0, 3).map((field) => <span key={field}>{field}</span>)}</div>
@@ -402,49 +469,50 @@ const AddProductPage = () => {
           <label>Category<select required value={form.category} onChange={(event) => setCategory(event.target.value as CategoryName)}>{categoryNames.map((item) => <option key={item}>{item}</option>)}</select></label>
         </details>
 
-        <details className="product-accordion" open>
-          <summary><span><strong>2. Photos</strong><small>Add up to 12 clear images. First image is the main image.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
-          <label>Product gallery ({form.images.length}/12 images)<input multiple type="file" accept="image/*" onChange={(event) => { selectImages(event.target.files); event.currentTarget.value = ""; }} /></label>
+        <details className="product-accordion" data-product-step="1" hidden={step !== 1} open>
+          <summary><span><strong>Photos</strong><small>Add up to 12 clear images. First image is the main image.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <label>Product gallery ({form.images.length}/12 images)<input {...fieldProps("images")} multiple type="file" accept="image/*" onChange={(event) => { selectImages(event.target.files); event.currentTarget.value = ""; }} />{fieldError("images")}</label>
           {form.images.length ? <div className="product-gallery-preview">{form.images.map((image, index) => <figure key={`${image.slice(-30)}-${index}`}><img src={image} alt={`Product preview ${index + 1}`} />{index === 0 ? <span>Main</span> : null}<button type="button" onClick={() => removeImage(index)}>Remove</button></figure>)}</div> : null}
         </details>
 
-        <details className="product-accordion" open>
-          <summary><span><strong>3. Basic Details</strong><small>Required basics kept short.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+        <details className="product-accordion" data-product-step="0" hidden={step !== 0} open>
+          <summary><span><strong>Basic Details</strong><small>Required basics kept short.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row">
-            <label>Condition<select required value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value })}>{["New", "Like New", "Used", "Refurbished"].map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label>Quantity<input required type="number" min="1" step="1" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} /></label>
+            <label>Condition<select {...fieldProps("condition")} required value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value })}>{["New", "Like New", "Used", "Refurbished"].map((item) => <option key={item}>{item}</option>)}</select>{fieldError("condition")}</label>
+            <label>Quantity<input {...fieldProps("quantity")} required type="number" min="1" step="1" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />{fieldError("quantity")}</label>
           </div>
-          <label>Description<textarea required minLength={20} maxLength={1500} rows={4} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Describe the real condition, what is included, and important buyer details." /><small className="form-help">{form.description.length}/1500 characters</small></label>
+          <label>Description<textarea {...fieldProps("description")} required minLength={20} maxLength={1500} rows={4} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Describe the real condition, what is included, and important buyer details." /><small className="form-help">{form.description.length}/1500 characters</small>{fieldError("description")}</label>
         </details>
 
-        <details className="product-accordion" open>
-          <summary><span><strong>4. Price in USDT + PI</strong><small>{formatPiRate()}. Edit either field.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+        <details className="product-accordion" data-product-step="1" hidden={step !== 1} open>
+          <summary><span><strong>Price in USDT + PI</strong><small>{formatPiRate()}. Edit either field.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row">
-            <label>$ price (USDT)<input required type="number" min="0.01" step="any" value={form.priceUsdt} onChange={(event) => setUsdtPrice(event.target.value)} /></label>
-            <label>π price<input required type="number" min="0.00000001" step="any" value={form.pricePi} onChange={(event) => setPiPrice(event.target.value)} /></label>
+            <label>$ price (USDT)<input {...fieldProps("priceUsdt")} required type="number" min="0.01" step="any" value={form.priceUsdt} onChange={(event) => setUsdtPrice(event.target.value)} />{fieldError("priceUsdt")}</label>
+            <label>π price<input {...fieldProps("pricePi")} required type="number" min="0.00000001" step="any" value={form.pricePi} onChange={(event) => setPiPrice(event.target.value)} />{fieldError("pricePi")}</label>
           </div>
           {priceUsdt > 0 && pricePi > 0 ? <small className="product-price-preview">Listing price: {formatUsdAmount(priceUsdt)} USDT · {formatPiAmount(pricePi)}</small> : null}
         </details>
 
-        <details className="product-accordion" open>
-          <summary><span><strong>5. Category-Specific Details</strong><small>Only details for {form.category}.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+        <details className="product-accordion" data-product-step="2" hidden={step !== 2} open>
+          <summary><span><strong>Category-Specific Details</strong><small>Only details for {form.category}.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row">{activeFields.map((field) => renderSpecField(field))}</div>
         </details>
 
-        <details className="product-accordion">
-          <summary><span><strong>6. Variants</strong><small>Advanced options for size, color, storage, RAM, or model.</small></span><span className="section-tag">Advanced</span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+        <details className="product-accordion" data-product-step="2" hidden={step !== 2}>
+          <summary><span><strong>Variants</strong><small>Advanced options for size, color, storage, RAM, or model.</small></span><span className="section-tag">Advanced</span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           {suggestedVariants.length ? <div className="product-name-guide good"><p>Suggested variant fields: {suggestedVariants.join(", ")}.</p></div> : null}
-          <button type="button" className="private-secondary-button" onClick={addVariant}>Add Variant</button>
+          <button {...fieldProps("variants")} type="button" className="private-secondary-button" onClick={addVariant}>Add Variant</button>
+          {fieldError("variants")}
           {form.variants.length ? <div className="product-variant-list">{form.variants.map((variant, index) => <article key={index}><div className="product-variant-head"><strong>Variant {index + 1}</strong><button type="button" onClick={() => removeVariant(index)}>Remove</button></div><div className="private-form-row">{variantFields.map((field) => {
             const options = selectOptionsByField[field];
             return <label key={field}>{field}{field === "color" ? <ColorPicker value={variant.color} onChange={(value) => updateVariant(index, { color: value })} /> : options ? <select value={variant[field]} onChange={(event) => updateVariant(index, { [field]: event.target.value } as Partial<VariantRow>)}><option value="">Select {field}</option>{options.map((option) => <option value={option} key={option}>{option}</option>)}</select> : <input value={variant[field]} onChange={(event) => updateVariant(index, { [field]: event.target.value } as Partial<VariantRow>)} />}</label>;
           })}</div><div className="private-form-row"><label>Variant stock<input type="number" min="0" value={variant.stock} onChange={(event) => updateVariant(index, { stock: event.target.value })} /></label><label>Variant $ price (USDT)<input type="number" min="0" step="any" value={variant.priceUsdt} onChange={(event) => updateVariant(index, { priceUsdt: event.target.value })} /></label><label>Variant image<input type="file" accept="image/*" onChange={(event) => { selectVariantImage(index, event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div>{variant.image ? <img className="product-variant-image" src={variant.image} alt="" /> : null}</article>)}</div> : <div className="private-state compact"><h3>No variants yet</h3><p>Add only if the item has choices like sizes, colors, storage, or models.</p></div>}
         </details>
 
-        <details className="product-accordion" open>
-          <summary><span><strong>7. Delivery / Service Method</strong><small>Choose delivery, pickup, digital delivery, or appointment method.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+        <details className="product-accordion" data-product-step="2" hidden={step !== 2} open>
+          <summary><span><strong>Delivery / Service Method</strong><small>Choose delivery, pickup, digital delivery, or appointment method.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row">
-            <label>Delivery method<select required value={form.deliveryOption} onChange={(event) => setForm({ ...form, deliveryOption: event.target.value })}>{(form.category === "Services" ? ["Online Service", "In-person Service", "Online or In-person"] : form.category === "Digital Products" ? ["Digital Delivery"] : ["Delivery", "Pickup", "Delivery or Pickup"]).map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label>Delivery method<select {...fieldProps("deliveryOption")} required value={form.deliveryOption} onChange={(event) => setForm({ ...form, deliveryOption: event.target.value })}>{(form.category === "Services" ? ["Online Service", "In-person Service", "Online or In-person"] : form.category === "Digital Products" ? ["Digital Delivery"] : ["Delivery", "Pickup", "Delivery or Pickup"]).map((item) => <option key={item}>{item}</option>)}</select>{fieldError("deliveryOption")}</label>
             <label>Delivery time<input value={form.shipping.deliveryTime} onChange={(event) => setForm({ ...form, shipping: { ...form.shipping, deliveryTime: event.target.value } })} placeholder={form.category === "Services" ? "Available weekdays" : "2-4 days"} /></label>
           </div>
           {form.category !== "Digital Products" && form.category !== "Services" ? <div className="private-form-row"><label>Weight<input value={form.shipping.weight} onChange={(event) => setForm({ ...form, shipping: { ...form.shipping, weight: event.target.value } })} placeholder="1.2 kg" /></label><label>Dimensions<input value={form.shipping.dimensions} onChange={(event) => setForm({ ...form, shipping: { ...form.shipping, dimensions: event.target.value } })} placeholder="30 x 20 x 10 cm" /></label></div> : null}
@@ -452,35 +520,47 @@ const AddProductPage = () => {
           {form.category === "Digital Products" ? <div className="private-form-row"><label>File URL<input value={form.digitalProduct.fileUrl} onChange={(event) => setForm({ ...form, digitalProduct: { ...form.digitalProduct, fileUrl: event.target.value, enabled: true } })} /></label><label>License key<input value={form.digitalProduct.licenseKey} onChange={(event) => setForm({ ...form, digitalProduct: { ...form.digitalProduct, licenseKey: event.target.value, enabled: true } })} /></label></div> : null}
         </details>
 
-        <details className="product-accordion">
-          <summary><span><strong>8. Warranty / Returns</strong><small>Advanced buyer expectations.</small></span><span className="section-tag">Advanced</span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+        <details className="product-accordion" data-product-step="2" hidden={step !== 2}>
+          <summary><span><strong>Warranty / Returns</strong><small>Advanced buyer expectations.</small></span><span className="section-tag">Advanced</span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row"><label>Warranty<select value={form.warranty} onChange={(event) => setForm({ ...form, warranty: event.target.value })}>{["No Warranty", "7 Days", "30 Days", "6 Months", "1 Year"].map((item) => <option key={item}>{item}</option>)}</select></label><label>Return Policy<select value={form.returnPolicy} onChange={(event) => setForm({ ...form, returnPolicy: event.target.value })}>{["No Returns", "7 Days", "14 Days", "30 Days"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
         </details>
 
-        <details className="product-accordion" open>
-          <summary><span><strong>9. Review & Publish</strong><small>Status is pending review by default.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+        <details className="product-accordion" data-product-step="3" hidden={step !== 3} open>
+          <summary><span><strong>Review & Publish</strong><small>Status is pending review by default.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <div className="product-wizard-review">
+            {form.image ? <img src={form.image} alt="Main product preview" /> : null}
+            <div><strong>{form.title || "Product name required"}</strong><p>{form.category} · {form.condition} · Quantity {form.quantity}</p><p>{formatUsdAmount(priceUsdt)} USDT · {formatPiAmount(pricePi)}</p></div>
+            <button type="button" className="private-secondary-button" onClick={() => goToStep(0)}>Edit information</button>
+            <button type="button" className="private-secondary-button" onClick={() => goToStep(1)}>Edit photos & pricing</button>
+            <button type="button" className="private-secondary-button" onClick={() => goToStep(2)}>Edit options</button>
+          </div>
           <div className="product-name-guide good"><p>Publishing status: Pending review. Admin will review before this appears live unless your seller account is auto-approved.</p></div>
           <div className="product-location-card">
             <div><strong>Using your profile location</strong><p>{[form.country, form.stateRegion, form.city].filter(Boolean).join(" - ") || "Add location details before publishing."}</p></div>
             <button type="button" className="private-secondary-button" onClick={() => setProfileLocationLocked(false)}>Edit</button>
           </div>
-          <LocationFields value={form} countryDisabled={profileLocationLocked && Boolean(form.country)} onChange={(location) => setForm({ ...form, ...location })} />
-          <label>Seller contact<input required value={form.sellerContact} onChange={(event) => setForm({ ...form, sellerContact: event.target.value })} placeholder="+971 50 123 4567, email, or Pi username" /></label>
+          <LocationFields errors={Object.fromEntries(issues.filter(issue => ["country", "city", "areaAddress"].includes(issue.field)).map(issue => [issue.field, issue.message]))} idPrefix="product-" value={form} countryDisabled={profileLocationLocked && Boolean(form.country)} onChange={(location) => setForm({ ...form, ...location })} />
+          <label>Seller contact<input {...fieldProps("sellerContact")} required value={form.sellerContact} onChange={(event) => setForm({ ...form, sellerContact: event.target.value })} placeholder="+971 50 123 4567, email, or Pi username" />{fieldError("sellerContact")}</label>
         </details>
 
-        <details className="product-accordion" open>
-          <summary><span><strong>10. Seller Agreement</strong><small>Required before publish.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
-          <label className="setting-line"><span><strong>Seller agreement</strong><small>Read the official <Link className="seller-agreement-link" to="/seller-agreement" target="_blank" rel="noreferrer">SMAJ PI HUB Seller Agreement</Link> before accepting. I confirm this product is real, photos are clear, pricing is fair, location is valid, and SMAJ PI HUB may review before publishing.</small></span><input type="checkbox" checked={form.sellerAgreementAccepted} onChange={(event) => setForm({ ...form, sellerAgreementAccepted: event.target.checked })} /></label>
+        <details className="product-accordion" data-product-step="3" hidden={step !== 3} open>
+          <summary><span><strong>Seller Agreement</strong><small>Required before publish.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <label className="setting-line"><span><strong>Seller agreement</strong><small>Read the official <Link className="seller-agreement-link" to="/seller-agreement" target="_blank" rel="noreferrer">SMAJ PI HUB Seller Agreement</Link> before accepting. I confirm this product is real, photos are clear, pricing is fair, location is valid, and SMAJ PI HUB may review before publishing.</small></span><input {...fieldProps("sellerAgreementAccepted")} type="checkbox" checked={form.sellerAgreementAccepted} onChange={(event) => setForm({ ...form, sellerAgreementAccepted: event.target.checked })} />{fieldError("sellerAgreementAccepted")}</label>
         </details>
 
-        {error ? <div className="private-alert floating-alert error">{error}</div> : null}
-        {success ? <div className="private-alert floating-alert success">{success}</div> : null}
-        <button className="private-primary-button" disabled={publishDisabled}>{submitting ? "Publishing..." : form.sellerAgreementAccepted ? "Publish for Review" : "Accept Agreement to Publish"}</button>
-        <div className="product-form-mobile-actions" aria-label="Listing form actions">
-          <button type="button" onClick={() => setSuccess("Draft saved on this device.")}>Save draft</button>
-          <button type="submit" disabled={publishDisabled}>{submitting ? "Publishing..." : "Publish for Review"}</button>
+        {issues.length ? <div className="product-wizard-errors" role="alert"><strong>Please check these fields:</strong><ul>{issues.map(issue => <li key={issue.field}><button type="button" onClick={() => showIssues([issue])}>{issue.message}</button></li>)}</ul></div> : null}
+        {error ? <div className="private-alert error" role="alert">{error}</div> : null}
+        {draftError ? <div className="private-alert error" role="alert">{draftError}</div> : null}
+        {success ? <div className="private-alert success" role="status">{success}</div> : null}
+        {processingImages > 0 ? <p role="status">Processing selected images...</p> : null}
+        <div className="product-wizard-actions" aria-label="Listing form actions">
+          <button type="button" className="private-secondary-button" disabled={submitting || processingImages > 0} onClick={() => { if (saveDraft()) setSuccess("Draft saved on this device."); }}>Save draft</button>
+          {step > 0 ? <button type="button" className="private-secondary-button" disabled={submitting} onClick={() => goToStep(step - 1)}>Back</button> : null}
+          {step < 3 ? <button key="next-step" type="button" className="private-primary-button" disabled={submitting || processingImages > 0} onClick={nextStep}>Next <span aria-hidden="true">{String.fromCharCode(8594)}</span></button> : <button key="publish-product" type="submit" className="private-primary-button" disabled={publishDisabled}>{submitting ? "Publishing..." : "Publish for Review"}</button>}
         </div>
+        {step === 3 && !form.sellerAgreementAccepted ? <p className="form-help">Accept the seller agreement to enable Publish for Review.</p> : null}
       </form>
+      {blocker.state === "blocked" ? <div className="product-leave-backdrop"><section className="product-leave-dialog" role="alertdialog" aria-modal="true" aria-labelledby="product-leave-title" onKeyDown={(event) => { if (event.key === "Escape") blocker.reset(); if (event.key === "Tab") { const buttons = event.currentTarget.querySelectorAll("button"); const target = event.shiftKey ? buttons[0] : buttons[buttons.length - 1]; if (document.activeElement === target) { event.preventDefault(); (event.shiftKey ? buttons[buttons.length - 1] : buttons[0]).focus(); } } }}><h2 id="product-leave-title">Keep your listing?</h2><p>Your latest changes or selected images have not finished saving.</p><button type="button" className="private-primary-button" autoFocus onClick={() => { saveDraft(); blocker.reset(); }}>Stay and save draft</button><button type="button" className="private-secondary-button" onClick={() => blocker.proceed()}>Leave without saving latest changes</button></section></div> : null}
     </main>
   );
 };
