@@ -9,22 +9,23 @@ const Original = createContext(false);
 export function originalContent(children: ReactNode) {
   return createElement(Original.Provider, { value: true }, children);
 }
-const skipped = new Set(['script', 'style', 'code', 'pre', 'textarea', 'svg', 'path']);
+const skipped = new Set(['script', 'style', 'code', 'pre', 'svg', 'path']);
 type HostProps = { host: ElementType; children?: ReactNode } & Record<string, unknown>;
 function LocalizedHost({ host, ...props }: HostProps) {
   const { i18n } = useTranslation();
   const inherited = useContext(Original);
-  const original = inherited || props.translate === 'no' || props['data-no-auto-translate'] !== undefined || props.contentEditable === true || (typeof host === 'string' && skipped.has(host));
+  const original = inherited || props.translate === 'no' || props['data-no-auto-translate'] !== undefined || (typeof host === 'string' && skipped.has(host));
+  const preserveChildren = host === 'textarea' || props.contentEditable === true || props.contentEditable === 'true';
   if (original) return createElement(Original.Provider, { value: true }, createElement(host, props));
   const translated = { ...props };
   for (const attribute of ['placeholder', 'title', 'aria-label', 'alt', 'label', 'helperText', 'emptyText', 'buttonText']) {
     if (typeof props[attribute] === 'string') translated[attribute] = localizeText(props[attribute], i18n);
   }
-  if (host === 'input' && ['submit', 'reset', 'button'].includes(String(props.type))) translated.value = localizeText(props.value, i18n);
   const localizeChildren = (children: ReactNode): ReactNode => Array.isArray(children) ? children.map(localizeChildren) : localizeText(children, i18n) as ReactNode;
-  if ('children' in props) translated.children = localizeChildren(props.children);
+  if ('children' in props) translated.children = preserveChildren ? props.children : localizeChildren(props.children);
   if (host === 'option' && props.value === undefined && typeof props.children === 'string') translated.value = props.children;
-  return createElement(host, translated);
+  const element = createElement(host, translated);
+  return preserveChildren ? createElement(Original.Provider, { value: true }, element) : element;
 }
 type Jsx = typeof reactJsx;
 function render(factory: Jsx, type: ElementType, props: unknown, key?: Key) {

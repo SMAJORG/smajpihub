@@ -11,6 +11,9 @@ on:
     branches: [fix/multilingual-localization]
 permissions:
   contents: read
+concurrency:
+  group: localization-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   web:
     runs-on: ubuntu-latest
@@ -27,11 +30,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run test:i18n
-      - run: npm run test:jobs
       - run: npm run build
       - run: npm run build:android-web
       - run: npx playwright install --with-deps chromium
       - run: npm run test:i18n:browser
+      - name: Existing jobs UI source contract
+        run: npm run test:jobs
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15

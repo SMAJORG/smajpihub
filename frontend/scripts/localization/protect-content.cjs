@@ -16,7 +16,7 @@ module.exports = function ({ types: t }) {
       while (t.isMemberExpression(root) || t.isOptionalMemberExpression(root)) root = root.object;
       const userVariable = t.isIdentifier(expression) && /^(?:messageText|bodyText|descriptionText|caption|authorName|participantName|displayName|username|draft)$/.test(expression.name);
       const property = direct && expression.property;
-      const contentField = property && t.isIdentifier(property) && /^(?:title|name|description|text|body|content|caption|displayName|username|piUsername|participantName|lastMessage|bio|address|email|phone|review|comment)$/.test(property.name);
+      const contentField = property && t.isIdentifier(property) && /^(?:title|name|description|message|text|body|content|caption|displayName|username|piUsername|participantName|lastMessage|bio|address|email|phone|review|comment)$/.test(property.name);
       if ((direct && contentField && t.isIdentifier(root) && roots.test(root.name)) || userVariable) {
         path.node.expression = t.callExpression(t.identifier('__smajOriginal'), [expression]);
         path.findParent(parent => parent.isProgram()).setData('needsOriginal', true);

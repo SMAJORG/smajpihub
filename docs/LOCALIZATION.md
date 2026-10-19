@@ -73,3 +73,5 @@ npm run mobile:test:oauth
 ```
 
 Browser checks should cover all ten selector options, repeated switching back to English, refresh persistence, Arabic on initial load, desktop and 390px mobile widths, an open form retaining its values, navigation, translated accessibility labels, and dynamic failure messaging. A physical Android device / signed APK and authenticated production workflows still require device/account validation; a web build alone cannot certify them.
+
+Local verification on 2026-10-19: six catalog/rendering tests and twelve dynamic-provider tests passed. The existing `frontend/tests/jobsUi.test.mjs` fails its raw-source assertion for `Search companies or industries`; the Jobs page and that test are unchanged by this branch. Keep that failure visible rather than changing unrelated Jobs behavior or weakening its assertion. Production builds, browser checks and native type checking are also included in the non-deploying CI workflow. Local full installs/builds encountered a full disk and severe memory pressure (4 GB machine); interrupted checks are not reported as passing.

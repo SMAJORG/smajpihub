@@ -36,6 +36,9 @@ test('switching back restores English, and locale variants normalize', async () 
 test('form values, keys and user content remain original', async () => {
   await instance.changeLanguage('fr');
   assert.equal(render(jsx('input', { value: 'Save', readOnly: true })), '<input readOnly="" value="Save"/>');
+  assert.equal(render(jsx('input', { type: 'submit', name: 'action', value: 'Save' })), '<input type="submit" name="action" value="Save"/>');
+  const textarea = render(jsx('textarea', { placeholder: 'Save', defaultValue: 'Save' }));
+  assert.match(textarea, /^<textarea placeholder="(Enregistrer|Sauvegarder)">Save<\/textarea>$/);
   assert.equal(render(jsx('span', { translate: 'no', children: jsx('strong', { children: 'Save' }) })), '<span translate="no"><strong>Save</strong></span>');
   assert.equal(render(jsx('div', { children: originalContent('Save') })), '<div>Save</div>');
   assert.equal(localizeText('An arbitrary user sentence that is not a catalog entry.', instance), 'An arbitrary user sentence that is not a catalog entry.');
