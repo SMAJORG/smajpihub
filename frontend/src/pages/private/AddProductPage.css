@@ -90,6 +90,9 @@
   gap: 6px;
   color: var(--smaj-text);
 }
+.product-wizard .product-accordion > .product-name-guide {
+  margin-block: 16px;
+}
 .product-wizard .private-form input,
 .product-wizard .private-form select,
 .product-wizard .private-form textarea {

@@ -17,7 +17,7 @@ export default function StoreFooter({
     <footer className="storefront-footer store-footer">
       <div className="store-footer-heading">
         <div className="store-footer-brand">
-          <img src="/smaj_ecosystem_logo.png" alt="" loading="lazy" />
+          <img src="/assets/services/store.png" alt="" loading="lazy" />
           <div>
             <strong>SMAJ Store</strong>
             <p>
