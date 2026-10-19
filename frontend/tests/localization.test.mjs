@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { instance, plugin, resources, catalogs, jsx, jsxs, originalContent, renderToStaticMarkup: render, localizeText, normalizeLanguage } = require('./localization-loader.cjs');
+const { instance, plugin, resources, catalogs, jsx, jsxs, originalContent, renderToStaticMarkup: render, localizeText, normalizeLanguage, createElement } = require('./localization-loader.cjs');
 await instance.use(plugin).init({ resources, lng: 'en', fallbackLng: 'en', interpolation: { escapeValue: false }, initAsync: false });
 const codes = ['en', 'fr', 'ar', 'ha', 'es', 'pt', 'zh', 'sw', 'hi', 'tr'];
 test('all ten catalogs contain every source message and valid interpolation', () => {
@@ -51,6 +51,15 @@ test('templates retain inserted user values and surrounding whitespace', async (
   assert.ok(template);
   const translated = localizeText('  View My private product  ', instance);
   assert.ok(translated.startsWith('  ')); assert.ok(translated.endsWith('  ')); assert.ok(translated.includes('My private product'));
+});
+test('custom component data props survive while dependency display props localize', async () => {
+  await instance.changeLanguage('fr');
+  function Editor({ title }) { return jsx('input', { value: title, readOnly: true }); }
+  assert.equal(render(jsx(Editor, { title: 'Save' })), '<input readOnly="" value="Save"/>');
+  function DependencyButton({ children }) { return createElement('button', null, children); }
+  assert.match(render(jsx(DependencyButton, { __smajDisplay: true, children: 'Save' })), /^<button>(Enregistrer|Sauvegarder)<\/button>$/);
+  const transformed = require('@babel/core').transformSync('import { Button } from "@mui/material"; const UI = () => <Button>Save</Button>;', { configFile: false, babelrc: false, parserOpts: { plugins: ['jsx'] }, plugins: [require('../scripts/localization/protect-content.cjs')] }).code;
+  assert.match(transformed, /__smajDisplay=\{true\}/);
 });
 test('React preserves nested elements without adding DOM wrappers', async () => {
   await instance.changeLanguage('fr');

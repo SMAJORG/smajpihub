@@ -28,4 +28,5 @@ module.exports = {
   instance: require('i18next').createInstance(),
   plugin: require('react-i18next').initReactI18next,
   renderToStaticMarkup: require('react-dom/server').renderToStaticMarkup,
+  createElement: require('react').createElement,
 };

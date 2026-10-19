@@ -1,12 +1,25 @@
 // Exclude API/user-content expressions before React creates localized hosts.
 // This is a source transform, never a DOM scan or a translation API request.
 module.exports = function ({ types: t }) {
+  const displayLibrary = /^(?:@mui\/|react-router(?:-dom)?$|recharts$|lucide-react$)/;
   return { name: 'protect-user-content', visitor: {
     Program: { enter(path) { path.setData('needsOriginal', false); }, exit(path) {
       if (path.getData('needsOriginal')) path.unshiftContainer('body', t.importDeclaration([
         t.importSpecifier(t.identifier('__smajOriginal'), t.identifier('originalContent')),
       ], t.stringLiteral('@smaj/localization/jsx-runtime')));
     } },
+    JSXOpeningElement(path) {
+      let name = path.node.name;
+      while (t.isJSXMemberExpression(name)) name = name.object;
+      if (!t.isJSXIdentifier(name) || /^[a-z]/.test(name.name)) return;
+      const binding = path.scope.getBinding(name.name);
+      const declaration = binding?.path.parentPath;
+      // Only audited UI dependencies receive translated display props. Custom
+      // application components keep their data props (including title) intact.
+      if (declaration?.isImportDeclaration() && displayLibrary.test(declaration.node.source.value)) {
+        path.node.attributes.push(t.jsxAttribute(t.jsxIdentifier('__smajDisplay'), t.jsxExpressionContainer(t.booleanLiteral(true))));
+      }
+    },
     JSXExpressionContainer(path) {
       if (path.parentPath.isJSXAttribute()) return;
       const expression = path.node.expression;
