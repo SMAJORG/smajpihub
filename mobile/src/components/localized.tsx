@@ -2,9 +2,10 @@ import { Text as NativeText, TextInput as NativeInput, View as NativeView, Alert
 import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import { localizeText } from '../../../frontend/src/localization/catalog';
+import { localizeDisplay } from '../../../frontend/src/localization/numbers';
 import i18n from '@/lib/i18n';
 
-const childrenText = (value: ReactNode): ReactNode => Array.isArray(value) ? value.map(childrenText) : localizeText(value, i18n) as ReactNode;
+const childrenText = (value: ReactNode): ReactNode => Array.isArray(value) ? value.map(childrenText) : localizeDisplay(localizeText(value, i18n), i18n) as ReactNode;
 export function Text({ original = false, children, style, ...props }: TextProps & { original?: boolean }) {
   useTranslation();
   return <NativeText {...props} style={[{ writingDirection: i18n.language === 'ar' ? 'rtl' : 'ltr' }, style]}>{original ? children : childrenText(children)}</NativeText>;

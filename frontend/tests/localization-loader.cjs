@@ -22,6 +22,7 @@ function load(filename) {
   return module.exports;
 }
 module.exports = {
+  ...load(path.join(__dirname, '../src/localization/numbers.ts')),
   ...load(path.join(__dirname, '../src/localization/catalog.ts')),
   ...load(path.join(__dirname, '../src/localization/jsx-runtime.ts')),
   ...load(path.join(__dirname, '../src/localization/languages.ts')),

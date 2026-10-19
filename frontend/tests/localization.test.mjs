@@ -66,3 +66,26 @@ test('React preserves nested elements without adding DOM wrappers', async () => 
   const markup = render(jsxs('div', { children: [jsx('strong', { children: 'Save' }), jsx('button', { children: 'Cancel' })] }));
   assert.match(markup, /^<div><strong>(Enregistrer|Sauvegarder)<\/strong><button>Annuler<\/button><\/div>$/);
 });
+
+test('display numbers localize without changing currency precision or machine values', async () => {
+  for (const code of codes) {
+    await instance.changeLanguage(code);
+    assert.equal(render(jsx('strong', { children: 1234 })), `<strong>${new Intl.NumberFormat(code === 'ar' ? 'ar-u-nu-arab' : code, { maximumFractionDigits: 20 }).format(1234)}</strong>`);
+  }
+  await instance.changeLanguage('ar');
+  assert.equal(render(jsx('strong', { children: '$1,299.00' })), '<strong>$١٬٢٩٩٫٠٠</strong>');
+  assert.equal(render(jsx('strong', { children: 'π 0.0002' })), '<strong>π ٠٫٠٠٠٢</strong>');
+  assert.equal(render(jsx('input', { type: 'number', value: 1299, readOnly: true })), '<input type="number" readOnly="" value="1299"/>');
+  assert.equal(render(jsx('span', { translate: 'no', children: 1234 })), '<span translate="no">1234</span>');
+  assert.equal(render(jsx('span', { children: '1.0.2' })), '<span>1.0.2</span>');
+  assert.equal(render(jsx('span', { children: originalContent('$1,299.00') })), '<span>$1,299.00</span>');
+});
+
+test('screenshot banner and backend error messages have actual translations', async () => {
+  for (const code of codes.filter(code => code !== 'en')) {
+    await instance.changeLanguage(code);
+    for (const text of ['Start Your Business', 'BUILD YOUR FUTURE!', 'Sci-Fi & Fantasy', 'A downloadable video source is not available for this title.']) {
+      assert.notEqual(localizeText(text, instance), text, `${code}: ${text}`);
+    }
+  }
+});

@@ -8,6 +8,10 @@ html[dir="rtl"] :is(input[type="email"], input[type="url"], input[type="tel"], i
 }
 html[dir="rtl"] :is(video, audio, canvas, .recharts-wrapper) { direction: ltr; }
 html[dir="rtl"] :is([data-testid="ArrowBackOutlinedIcon"], [data-testid="ArrowBackIosNewOutlinedIcon"], [data-testid="ChevronRightOutlinedIcon"], [data-testid="KeyboardArrowRightIcon"]) { transform: scaleX(-1); }
+html[dir="rtl"] :is([data-testid^="ArrowForward"], [data-testid^="ArrowBack"], [data-testid^="ChevronRight"], [data-testid^="ChevronLeft"], [data-testid^="KeyboardArrowRight"], [data-testid^="KeyboardArrowLeft"]) { transform: scaleX(-1); }
+/* Cards may contain long translated words. Let grid/flex children shrink and
+   wrap without mirroring product imagery, brand logos, or media controls. */
+:is(.mobile-home-hero-copy, .settings-group, .dynamic-translation) { min-width: 0; overflow-wrap: anywhere; }
 .language-choice-dialog { max-width: min(440px, calc(100vw - 24px)); }
 .language-choice-dialog select { max-width: 100%; min-width: 0; }
 html[dir="rtl"] .language-choice-close { right: auto; left: 16px; }

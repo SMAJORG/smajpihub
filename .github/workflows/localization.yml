@@ -30,6 +30,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run test:i18n
+      - run: node scripts/localization/extract.mjs --check
       - run: npm run build
       - run: npm run build:android-web
       - run: npx playwright install --with-deps chromium

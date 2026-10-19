@@ -2,6 +2,7 @@ import { createContext, createElement, useContext, type ElementType, type ReactN
 import { jsx as reactJsx, jsxs as reactJsxs, Fragment } from 'react/jsx-runtime';
 import { useTranslation } from 'react-i18next';
 import { localizeText } from './catalog';
+import { localizeDisplay } from './numbers';
 export { Fragment };
 export type { JSX } from 'react/jsx-runtime';
 // React owns translated nodes: no DOM mutation, requests, or application remount.
@@ -21,7 +22,7 @@ function LocalizedHost({ host, __smajDisplay: _display, ...props }: HostProps) {
   for (const attribute of ['placeholder', 'title', 'aria-label', 'alt', 'label', 'helperText', 'emptyText', 'buttonText']) {
     if (typeof props[attribute] === 'string') translated[attribute] = localizeText(props[attribute], i18n);
   }
-  const localizeChildren = (children: ReactNode): ReactNode => Array.isArray(children) ? children.map(localizeChildren) : localizeText(children, i18n) as ReactNode;
+  const localizeChildren = (children: ReactNode): ReactNode => Array.isArray(children) ? children.map(localizeChildren) : localizeDisplay(localizeText(children, i18n), i18n) as ReactNode;
   if ('children' in props) translated.children = preserveChildren ? props.children : localizeChildren(props.children);
   if (host === 'option' && props.value === undefined && typeof props.children === 'string') translated.value = props.children;
   const element = createElement(host, translated);

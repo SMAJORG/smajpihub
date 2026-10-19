@@ -13,6 +13,12 @@ function Fixture() {
     <label>Search<input id="preserved-input" placeholder="Search" value={value} onChange={event => setValue(event.target.value)} /></label>
     <button id="sample-button" title="Save" type="button">Save</button>
     <p id="original" translate="no">Save</p>
+    <section id="localized-card" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+      <h2>Start Your Business</h2>
+      <strong id="localized-count">{1234}</strong>
+      <p id="localized-price">$1,299.00</p>
+      <svg id="direction-icon" data-testid="ArrowForwardOutlinedIcon" aria-hidden="true" width="24" height="24"><path d="M4 12h16m-6-6 6 6-6 6" /></svg>
+    </section>
     <div id="dynamic"><DynamicTranslation text="A private product description." source="en" /></div>
   </main>;
 }

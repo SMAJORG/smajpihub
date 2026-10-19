@@ -47,10 +47,22 @@ const legacy = JSON.parse(fs.readFileSync(path.join(root, 'frontend/src/localiza
 const addLegacy = value => { if (typeof value === 'string') messages.add(normalize(value)); else if (value && typeof value === 'object') Object.values(value).forEach(addLegacy); };
 addLegacy(legacy);
 const extras = ['Translation unavailable. Showing original text.', 'Translate', 'Show original', 'Pick language', 'Choose language', 'Language', 'Close', 'Cancel', 'Save',
+  'Start Your Business', 'BUILD YOUR FUTURE!', 'Build your future!', 'Sci-Fi & Fantasy',
+  'A downloadable video source is not available for this title.', 'A valid downloadable video source is unavailable.',
   'pending', 'approved', 'rejected', 'completed', 'cancelled', 'canceled', 'published', 'active', 'inactive', 'draft', 'failed', 'processing', 'paid', 'unpaid', 'delivered', 'shipped', 'refunded', 'open', 'closed', 'online', 'offline', 'free', 'live', 'available', 'unavailable', 'verified', 'unverified', 'yes', 'no', 'on', 'off'];
 extras.forEach(text => messages.add(text));
 const sorted = [...messages].sort();
+if (process.argv.includes('--check')) {
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'frontend/src/locales/en.json'), 'utf8'));
+  const missing = sorted.filter(text => !Object.hasOwn(catalog, text));
+  if (missing.length) { console.error('Missing interface catalog entries:', missing); process.exit(1); }
+  console.log(`Catalog coverage passed: ${sorted.length} extracted interface messages.`);
+  process.exit(0);
+}
 fs.mkdirSync(path.join(root, 'frontend/src/locales'), { recursive: true });
-fs.writeFileSync(path.join(root, 'frontend/src/locales/en.json'), JSON.stringify(Object.fromEntries(sorted.map(text => [text, text])), null, 2) + '\n');
+const sourceFile = path.join(root, 'frontend/src/locales/en.json');
+const existing = fs.existsSync(sourceFile) ? JSON.parse(fs.readFileSync(sourceFile, 'utf8')) : {};
+// Keep curated server/CMS messages that are not present in frontend source.
+fs.writeFileSync(sourceFile, JSON.stringify({ ...existing, ...Object.fromEntries(sorted.map(text => [text, text])) }, null, 2) + '\n');
 fs.writeFileSync(path.join(root, 'frontend/src/localization/templates.json'), JSON.stringify([...templates].sort(), null, 2) + '\n');
 console.log(`${sorted.length} interface messages, ${templates.size} interpolation templates; ${sorted.join('').length} source characters`);
