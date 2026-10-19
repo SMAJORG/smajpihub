@@ -1,7 +1,8 @@
+import { Text, View } from "@/components/localized";
 import { colors, radii, spacing } from "@smaj/design-tokens";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";

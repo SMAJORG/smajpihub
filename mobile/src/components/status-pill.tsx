@@ -1,6 +1,7 @@
+import { Text } from "@/components/localized";
 import { colors, radii } from "@smaj/design-tokens";
 import type { ServiceLaunchStatus } from "@smaj/shared-types";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet} from "react-native";
 export function StatusPill({ status }: { status: ServiceLaunchStatus }) {
   const label = status === "live" ? "LIVE" : status === "coming-soon" ? "COMING SOON" : "IN PROGRESS";
   return <Text style={[styles.base, status === "live" ? styles.live : status === "coming-soon" ? styles.soon : styles.progress]}>{label}</Text>;

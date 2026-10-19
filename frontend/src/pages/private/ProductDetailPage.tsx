@@ -1,4 +1,5 @@
 import { chatLink } from "../../lib/chatCache";
+import DynamicTranslation from "../../components/DynamicTranslation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -201,7 +202,7 @@ const ProductDetailPage = () => {
 
         <div className="product-detail-content">
           <span className="product-category inline">{product.category}</span>
-          <h1>{product.title}</h1>
+          <h1 translate="no" dir="auto">{product.title}</h1>
           <div className="product-detail-rating"><span>{Array.from({ length: 5 }).map((_, index) => productRating >= index + 1 ? <StarRoundedIcon className="star-filled" key={index} /> : productRating >= index + 0.5 ? <StarHalfRoundedIcon className="star-half" key={index} /> : <StarBorderRoundedIcon className="star-empty" key={index} />)}</span><small>{productReviewCount ? `${productRating.toFixed(1)} (${productReviewCount} reviews)` : "No reviews yet"}</small></div>
           <div className="product-detail-price-row"><strong>{formatUsdAmount(product.priceUsdt ?? product.pricePi * PI_USDT_RATE)}</strong><small>{formatPiAmount(piPrice)}</small></div>
           <p className="product-delivery-line">{sellerFlag ? `${sellerFlag} ` : ""}{product.city || sellerCountry} · {product.shipping?.deliveryTime || "Contact seller for delivery"}</p>
@@ -224,7 +225,7 @@ const ProductDetailPage = () => {
 
           <details className="product-info-disclosure" open>
             <summary>Description</summary>
-            <p>{product.description}</p>
+            <p><DynamicTranslation text={product.description || ''} /></p>
           </details>
           <details className="product-info-disclosure">
             <summary>Product details</summary>

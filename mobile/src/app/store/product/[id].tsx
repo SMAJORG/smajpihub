@@ -1,7 +1,8 @@
+import { Alert, Text, View } from "@/components/localized";
 import { colors, radii, spacing } from "@smaj/design-tokens";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
@@ -60,7 +61,7 @@ export default function NativeProductDetailScreen() {
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.imageBox}>{selectedImage ? <Image source={{ uri: selectedImage }} style={styles.image} resizeMode="contain"/> : <Text style={styles.imageFallback}>ST</Text>}</View>
       {images.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>{images.map(image => <Pressable key={image} onPress={() => setSelectedImage(image)} style={[styles.thumb, selectedImage === image && styles.thumbActive]}><Image source={{ uri: image }} style={styles.thumbImage}/></Pressable>)}</ScrollView> : null}
-      <View style={styles.copy}><Text style={styles.category}>{product.category || "SMAJ Store"}</Text><Text style={styles.title}>{productTitle(product)}</Text><Text style={styles.price}>π {Number(product.pricePi || 0).toFixed(4)}</Text><Text style={styles.location}>{[product.city, product.country, product.location].filter(Boolean).join(" · ")}</Text><Text style={styles.description}>{product.description || "Contact the seller for product information."}</Text></View>
+      <View style={styles.copy}><Text original style={styles.category}>{product.category || "SMAJ Store"}</Text><Text style={styles.title}>{productTitle(product)}</Text><Text style={styles.price}>π {Number(product.pricePi || 0).toFixed(4)}</Text><Text style={styles.location}>{[product.city, product.country, product.location].filter(Boolean).join(" · ")}</Text><Text original style={styles.description}>{product.description || "Contact the seller for product information."}</Text></View>
       <View style={styles.seller}><View style={styles.avatar}>{data.seller?.avatar ? <Image source={{ uri: data.seller.avatar }} style={styles.avatarImage}/> : <Text style={styles.avatarText}>{(data.seller?.displayName || product.sellerName || "S").slice(0,1)}</Text>}</View><View style={styles.sellerCopy}><Text style={styles.sellerLabel}>SELLER</Text><Text style={styles.sellerName}>{data.seller?.displayName || product.sellerName || "SMAJ seller"}</Text><Text style={styles.sellerHandle}>@{data.seller?.piUsername || product.piUsername || "pi-seller"}</Text></View></View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable disabled={submitting} onPress={() => void order()} style={[styles.buy, submitting && styles.disabled]}><Text style={styles.buyText}>{submitting ? "Working..." : "Create order with Pi"}</Text></Pressable>

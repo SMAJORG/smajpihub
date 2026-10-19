@@ -1,0 +1,65 @@
+name: Localization checks
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'mobile/**'
+      - 'package*.json'
+      - '.github/workflows/localization.yml'
+  push:
+    branches: [fix/multilingual-localization]
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:i18n
+      - run: npm run test:jobs
+      - run: npm run build
+      - run: npm run build:android-web
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:i18n:browser
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run test:i18n
+      - run: npm run test:transactions
+      - run: npm run test:institutions
+      - run: npm run test:validation
+      - run: npm run test:jobs
+      - run: npm run build
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run check:shared
+      - run: npm run mobile:typecheck
+      - run: npm run mobile:test:oauth

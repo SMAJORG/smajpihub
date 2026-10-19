@@ -1,8 +1,13 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider } from "@/providers/auth-provider";
+import { useEffect, useState } from 'react';
+import { localeReady } from '@/lib/i18n';
 
 export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => { void localeReady.then(() => setReady(true)); }, []);
+  if (!ready) return null;
   return <AuthProvider>
     <StatusBar style="dark" />
     <Stack screenOptions={{ headerShown: false }}>

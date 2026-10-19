@@ -9,7 +9,6 @@ import GlobalFeedbackCenter from "./components/GlobalFeedbackCenter";
 import useSliceReveal from "./hooks/useSliceReveal";
 import { FoodCartProvider } from "./contexts/FoodCartContext";
 import { HealthBookingProvider } from "./contexts/HealthBookingContext";
-import AutomaticPageTranslator from "./components/AutomaticPageTranslator";
 import PiBrowserHandoff from "./components/PiBrowserHandoff";
 import NativeWelcomeGate from "./components/NativeWelcomeGate";
 import NativeRuntimeBridge from "./components/NativeRuntimeBridge";
@@ -34,15 +33,6 @@ function App() {
         <NativeRuntimeBridge />
         <NativeAdsController />
         <NativeUpdatePrompt />
-        {!isAdminRoute ? (
-          <main className="desktop-access-block" aria-labelledby="desktop-access-title">
-            <div>
-              <span aria-hidden="true">SMAJ Pi Hub</span>
-              <h1 id="desktop-access-title">Mobile and tablet only</h1>
-              <p>Please open SMAJ Pi Hub on a mobile phone or tablet to continue.</p>
-            </div>
-          </main>
-        ) : null}
         <div className={"mobile-tablet-app" + (isAdminRoute ? " desktop-admin-app" : "")}>
           <FoodCartProvider>
             <HealthBookingProvider>
@@ -51,7 +41,6 @@ function App() {
           </FoodCartProvider>
           <AuthToast />
           <GlobalFeedbackCenter />
-          <AutomaticPageTranslator />
         </div>
         <PiBrowserHandoff />
         </NativeAppLockGate>

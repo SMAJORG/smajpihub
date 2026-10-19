@@ -1,0 +1,132 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "services": "Services",
+    "whitePaper": "White Paper",
+    "howItWorks": "How It Works",
+    "join": "Apply to Join",
+    "contact": "Contact",
+    "dashboard": "Go to Dashboard",
+    "login": "Login with Pi",
+    "signingIn": "Signing in..."
+  },
+  "home": {
+    "kicker": "SMAJ PI HUB",
+    "title": "The Economic Utility Layer for the Pi Ecosystem",
+    "description": "Buy, sell, work, and access real-world services through one verified Pi identity and one Pi wallet.",
+    "explore": "Explore Services",
+    "foundationKicker": "THE ECONOMIC FOUNDATION",
+    "foundationTitle": "Commerce and Work Come First",
+    "foundationText": "Buy, sell, and find work with Pi.",
+    "foundationCards": [
+      {
+        "title": "SMAJ Store",
+        "text": "Buy and sell products with Pi.",
+        "action": "Explore Store"
+      },
+      {
+        "title": "SMAJ PI Jobs",
+        "text": "Find work or hire talent.",
+        "action": "Explore Jobs"
+      }
+    ],
+    "howKicker": "HOW SMAJ WORKS",
+    "howTitle": "An Economic Loop Built Around Pi",
+    "howText": "Start with identity, exchange value, and return to a growing economy. Trust features are being developed alongside the marketplace.",
+    "steps": [
+      {
+        "title": "Pi Identity",
+        "text": "Sign in with Pi."
+      },
+      {
+        "title": "Discover",
+        "text": "Find products or work."
+      },
+      {
+        "title": "Transact",
+        "text": "Use the available Pi payment flow."
+      },
+      {
+        "title": "Complete Exchange",
+        "text": "Deliver goods or agreed work."
+      },
+      {
+        "title": "Build Trust",
+        "text": "Reputation tools are planned."
+      },
+      {
+        "title": "Repeat",
+        "text": "Return for your next opportunity."
+      }
+    ],
+    "trustKicker": "THE TRUST LAYER",
+    "trustTitle": "Built for Trusted Pi Commerce",
+    "trustText": "Pi sign-in is live. Additional protections are planned.",
+    "planned": "PLANNED",
+    "trustFeatures": [
+      {
+        "title": "Pi Identity Access",
+        "text": "Pi sign-in; seller reliability is not guaranteed."
+      },
+      {
+        "title": "Seller Verification",
+        "text": "Business and provider checks."
+      },
+      {
+        "title": "Ratings & Reputation",
+        "text": "Reviews and reputation tools."
+      },
+      {
+        "title": "Marketplace Safety",
+        "text": "Fraud prevention and monitoring."
+      },
+      {
+        "title": "Dispute Support",
+        "text": "Dispute tools; contact us for current support."
+      }
+    ],
+    "servicesKicker": "EXPANDING SERVICE ECOSYSTEM",
+    "servicesTitle": "A Broader Pi Economy, Built Over Time",
+    "servicesText": "Store and Jobs form the initial foundation. Explore the wider service architecture below, including live services and modules still in development. Status labels show current availability, not a simultaneous launch promise.",
+    "partnerKicker": "MERCHANTS AND PARTNERS",
+    "partnerTitle": "Help Build Practical Pi Utility",
+    "partnerText": "Bring products, skills, or a useful service to the ecosystem. Talk with the team about merchant participation and partnerships.",
+    "merchantAction": "Collaborate With Us",
+    "partnerAction": "Explore Partnerships",
+    "resourcesLabel": "White paper and frequently asked questions",
+    "readWhitePaper": "Read White Paper",
+    "whitePaperText": "Explore the strategy, phased roadmap, and long-term architecture.",
+    "faqTitle": "Questions About SMAJ?",
+    "faqText": "Learn about access, services, and using the hub.",
+    "finalTitle": "Take Part in the Pi Utility Economy"
+  },
+  "footer": {
+    "description": "Building a trusted economic utility layer for Pi commerce, work, and real-world services.",
+    "platform": "Platform",
+    "trust": "Trust & Safety",
+    "company": "Company",
+    "programs": "Programs",
+    "affiliate": "Affiliate Program",
+    "collaborate": "Collaborate With Us",
+    "partners": "Partners",
+    "community": "Community",
+    "developers": "Developers",
+    "keyServices": "Key Services",
+    "viewAll": "View All Services",
+    "social": "Social",
+    "poweredBy": "Powered By SMAJ Ecosystem",
+    "privacy": "Privacy Policy",
+    "terms": "Terms & Conditions",
+    "cookies": "Cookie Policy",
+    "reportAbuse": "Report Abuse",
+    "sellerAgreement": "Seller Agreement",
+    "rights": "All rights reserved.",
+    "scrollTop": "Scroll to top"
+  },
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "french": "Français"
+  }
+}
