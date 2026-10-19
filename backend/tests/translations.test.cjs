@@ -11,11 +11,11 @@ vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.Mo
 });
 const mount = exportsObject.default;
 const languages = [{ code: 'en', targets: ['en', 'fr', 'ar'] }, { code: 'fr', targets: ['fr', 'en'] }];
-function fixture({ url = 'https://provider.invalid', post, now } = {}) {
+function fixture({ url = 'https://provider.invalid', post, get, now, overrides } = {}) {
   const routes = {}, calls = [];
   const router = { post: (url, handler) => { routes[url] = handler; }, get: (url, handler) => { routes[url] = handler; } };
-  mount(router, { url, key: 'server-only-secret', now }, {
-    get: async () => ({ data: languages }),
+  mount(router, { url, key: 'server-only-secret', now, overrides }, {
+    get: async (...args) => get ? get(...args) : ({ data: languages }),
     post: async (...args) => { calls.push(args); return post ? post(...args) : { data: { translatedText: ['Bonjour'] } }; },
   });
   const invoke = async (body, route = '/batch', ip = 'test') => {
@@ -85,6 +85,16 @@ test('rate window resets after one minute', async () => {
 test('capabilities explicitly report missing languages', async () => {
   const { invoke } = fixture(); const res = await invoke({}, '/languages');
   assert.equal(res.body.status, 'available'); assert.deepEqual(Array.from(res.body.sourcesByTarget.fr), ['en']); assert.equal(res.body.sourcesByTarget.ha.length, 0);
+});
+test('legacy capability discovery deduplicates URLs and respects its one-slot budget', async () => {
+  let active = 0, maximum = 0, count = 0;
+  const { invoke } = fixture({ overrides: { ar: 'https://ar.invalid', sw: 'https://sw.invalid', zh: 'https://zh.invalid' }, get: async () => {
+    active++; count++; maximum = Math.max(maximum, active);
+    await new Promise(resolve => setTimeout(resolve, 1));
+    active--; return { data: languages };
+  } });
+  await invoke({}, '/languages');
+  assert.equal(count, 4); assert.equal(maximum, 1);
 });
 test('global concurrency limit rejects excess work and releases failed slots', async () => {
   let release;

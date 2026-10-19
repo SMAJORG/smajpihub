@@ -47,13 +47,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
       - run: npm run test:i18n
       - run: npm run test:transactions
       - run: npm run test:institutions
-      - run: npm run test:validation
       - run: npm run test:jobs
-      - run: npm run build
+      - name: Existing storage/session validation contract
+        run: npm run test:validation
   native:
     runs-on: ubuntu-latest
     timeout-minutes: 20

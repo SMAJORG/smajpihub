@@ -45,17 +45,21 @@ export const mountTranslationEndpoints = (router: Router, configuration: Configu
     active++;
     try {
       const pairs: Record<string, string[]> = {};
-      const probes = new Map<string, Promise<Language[]>>();
+      const probes = new Map<string, Language[]>();
+      const urls = new Set<string>();
       for (const target of LANGUAGES) {
         try {
-          const url = baseUrl(target);
-          if (!probes.has(url)) probes.set(url, discover(url).catch(() => []));
+          urls.add(baseUrl(target));
         } catch { /* Unconfigured targets are explicitly unavailable. */ }
       }
-      await Promise.all(probes.values());
+      // A capability request holds one global slot: probe its distinct legacy
+      // providers sequentially so it never multiplies that slot into four calls.
+      for (const url of urls) {
+        try { probes.set(url, await discover(url)); } catch { probes.set(url, []); }
+      }
       for (const target of LANGUAGES) {
         try {
-          const supported = await probes.get(baseUrl(target)) || [];
+          const supported = probes.get(baseUrl(target)) || [];
           pairs[target] = supported.filter(language => language.targets.includes(target) && language.code !== target).map(language => language.code);
         } catch { pairs[target] = []; }
       }
