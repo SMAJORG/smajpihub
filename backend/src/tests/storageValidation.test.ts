@@ -1,4 +1,5 @@
 import assert from "assert";
+import axios from "axios";
 
 const base64Png = "data:image/png;base64,iVBORw0KGgo=";
 
@@ -45,6 +46,16 @@ const main = async () => {
     role: "seller",
   });
   assert.deepEqual(sessionUser, { userId: "user-object-id", piUsername: "seller", role: "seller" });
+  assert.equal(auth.minimalSessionUser({ _id: "id", uid: "pi-uid", role: "buyer" }).uid, "pi-uid");
+  assert.equal("uid" in auth.minimalSessionUser({ _id: "id", uid: null }), false);
+
+  const originalAdapter = axios.defaults.adapter;
+  let verifiedUid = "pi-uid";
+  axios.defaults.adapter = async config => {
+    assert.equal(config.url, "/v2/me");
+    assert.equal(config.headers.Authorization, "Bearer token-123");
+    return { data: { uid: verifiedUid }, status: 200, statusText: "OK", headers: {}, config };
+  };
 
   const request: any = {
     session: {},
@@ -67,6 +78,9 @@ const main = async () => {
   const resolvedUser = await auth.resolveCurrentUser(request);
   assert.equal(resolvedUser?.uid, "pi-uid");
   assert.equal(request.session.user, undefined);
+  verifiedUid = "different-user";
+  assert.equal(await auth.resolveCurrentUser({ ...request, session: {} }), null);
+  axios.defaults.adapter = originalAdapter;
 
   global.fetch = originalFetch;
   console.log("storage validation tests passed");

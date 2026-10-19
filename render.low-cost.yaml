@@ -1,0 +1,34 @@
+# PROPOSAL ONLY: applying this paid Starter plan requires owner approval.
+# Existing services/data must not be deleted when migrating this blueprint.
+# Interface localization ships as static assets; no model services are needed.
+services:
+  - type: web
+    name: smajpihub
+    runtime: docker
+    plan: starter
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: PI_NETWORK
+        sync: false
+      # Dynamic translation is disabled until an existing no-cost provider is
+      # approved and configured. No localhost or public-service default.
+      - key: TRANSLATION_API_URL
+        value: ""
+      - key: TRANSLATION_API_KEY
+        sync: false
+  - type: web
+    name: sph-bot
+    runtime: node
+    plan: free
+    rootDir: sph-bot
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeployTrigger: "off"
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false

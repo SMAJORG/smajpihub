@@ -1,6 +1,6 @@
 export type AuthSessionUser = {
   userId: string;
-  uid: string;
+  uid?: string;
   piUsername: string;
   role: "buyer" | "seller" | "admin";
 };

@@ -1,3 +1,6 @@
+# Legacy deployment inventory retained for review. Interface localization no
+# longer calls these model services. See render.low-cost.yaml and
+# docs/LOCALIZATION.md before approving any service migration or deletion.
 services:
   - type: web
     name: sph-bot

@@ -1,7 +1,8 @@
+import { Text, TextInput, View } from "@/components/localized";
 import { colors, radii, spacing } from "@smaj/design-tokens";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/lib/api";
 import type { MobileProduct } from "@/types/marketplace";
@@ -67,7 +68,7 @@ export default function NativeStoreScreen() {
           return <Pressable key={id} style={styles.card} disabled={!id} onPress={() => router.push({ pathname: "/store/product/[id]", params: { id } })}>
             <View style={styles.imageBox}>{product.image ? <Image source={{ uri: product.image }} style={styles.image} resizeMode="cover"/> : <Text style={styles.imageFallback}>ST</Text>}</View>
             <Text numberOfLines={2} style={styles.cardTitle}>{productTitle(product)}</Text>
-            <Text numberOfLines={1} style={styles.seller}>{product.sellerName || product.piUsername || "SMAJ seller"}</Text>
+            <Text original numberOfLines={1} style={styles.seller}>{product.sellerName || product.piUsername || "SMAJ seller"}</Text>
             <Text style={styles.price}>π {Number(product.pricePi || 0).toFixed(4)}</Text>
           </Pressable>;
         })}

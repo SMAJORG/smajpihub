@@ -1,0 +1,21 @@
+/* Flex/grid inherit document direction. Keep numbers, URLs and media controls
+   readable without reversing icons, charts or the entire application. */
+html[dir="rtl"] body { text-align: start; }
+html[dir="rtl"] :is(input, textarea) { text-align: start; }
+html[dir="rtl"] :is(input[type="email"], input[type="url"], input[type="tel"], input[type="number"]) {
+  direction: ltr;
+  text-align: end;
+}
+html[dir="rtl"] :is(video, audio, canvas, .recharts-wrapper) { direction: ltr; }
+html[dir="rtl"] :is([data-testid="ArrowBackOutlinedIcon"], [data-testid="ArrowBackIosNewOutlinedIcon"], [data-testid="ChevronRightOutlinedIcon"], [data-testid="KeyboardArrowRightIcon"]) { transform: scaleX(-1); }
+.language-choice-dialog { max-width: min(440px, calc(100vw - 24px)); }
+.language-choice-dialog select { max-width: 100%; min-width: 0; }
+html[dir="rtl"] .language-choice-close { right: auto; left: 16px; }
+.dynamic-translation { white-space: pre-wrap; overflow-wrap: anywhere; }
+.dynamic-translation > button { margin-inline-start: .5rem; font: inherit; font-size: .8em; cursor: pointer; }
+.dynamic-translation > small { display: block; margin-block-start: .4rem; }
+/* The same localized application is available on desktop and mobile. */
+@media (min-width: 1024px) {
+  body .mobile-tablet-app { display: block; }
+  html body { overflow: auto; }
+}

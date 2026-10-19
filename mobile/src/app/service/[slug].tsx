@@ -1,7 +1,8 @@
+import { Text, View } from "@/components/localized";
 import { colors, radii, spacing } from "@smaj/design-tokens";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusPill } from "@/components/status-pill";
 import { config } from "@/constants/config";

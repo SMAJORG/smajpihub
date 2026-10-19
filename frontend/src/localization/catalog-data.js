@@ -1,0 +1,11 @@
+import en from '../locales/en.json';
+import fr from '../locales/fr.json';
+import ar from '../locales/ar.json';
+import ha from '../locales/ha.json';
+import es from '../locales/es.json';
+import pt from '../locales/pt.json';
+import zh from '../locales/zh.json';
+import sw from '../locales/sw.json';
+import hi from '../locales/hi.json';
+import tr from '../locales/tr.json';
+export const catalogs = { en, fr, ar, ha, es, pt, zh, sw, hi, tr };

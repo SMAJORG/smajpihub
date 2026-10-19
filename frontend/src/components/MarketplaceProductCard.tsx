@@ -173,7 +173,7 @@ const MarketplaceProductCard = ({
         </div>
 
         <div className="product-card-body storefront-product-body">
-          <h2>{product.title}</h2>
+          <h2 translate="no" dir="auto">{product.title}</h2>
 
           <div className="storefront-product-rating">
             <span

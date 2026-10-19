@@ -1,98 +1,126 @@
-import axios from "axios";
-import type { Router } from "express";
-import env from "../environments";
+import axios from 'axios';
+import { createHash } from 'crypto';
+import type { Router, Response } from 'express';
+import env from '../environments';
 
-const translationCache = new Map<string, string>();
-const requestWindows = new Map<string, { startedAt: number; count: number }>();
-const MAX_TEXTS = 20;
-const MAX_TEXT_LENGTH = 1_000;
-const MAX_REQUESTS_PER_MINUTE = 60;
-const MAX_CACHE_ENTRIES = 3_000;
-const REQUEST_WINDOW_TTL_MS = 2 * 60_000;
-const SUPPORTED_TARGETS = new Set(["fr", "sw", "ar", "zh"]);
-const activeProviderTargets = new Set<string>();
-let lastWindowCleanupAt = 0;
+const LANGUAGES = new Set(['en', 'fr', 'ar', 'ha', 'es', 'pt', 'zh', 'sw', 'hi', 'tr']);
+type Language = { code: string; targets: string[] };
+type Provider = { get: typeof axios.get; post: typeof axios.post };
+type Configuration = { url: string; key: string; overrides?: Record<string, string>; now?: () => number };
+class TranslationError extends Error {
+  constructor(public status: number, public code: string) { super(code); }
+}
 
-const getProviderBaseUrl = (target: string) => {
-  const providers: Record<string, string> = {
-    ar: env.translation_api_url_ar,
-    sw: env.translation_api_url_sw,
-    zh: env.translation_api_url_zh,
+export const mountTranslationEndpoints = (router: Router, configuration: Configuration = {
+  url: env.translation_api_url, key: env.translation_api_key,
+  overrides: { ar: env.translation_api_url_ar, sw: env.translation_api_url_sw, zh: env.translation_api_url_zh },
+}, provider: Provider = axios) => {
+  const now = configuration.now || Date.now;
+  const cache = new Map<string, { text: string; expires: number }>();
+  const capabilities = new Map<string, { languages: Language[]; expires: number }>();
+  const windows = new Map<string, { start: number; count: number }>();
+  let active = 0;
+  let lastCleanup = 0;
+  const baseUrl = (target: string) => {
+    const value = (configuration.overrides?.[target] || configuration.url).replace(/\/+$/, '');
+    if (!value) throw new TranslationError(503, 'translation_not_configured');
+    if (!/^https?:\/\//i.test(value)) throw new TranslationError(503, 'translation_invalid_configuration');
+    return value;
   };
-  const configured = (providers[target] || env.translation_api_url).replace(/\/+$/, "");
-  return /^https?:\/\//i.test(configured) ? configured : `http://${configured}`;
-};
-
-const mountTranslationEndpoints = (router: Router) => {
-  router.post("/batch", async (req, res) => {
-    const client = req.ip || req.socket.remoteAddress || "unknown";
-    const now = Date.now();
-    if (now - lastWindowCleanupAt >= REQUEST_WINDOW_TTL_MS) {
-      for (const [key, value] of requestWindows) {
-        if (now - value.startedAt >= REQUEST_WINDOW_TTL_MS) requestWindows.delete(key);
-      }
-      lastWindowCleanupAt = now;
-    }
-    const window = requestWindows.get(client);
-    const usage = !window || now - window.startedAt >= 60_000 ? { startedAt: now, count: 1 } : { ...window, count: window.count + 1 };
-    requestWindows.set(client, usage);
-    if (usage.count > MAX_REQUESTS_PER_MINUTE) {
-      res.status(429).json({ message: "Translation request limit reached. Please try again shortly." });
-      return;
-    }
-
-    const texts = Array.isArray(req.body?.texts) ? req.body.texts : [];
-    const target = String(req.body?.target || "").toLowerCase();
-
-    if (!SUPPORTED_TARGETS.has(target) || !texts.length || texts.length > MAX_TEXTS) {
-      res.status(400).json({ message: `Provide 1-${MAX_TEXTS} texts and a valid non-English target language code.` });
-      return;
-    }
-
-    const normalized: string[] = texts.map((text: unknown) => String(text || "").trim());
-    if (normalized.some((text: string) => !text || text.length > MAX_TEXT_LENGTH)) {
-      res.status(400).json({ message: `Each text must contain 1-${MAX_TEXT_LENGTH} characters.` });
-      return;
-    }
-
-    const missing = [...new Set(normalized.filter((text: string) => !translationCache.has(`${target}:${text}`)))];
-
-    if (missing.length && activeProviderTargets.has(target)) {
-      res.setHeader("Retry-After", "2");
-      res.status(503).json({ message: "Translation service is busy. Please retry shortly." });
-      return;
-    }
-
+  const discover = async (url: string): Promise<Language[]> => {
+    const saved = capabilities.get(url);
+    if (saved && saved.expires > now()) return saved.languages;
+    const response = await provider.get(`${url}/languages`, { timeout: 5000, maxContentLength: 65536, maxRedirects: 0 });
+    if (!Array.isArray(response.data) || response.data.some((item: Language) => typeof item?.code !== 'string' || !Array.isArray(item.targets) || item.targets.some(target => typeof target !== 'string'))) throw new TranslationError(502, 'translation_invalid_capabilities');
+    capabilities.set(url, { languages: response.data, expires: now() + 600000 });
+    return response.data;
+  };
+  const failure = (res: Response, error: unknown) => {
+    // No provider URLs, secrets, request text, or axios configuration in logs/errors.
+    if (error instanceof TranslationError) return res.status(error.status).json({ status: 'unavailable', code: error.code });
+    return res.status(502).json({ status: 'unavailable', code: 'translation_provider_unavailable' });
+  };
+  router.get('/languages', async (_req, res) => {
+    if (active >= 2) { res.status(503).json({ status: 'unavailable', code: 'translation_busy' }); return; }
+    active++;
     try {
+      const pairs: Record<string, string[]> = {};
+      const probes = new Map<string, Language[]>();
+      const urls = new Set<string>();
+      for (const target of LANGUAGES) {
+        try {
+          urls.add(baseUrl(target));
+        } catch { /* Unconfigured targets are explicitly unavailable. */ }
+      }
+      // A capability request holds one global slot: probe its distinct legacy
+      // providers sequentially so it never multiplies that slot into four calls.
+      for (const url of urls) {
+        try { probes.set(url, await discover(url)); } catch { probes.set(url, []); }
+      }
+      for (const target of LANGUAGES) {
+        try {
+          const supported = probes.get(baseUrl(target)) || [];
+          pairs[target] = supported.filter(language => language.targets.includes(target) && language.code !== target).map(language => language.code);
+        } catch { pairs[target] = []; }
+      }
+      res.json({ status: Object.values(pairs).some(sources => sources.length) ? 'available' : 'unavailable', sourcesByTarget: pairs });
+    } finally { active--; }
+  });
+  router.post('/batch', async (req, res) => {
+    const timestamp = now();
+    if (timestamp - lastCleanup >= 60000) {
+      for (const [ip, window] of windows) if (timestamp - window.start >= 60000) windows.delete(ip);
+      lastCleanup = timestamp;
+    }
+    const client = req.ip || req.socket.remoteAddress || 'unknown';
+    const previous = windows.get(client);
+    const usage = !previous || timestamp - previous.start >= 60000 ? { start: timestamp, count: 0 } : previous;
+    usage.count++;
+    if (usage.count > 30 || (!windows.has(client) && windows.size >= 10000)) {
+      res.setHeader('Retry-After', '60');
+      res.status(429).json({ status: 'unavailable', code: 'translation_rate_limited' }); return;
+    }
+    windows.set(client, usage);
+    const texts: unknown = req.body?.texts;
+    const target = typeof req.body?.target === 'string' ? req.body.target.toLowerCase() : '';
+    const source = typeof req.body?.source === 'string' ? req.body.source.toLowerCase() : 'auto';
+    if (!LANGUAGES.has(target) || (source !== 'auto' && !LANGUAGES.has(source)) || source === target || !Array.isArray(texts) || !texts.length || texts.length > 20 || texts.some(text => typeof text !== 'string' || !text.trim() || text.length > 1000)) {
+      res.status(400).json({ status: 'unavailable', code: 'translation_invalid_request' }); return;
+    }
+    const input = texts as string[];
+    let slot = false;
+    try {
+      const url = baseUrl(target);
+      const keyFor = (text: string) => createHash('sha256').update(JSON.stringify([url, source, target, text])).digest('hex');
+      for (const [key, entry] of cache) if (entry.expires <= timestamp) cache.delete(key);
+      const missing = [...new Set(input.filter(text => !cache.has(keyFor(text))))];
       if (missing.length) {
-        activeProviderTargets.add(target);
-        const response = await axios.post(
-          `${getProviderBaseUrl(target)}/translate`,
-          {
-            q: missing,
-            source: "auto",
-            target,
-            format: "text",
-            ...(env.translation_api_key ? { api_key: env.translation_api_key } : {}),
-          },
-          { timeout: 30_000 },
-        );
-        const results = Array.isArray(response.data) ? response.data : [response.data];
+        if (active >= 2) throw new TranslationError(503, 'translation_busy');
+        active++; slot = true;
+        const languages = await discover(url);
+        const supported = source === 'auto'
+          ? languages.some(language => language.code !== target && language.targets.includes(target))
+          : languages.some(language => language.code === source && language.targets.includes(target));
+        if (!supported) throw new TranslationError(422, 'translation_unsupported_pair');
+        const response = await provider.post(`${url}/translate`, {
+          q: missing, source, target, format: 'text',
+          ...(configuration.key ? { api_key: configuration.key } : {}),
+        }, { timeout: 8000, maxContentLength: 262144, maxRedirects: 0 });
+        // LibreTranslate returns { translatedText: string[] } for q arrays.
+        // Older compatible providers return [{ translatedText: string }].
+        const data = response.data;
+        const results = Array.isArray(data?.translatedText) ? data.translatedText : Array.isArray(data) ? data.map(item => item?.translatedText) : missing.length === 1 ? [data?.translatedText] : [];
+        if (results.length !== missing.length || results.some((text: unknown) => typeof text !== 'string' || !text.trim() || text.length > 10000)) throw new TranslationError(502, 'translation_invalid_response');
+        if (results.some((text: string, index: number) => text.trim() === missing[index].trim())) throw new TranslationError(422, 'translation_unchanged');
+        // Validate the whole batch before caching any result.
         missing.forEach((text, index) => {
-          const translated = String(results[index]?.translatedText || text).trim();
-          translationCache.set(`${target}:${text}`, translated || text);
-          if (translationCache.size > MAX_CACHE_ENTRIES) translationCache.delete(translationCache.keys().next().value as string);
+          cache.set(keyFor(text), { text: results[index], expires: now() + 300000 });
+          if (cache.size > 3000) cache.delete(cache.keys().next().value!);
         });
       }
-
-      res.json({ translations: normalized.map((text: string) => translationCache.get(`${target}:${text}`) || text) });
-    } catch (error) {
-      console.error("[translation] provider request failed", axios.isAxiosError(error) ? error.message : error);
-      res.status(502).json({ message: "Automatic translation is temporarily unavailable." });
-    } finally {
-      if (missing.length) activeProviderTargets.delete(target);
-    }
+      res.json({ status: 'translated', source, target, translations: input.map(text => cache.get(keyFor(text))!.text) });
+    } catch (error) { failure(res, error); }
+    finally { if (slot) active--; }
   });
 };
-
 export default mountTranslationEndpoints;

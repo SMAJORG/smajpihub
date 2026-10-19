@@ -5,8 +5,10 @@ import legacy from "@vitejs/plugin-legacy";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 const productionApiBaseURL = "https://smajpihub.onrender.com";
 
 // https://vite.dev/config/
@@ -48,7 +50,7 @@ export default defineConfig(({ mode }) => {
     base: "/",
     define: { "import.meta.env.VITE_APP_BUILD_ID": JSON.stringify(appBuildId) },
     plugins: [
-      react(),
+      react({ jsxImportSource: "@smaj/localization", babel: { plugins: [require('./scripts/localization/protect-content.cjs')] } }),
       tailwindcss(),
       {
         name: "app-version-manifest",
@@ -105,6 +107,7 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
+        "@smaj/localization": path.resolve(rootDir, "src/localization"),
         "@mui/styled-engine": path.resolve(rootDir, "node_modules/@mui/styled-engine-sc"),
       },
     },

@@ -1,7 +1,8 @@
+import { Text, TextInput, View } from "@/components/localized";
 import {colors,radii,spacing} from "@smaj/design-tokens";
 import {useFocusEffect,useRouter} from "expo-router";
 import {useCallback,useMemo,useState} from "react";
-import {ActivityIndicator,Pressable,RefreshControl,ScrollView,StyleSheet,Text,TextInput,View} from "react-native";
+import {ActivityIndicator,Pressable,RefreshControl,ScrollView,StyleSheet} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
 import {api} from "@/lib/api";import {useAuth} from "@/providers/auth-provider";import type {Conversation} from "@/types/messaging";
 export default function Messages(){const router=useRouter(),{user,beginPiSignIn}=useAuth();const [all,setAll]=useState<Conversation[]>([]),[q,setQ]=useState(""),[arch,setArch]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
