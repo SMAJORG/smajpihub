@@ -109,7 +109,6 @@ import FoodDeliveryPage from "./pages/food-delivery/FoodDeliveryPage";
 import RestaurantDetailPage from "./pages/food-delivery/RestaurantDetailPage";
 import CartPage from "./pages/food-delivery/CartPage";
 import FoodDealsOrdersPage from "./pages/food-delivery/FoodDealsOrdersPage";
-import HealthPage from "./pages/health/HealthPage";
 import ProviderDetailPage from "./pages/health/ProviderDetailPage";
 import BookingPage from "./pages/health/BookingPage";
 import HousingPage, { type HousingPageKind } from "./pages/housing/HousingPage";
@@ -119,6 +118,12 @@ import EnergyPage, { type EnergyPageKind } from "./pages/energy/EnergyPage";
 import CharityPage, { type CharityPageKind } from "./pages/charity/CharityPage";
 import SwapPage, { type SwapPageKind } from "./pages/swap/SwapPage";
 import HealthAppointmentsPage from "./pages/health/HealthAppointmentsPage";
+import CareRouteHomePage from "./pages/careroute/CareRouteHomePage";
+import CareRouteRequestPage from "./pages/careroute/CareRouteRequestPage";
+import CareRouteHospitalsPage from "./pages/careroute/CareRouteHospitalsPage";
+import CareRouteTrackPage from "./pages/careroute/CareRouteTrackPage";
+import CareRouteHospitalDashboard from "./pages/careroute/CareRouteHospitalDashboard";
+import CareRouteMyRequestsPage from "./pages/careroute/CareRouteMyRequestsPage";
 
 // eslint-disable-next-line react-refresh/only-export-components
 const LegacyProductRedirect = () => {
@@ -331,7 +336,7 @@ export const router = createBrowserRouter([
       ) : platform.routeSegment === "food-delivery" ? (
         <FoodDeliveryPage />
       ) : platform.routeSegment === "health" ? (
-        <HealthPage />
+        <Navigate to="/careroute" replace />
       ) : platform.routeSegment === "housing" ? (
         <HousingPage />
       ) : platform.routeSegment === "events" ? (
@@ -906,7 +911,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/services/health/providers",
-    element: <HealthPage />,
+    element: <Navigate to="/careroute/hospitals" replace />,
   },
   {
     path: "/services/health/appointments",
@@ -925,7 +930,7 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <PrivateLayout>
-          <HealthPage />
+          <CareRouteHomePage embedded />
         </PrivateLayout>
       </ProtectedRoute>
     ),
@@ -945,6 +950,46 @@ export const router = createBrowserRouter([
   {
     path: "/app/services/health/*",
     element: <Navigate to="/services/health" replace />,
+  },
+  {
+    path: "/careroute",
+    element: <CareRouteHomePage />,
+  },
+  {
+    path: "/careroute/request",
+    element: <CareRouteRequestPage />,
+  },
+  {
+    path: "/careroute/hospitals",
+    element: <CareRouteHospitalsPage />,
+  },
+  {
+    path: "/careroute/track",
+    element: <CareRouteTrackPage />,
+  },
+  {
+    path: "/careroute/track/:requestId",
+    element: <CareRouteTrackPage />,
+  },
+  {
+    path: "/careroute/my-requests",
+    element: <CareRouteMyRequestsPage />,
+  },
+  {
+    path: "/careroute/hospital-login",
+    element: <Navigate to="/careroute/hospital-dashboard" replace />,
+  },
+  {
+    path: "/careroute/hospital-register",
+    element: <Navigate to="/careroute/hospital-dashboard" replace />,
+  },
+  {
+    path: "/careroute/hospital-dashboard",
+    element: <CareRouteHospitalDashboard />,
+  },
+  {
+    path: "/services/health/hospital-dashboard",
+    element: <CareRouteHospitalDashboard />,
   },
   {
     path: "/app/services/stream/movies",

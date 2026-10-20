@@ -1,9 +1,9 @@
 import { axiosClient } from "./axiosClient";
 import type { BookingDetails, HealthCategory, HealthProvider, HealthService } from "../types/health";
 
-const FALLBACK_CATEGORIES: HealthCategory[] = ["All", "General Practice", "Diagnostics", "Pharmacy", "Therapy"];
+export const FALLBACK_CATEGORIES: HealthCategory[] = ["All", "General Practice", "Diagnostics", "Pharmacy", "Therapy"];
 
-const FALLBACK_PROVIDERS: HealthProvider[] = [
+export const FALLBACK_PROVIDERS: HealthProvider[] = [
   {
     id: "smaj-health-clinic",
     name: "SMAJ Health Clinic",
@@ -135,9 +135,9 @@ const FALLBACK_SERVICES: Record<string, HealthService[]> = {
 
 export const getHealthCategories = async (): Promise<HealthCategory[]> => {
   try {
-    const response = await axiosClient.get<{ categories: HealthCategory[] }>("/health/categories");
-    const data = response.data.categories;
-    return data.length ? data : FALLBACK_CATEGORIES;
+    const response = await axiosClient.get<{ categories: HealthCategory[] }>("/health/categories", { timeout: 2000 });
+    const data = response.data?.categories;
+    return Array.isArray(data) && data.length ? data : FALLBACK_CATEGORIES;
   } catch {
     return FALLBACK_CATEGORIES;
   }
@@ -145,9 +145,9 @@ export const getHealthCategories = async (): Promise<HealthCategory[]> => {
 
 export const getHealthProviders = async (params?: { category?: string; query?: string }): Promise<HealthProvider[]> => {
   try {
-    const response = await axiosClient.get<{ providers: HealthProvider[] }>("/health/providers", { params });
-    const data = response.data.providers;
-    return data.length ? data : FALLBACK_PROVIDERS;
+    const response = await axiosClient.get<{ providers: HealthProvider[] }>("/health/providers", { params, timeout: 2000 });
+    const data = response.data?.providers;
+    return Array.isArray(data) && data.length ? data : FALLBACK_PROVIDERS;
   } catch {
     return FALLBACK_PROVIDERS;
   }
@@ -155,8 +155,8 @@ export const getHealthProviders = async (params?: { category?: string; query?: s
 
 export const getHealthProvider = async (id: string): Promise<HealthProvider | undefined> => {
   try {
-    const response = await axiosClient.get<{ provider: HealthProvider }>(`/health/providers/${encodeURIComponent(id)}`);
-    return response.data.provider;
+    const response = await axiosClient.get<{ provider: HealthProvider }>(`/health/providers/${encodeURIComponent(id)}`, { timeout: 2000 });
+    return response.data?.provider || FALLBACK_PROVIDERS.find(provider => provider.id === id);
   } catch {
     return FALLBACK_PROVIDERS.find(provider => provider.id === id);
   }
@@ -165,10 +165,11 @@ export const getHealthProvider = async (id: string): Promise<HealthProvider | un
 export const getHealthServices = async (providerId: string): Promise<HealthService[]> => {
   try {
     const response = await axiosClient.get<{ services: HealthService[] }>(
-      `/health/providers/${encodeURIComponent(providerId)}/services`
+      `/health/providers/${encodeURIComponent(providerId)}/services`,
+      { timeout: 2000 }
     );
-    const data = response.data.services;
-    return data.length ? data : (FALLBACK_SERVICES[providerId] ?? []);
+    const data = response.data?.services;
+    return Array.isArray(data) && data.length ? data : (FALLBACK_SERVICES[providerId] ?? []);
   } catch {
     return FALLBACK_SERVICES[providerId] ?? [];
   }

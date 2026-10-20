@@ -37,6 +37,7 @@ import mountHeroBannerEndpoints from "./handlers/heroBanners";
 import mountAmbassadorEndpoints from "./handlers/ambassadors";
 import mountEducationEndpoints from "./handlers/education";
 import mountCourseEndpoints from "./handlers/courses";
+import mountCareRouteEndpoints from "./handlers/careroute";
 import { createMemoryCollections } from "./services/memoryDatabase";
 import { validateAndTouchDeviceSession } from "./services/deviceSessions";
 
@@ -339,6 +340,10 @@ app.use("/education", educationRouter);
 const coursesRouter = express.Router();
 mountCourseEndpoints(coursesRouter);
 app.use(coursesRouter);
+
+const carerouteRouter = express.Router();
+mountCareRouteEndpoints(carerouteRouter);
+app.use(carerouteRouter);
 
 app.get("/health", async (_, res) => {
   const ready = Boolean(
