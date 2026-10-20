@@ -269,4 +269,7 @@ export const createMemoryCollections = () => ({
   quizCollection: new MemoryCollection(),
   quizSubmissionCollection: new MemoryCollection(),
   certificateCollection: new MemoryCollection(),
+  careRouteHospitalCollection: new MemoryCollection(),
+  careRouteRequestCollection: new MemoryCollection(),
+  careRouteStaffCollection: new MemoryCollection(),
 });

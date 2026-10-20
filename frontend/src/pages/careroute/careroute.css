@@ -1,0 +1,924 @@
+/* ======================================================================
+   SMAJ CareRoute - Scoped Stylesheet
+   CRITICAL: ZERO global CSS pollution. All rules MUST be scoped
+   under .careroute-portal or .careroute-page.
+   ====================================================================== */
+
+.careroute-portal {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.careroute-portal *,
+.careroute-portal *::before,
+.careroute-portal *::after {
+  box-sizing: border-box;
+}
+
+/* CareRoute Portal Header */
+.careroute-portal .careroute-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.careroute-portal .careroute-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.careroute-portal .careroute-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.careroute-portal .careroute-back-hub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  transition: all 0.15s ease;
+}
+
+.careroute-portal .careroute-back-hub:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.careroute-portal .careroute-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #0f172a;
+}
+
+.careroute-portal .careroute-brand-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);
+}
+
+.careroute-portal .careroute-brand-text {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.careroute-portal .careroute-brand-text span {
+  color: #dc2626;
+}
+
+.careroute-portal .careroute-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.careroute-portal .careroute-nav a {
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.careroute-portal .careroute-nav a:hover,
+.careroute-portal .careroute-nav a.active {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.careroute-portal .careroute-emergency-chip {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+}
+
+.careroute-portal .careroute-emergency-chip:hover {
+  background: #b91c1c !important;
+}
+
+/* CareRoute Main Container */
+.careroute-portal .careroute-main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+/* Emergency Broadcast Banner */
+.careroute-portal .careroute-alert-banner {
+  background: #fef2f2;
+  border-left: 4px solid #dc2626;
+  padding: 0.85rem 1.25rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.careroute-portal .careroute-alert-text {
+  font-size: 0.875rem;
+  color: #991b1b;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.careroute-portal .careroute-alert-badge {
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Hero Section */
+.careroute-portal .careroute-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  padding: 2.5rem 2rem;
+  border-radius: 16px;
+  margin-bottom: 2rem;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15);
+}
+
+.careroute-portal .careroute-hero h1 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.75rem;
+  color: #ffffff;
+}
+
+.careroute-portal .careroute-hero p {
+  font-size: 1.05rem;
+  color: #cbd5e1;
+  max-width: 650px;
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+.careroute-portal .careroute-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
+/* Buttons */
+.careroute-portal .careroute-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #dc2626;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
+}
+
+.careroute-portal .careroute-btn-primary:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.careroute-portal .careroute-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.careroute-portal .careroute-btn-secondary:hover {
+  background: #f1f5f9;
+}
+
+.careroute-portal .careroute-btn-dark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #334155;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.careroute-portal .careroute-btn-dark:hover {
+  background: #475569;
+}
+
+/* CareRoute Card & Grids */
+.careroute-portal .careroute-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.careroute-portal .careroute-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.careroute-portal .careroute-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.careroute-portal .careroute-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.careroute-portal .careroute-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* Status Badges */
+.careroute-portal .careroute-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.careroute-portal .careroute-badge-active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.careroute-portal .careroute-badge-diverting {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.careroute-portal .careroute-badge-inactive {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.careroute-portal .careroute-badge-critical {
+  background: #fee2e2;
+  color: #b91c1c;
+  animation: careroute-pulse 1.8s infinite;
+}
+
+.careroute-portal .careroute-badge-urgent {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.careroute-portal .careroute-badge-moderate {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.careroute-portal .careroute-badge-low {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.careroute-portal .careroute-badge-submitted {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.careroute-portal .careroute-badge-dispatched {
+  background: #fef08a;
+  color: #854d0e;
+}
+
+.careroute-portal .careroute-badge-accepted {
+  background: #bbf7d0;
+  color: #166534;
+}
+
+.careroute-portal .careroute-badge-completed {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.careroute-portal .careroute-badge-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.careroute-portal .careroute-badge-closed {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+@keyframes careroute-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+/* Forms */
+.careroute-portal .careroute-form-group {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.careroute-portal .careroute-form-group label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.careroute-portal .careroute-form-group input,
+.careroute-portal .careroute-form-group select,
+.careroute-portal .careroute-form-group textarea {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.15s ease;
+}
+
+.careroute-portal .careroute-form-group input:focus,
+.careroute-portal .careroute-form-group select:focus,
+.careroute-portal .careroute-form-group textarea:focus {
+  outline: none;
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.careroute-portal input[type="number"] {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Hospital Dashboard Specific */
+.careroute-portal .careroute-dashboard-header {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.careroute-portal .careroute-hospital-info h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+  color: #0f172a;
+}
+
+.careroute-portal .careroute-hospital-info p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.careroute-portal .careroute-intake-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8fafc;
+  padding: 0.35rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.careroute-portal .careroute-intake-btn {
+  border: none;
+  background: transparent;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.825rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.15s ease;
+}
+
+.careroute-portal .careroute-intake-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.careroute-portal .careroute-intake-btn.active.status-active {
+  color: #15803d;
+}
+
+.careroute-portal .careroute-intake-btn.active.status-diverting {
+  color: #b45309;
+}
+
+.careroute-portal .careroute-intake-btn.active.status-inactive {
+  color: #64748b;
+}
+
+/* Siren Audio Banner (Inside CareRoute Hospital Dashboard ONLY) */
+.careroute-portal .careroute-siren-alert {
+  background: #fee2e2;
+  border: 2px solid #ef4444;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  animation: careroute-siren-flash 1s infinite alternate;
+}
+
+@keyframes careroute-siren-flash {
+  from { background-color: #fee2e2; border-color: #ef4444; }
+  to { background-color: #fecaca; border-color: #dc2626; }
+}
+
+.careroute-portal .careroute-siren-badge {
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  letter-spacing: 0.05em;
+}
+
+.careroute-portal .careroute-siren-mute-btn {
+  border: 1px solid #dc2626;
+  background: #ffffff;
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.careroute-portal .careroute-siren-mute-btn:hover {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* Request Table / Queue */
+.careroute-portal .careroute-table-wrapper {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow-x: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.careroute-portal .careroute-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.careroute-portal .careroute-table th {
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.careroute-portal .careroute-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  vertical-align: middle;
+}
+
+.careroute-portal .careroute-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* Action Dropdown / Buttons */
+.careroute-portal .careroute-action-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.careroute-portal .careroute-action-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.careroute-portal .careroute-action-btn:hover {
+  background: #f1f5f9;
+}
+
+.careroute-portal .careroute-action-btn.btn-accept {
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.careroute-portal .careroute-action-btn.btn-accept:hover {
+  background: #dcfce7;
+}
+
+.careroute-portal .careroute-action-btn.btn-dispatch {
+  border-color: #ca8a04;
+  color: #ca8a04;
+}
+
+.careroute-portal .careroute-action-btn.btn-dispatch:hover {
+  background: #fef9c3;
+}
+
+/* Tracking Timeline */
+.careroute-portal .careroute-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+  position: relative;
+  padding-left: 2rem;
+}
+
+.careroute-portal .careroute-timeline::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  background: #e2e8f0;
+}
+
+.careroute-portal .careroute-timeline-step {
+  position: relative;
+}
+
+.careroute-portal .careroute-timeline-marker {
+  position: absolute;
+  left: -2rem;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+}
+
+.careroute-portal .careroute-timeline-step.completed .careroute-timeline-marker {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+}
+
+.careroute-portal .careroute-timeline-step.current .careroute-timeline-marker {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.2);
+}
+
+.careroute-portal .careroute-timeline-step.rejected .careroute-timeline-marker {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.careroute-portal .careroute-timeline-step.closed .careroute-timeline-marker {
+  background: #64748b;
+  border-color: #64748b;
+  color: #ffffff;
+}
+
+/* Footer within CareRoute */
+.careroute-portal .careroute-footer {
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 1.5rem 1.25rem;
+  margin-top: auto;
+  text-align: center;
+  font-size: 0.825rem;
+  color: #64748b;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .careroute-portal .careroute-header-inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .careroute-portal .careroute-nav {
+    justify-content: space-around;
+    flex-wrap: wrap;
+  }
+  .careroute-portal .careroute-hero {
+    padding: 1.75rem 1.25rem;
+  }
+  .careroute-portal .careroute-hero h1 {
+    font-size: 1.65rem;
+  }
+  .careroute-portal .careroute-dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Bed Categories Grid & Cards */
+.careroute-portal .careroute-bed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0;
+}
+
+.careroute-portal .careroute-bed-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.careroute-portal .careroute-bed-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.careroute-portal .careroute-bed-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 0.5rem;
+}
+
+.careroute-portal .careroute-bed-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.careroute-portal .careroute-bed-input {
+  width: 60px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Doctor Roster Grid */
+.careroute-portal .careroute-doctor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.careroute-portal .careroute-doctor-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.careroute-portal .careroute-doctor-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.careroute-portal .careroute-doctor-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.careroute-portal .careroute-doctor-name {
+  font-size: 0.925rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.15rem;
+}
+
+.careroute-portal .careroute-doctor-specialty {
+  font-size: 0.78rem;
+  color: #2563eb;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.careroute-portal .careroute-doctor-shift {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.careroute-portal .careroute-status-pill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.careroute-portal .status-on_duty {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.careroute-portal .status-on_call {
+  background: #fef9c3;
+  color: #a16207;
+  border: 1px solid #fef08a;
+}
+
+.careroute-portal .status-in_surgery {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.careroute-portal .status-off_duty {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* Emergency Search Radar & Loading Screen */
+@keyframes careroute-radar-pulse {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(0.96);
+    opacity: 0.95;
+  }
+}
+
+@keyframes careroute-radar-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.careroute-portal .careroute-radar-beacon {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.careroute-portal .careroute-radar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(220, 38, 38, 0.45);
+  animation: careroute-radar-ring 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.careroute-portal .careroute-radar-ring:nth-child(2) {
+  animation-delay: 0.75s;
+}
+
+.careroute-portal .careroute-radar-ring:nth-child(3) {
+  animation-delay: 1.5s;
+}
+
+.careroute-portal .careroute-radar-center {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: 0 0 25px rgba(220, 38, 38, 0.55);
+  animation: careroute-radar-pulse 1.8s ease-in-out infinite;
+}
+
+

@@ -119,6 +119,12 @@ import EnergyPage, { type EnergyPageKind } from "./pages/energy/EnergyPage";
 import CharityPage, { type CharityPageKind } from "./pages/charity/CharityPage";
 import SwapPage, { type SwapPageKind } from "./pages/swap/SwapPage";
 import HealthAppointmentsPage from "./pages/health/HealthAppointmentsPage";
+import CareRouteHomePage from "./pages/careroute/CareRouteHomePage";
+import CareRouteRequestPage from "./pages/careroute/CareRouteRequestPage";
+import CareRouteHospitalsPage from "./pages/careroute/CareRouteHospitalsPage";
+import CareRouteTrackPage from "./pages/careroute/CareRouteTrackPage";
+import CareRouteHospitalDashboard from "./pages/careroute/CareRouteHospitalDashboard";
+import CareRouteMyRequestsPage from "./pages/careroute/CareRouteMyRequestsPage";
 
 // eslint-disable-next-line react-refresh/only-export-components
 const LegacyProductRedirect = () => {
@@ -945,6 +951,46 @@ export const router = createBrowserRouter([
   {
     path: "/app/services/health/*",
     element: <Navigate to="/services/health" replace />,
+  },
+  {
+    path: "/careroute",
+    element: <CareRouteHomePage />,
+  },
+  {
+    path: "/careroute/request",
+    element: <CareRouteRequestPage />,
+  },
+  {
+    path: "/careroute/hospitals",
+    element: <CareRouteHospitalsPage />,
+  },
+  {
+    path: "/careroute/track",
+    element: <CareRouteTrackPage />,
+  },
+  {
+    path: "/careroute/track/:requestId",
+    element: <CareRouteTrackPage />,
+  },
+  {
+    path: "/careroute/my-requests",
+    element: <CareRouteMyRequestsPage />,
+  },
+  {
+    path: "/careroute/hospital-login",
+    element: <Navigate to="/careroute/hospital-dashboard" replace />,
+  },
+  {
+    path: "/careroute/hospital-register",
+    element: <Navigate to="/careroute/hospital-dashboard" replace />,
+  },
+  {
+    path: "/careroute/hospital-dashboard",
+    element: <CareRouteHospitalDashboard />,
+  },
+  {
+    path: "/services/health/hospital-dashboard",
+    element: <CareRouteHospitalDashboard />,
   },
   {
     path: "/app/services/stream/movies",
