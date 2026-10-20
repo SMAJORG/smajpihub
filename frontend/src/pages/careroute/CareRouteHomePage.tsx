@@ -10,7 +10,7 @@ import NearMeOutlinedIcon from "@mui/icons-material/NearMeOutlined";
 export const CareRouteHomePage: React.FC = () => {
   return (
     <CareRouteLayout>
-      <div style={{ maxWidth: "860px", margin: "1rem auto 2.5rem" }}>
+      <div className="careroute-home">
         {/* Emergency Notice */}
         <div
           style={{
@@ -33,9 +33,9 @@ export const CareRouteHomePage: React.FC = () => {
 
         {/* Hero Section */}
         <section className="careroute-hero" style={{ textAlign: "center", padding: "3rem 2rem" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", background: "#fee2e2", color: "#dc2626", padding: "0.3rem 0.85rem", borderRadius: "999px", fontWeight: 800, fontSize: "0.78rem", marginBottom: "1.25rem", textTransform: "uppercase" }}>
+          <div className="careroute-hero-eyebrow">
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#dc2626", display: "inline-block" }} />
-            <span>Emergency Hospital Finder & Routing</span>
+            <span>SMAJ Health · Emergency Hospital Finder</span>
           </div>
           <h1 style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)", fontWeight: 800, margin: "0 0 1rem", color: "#ffffff", letterSpacing: "-0.03em" }}>
             Find the Right Hospital During an Emergency
@@ -67,11 +67,11 @@ export const CareRouteHomePage: React.FC = () => {
         {/* 3 Step Breakdown */}
         <div style={{ marginTop: "2.5rem" }}>
           <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--smaj-text-secondary, #64748b)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               How CareRoute Coordinates Emergency Care
             </span>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "0.25rem 0 0", color: "#0f172a" }}>
-              Intelligent NearER Facility Matching
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "0.25rem 0 0", color: "var(--smaj-text, #0f172a)" }}>
+              Find care in three steps
             </h2>
           </div>
 
@@ -80,10 +80,10 @@ export const CareRouteHomePage: React.FC = () => {
               <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
                 <EmergencyShareOutlinedIcon />
               </div>
-              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 0.5rem", color: "#0f172a" }}>
+              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 0.5rem", color: "var(--smaj-text, #0f172a)" }}>
                 1. Specify Emergency
               </h3>
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "#64748b", lineHeight: 1.5 }}>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--smaj-text-secondary, #64748b)", lineHeight: 1.5 }}>
                 Select the incident type (Accident/Trauma, Cardiac, Respiratory, Pediatric, etc.) and your current location.
               </p>
             </div>
@@ -92,10 +92,10 @@ export const CareRouteHomePage: React.FC = () => {
               <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#e0f2fe", color: "#0284c7", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
                 <NearMeOutlinedIcon />
               </div>
-              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 0.5rem", color: "#0f172a" }}>
+              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 0.5rem", color: "var(--smaj-text, #0f172a)" }}>
                 2. Right Hospital Match
               </h3>
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "#64748b", lineHeight: 1.5 }}>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--smaj-text-secondary, #64748b)", lineHeight: 1.5 }}>
                 CareRoute matches emergency capability, proximity distance, intake status, and reported bed capacity.
               </p>
             </div>
@@ -104,10 +104,10 @@ export const CareRouteHomePage: React.FC = () => {
               <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#dcfce7", color: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
                 <LocalHospitalOutlinedIcon />
               </div>
-              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 0.5rem", color: "#0f172a" }}>
+              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 0.5rem", color: "var(--smaj-text, #0f172a)" }}>
                 3. Direct Triage Dispatch
               </h3>
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "#64748b", lineHeight: 1.5 }}>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--smaj-text-secondary, #64748b)", lineHeight: 1.5 }}>
                 Your request is sent directly to the selected hospital's emergency desk for acceptance and real-time tracking.
               </p>
             </div>
@@ -116,7 +116,7 @@ export const CareRouteHomePage: React.FC = () => {
 
         {/* Dedicated Hospital & ER Staff Operations Portal Banner */}
         <div
-          className="careroute-card"
+          className="careroute-card careroute-staff-banner"
           style={{
             marginTop: "2.5rem",
             padding: "1.75rem 2rem",
@@ -162,7 +162,7 @@ export const CareRouteHomePage: React.FC = () => {
           <Link
             to="/careroute/hospital-dashboard"
             style={{
-              background: "#dc2626",
+              background: "var(--smaj-primary, #6f35ff)",
               color: "#ffffff",
               padding: "0.85rem 1.65rem",
               borderRadius: "10px",
@@ -172,7 +172,7 @@ export const CareRouteHomePage: React.FC = () => {
               display: "inline-flex",
               alignItems: "center",
               gap: "8px",
-              boxShadow: "0 4px 14px rgba(220, 38, 38, 0.45)",
+              boxShadow: "0 4px 14px rgba(111, 53, 255, 0.25)",
               transition: "transform 0.15s ease, background 0.15s ease",
             }}
           >

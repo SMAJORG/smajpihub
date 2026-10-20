@@ -1,6 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import LocalHospitalOutlinedIcon from "@mui/icons-material/LocalHospitalOutlined";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
@@ -23,112 +22,53 @@ export const CareRouteLayout: React.FC<CareRouteLayoutProps> = ({ children }) =>
         <div className="careroute-header-inner">
           <div className="careroute-brand-group">
             <Link to="/app/services" className="careroute-back-hub" title="Return to SMAJ PI HUB services">
-              <ArrowBackRoundedIcon style={{ fontSize: "1rem" }} />
+              <ArrowBackRoundedIcon />
               <span>Back to Hub</span>
             </Link>
-            <Link to="/careroute" className="careroute-brand">
+            <Link to="/careroute" className="careroute-brand" aria-label="SMAJ PI HUB Health — CareRoute">
               <div className="careroute-brand-icon">
-                <LocalHospitalOutlinedIcon />
+                <img src="/logo.png" alt="SMAJ PI HUB" />
               </div>
               <div className="careroute-brand-text">
-                Care<span>Route</span>
+                <small>SMAJ PI HUB</small>
+                Health <span> / CareRoute</span>
               </div>
             </Link>
           </div>
 
           {/* Right side: Adaptive nav based on staff auth state */}
-          <nav className="careroute-nav" aria-label="CareRoute portal navigation" style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            <Link
-              to="/careroute/track"
-              style={{
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                color: location.pathname.startsWith("/careroute/track") ? "#dc2626" : "#475569",
-                textDecoration: "none",
-                padding: "0.4rem 0.75rem",
-                borderRadius: "6px",
-              }}
+          <nav className="careroute-nav" aria-label="CareRoute portal navigation">
+            <NavLink to="/careroute/track"
             >
               Track Request
-            </Link>
+            </NavLink>
 
-            <Link
-              to="/careroute/my-requests"
-              style={{
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                color: location.pathname.startsWith("/careroute/my-requests") ? "#dc2626" : "#475569",
-                textDecoration: "none",
-                padding: "0.4rem 0.75rem",
-                borderRadius: "6px",
-                background: location.pathname.startsWith("/careroute/my-requests") ? "#fef2f2" : "transparent",
-              }}
+            <NavLink to="/careroute/my-requests"
             >
               My Requests
-            </Link>
+            </NavLink>
 
             {user?.username && (
-              <Link
-                to="/careroute/my-requests"
-                style={{
-                  fontSize: "0.78rem",
-                  fontWeight: 700,
-                  color: "#15803d",
-                  background: "#f0fdf4",
-                  border: "1px solid #bbf7d0",
-                  padding: "0.3rem 0.65rem",
-                  borderRadius: "20px",
-                  textDecoration: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
+              <NavLink to="/careroute/my-requests"
                 title="Pi Network Authenticated Session"
               >
-                <PersonOutlineOutlinedIcon style={{ fontSize: "0.95rem" }} />
+                <PersonOutlineOutlinedIcon />
                 <span>π @{user.username}</span>
-              </Link>
+              </NavLink>
             )}
 
             {!isHospitalDashboard ? (
-              <Link
-                to="/careroute/hospital-dashboard"
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  color: "#1d4ed8",
-                  textDecoration: "none",
-                  padding: "0.4rem 0.75rem",
-                  borderRadius: "6px",
-                  border: "1px solid #bfdbfe",
-                  background: "#eff6ff",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
+              <NavLink to="/careroute/hospital-dashboard"
                 title="Open Hospital Emergency Triage Desk"
               >
-                <DashboardOutlinedIcon style={{ fontSize: "0.95rem" }} />
+                <DashboardOutlinedIcon />
                 <span>Hospital ER Desk</span>
-              </Link>
+              </NavLink>
             ) : (
               <Link
                 to="/services/health"
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  color: "#475569",
-                  textDecoration: "none",
-                  padding: "0.4rem 0.75rem",
-                  borderRadius: "6px",
-                  border: "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
               >
-                <ArrowBackRoundedIcon style={{ fontSize: "0.95rem" }} />
+                <ArrowBackRoundedIcon />
                 <span>Health Hub</span>
               </Link>
             )}
@@ -142,7 +82,7 @@ export const CareRouteLayout: React.FC<CareRouteLayoutProps> = ({ children }) =>
 
       <footer className="careroute-footer">
         <div>
-          CareRoute Emergency Coordination Portal · Built for the Pi Network Ecosystem · Strict Hospital Data Isolation
+          SMAJ PI HUB &middot; Health &middot; CareRoute emergency coordination
         </div>
       </footer>
     </div>
