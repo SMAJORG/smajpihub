@@ -50,6 +50,15 @@ type CareRouteHospital = {
   matchedSpecialty?: string;
 };
 
+type CareRouteStaff = {
+  id: string;
+  hospitalId: string;
+  username: string;
+  fullName: string;
+  role: string;
+  email?: string;
+};
+
 type CareRouteRequest = {
   id: string;
   patientName: string;
@@ -66,6 +75,7 @@ type CareRouteRequest = {
   status: "submitted" | "dispatched" | "accepted" | "rejected" | "completed" | "closed";
   ambulanceAssigned?: string;
   etaMinutes?: number;
+  responseNote?: string;
   createdAt: string;
   updatedAt: string;
 };

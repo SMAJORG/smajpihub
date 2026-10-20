@@ -22,9 +22,9 @@ export const CareRouteLayout: React.FC<CareRouteLayoutProps> = ({ children }) =>
       <header className="careroute-header">
         <div className="careroute-header-inner">
           <div className="careroute-brand-group">
-            <Link to="/services/health" className="careroute-back-hub" title="Return to SMAJ PI HUB Health">
+            <Link to="/app/services" className="careroute-back-hub" title="Return to SMAJ PI HUB services">
               <ArrowBackRoundedIcon style={{ fontSize: "1rem" }} />
-              <span>Back to Health</span>
+              <span>Back to Hub</span>
             </Link>
             <Link to="/careroute" className="careroute-brand">
               <div className="careroute-brand-icon">

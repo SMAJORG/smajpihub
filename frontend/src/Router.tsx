@@ -109,7 +109,6 @@ import FoodDeliveryPage from "./pages/food-delivery/FoodDeliveryPage";
 import RestaurantDetailPage from "./pages/food-delivery/RestaurantDetailPage";
 import CartPage from "./pages/food-delivery/CartPage";
 import FoodDealsOrdersPage from "./pages/food-delivery/FoodDealsOrdersPage";
-import HealthPage from "./pages/health/HealthPage";
 import ProviderDetailPage from "./pages/health/ProviderDetailPage";
 import BookingPage from "./pages/health/BookingPage";
 import HousingPage, { type HousingPageKind } from "./pages/housing/HousingPage";
@@ -337,7 +336,7 @@ export const router = createBrowserRouter([
       ) : platform.routeSegment === "food-delivery" ? (
         <FoodDeliveryPage />
       ) : platform.routeSegment === "health" ? (
-        <HealthPage />
+        <Navigate to="/careroute" replace />
       ) : platform.routeSegment === "housing" ? (
         <HousingPage />
       ) : platform.routeSegment === "events" ? (
@@ -912,7 +911,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/services/health/providers",
-    element: <HealthPage />,
+    element: <Navigate to="/careroute/hospitals" replace />,
   },
   {
     path: "/services/health/appointments",
@@ -928,13 +927,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/app/services/health",
-    element: (
-      <ProtectedRoute>
-        <PrivateLayout>
-          <HealthPage />
-        </PrivateLayout>
-      </ProtectedRoute>
-    ),
+    element: <Navigate to="/careroute" replace />,
   },
   {
     path: "/app/services/health/appointments",
