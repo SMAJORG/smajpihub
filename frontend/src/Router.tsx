@@ -57,7 +57,7 @@ import ServicesHubPage from "./pages/private/ServicesHubPage";
 import WalletPage from "./pages/private/WalletPage";
 import HelpCenterPage from "./pages/private/HelpCenterPage";
 import TutorialCenterPage from "./pages/private/TutorialCenterPage";
-import ServiceDetailPage from "./pages/private/ServiceDetailPage";
+import ServiceRouteRedirect from "./pages/private/ServiceRouteRedirect";
 import ServiceDiscoveryPage from "./pages/private/ServiceDiscoveryPage";
 import CommerceFlowPage from "./pages/private/CommerceFlowPage";
 import OrderTrackingPage from "./pages/private/OrderTrackingPage";
@@ -1052,7 +1052,7 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <PrivateLayout>
-          <ServiceDetailPage />
+          <ServiceRouteRedirect />
         </PrivateLayout>
       </ProtectedRoute>
     ),

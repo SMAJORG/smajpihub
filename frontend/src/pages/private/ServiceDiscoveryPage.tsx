@@ -16,7 +16,7 @@ const ratings: Record<string, string> = {
 const lifestyleSlugs = ["food", "health", "housing", "transport", "education", "charity", "events", "agro"];
 const trendingSlugs = ["store", "stream", "sports", "events", "food", "jobs", "education", "health", "housing", "transport"];
 const routeFor = (service: ServiceDefinition) => {
-  return service.live ? serviceAppPath(service.slug) : `/app/services/${service.slug}`;
+  return serviceAppPath(service.slug);
 };
 
 const DiscoveryTabs = ({ active }: { active: Exclude<DiscoveryMode, "categories"> }) => (

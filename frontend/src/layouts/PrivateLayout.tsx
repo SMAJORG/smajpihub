@@ -444,7 +444,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
                 <KeyboardArrowUpIcon className={serviceMenuOpen ? "open" : ""} />
               </button>
               {serviceMenuOpen && !sidebarCollapsed ? <div>{serviceCatalog.map(service => (
-                <Link key={service.slug} to={service.live ? serviceAppPath(service.slug) : `/app/services/${service.slug}`} state={serviceLaunchNavigationState(service.slug)} onClick={() => setMobileSidebarOpen(false)}>
+                <Link key={service.slug} to={serviceAppPath(service.slug)} state={serviceLaunchNavigationState(service.slug)} onClick={() => setMobileSidebarOpen(false)}>
                   <span>{service.name.replace("SMAJ ", "")}</span><small>{service.live ? "Open" : "Soon"}</small>
                 </Link>
               ))}</div> : null}

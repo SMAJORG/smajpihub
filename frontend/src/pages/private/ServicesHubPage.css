@@ -135,7 +135,7 @@
   color: var(--smaj-text-secondary);
 }
 .services-hub-directory .services-hub-directory-status.live {
-  color: #08784c;
+  color: var(--smaj-primary, #7352d6) !important;
 }
 .services-hub-directory .services-hub-directory-status.in-progress {
   color: #8b5b12;
@@ -262,7 +262,7 @@
 html[data-private-theme="dark"]
   .services-hub-directory
   .services-hub-directory-status.live {
-  color: #6ee7b7;
+  color: var(--smaj-primary, #a78bfa) !important;
 }
 html[data-private-theme="dark"]
   .services-hub-directory

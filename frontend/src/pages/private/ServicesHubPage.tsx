@@ -84,11 +84,7 @@ export default function ServicesHubPage() {
                 <Link
                   className="services-hub-directory-item"
                   key={service.slug}
-                  to={
-                    service.live
-                      ? serviceAppPath(service.slug)
-                      : `/app/services/${service.slug}`
-                  }
+                  to={serviceAppPath(service.slug)}
                   state={serviceLaunchNavigationState(service.slug)}
                   aria-label={`${service.name}: ${getServiceLaunchLabel(service.slug)}`}
                   title={service.description}
