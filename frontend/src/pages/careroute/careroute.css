@@ -21,6 +21,16 @@
 }
 
 /* CareRoute Portal Header */
+.careroute-portal.careroute-embedded {
+  min-height: 0;
+  border-radius: 18px;
+  overflow: clip;
+}
+
+.careroute-portal.careroute-embedded .careroute-header {
+  position: static;
+}
+
 .careroute-portal .careroute-brand-icon img {
   width: 40px;
   height: 40px;

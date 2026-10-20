@@ -8,16 +8,17 @@ import "./careroute.css";
 
 type CareRouteLayoutProps = {
   children: React.ReactNode;
+  embedded?: boolean;
 };
 
-export const CareRouteLayout: React.FC<CareRouteLayoutProps> = ({ children }) => {
+export const CareRouteLayout: React.FC<CareRouteLayoutProps> = ({ children, embedded = false }) => {
   const location = useLocation();
   const { user } = useAuth();
 
   const isHospitalDashboard = location.pathname.startsWith("/careroute/hospital-dashboard");
 
   return (
-    <div className="careroute-portal">
+    <div className={`careroute-portal${embedded ? " careroute-embedded" : ""}`}>
       <header className="careroute-header">
         <div className="careroute-header-inner">
           <div className="careroute-brand-group">

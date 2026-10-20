@@ -7,9 +7,9 @@ import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import LocalHospitalOutlinedIcon from "@mui/icons-material/LocalHospitalOutlined";
 import NearMeOutlinedIcon from "@mui/icons-material/NearMeOutlined";
 
-export const CareRouteHomePage: React.FC = () => {
+export const CareRouteHomePage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   return (
-    <CareRouteLayout>
+    <CareRouteLayout embedded={embedded}>
       <div className="careroute-home">
         {/* Emergency Notice */}
         <div

@@ -927,7 +927,13 @@ export const router = createBrowserRouter([
   },
   {
     path: "/app/services/health",
-    element: <Navigate to="/careroute" replace />,
+    element: (
+      <ProtectedRoute>
+        <PrivateLayout>
+          <CareRouteHomePage embedded />
+        </PrivateLayout>
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/app/services/health/appointments",
