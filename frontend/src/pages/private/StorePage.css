@@ -39,6 +39,19 @@ html[dir="rtl"] .storefront-page .storefront-mobile-drawer-panel { direction: rt
 .storefront-page .storefront-cart-count { right: auto; inset-inline-end: -7px; }
 html[dir="rtl"] .storefront-page :is([data-testid^="ArrowBack"], [data-testid^="ArrowForward"]) { transform: scaleX(-1); }
 
+@media (min-width: 1024px) {
+  .storefront-page .storefront-tool-menu .storefront-tool-panel {
+    left: auto;
+    right: auto;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+  }
+  .storefront-page .storefront-tool-menu:nth-of-type(n+3) .storefront-tool-panel {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+  }
+}
+
 @media (max-width: 1023px) {
   .storefront-page .storefront-mobile-top { justify-content: flex-start; gap: 10px; }
   .storefront-page .storefront-mobile-logo { margin: 0; }
