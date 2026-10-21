@@ -16,6 +16,8 @@
     "android:open": "cap open android",
     "lint": "eslint .",
     "test:jobs": "node tests/jobsUi.test.mjs",
+    "test:careroute": "node --test tests/carerouteState.test.cjs",
+    "test:careroute:browser": "playwright test --config tests/careroute.playwright.config.ts",
     "test:i18n": "node --test --test-isolation=none tests/localization.test.mjs",
     "test:i18n:browser": "playwright test --config tests/localization.playwright.config.ts",
     "preview": "node node_modules/vite/bin/vite.js preview",

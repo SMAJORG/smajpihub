@@ -1,0 +1,1190 @@
+/* CareRoute clinical design system. All tokens and rules stay inside the product. */
+.careroute-portal.cr-product {
+  --cr-navy: #142b45;
+  --cr-teal: #087f80;
+  --cr-teal-dark: #066465;
+  --cr-muted: #52667b;
+  --cr-border: #dce5ed;
+  --cr-soft: #f3f7fa;
+  --cr-purple: #6b4bb4;
+  --text: var(--cr-navy);
+  --muted: var(--cr-muted);
+  --primary: var(--cr-teal);
+  --primary-soft: #e7f5f3;
+  --smaj-text: var(--cr-navy);
+  --smaj-text-secondary: var(--cr-muted);
+  --smaj-card: #fff;
+  --smaj-primary: var(--cr-teal);
+  --smaj-primary-hover: var(--cr-teal-dark);
+  --smaj-border: var(--cr-border);
+  --smaj-secondary-bg: var(--cr-soft);
+  background: var(--cr-soft);
+  color: var(--cr-navy);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  min-width: 0;
+}
+.cr-product :is(h1, h2, h3, h4, p) {
+  margin-top: 0;
+}
+.cr-product :is(h1, h2, h3, h4) {
+  color: var(--cr-navy) !important;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+.cr-product h1 {
+  font-size: clamp(1.8rem, 3vw, 2.35rem);
+  font-weight: 750;
+  margin-bottom: 10px;
+}
+.cr-product h2 {
+  font-size: 1.22rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.cr-product h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.cr-product p {
+  color: var(--cr-muted) !important;
+  margin-bottom: 16px;
+}
+.cr-product :is(a, button, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+.cr-product :is(button, input, select, textarea) {
+  font: inherit;
+}
+.cr-product button {
+  cursor: pointer;
+}
+.cr-product button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.cr-product :is(label, small) {
+  font-size: 0.85rem !important;
+}
+.cr-product .careroute-badge {
+  font-size: 0.8rem !important;
+  padding: 7px 10px;
+}
+.cr-product :is(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid #8a63ca;
+  outline-offset: 3px;
+}
+.cr-product :is(input:not([type="radio"]):not([type="checkbox"]), select, textarea) {
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 13px;
+  background: #fff;
+  border: 1px solid #bdcbd8;
+  border-radius: 10px;
+  color: var(--cr-navy);
+  font-size: 16px;
+  box-shadow: none;
+}
+.cr-product textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+.cr-product input::placeholder {
+  color: #62758a;
+  opacity: 1;
+}
+.cr-product :is(input[type="radio"], input[type="checkbox"]) {
+  accent-color: var(--cr-teal);
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.cr-product .cr-main {
+  max-width: 1240px;
+  padding: 24px 28px 48px;
+}
+.cr-product .cr-header {
+  background: #fff;
+  border-bottom: 1px solid var(--cr-border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.cr-product.careroute-embedded .cr-header {
+  position: static;
+}
+.cr-product .cr-header-inner {
+  max-width: 1240px;
+  margin: auto;
+  min-height: 80px;
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cr-product .cr-brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-decoration: none;
+  color: var(--cr-navy);
+}
+.cr-product .cr-brand > i {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: var(--cr-teal);
+  background: #e2f3ef;
+}
+.cr-product .cr-brand strong {
+  display: block;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+}
+.cr-product .cr-brand small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 550;
+  color: var(--cr-muted) !important;
+}
+.cr-product .cr-header-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.cr-product :is(.cr-hub-link, .cr-staff-link) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--cr-muted);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.cr-product .cr-hub-link img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+.cr-product .cr-staff-link {
+  color: var(--cr-purple);
+}
+.cr-product .cr-patient-nav {
+  display: flex;
+  gap: 6px;
+  max-width: 1240px;
+  margin: auto;
+  padding: 0 28px 10px;
+}
+.cr-product .cr-patient-nav a {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 10px 18px;
+  color: var(--cr-muted);
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-decoration: none;
+  border-radius: 10px;
+}
+.cr-product .cr-patient-nav a.active {
+  background: #e8f5f2;
+  color: #086967;
+}
+.cr-product .cr-footer {
+  border-top: 1px solid var(--cr-border);
+  background: #fff;
+  padding: 20px 28px max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--cr-muted);
+}
+.cr-product .cr-footer a {
+  color: var(--cr-muted);
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  text-underline-offset: 3px;
+}
+.cr-product .cr-connection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #dce7eb;
+  background: #edf4f7;
+  color: #405a6d;
+  border-radius: 12px;
+  margin-bottom: 28px;
+  font-size: 0.8rem;
+}
+.cr-product .cr-connection > i {
+  width: 8px;
+  height: 8px;
+  background: #6c8192;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cr-product .cr-connection strong {
+  font-size: 0.84rem;
+  font-weight: 650;
+  display: block;
+}
+.cr-product .cr-connection span {
+  color: inherit !important;
+  display: block;
+  margin-top: 2px;
+}
+.cr-product .cr-connection-warning {
+  background: #fff8e7;
+  border-color: #eacb82;
+  color: #725016;
+}
+.cr-product .cr-connection-warning > i {
+  background: #b77913;
+}
+.cr-product .cr-page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.cr-product .cr-page-heading p {
+  max-width: 620px;
+  margin: 0;
+}
+.cr-product .cr-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cr-purple) !important;
+  margin-bottom: 9px;
+}
+.cr-product .cr-panel {
+  min-width: 0;
+  background: #fff;
+  border: 1px solid var(--cr-border);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 4px 18px #173b5a04;
+}
+.cr-product :is(.careroute-card, .careroute-bed-card, .careroute-doctor-card) {
+  border-radius: 16px;
+  border-color: var(--cr-border);
+  background: #fff;
+  box-shadow: none;
+}
+.cr-product :is(.careroute-btn-primary, .careroute-btn-secondary, .cr-button-danger) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: 11px;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: center;
+  text-decoration: none;
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: background 0.15s ease;
+}
+.cr-product .careroute-btn-primary {
+  background: var(--cr-teal);
+  color: #fff !important;
+}
+.cr-product .careroute-btn-primary :is(span, svg) {
+  color: #fff !important;
+}
+.cr-product .careroute-btn-primary:hover {
+  background: var(--cr-teal-dark);
+  transform: none;
+}
+.cr-product .careroute-btn-secondary {
+  background: #fff;
+  color: var(--cr-navy) !important;
+  border-color: #bdcbd8;
+}
+.cr-product .careroute-btn-secondary span {
+  color: inherit !important;
+}
+.cr-product .careroute-btn-secondary:hover {
+  background: var(--cr-soft);
+}
+.cr-product .cr-button-danger {
+  color: #a82c35;
+  border-color: #e8b8bd;
+  background: #fff4f4;
+}
+.cr-product .cr-button-danger:hover {
+  background: #ffe6e8;
+}
+.cr-product :is(.cr-text-button, .cr-text-link) {
+  min-height: 44px;
+  padding: 8px 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--cr-teal);
+  font-size: 0.88rem;
+  font-weight: 650;
+  border: none;
+  background: transparent;
+  text-decoration: none;
+}
+.cr-product .cr-danger {
+  color: #a82c35;
+}
+.cr-product .cr-text-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.cr-product .cr-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.cr-product .cr-icon-button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--cr-border);
+  border-radius: 10px;
+  color: var(--cr-navy);
+  background: transparent;
+  font-size: 1.25rem;
+}
+.cr-product .cr-message {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #c9dfdf;
+  background: #edf8f5;
+  color: #245f5d;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+.cr-product .cr-message span {
+  color: inherit !important;
+}
+.cr-product .cr-message p {
+  margin: 4px 0 0;
+  color: inherit !important;
+}
+.cr-product :is(.cr-message-error, .cr-message-warning) {
+  border-color: #e8c0b1;
+  background: #fff5ee;
+  color: #8a3b24;
+}
+.cr-product .cr-loading {
+  padding: 28px;
+  text-align: center;
+  color: var(--cr-muted);
+  background: #fff;
+  border: 1px solid var(--cr-border);
+  border-radius: 14px;
+}
+.cr-product .cr-loading::before {
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+  margin-inline-end: 10px;
+  border: 2px solid #c2dddd;
+  border-top-color: var(--cr-teal);
+  border-radius: 50%;
+  animation: cr-spin 0.8s linear infinite;
+}
+@keyframes cr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.cr-product .cr-empty {
+  padding: 28px 16px;
+  text-align: center;
+}
+.cr-product .cr-empty p {
+  max-width: 420px;
+  margin: 0 auto 14px;
+}
+.cr-product .cr-account-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--cr-muted);
+  font-size: 0.88rem;
+  margin-bottom: 20px;
+}
+.cr-product .cr-code-form {
+  margin: 24px 0;
+}
+.cr-product .cr-code-form > label {
+  font-weight: 650;
+  display: block;
+  margin-bottom: 10px;
+}
+.cr-product .cr-code-form > div {
+  display: flex;
+  gap: 10px;
+}
+.cr-product .cr-code-form input {
+  flex: 1;
+}
+.cr-product .cr-code-form button {
+  flex-shrink: 0;
+}
+.cr-product :is(.cr-segments, .cr-workspace-tabs) {
+  display: flex;
+  gap: 4px;
+  background: #eaf0f5;
+  border-radius: 12px;
+  padding: 5px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 20px;
+}
+.cr-product :is(.cr-segments, .cr-workspace-tabs) button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  padding: 9px 16px;
+  color: var(--cr-muted);
+  background: transparent;
+  font-weight: 650;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+.cr-product :is(.cr-segments, .cr-workspace-tabs) button[aria-pressed="true"] {
+  background: #fff;
+  box-shadow: 0 2px 6px #18394a0c;
+  color: var(--cr-teal-dark);
+}
+.cr-product .cr-segments span {
+  padding-inline-start: 7px;
+  color: inherit !important;
+}
+.cr-product .cr-request-list {
+  display: grid;
+  gap: 14px;
+}
+.cr-product .cr-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.cr-product .cr-card-top .cr-eyebrow {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.cr-product .cr-status {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  border-radius: 8px;
+  background: #edf2f8;
+  color: #385673 !important;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.cr-product .cr-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.cr-product :is(.cr-status-accepted, .cr-status-completed) {
+  background: #e5f4ef;
+  color: #12634f !important;
+}
+.cr-product .cr-status-dispatched {
+  background: #f0ebfb;
+  color: #62449b !important;
+}
+.cr-product .cr-status-rejected {
+  background: #fff0e9;
+  color: #984322 !important;
+}
+.cr-product .cr-status-closed {
+  background: #edf0f4;
+  color: #4a5a6a !important;
+}
+.cr-product .cr-history-card > p {
+  margin-bottom: 18px;
+}
+.cr-product :is(.cr-inline-details, .cr-detail-grid) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  padding: 0;
+  margin: 20px 0;
+}
+.cr-product dt {
+  font-size: 0.78rem;
+  color: var(--cr-muted);
+  margin-bottom: 4px;
+}
+.cr-product dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+}
+.cr-product dd a {
+  color: var(--cr-teal);
+}
+.cr-product .cr-card-footer {
+  border-top: 1px solid #e8eef3;
+  padding-top: 18px;
+  margin-top: 20px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cr-product .cr-tracking-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.cr-product .cr-response {
+  padding: 18px;
+  background: #f1f5fa;
+  border-radius: 12px;
+  border-inline-start: 3px solid #8a9eb2;
+  margin: 24px 0;
+}
+.cr-product .cr-response p {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+}
+.cr-product :is(.cr-response-accepted, .cr-response-completed) {
+  background: #ecf7f2;
+  border-color: var(--cr-teal);
+}
+.cr-product .cr-response-rejected {
+  background: #fff4ed;
+  border-color: #bb623e;
+}
+.cr-product .cr-progress-list {
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cr-product .cr-progress-step {
+  display: flex;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 28px;
+}
+.cr-product .cr-progress-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 13px;
+  top: 27px;
+  bottom: 0;
+  width: 2px;
+  background: #dce5ed;
+}
+.cr-product .cr-progress-step > i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #c1cdd8;
+  color: var(--cr-muted);
+  background: #fff;
+  flex-shrink: 0;
+  font-style: normal;
+  font-size: 0.85rem;
+  z-index: 1;
+}
+.cr-product :is(.cr-progress-current, .cr-progress-completed) > i {
+  border-color: var(--cr-teal);
+  background: #e0f2ed;
+  color: #085e58;
+}
+.cr-product .cr-progress-current > i {
+  box-shadow: 0 0 0 4px #e5f4ef;
+}
+.cr-product .cr-progress-rejected > i {
+  background: #fff2eb;
+  border-color: #ad5330;
+  color: #8a3b24;
+}
+.cr-product .cr-progress-pending strong {
+  color: var(--cr-muted);
+  font-weight: 550;
+}
+.cr-product .cr-progress-step p {
+  font-size: 0.85rem;
+  margin: 5px 0;
+}
+.cr-product .cr-progress-step time {
+  font-size: 0.8rem;
+  color: var(--cr-muted);
+}
+.cr-product .cr-caption {
+  font-size: 0.78rem;
+  margin: 8px 0 0;
+}
+.cr-product .cr-dialog {
+  width: min(540px, calc(100% - 28px));
+  max-height: calc(100dvh - 40px);
+  padding: 26px;
+  color: var(--cr-navy);
+  background: #fff;
+  border: 1px solid var(--cr-border);
+  border-radius: 20px;
+  box-shadow: 0 28px 90px #142b4533;
+  overflow-y: auto;
+}
+.cr-product .cr-dialog::backdrop {
+  background: #102b45a6;
+  backdrop-filter: blur(3px);
+}
+.cr-product .cr-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 16px;
+}
+.cr-product .cr-dialog-heading h2 {
+  margin: 0;
+}
+.cr-product .cr-dialog > .cr-actions {
+  margin-top: 24px;
+  justify-content: flex-end;
+}
+.cr-product .cr-reasons {
+  border: 0;
+  margin: 20px 0;
+  padding: 0;
+}
+.cr-product .cr-reasons legend {
+  margin-bottom: 10px;
+  font-weight: 650;
+}
+.cr-product .cr-reasons label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px;
+  font-size: 0.9rem;
+}
+.cr-product .cr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  margin-bottom: 18px;
+}
+.cr-product .cr-form {
+  display: grid;
+  gap: 6px;
+}
+.cr-product :is(.cr-signin, .cr-staff-signin) {
+  max-width: 560px;
+  margin: 30px auto;
+  padding: 30px;
+}
+.cr-product .cr-staff-signin > .cr-text-link {
+  margin-top: 20px;
+}
+.cr-product .cr-pi-signin {
+  border-block: 1px solid var(--cr-border);
+  padding: 18px 0;
+  margin: 22px 0;
+}
+.cr-product .cr-pi-signin p {
+  font-size: 0.82rem;
+  margin: 10px 0 0;
+}
+.cr-product .cr-intake-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+.cr-product .cr-intake-panel p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+.cr-product .cr-intake-panel .cr-segments {
+  margin: 0;
+  flex-shrink: 0;
+}
+.cr-product .cr-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.cr-product .cr-metrics .cr-panel {
+  padding: 18px 20px;
+}
+.cr-product .cr-metrics span {
+  font-size: 0.8rem;
+  color: var(--cr-muted) !important;
+}
+.cr-product .cr-metrics strong {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 750;
+  margin-top: 4px;
+}
+.cr-product .cr-workspace-tabs {
+  width: 100%;
+  background: transparent;
+  border-bottom: 1px solid var(--cr-border);
+  border-radius: 0;
+  padding: 0 0 8px;
+  overflow-x: auto;
+}
+.cr-product .cr-workspace-tabs button[aria-pressed="true"] {
+  background: #e1efed;
+  box-shadow: none;
+}
+.cr-product .cr-operations-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.35fr);
+  gap: 20px;
+  align-items: start;
+}
+.cr-product .cr-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.cr-product .cr-section-heading h2 {
+  margin-bottom: 6px;
+}
+.cr-product .cr-section-heading p {
+  font-size: 0.87rem;
+  margin: 0;
+}
+.cr-product .cr-count {
+  padding: 6px 12px;
+  border-radius: 9px;
+  background: #e7f3f1;
+  color: var(--cr-teal) !important;
+  font-weight: 700;
+}
+.cr-product .cr-queue-list {
+  display: grid;
+  gap: 10px;
+  max-height: 680px;
+  overflow-y: auto;
+  padding: 3px;
+}
+.cr-product .cr-queue-item {
+  background: #fff;
+  color: var(--cr-navy);
+  border: 1px solid var(--cr-border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: start;
+  width: 100%;
+}
+.cr-product .cr-queue-item.is-selected {
+  border-color: var(--cr-teal);
+  background: #eff8f6;
+  box-shadow: inset 3px 0 var(--cr-teal);
+}
+.cr-product .cr-queue-item .cr-card-top {
+  margin-bottom: 8px;
+}
+.cr-product .cr-queue-item p {
+  font-size: 0.88rem;
+  margin-bottom: 10px;
+}
+.cr-product .cr-queue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--cr-muted);
+}
+.cr-product .cr-request-details {
+  position: sticky;
+  top: 110px;
+}
+.cr-product .cr-bed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.cr-product .cr-bed-card {
+  border: 1px solid var(--cr-border);
+  border-radius: 12px;
+  padding: 18px;
+  background: #f9fbfc;
+}
+.cr-product .cr-bed-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(65px, 1fr);
+  gap: 12px;
+}
+.cr-product .cr-bed-fields .cr-field {
+  margin: 12px 0 0;
+}
+.cr-product .cr-stepper {
+  display: flex;
+}
+.cr-product .cr-stepper button {
+  border: 1px solid #bdcbd8;
+  background: #fff;
+  color: var(--cr-navy);
+  min-width: 40px;
+  min-height: 48px;
+}
+.cr-product .cr-stepper button:first-child {
+  border-radius: 9px 0 0 9px;
+}
+.cr-product .cr-stepper button:last-child {
+  border-radius: 0 9px 9px 0;
+}
+.cr-product .cr-stepper input {
+  padding: 8px 2px;
+  border-radius: 0;
+  text-align: center;
+  appearance: textfield;
+}
+.cr-product .cr-stepper input::-webkit-inner-spin-button {
+  appearance: none;
+}
+.cr-product .cr-doctor-list {
+  display: grid;
+  gap: 12px;
+}
+.cr-product .cr-doctor-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
+  gap: 20px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid var(--cr-border);
+  border-radius: 12px;
+}
+.cr-product .cr-doctor-card p {
+  font-size: 0.85rem;
+  margin: 4px 0;
+}
+.cr-product .cr-doctor-card .cr-field {
+  margin: 0;
+}
+.cr-product .careroute-home {
+  max-width: none;
+  margin: 0;
+}
+.cr-product .careroute-home .careroute-hero {
+  text-align: start;
+  padding: 32px;
+  background: linear-gradient(110deg, #fff, #f0f8f5);
+  border: 1px solid var(--cr-border);
+  border-radius: 20px;
+  box-shadow: none;
+}
+.cr-product .careroute-home .careroute-hero h1 {
+  max-width: 580px;
+  font-size: clamp(1.85rem, 4vw, 2.7rem);
+}
+.cr-product .careroute-hero-eyebrow {
+  border: 0;
+  background: #e1f1ed;
+  color: #086967 !important;
+  padding: 6px 11px;
+}
+.cr-product .careroute-home-notice {
+  border-color: #ead19a;
+  background: #fff9ed;
+  border-radius: 12px;
+}
+.cr-product .careroute-home-notice p {
+  font-size: 0.85rem;
+  color: #73501e !important;
+}
+.cr-product .careroute-home .careroute-staff-banner {
+  background: #fff;
+  border: 1px solid var(--cr-border);
+  border-radius: 16px;
+}
+.cr-product .careroute-home .careroute-btn-primary span {
+  color: #fff !important;
+}
+.cr-product .careroute-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.cr-product .careroute-step-icon {
+  background: #e6f4ef;
+  color: var(--cr-teal);
+}
+.cr-product .cr-quick-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0 28px;
+}
+.cr-product .cr-quick-links a {
+  text-decoration: none;
+  border: 1px solid var(--cr-border);
+  border-radius: 16px;
+  background: #fff;
+  padding: 20px;
+  color: var(--cr-navy);
+}
+.cr-product .cr-quick-links strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.cr-product .cr-quick-links span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--cr-muted) !important;
+}
+@media (max-width: 980px) {
+  .cr-product .cr-intake-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cr-product .cr-tracking-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
+  }
+  .cr-product .cr-operations-grid {
+    grid-template-columns: minmax(240px, 1fr) minmax(0, 1.2fr);
+  }
+  .cr-product .cr-doctor-card {
+    grid-template-columns: minmax(0, 1fr) 160px;
+  }
+  .cr-product .cr-doctor-card > button {
+    justify-self: start;
+  }
+}
+@media (max-width: 700px) {
+  .cr-product .cr-header-inner {
+    min-height: 72px;
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .cr-product .cr-brand {
+    gap: 9px;
+  }
+  .cr-product .cr-brand strong {
+    font-size: 1.2rem;
+  }
+  .cr-product .cr-brand small {
+    font-size: 0.75rem;
+  }
+  .cr-product .cr-header-links {
+    gap: 10px;
+  }
+  .cr-product .cr-hub-link {
+    font-size: 0.8rem;
+    gap: 5px;
+  }
+  .cr-product .cr-hub-link img {
+    width: 22px;
+    height: 22px;
+  }
+  .cr-product .cr-patient-nav {
+    padding: 0 10px 8px;
+    gap: 2px;
+    display: grid;
+    grid-template-columns: 0.8fr 1.3fr 0.8fr 1.3fr;
+  }
+  .cr-product .cr-patient-nav a {
+    padding: 9px 6px;
+    font-size: 0.8rem;
+  }
+  .cr-product .cr-main {
+    padding: 18px 14px calc(28px + env(safe-area-inset-bottom));
+  }
+  .cr-product .cr-connection {
+    margin-bottom: 22px;
+    align-items: flex-start;
+  }
+  .cr-product .cr-connection > i {
+    margin-top: 6px;
+  }
+  .cr-product .cr-page-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .cr-product .cr-page-heading h1 {
+    font-size: 1.8rem;
+  }
+  .cr-product .cr-page-heading p {
+    font-size: 0.92rem;
+  }
+  .cr-product .cr-panel {
+    padding: 20px;
+    border-radius: 15px;
+  }
+  .cr-product :is(.cr-tracking-grid, .cr-operations-grid) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .cr-product .cr-request-details {
+    position: static;
+  }
+  .cr-product .cr-queue-list {
+    max-height: 430px;
+  }
+  .cr-product .cr-queue:has(.cr-queue-item.is-selected) {
+    border-color: #a8c9c7;
+  }
+  .cr-product .cr-queue-item.is-selected::after {
+    content: "Details below";
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 650;
+    margin-top: 10px;
+    color: var(--cr-teal);
+  }
+  .cr-product .cr-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .cr-product .cr-metrics .cr-panel {
+    padding: 14px 16px;
+  }
+  .cr-product .cr-metrics strong {
+    font-size: 1.6rem;
+  }
+  .cr-product .cr-workspace-tabs {
+    gap: 2px;
+  }
+  .cr-product .cr-workspace-tabs button {
+    font-size: 0.85rem;
+    padding-inline: 12px;
+  }
+  .cr-product .cr-intake-panel .cr-segments {
+    width: 100%;
+  }
+  .cr-product .cr-intake-panel .cr-segments button {
+    flex: 1;
+    padding-inline: 8px;
+    font-size: 0.8rem;
+  }
+  .cr-product .cr-code-form > div {
+    flex-direction: column;
+  }
+  .cr-product .cr-code-form button {
+    align-self: stretch;
+  }
+  .cr-product .cr-dialog {
+    padding: 22px;
+    max-height: calc(100dvh - 28px);
+  }
+  .cr-product .cr-dialog > .cr-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cr-product .cr-bed-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cr-product .cr-bed-fields {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+  .cr-product .cr-stepper button {
+    min-width: 44px;
+  }
+  .cr-product .cr-doctor-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .cr-product .cr-footer {
+    padding-inline: 18px;
+  }
+  .cr-product .careroute-grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cr-product .careroute-home .careroute-hero {
+    padding: 24px !important;
+  }
+  .cr-product .careroute-home-actions {
+    flex-direction: column;
+  }
+  .cr-product .careroute-home-actions a {
+    width: 100%;
+  }
+  .cr-product .cr-quick-links {
+    gap: 10px;
+  }
+  .cr-product .cr-quick-links a {
+    padding: 16px;
+  }
+}
+@media (max-width: 360px) {
+  .cr-product .cr-header-links {
+    flex-direction: column;
+    gap: 0;
+  }
+  .cr-product .cr-header-links a {
+    min-height: 32px;
+  }
+  .cr-product .cr-panel {
+    padding: 16px;
+  }
+  .cr-product .cr-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cr-product .cr-dialog > .cr-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cr-product *,
+  .cr-product *::before,
+  .cr-product *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

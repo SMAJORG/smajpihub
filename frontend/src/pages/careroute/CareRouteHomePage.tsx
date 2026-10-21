@@ -8,7 +8,11 @@ import LocalHospitalOutlinedIcon from "@mui/icons-material/LocalHospitalOutlined
 import NearMeOutlinedIcon from "@mui/icons-material/NearMeOutlined";
 
 const steps = [
-  { title: "Share your location", text: "Tell us where you are and what help you need.", Icon: EmergencyShareOutlinedIcon },
+  {
+    title: "Share your location",
+    text: "Tell us where you are and what help you need.",
+    Icon: EmergencyShareOutlinedIcon,
+  },
   { title: "Choose a hospital", text: "Compare nearby hospitals and available care.", Icon: NearMeOutlinedIcon },
   { title: "Follow your request", text: "Get updates when the hospital responds.", Icon: LocalHospitalOutlinedIcon },
 ];
@@ -23,29 +27,46 @@ export const CareRouteHomePage: React.FC<{ embedded?: boolean }> = ({ embedded =
 
       <section className="careroute-hero" aria-labelledby="careroute-home-title">
         <div className="careroute-hero-eyebrow">SMAJ Health</div>
-        <h1 id="careroute-home-title">Find a hospital nearby</h1>
-        <p>Share your location to find participating hospitals and request help.</p>
+        <h1 id="careroute-home-title">Emergency care, made simple.</h1>
+        <p>Find a participating hospital, request help, and follow the response in one place.</p>
         <div className="careroute-home-actions">
           <Link to="/careroute/request" className="careroute-btn-primary">
             <EmergencyShareOutlinedIcon />
-            <span>Request help</span>
+            <span>New emergency request</span>
           </Link>
           <Link to="/careroute/track" className="careroute-btn-secondary">
             <LocalShippingOutlinedIcon />
             <span>Track request</span>
           </Link>
         </div>
-        <Link className="careroute-browse-link" to="/careroute/hospitals">Browse hospitals</Link>
+        <Link className="careroute-browse-link" to="/careroute/hospitals">
+          Browse hospitals
+        </Link>
       </section>
+
+      <div className="cr-quick-links">
+        <Link to="/careroute/track">
+          <strong>Track a request</strong>
+          <span>Check the hospital response and progress.</span>
+        </Link>
+        <Link to="/careroute/my-requests">
+          <strong>My requests</strong>
+          <span>Your active requests and care history.</span>
+        </Link>
+      </div>
 
       <section className="careroute-home-steps" aria-labelledby="careroute-steps-title">
         <h2 id="careroute-steps-title">How it works</h2>
         <div className="careroute-grid-3">
           {steps.map(({ title, text, Icon }, index) => (
             <article className="careroute-card careroute-step-card" key={title}>
-              <div className="careroute-step-icon"><Icon /></div>
+              <div className="careroute-step-icon">
+                <Icon />
+              </div>
               <div>
-                <h3>{index + 1}. {title}</h3>
+                <h3>
+                  {index + 1}. {title}
+                </h3>
                 <p>{text}</p>
               </div>
             </article>
@@ -58,7 +79,9 @@ export const CareRouteHomePage: React.FC<{ embedded?: boolean }> = ({ embedded =
           <h2 id="careroute-staff-title">Hospital staff?</h2>
           <p>Manage incoming requests and update bed availability.</p>
         </div>
-        <Link to="/careroute/hospital-dashboard" className="careroute-btn-secondary">Open hospital desk</Link>
+        <Link to="/careroute/hospital-dashboard" className="careroute-btn-secondary">
+          Open hospital desk
+        </Link>
       </section>
     </div>
   </CareRouteLayout>

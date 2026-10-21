@@ -77,13 +77,13 @@ export const CareRouteHospitalsPage: React.FC = () => {
       <div style={{ marginBottom: "1.5rem", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
         <div>
           <span className="careroute-badge careroute-badge-submitted" style={{ marginBottom: "0.5rem" }}>
-            Network Facilities
+            Find care
           </span>
           <h1 style={{ fontSize: "1.75rem", fontWeight: 800, margin: "0 0 0.25rem", color: "#0f172a" }}>
-            Trauma Centers & ER Capacity Directory
+            Participating hospitals
           </h1>
           <p style={{ color: "#64748b", margin: 0, fontSize: "0.95rem" }}>
-            Real-time intake readiness status and bed availability across participating emergency facilities.
+            Compare reported availability, services and contact details.
           </p>
         </div>
 

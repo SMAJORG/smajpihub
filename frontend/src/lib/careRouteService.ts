@@ -1,3 +1,4 @@
+import "./careRouteConnection";
 import type {
   CareRouteHospital,
   CareRouteRequest,
@@ -1040,7 +1041,7 @@ export const careRouteService = {
       const resp = await axiosClient.get(`/careroute/patient/${encodeURIComponent(cleanUser)}/requests`, {
         timeout: 4000,
       });
-      if (resp.data && Array.isArray(resp.data.requests) && resp.data.requests.length > 0) {
+      if (resp.data && Array.isArray(resp.data.requests)) {
         return resp.data.requests;
       }
     } catch (err) {

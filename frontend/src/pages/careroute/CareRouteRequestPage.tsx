@@ -125,7 +125,7 @@ export const CareRouteRequestPage: React.FC = () => {
       // Stage 1: Geolocation and condition lock
       await new Promise((resolve) => setTimeout(resolve, 380));
       setSearchProgress(45);
-      setSearchPhase("Scanning regional emergency hospital network within GPS radius...");
+      setSearchPhase("Finding participating hospitals near your location...");
 
       // Trigger matching query
       const matchPromise = careRouteService.findMatchingHospitals({
@@ -137,12 +137,12 @@ export const CareRouteRequestPage: React.FC = () => {
       // Stage 2: Audit bed capacity
       await new Promise((resolve) => setTimeout(resolve, 450));
       setSearchProgress(70);
-      setSearchPhase("Auditing real-time ICU, trauma bays & ventilator bed availability...");
+      setSearchPhase("Comparing reported bed availability...");
 
       // Stage 3: Audit specialist physicians
       await new Promise((resolve) => setTimeout(resolve, 420));
       setSearchProgress(90);
-      setSearchPhase("Verifying on-duty emergency physicians & intake status...");
+      setSearchPhase("Comparing reported staff and intake availability...");
 
       const result = await matchPromise;
 
@@ -369,7 +369,7 @@ export const CareRouteRequestPage: React.FC = () => {
                   <MyLocationOutlinedIcon style={{ animation: "spin 2s linear infinite" }} />
                 </div>
                 <div style={{ fontWeight: 700, color: "#0f172a", fontSize: "0.95rem" }}>
-                  Auto-detecting live GPS coordinates & area...
+                  Finding your location...
                 </div>
                 <div style={{ fontSize: "0.825rem", color: "#64748b", marginTop: "4px" }}>
                   Locking satellite coordinates and reverse-geocoding neighborhood
@@ -412,7 +412,7 @@ export const CareRouteRequestPage: React.FC = () => {
                     style={{ padding: "0.45rem 0.85rem", fontSize: "0.825rem", whiteSpace: "nowrap" }}
                   >
                     <MyLocationOutlinedIcon style={{ fontSize: "0.95rem" }} />
-                    <span>Re-detect GPS</span>
+                    <span>Update location</span>
                   </button>
                 </div>
               </div>
@@ -447,7 +447,7 @@ export const CareRouteRequestPage: React.FC = () => {
                   className="careroute-btn-secondary"
                   style={{ padding: "0.4rem 0.75rem", fontSize: "0.8rem" }}
                 >
-                  Retry GPS
+                  Retry location
                 </button>
               </div>
             )}
@@ -468,7 +468,7 @@ export const CareRouteRequestPage: React.FC = () => {
                 style={{ padding: "0.75rem 1rem", fontSize: "0.95rem" }}
               />
               <small style={{ color: "#64748b", marginTop: "4px" }}>
-                Auto-located from your live coordinates. You can append an apartment number, floor, or landmark.
+                Check the detected address. Add an apartment number, floor or nearby landmark.
               </small>
             </div>
 
@@ -657,14 +657,14 @@ export const CareRouteRequestPage: React.FC = () => {
                       animation: "careroute-radar-pulse 1s infinite",
                     }}
                   />
-                  <span>CareRoute NearER Intelligent Triage Engine</span>
+                  <span>Finding care</span>
                 </div>
 
                 <h3 style={{ fontSize: "1.55rem", fontWeight: 800, color: "#0f172a", margin: "0 0 0.5rem" }}>
-                  Searching Regional Emergency Grid...
+                  Looking for suitable hospitals...
                 </h3>
                 <p style={{ color: "#64748b", margin: "0 auto 1.75rem", maxWidth: "540px", fontSize: "0.95rem" }}>
-                  Querying participating trauma centers and matching clinical suitability for emergency:{" "}
+                  Comparing participating hospitals for:{" "}
                   <strong style={{ color: "#dc2626" }}>{emergencyType}</strong>
                 </p>
 
@@ -742,7 +742,7 @@ export const CareRouteRequestPage: React.FC = () => {
                     >
                       {searchProgress >= 45 ? "✓" : "○"}
                     </span>
-                    <span>Clinical Emergency Classification ({emergencyType})</span>
+                    <span>Emergency type: {emergencyType}</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span
@@ -754,7 +754,7 @@ export const CareRouteRequestPage: React.FC = () => {
                     >
                       {searchProgress >= 70 ? "✓" : "○"}
                     </span>
-                    <span>Live Audit of Specialized Beds (ICU, Trauma Bays, Ventilators)</span>
+                    <span>Reported bed availability</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span
@@ -778,13 +778,13 @@ export const CareRouteRequestPage: React.FC = () => {
               <>
                 <div style={{ marginBottom: "1.5rem" }}>
                   <span className="careroute-badge careroute-badge-submitted" style={{ marginBottom: "0.5rem" }}>
-                    Step 4: NearER Intelligent Hospital Matching
+                    Step 4: Choose a hospital
                   </span>
                   <h2 style={{ fontSize: "1.65rem", fontWeight: 800, margin: "0 0 0.5rem", color: "#0f172a" }}>
                     Find the Right Hospital
                   </h2>
                   <p style={{ color: "#64748b", margin: 0, fontSize: "0.95rem" }}>
-                    Facilities evaluated for <strong>{emergencyType}</strong> using real-time clinical suitability, specialized bed availability, on-duty emergency physicians, and travel proximity.
+                    Compare hospitals for <strong>{emergencyType}</strong> using their reported care capabilities, bed availability, staff and distance.
                   </p>
                 </div>
 
@@ -1140,13 +1140,13 @@ export const CareRouteRequestPage: React.FC = () => {
         {currentStep === 5 && selectedHospital && (
           <div className="careroute-card" style={{ padding: "2rem" }}>
             <span className="careroute-badge careroute-badge-critical" style={{ marginBottom: "0.5rem" }}>
-              Step 5: Final Review & Dispatch
+              Step 5: Review request
             </span>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 800, margin: "0 0 0.5rem", color: "#0f172a" }}>
               Confirm Emergency Request
             </h2>
             <p style={{ color: "#64748b", margin: "0 0 1.5rem", fontSize: "0.95rem" }}>
-              Review the emergency intake summary before transmitting to the designated hospital triage desk.
+              Check your details and hospital before sending your request.
             </p>
 
             <div style={{ background: "#f8fafc", padding: "1.25rem", borderRadius: "10px", border: "1px solid #e2e8f0", display: "grid", gap: "0.85rem", marginBottom: "1.75rem", fontSize: "0.9rem" }}>
@@ -1189,7 +1189,7 @@ export const CareRouteRequestPage: React.FC = () => {
               style={{ width: "100%", justifyContent: "center", padding: "0.9rem", fontSize: "1.05rem" }}
             >
               <EmergencyShareOutlinedIcon />
-              <span>{submitting ? "Transmitting to Hospital..." : "Send Emergency Request"}</span>
+              <span>{submitting ? "Sending request..." : "Send Emergency Request"}</span>
             </button>
           </div>
         )}
