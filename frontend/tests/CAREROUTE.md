@@ -31,3 +31,16 @@ in place. A transport observer displays read/write failures even when a service
 falls back to cached data. A successful read does not clear a failed write. No
 page describes the connection as live; the UI shows the last server contact.
 Hospital matching and emergency dispatch logic are unchanged.
+
+## White paper alignment
+
+Sections 7.1 and 10.1 of `By_smaj_pi_hub_white_paper_v2.md` describe a shared Pi
+identity across hub services. CareRoute has no independent logout control and
+does not invoke the hub's global sign-out. Account sessions remain managed by
+SMAJ PI HUB.
+
+Section 7.4 requires provider verification for sensitive services. Hospital
+staff verification is retained through the existing backend endpoint; ordinary
+Pi patient access never automatically grants clinical operations permissions.
+Linking hospital permissions directly to Pi identity would require backend
+support and is not introduced by this frontend change.

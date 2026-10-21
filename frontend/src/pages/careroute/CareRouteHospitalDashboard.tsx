@@ -32,7 +32,7 @@ const EMPTY_BEDS: HospitalBedBreakdown = {
 };
 
 export const CareRouteHospitalDashboard: React.FC = () => {
-  const { user, isAuthenticated, isLoading: isAuthLoading, signOut } = useAuthContext();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuthContext();
 
   const [activeStaff, setActiveStaff] = useState<CareRouteStaff | null>(getHospitalStaff);
   const [currentStaff, setCurrentStaff] = useState<CareRouteStaff | null>(activeStaff);
@@ -625,19 +625,6 @@ export const CareRouteHospitalDashboard: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    stopSirenAlert();
-    setHospitalStaff(null);
-    setActiveStaff(null);
-    setRequests([]);
-    setCurrentStaff(null);
-    try {
-      await signOut();
-    } catch {
-      // ignore
-    }
-  };
-
   const signInStaff = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoginBusy(true);
@@ -749,7 +736,7 @@ export const CareRouteHospitalDashboard: React.FC = () => {
           {!isAuthenticated && (
             <div className="cr-pi-signin">
               <LoginWithPiButton className="careroute-btn-secondary">Connect Pi account</LoginWithPiButton>
-              <p>Pi identity and hospital staff access are verified separately.</p>
+              <p>Use your SMAJ PI HUB Pi identity. Hospital permissions require provider verification.</p>
             </div>
           )}
           <form className="cr-form" onSubmit={signInStaff}>
@@ -795,23 +782,9 @@ export const CareRouteHospitalDashboard: React.FC = () => {
         title="Hospital ER desk"
         description={hospital.id === activeStaff.hospitalId ? hospital.name : "Loading your assigned hospital..."}
         actions={
-          <>
-            <button className="careroute-btn-secondary" disabled={operationBusy || loading} onClick={refreshHospital}>
-              {operationBusy || loading ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              className="cr-text-button"
-              onClick={() =>
-                confirmAction(
-                  "Sign out of the ER desk?",
-                  "You will need your staff credentials to return.",
-                  handleLogout
-                )
-              }
-            >
-              Sign out
-            </button>
-          </>
+          <button className="careroute-btn-secondary" disabled={operationBusy || loading} onClick={refreshHospital}>
+            {operationBusy || loading ? "Refreshing..." : "Refresh"}
+          </button>
         }
       />
       <div className="cr-account-line">
