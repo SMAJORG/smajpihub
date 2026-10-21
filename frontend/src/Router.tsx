@@ -929,7 +929,7 @@ export const router = createBrowserRouter([
     path: "/app/services/health",
     element: (
       <ProtectedRoute>
-        <PrivateLayout>
+        <PrivateLayout fullScreen>
           <CareRouteHomePage embedded />
         </PrivateLayout>
       </ProtectedRoute>

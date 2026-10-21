@@ -24,7 +24,7 @@ export function StatusBadge({ status }: { status: PatientRequestStatus }) {
     </span>
   );
 }
-export function ConnectionBanner() {
+export function ConnectionBanner({ quiet = false }: { quiet?: boolean }) {
   const connection = useSyncExternalStore(careRouteConnection.subscribe, careRouteConnection.getSnapshot);
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
@@ -38,6 +38,7 @@ export function ConnectionBanner() {
   }, []);
   const writeFailed = connection.failures.some(key => !key.startsWith("GET "));
   const warning = !online || connection.failures.length > 0;
+  if (quiet && !warning && !connection.pendingWrites) return null;
   return (
     <div className={`cr-connection${warning ? " cr-connection-warning" : ""}`} role={warning ? "alert" : "status"}>
       <i aria-hidden="true" />

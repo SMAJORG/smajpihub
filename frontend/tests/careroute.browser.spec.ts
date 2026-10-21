@@ -88,11 +88,11 @@ async function setup(page: Page) {
       return json({ request: current });
     }
     if (path.startsWith("/presence") || path.startsWith("/users/presence")) return json({});
-    if (route.request().resourceType() === "image" && url.hostname !== "127.0.0.1") return route.abort();
+    if (url.hostname !== "127.0.0.1") return route.abort();
     return route.continue();
   });
-  await page.goto("/tests/careroute.html");
-  await expect(page.getByRole("heading", { name: "Emergency care, made simple." })).toBeVisible();
+  await page.goto("/tests/careroute.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Emergency Care, Made Simple." })).toBeVisible();
   return {
     mutations,
     hospitalReads: () => hospitalReads,
@@ -110,7 +110,7 @@ test("patient pages fit mobile, tablet and desktop with readable actions", async
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    const action = page.getByRole("link", { name: "New emergency request", exact: true });
+    const action = page.getByRole("link", { name: "New Emergency Request", exact: true });
     const box = await action.boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(44);
     expect(await action.locator("span").evaluate(el => getComputedStyle(el).color)).toBe("rgb(255, 255, 255)");
@@ -128,11 +128,20 @@ test("a patient Pi account and legacy fabricated staff session cannot open the E
   await page.screenshot({ path: "test-results/careroute-staff-access.png", fullPage: true });
 });
 
+test("the dashboard uses the Health card artwork and the patient's real API record", async ({ page }) => {
+  await setup(page);
+  await expect(page.locator(".cr-recent-card")).toContainText(request.trackingCode);
+  await expect(page.locator(".cr-recent-card")).toContainText(hospital.name);
+  await expect(page.locator(".cr-recent-card")).not.toContainText("CR-972033");
+  expect(await page.locator(".cr-health-card-icon").evaluate(el => getComputedStyle(el).backgroundImage)).toContain("health.png");
+  await expect(page.getByRole("navigation", { name: "CareRoute navigation" }).getByRole("link")).toHaveCount(4);
+});
+
 test("all active requests stay out of history and missing ETAs are not invented", async ({ page }) => {
   await setup(page);
   await page
     .getByRole("navigation", { name: "CareRoute navigation" })
-    .getByRole("link", { name: "My requests" })
+    .getByRole("link", { name: "Requests", exact: true })
     .click();
   await expect(page.locator(".cr-history-card")).toHaveCount(2);
   await expect(page.locator(".cr-history-card").first()).toContainText("Not provided");
@@ -146,10 +155,7 @@ test("tracking reflects recorded status and warns when offline; cancellation req
   context,
 }) => {
   const app = await setup(page);
-  await page
-    .getByRole("navigation", { name: "CareRoute navigation" })
-    .getByRole("link", { name: "Track", exact: true })
-    .click();
+  await page.locator('.cr-dashboard-shortcuts a[href="/careroute/track"]').click();
   await page.getByLabel("Tracking code", { exact: true }).fill(request.trackingCode);
   await page.getByRole("button", { name: "Track request", exact: true }).click();
   await expect(page.locator(".cr-tracking-summary")).toContainText("Not provided");

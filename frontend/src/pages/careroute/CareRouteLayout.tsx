@@ -1,10 +1,16 @@
 ﻿import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
+import ServiceArt from "../../components/ServiceArt";
 import { getHospitalStaff, STAFF_CHANGED } from "../../lib/careRouteStaffSession";
 import { ConnectionBanner } from "./CareRouteUI";
 import "./careroute.css";
 import "./careroute-modern.css";
+import "./careroute-dashboard.css";
 
 type CareRouteLayoutProps = { children: ReactNode; embedded?: boolean };
 export const CareRouteLayout = ({ children, embedded = false }: CareRouteLayoutProps) => {
@@ -16,50 +22,61 @@ export const CareRouteLayout = ({ children, embedded = false }: CareRouteLayoutP
     return () => window.removeEventListener(STAFF_CHANGED, update);
   }, []);
   const staffPage = location.pathname.includes("hospital-dashboard");
+  const homePage = location.pathname === "/careroute" || location.pathname === "/app/services/health";
   return (
-    <div className={`careroute-portal cr-product${embedded ? " careroute-embedded" : ""}`}>
+    <div className={`careroute-portal cr-product cr-reference-design${embedded ? " careroute-embedded" : ""}`}>
       <header className="cr-header">
         <div className="cr-header-inner">
           <Link to="/careroute" className="cr-brand" aria-label="CareRoute home">
-            <i>
-              <FavoriteBorderRoundedIcon />
-            </i>
+            <ServiceArt index={4} className="cr-health-card-icon" />
             <div>
               <strong>CareRoute</strong>
-              <small>SMAJ PI HUB Health</small>
+              <small>SMAJ PI HEALTH</small>
             </div>
           </Link>
           <div className="cr-header-links">
-            <Link to="/app/services" className="cr-hub-link">
-              <img src="/logo.png" alt="" />
-              Back to hub
-            </Link>
             {staff && (
               <NavLink to="/careroute/hospital-dashboard" className="cr-staff-link">
                 ER desk
               </NavLink>
             )}
+            <Link to="/notifications" className="cr-notification-link" aria-label="Notifications">
+              <NotificationsNoneRoundedIcon />
+            </Link>
           </div>
         </div>
-        {!staffPage && (
-          <nav className="cr-patient-nav" aria-label="CareRoute navigation">
-            <NavLink to="/careroute" end>
-              Home
-            </NavLink>
-            <NavLink to="/careroute/request">Request help</NavLink>
-            <NavLink to="/careroute/track">Track</NavLink>
-            <NavLink to="/careroute/my-requests">My requests</NavLink>
-          </nav>
-        )}
       </header>
       <main className="careroute-main cr-main">
-        <ConnectionBanner />
+        <ConnectionBanner quiet={homePage} />
         {children}
       </main>
       <footer className="cr-footer">
-        <span>CareRoute by SMAJ PI HUB</span>
+        <Link to="/app/services">Back to SMAJ PI HUB</Link>
         <Link to="/careroute/hospital-dashboard">Hospital staff sign-in</Link>
       </footer>
+      {!staffPage && (
+        <nav className="cr-bottom-nav" aria-label="CareRoute navigation">
+          <NavLink to="/careroute" end className={({ isActive }) => (isActive || homePage ? "active" : "")}>
+            <HomeOutlinedIcon />
+            <span>Home</span>
+          </NavLink>
+          <NavLink to="/careroute/request">
+            <FavoriteBorderRoundedIcon />
+            <span>Emergency</span>
+          </NavLink>
+          <NavLink
+            to="/careroute/my-requests"
+            className={({ isActive }) => (isActive || location.pathname.startsWith("/careroute/track") ? "active" : "")}
+          >
+            <AssignmentOutlinedIcon />
+            <span>Requests</span>
+          </NavLink>
+          <NavLink to="/profile">
+            <PersonOutlineRoundedIcon />
+            <span>Profile</span>
+          </NavLink>
+        </nav>
+      )}
     </div>
   );
 };
