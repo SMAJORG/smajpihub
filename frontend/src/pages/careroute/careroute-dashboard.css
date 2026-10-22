@@ -23,11 +23,18 @@
   width: 52px;
   height: 52px;
   flex: 0 0 52px;
-  display: block;
+  display: grid;
+  place-items: center;
+  background: #dfebe5;
+  color: #397b58 !important;
   margin: 0;
   border: 0;
   border-radius: 14px;
   box-shadow: none;
+}
+.cr-reference-design .cr-health-card-icon svg {
+  width: 29px;
+  height: 29px;
 }
 .cr-reference-design .cr-notification-link {
   display: grid;

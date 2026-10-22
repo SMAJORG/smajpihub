@@ -128,12 +128,12 @@ test("a patient Pi account and legacy fabricated staff session cannot open the E
   await page.screenshot({ path: "test-results/careroute-staff-access.png", fullPage: true });
 });
 
-test("the dashboard uses the Health card artwork and the patient's real API record", async ({ page }) => {
+test("the dashboard uses the reference heart mark and the patient's real API record", async ({ page }) => {
   await setup(page);
   await expect(page.locator(".cr-recent-card")).toContainText(request.trackingCode);
   await expect(page.locator(".cr-recent-card")).toContainText(hospital.name);
   await expect(page.locator(".cr-recent-card")).not.toContainText("CR-972033");
-  expect(await page.locator(".cr-health-card-icon").evaluate(el => getComputedStyle(el).backgroundImage)).toContain("health.png");
+  await expect(page.locator(".cr-health-card-icon svg.cr-heart-mark")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "CareRoute navigation" }).getByRole("link")).toHaveCount(4);
 });
 

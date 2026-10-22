@@ -1,11 +1,10 @@
 ﻿import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
-import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
-import ServiceArt from "../../components/ServiceArt";
+import CareRouteHeartIcon from "./CareRouteHeartIcon";
 import { getHospitalStaff, STAFF_CHANGED } from "../../lib/careRouteStaffSession";
 import { ConnectionBanner } from "./CareRouteUI";
 import "./careroute.css";
@@ -28,7 +27,9 @@ export const CareRouteLayout = ({ children, embedded = false }: CareRouteLayoutP
       <header className="cr-header">
         <div className="cr-header-inner">
           <Link to="/careroute" className="cr-brand" aria-label="CareRoute home">
-            <ServiceArt index={4} className="cr-health-card-icon" />
+            <span className="cr-health-card-icon">
+              <CareRouteHeartIcon />
+            </span>
             <div>
               <strong>CareRoute</strong>
               <small>SMAJ PI HEALTH</small>
@@ -61,7 +62,7 @@ export const CareRouteLayout = ({ children, embedded = false }: CareRouteLayoutP
             <span>Home</span>
           </NavLink>
           <NavLink to="/careroute/request">
-            <FavoriteBorderRoundedIcon />
+            <CareRouteHeartIcon />
             <span>Emergency</span>
           </NavLink>
           <NavLink
