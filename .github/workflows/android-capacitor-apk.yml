@@ -2,6 +2,12 @@ name: Build Capacitor Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish the verified APK as the live Android update (main branch only)
+        type: boolean
+        required: false
+        default: false
   push:
     branches:
       - main
@@ -16,6 +22,7 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: frontend
@@ -57,7 +64,7 @@ jobs:
           echo "SMAJ_ANDROID_VERSION_CODE=$code" >> "$GITHUB_ENV"
           echo "VITE_APP_VERSION=1.0.$code" >> "$GITHUB_ENV"
       - name: Install web dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
       - name: Build and sync Capacitor
         env:
           SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
@@ -85,6 +92,7 @@ jobs:
             frontend/android/app/build/outputs/apk/release/SMAJ-PI-HUB-update.json
           if-no-files-found: error
       - name: Publish verified update
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish_release == true)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
