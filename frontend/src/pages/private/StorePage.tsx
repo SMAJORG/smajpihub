@@ -3,6 +3,8 @@ import "./StorePage.css";
 import HeroBannerAction from "../../components/HeroBannerAction";
 import ServiceImage from "../../components/ServiceImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { localizeText } from "../../localization/catalog";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import ArrowForwardIosOutlinedIcon from "@mui/icons-material/ArrowForwardIosOutlined";
@@ -63,6 +65,7 @@ const sortOptions = [
   ["price-high", "Price: High to Low"], ["popular", "Most Popular"], ["rated", "Best Rated"],
 ] as const;
 const StorePage = () => {
+  const { i18n } = useTranslation();
   const { user } = useAuthContext();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -275,12 +278,8 @@ const StorePage = () => {
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
           aria-label="Search products"
+          placeholder={searchFocused ? "Search products" : `${localizeText("Search", i18n)} ${searchSuggestions[searchSuggestionIndex] || "products"}`}
         />
-        {!search && !searchFocused ? (
-          <span key={searchSuggestionIndex} className="storefront-search-suggestion" aria-hidden="true">
-            <span>Search</span> <bdi translate="no">{searchSuggestions[searchSuggestionIndex] || "products"}</bdi>
-          </span>
-        ) : null}
       </span>
     </label>
   );

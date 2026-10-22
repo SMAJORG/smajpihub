@@ -10,20 +10,25 @@ html[dir="rtl"] .storefront-page .storefront-mobile-drawer-panel { direction: rt
 }
 .storefront-page .storefront-hero-slide[hidden] { display: none; }
 .storefront-page .storefront-hero-slide > div { overflow-wrap: anywhere; }
+.storefront-page .storefront-search {
+  direction: ltr;
+  height: 48px;
+  padding-block: 0;
+}
 .storefront-page .storefront-search > svg { flex: 0 0 24px; }
-.storefront-page .storefront-search input { text-align: start; }
-.storefront-page .storefront-search-suggestion {
-  display: flex;
-  align-items: baseline;
-  gap: .35em;
-  text-align: start;
-}
-.storefront-page .storefront-search-suggestion bdi {
+.storefront-page .storefront-search-field { align-self: stretch; height: auto; }
+.storefront-page .storefront-search input {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
   min-width: 0;
-  overflow: hidden;
+  line-height: normal;
+  text-align: start;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
+.storefront-page .storefront-search input::placeholder { color: #64748b; opacity: 1; }
 .storefront-page .storefront-promo-strip { padding: 10px 14px; }
 .storefront-page .storefront-promo-strip > div {
   display: flex;
@@ -53,10 +58,12 @@ html[dir="rtl"] .storefront-page :is([data-testid^="ArrowBack"], [data-testid^="
 }
 
 @media (max-width: 1023px) {
-  .storefront-page .storefront-mobile-top { justify-content: flex-start; gap: 10px; }
+  /* The store toolbar keeps the same physical control order in every language:
+     menu, brand, beta, then cart and profile. Text direction remains localized. */
+  .storefront-page .storefront-mobile-top { direction: ltr; justify-content: flex-start; gap: 10px; }
   .storefront-page .storefront-mobile-logo { margin: 0; }
   .storefront-page .storefront-mobile-environment-badge { margin: 0; flex-shrink: 0; }
-  .storefront-page .storefront-mobile-actions { margin-inline-start: auto; gap: 10px; }
+  .storefront-page .storefront-mobile-actions { direction: ltr; margin: 0 0 0 auto; gap: 10px; }
   .storefront-page .storefront-mobile-actions a { display: inline-flex; align-items: center; flex-shrink: 0; }
   .storefront-page .storefront-mobile-drawer { inset-inline-start: 0; inset-inline-end: auto; }
   .storefront-page .storefront-mobile-drawer-panel header h3 { margin: 0; }

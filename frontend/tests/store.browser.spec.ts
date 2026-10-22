@@ -23,11 +23,21 @@ async function withinViewport(page: Page, locator: Locator) {
 }
 for (const language of ['en', 'ar']) {
   for (const width of [320, 390, 768, 1440]) {
-    test(`${language} store header, filters and banner fit at ${width}px`, async ({ page }) => {
+    test(`${language} store header, filters and banner fit at ${width}px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 });
       await openStore(page, language);
       const search = page.locator(width < 1024 ? '.storefront-mobile-search input' : '.storefront-header-main input');
       await withinViewport(page, search);
+      await expect(search).not.toHaveAttribute('placeholder', '');
+      await expect(page.locator('.storefront-search-suggestion')).toHaveCount(0);
+      if (width < 1024) {
+        const positions = await page.locator('.storefront-mobile-top').evaluate(header => [
+          '.storefront-mobile-menu-button', '.storefront-mobile-logo', '.storefront-mobile-environment-badge',
+          '.storefront-mobile-actions .storefront-cart-link', '.storefront-avatar-link',
+        ].map(selector => header.querySelector(selector)!.getBoundingClientRect().x));
+        for (let index = 1; index < positions.length; index++) expect(positions[index]).toBeGreaterThan(positions[index - 1]);
+      }
+      await page.locator('.storefront-header').screenshot({ path: testInfo.outputPath('store-header.png'), animations: 'disabled' });
       await search.fill('Samsung Galaxy S21 Ultra 5G');
       await expect(search).toHaveValue('Samsung Galaxy S21 Ultra 5G');
       await search.clear();
