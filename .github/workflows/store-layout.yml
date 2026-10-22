@@ -1,0 +1,33 @@
+name: Store layout checks
+on:
+  push:
+    branches: [fix/store-header-rtl-layout]
+  pull_request:
+    paths:
+      - 'frontend/src/pages/private/StorePage*'
+      - 'frontend/tests/store*'
+      - '.github/workflows/store-layout.yml'
+permissions:
+  contents: read
+concurrency:
+  group: store-layout-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  store:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:i18n
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node node_modules/@playwright/test/cli.js test --config tests/store.playwright.config.ts

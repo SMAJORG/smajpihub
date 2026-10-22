@@ -1,0 +1,78 @@
+/* Keep physical carousel translations independent of document text direction.
+   The same contract is used by the two-panel category drawer. */
+.storefront-page .storefront-hero-track,
+.storefront-page .storefront-mobile-drawer-panels { direction: ltr; }
+html[dir="rtl"] .storefront-page .storefront-hero-slide,
+html[dir="rtl"] .storefront-page .storefront-mobile-drawer-panel { direction: rtl; }
+.storefront-page .storefront-hero-slide {
+  min-width: 0;
+  background: linear-gradient(135deg, #31245d, #7040bb);
+}
+.storefront-page .storefront-hero-slide[hidden] { display: none; }
+.storefront-page .storefront-hero-slide > div { overflow-wrap: anywhere; }
+.storefront-page .storefront-search > svg { flex: 0 0 24px; }
+.storefront-page .storefront-search input { text-align: start; }
+.storefront-page .storefront-search-suggestion {
+  display: flex;
+  align-items: baseline;
+  gap: .35em;
+  text-align: start;
+}
+.storefront-page .storefront-search-suggestion bdi {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.storefront-page .storefront-promo-strip { padding: 10px 14px; }
+.storefront-page .storefront-promo-strip > div {
+  display: flex;
+  max-width: 100%;
+  gap: 12px 24px;
+  overflow-x: auto;
+  animation: none;
+  scrollbar-width: thin;
+}
+.storefront-page .storefront-promo-strip span { flex: 0 0 auto; }
+.storefront-page .storefront-tool-panel > button,
+.storefront-page .storefront-mobile-drawer-panel nav button { text-align: start; }
+.storefront-page .storefront-cart-count { right: auto; inset-inline-end: -7px; }
+html[dir="rtl"] .storefront-page :is([data-testid^="ArrowBack"], [data-testid^="ArrowForward"]) { transform: scaleX(-1); }
+
+@media (min-width: 1024px) {
+  .storefront-page .storefront-tool-menu .storefront-tool-panel {
+    left: auto;
+    right: auto;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+  }
+  .storefront-page .storefront-tool-menu:nth-of-type(n+3) .storefront-tool-panel {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .storefront-page .storefront-mobile-top { justify-content: flex-start; gap: 10px; }
+  .storefront-page .storefront-mobile-logo { margin: 0; }
+  .storefront-page .storefront-mobile-environment-badge { margin: 0; flex-shrink: 0; }
+  .storefront-page .storefront-mobile-actions { margin-inline-start: auto; gap: 10px; }
+  .storefront-page .storefront-mobile-actions a { display: inline-flex; align-items: center; flex-shrink: 0; }
+  .storefront-page .storefront-mobile-drawer { inset-inline-start: 0; inset-inline-end: auto; }
+  .storefront-page .storefront-mobile-drawer-panel header h3 { margin: 0; }
+  .storefront-page .storefront-shopping-tools { isolation: isolate; }
+  .storefront-page .storefront-tool-menu { position: static; }
+  /* Anchor every popover to the filter row, so neither RTL nor long labels
+     can send it beyond the viewport. Override the old physical edge rules. */
+  .storefront-page .storefront-tool-menu .storefront-tool-panel {
+    left: 0 !important;
+    right: 0 !important;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    max-height: min(65dvh, 480px);
+    overflow: auto;
+  }
+  .storefront-page .storefront-tool-panel :is(select, input[type="number"]) { min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box; }
+}

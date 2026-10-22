@@ -1,4 +1,5 @@
 import StoreFooter from "../../components/StoreFooter";
+import "./StorePage.css";
 import HeroBannerAction from "../../components/HeroBannerAction";
 import ServiceImage from "../../components/ServiceImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -84,6 +85,8 @@ const StorePage = () => {
   const [locationFilter, setLocationFilter] = useState(params.get("location") || "All");
   const [detectedLocation, setDetectedLocation] = useState(() => window.localStorage.getItem(STORE_LOCATION_STORAGE_KEY) || detectApproximateBrowserLocation());
   const shoppingToolsRef = useRef<HTMLElement | null>(null);
+  const mobileDrawerRef = useRef<HTMLElement | null>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
   const [displayHeroSlides, setDisplayHeroSlides] = useState(heroSlides.map(slide => ({ ...slide, label: "SMAJ Store", targetUrl: undefined as string | undefined, buttonText: "Shop now" })));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -132,13 +135,29 @@ const StorePage = () => {
     if (!mobileMenuOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    mobileDrawerRef.current?.querySelector<HTMLElement>('a, button')?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+      if (event.key !== "Tab") return;
+      const controls = Array.from(mobileDrawerRef.current?.querySelectorAll<HTMLElement>('a, button, input, select, [tabindex="0"]') || []).filter(element => !element.closest('[inert]') && element.getClientRects().length > 0);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+      mobileMenuButtonRef.current?.focus();
     };
   }, [mobileMenuOpen]);
 
   useEffect(() => {
-    if (displayHeroSlides.length < 2) return;
+    if (mobileMenuOpen) mobileDrawerRef.current?.querySelector<HTMLElement>('section:not([inert]) button')?.focus();
+  }, [mobileMenuOpen, mobileMenuPanel]);
+
+  useEffect(() => {
+    if (displayHeroSlides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const timer = window.setInterval(() => setHeroIndex((value) => (value + 1) % displayHeroSlides.length), 4800);
     return () => window.clearInterval(timer);
   }, [displayHeroSlides.length]);
@@ -246,9 +265,11 @@ const StorePage = () => {
   };
   const searchField = (mobile = false) => (
     <label className={`storefront-search${mobile ? " storefront-mobile-search" : ""}`}>
-      <SearchOutlinedIcon />
+      <SearchOutlinedIcon aria-hidden="true" />
       <span className="storefront-search-field">
         <input
+          type="search"
+          dir="auto"
           value={search}
           onChange={(event) => updateSearch(event.target.value)}
           onFocus={() => setSearchFocused(true)}
@@ -257,7 +278,7 @@ const StorePage = () => {
         />
         {!search && !searchFocused ? (
           <span key={searchSuggestionIndex} className="storefront-search-suggestion" aria-hidden="true">
-            Search {searchSuggestions[searchSuggestionIndex] || "products"}
+            <span>Search</span> <bdi translate="no">{searchSuggestions[searchSuggestionIndex] || "products"}</bdi>
           </span>
         ) : null}
       </span>
@@ -393,7 +414,7 @@ const StorePage = () => {
           </div>
 
           <div className="storefront-mobile-top">
-            <button type="button" className="storefront-mobile-menu-button" aria-label="Open categories menu" onClick={() => { setMobileMenuPanel("categories"); setMobileMenuOpen(true); }}>
+            <button ref={mobileMenuButtonRef} type="button" className="storefront-mobile-menu-button" aria-label="Open categories menu" aria-expanded={mobileMenuOpen} aria-controls="storefront-categories-menu" onClick={() => { setMobileMenuPanel("categories"); setMobileMenuOpen(true); }}>
               <MenuOutlinedIcon />
             </button>
             <Link to="/store" className="storefront-mobile-logo" aria-label="SMAJ Store">
@@ -416,9 +437,9 @@ const StorePage = () => {
           {mobileMenuOpen ? (
             <div className="storefront-mobile-drawer-wrap">
               <button type="button" className="storefront-mobile-drawer-backdrop" aria-label="Close menu" onClick={() => setMobileMenuOpen(false)} />
-              <aside className="storefront-mobile-drawer" aria-label="SMAJ Store categories menu">
+              <aside ref={mobileDrawerRef} id="storefront-categories-menu" className="storefront-mobile-drawer" role="dialog" aria-modal="true" aria-label="SMAJ Store categories menu">
                 <div className="storefront-mobile-drawer-panels" style={{ transform: mobileMenuPanel === "subcategories" ? "translateX(-50%)" : "translateX(0)" }}>
-                  <section className="storefront-mobile-drawer-panel">
+                  <section className="storefront-mobile-drawer-panel" inert={mobileMenuPanel !== "categories"}>
                     <header>
                       <Link to="/store" aria-label="SMAJ Store" onClick={() => setMobileMenuOpen(false)}><ServiceImage slug="store" src={logoImage} alt="SMAJ Store" /></Link>
                       <button type="button" aria-label="Close menu" onClick={() => setMobileMenuOpen(false)}><CloseOutlinedIcon /></button>
@@ -433,7 +454,7 @@ const StorePage = () => {
                       ))}
                     </nav>
                   </section>
-                  <section className="storefront-mobile-drawer-panel">
+                  <section className="storefront-mobile-drawer-panel" inert={mobileMenuPanel !== "subcategories"}>
                     <header>
                       <button type="button" className="storefront-mobile-drawer-back" aria-label="Back to categories" onClick={() => setMobileMenuPanel("categories")}><ArrowBackIosNewOutlinedIcon /></button>
                       <h3>{mobileMenuCategory}</h3>
@@ -501,15 +522,15 @@ const StorePage = () => {
         </section>
 
         <section className="storefront-promo-strip" aria-label="Store benefits">
-          <div>{[...promoStripItems, ...promoStripItems, ...promoStripItems].map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}</div>
+          <div>{promoStripItems.map(item => <span key={item}>{item}</span>)}</div>
         </section>
 
         {displayHeroSlides.length > 0 ? <section className="storefront-hero">
           <button type="button" className="storefront-arrow left" onClick={() => setHeroIndex((value) => (value - 1 + displayHeroSlides.length) % displayHeroSlides.length)} aria-label="Previous banner"><ArrowBackIosNewOutlinedIcon /></button>
-          <div className="storefront-hero-track" style={{ transform: `translateX(-${heroIndex * 100}%)` }}>
-            {displayHeroSlides.map((slide) => (
-              <article className="storefront-hero-slide" key={slide.image + slide.title} style={{ color: slide.textColor || "#ffffff" }}>
-                <img src={slide.image} alt={slide.title} />
+          <div className="storefront-hero-track">
+            {displayHeroSlides.map((slide, index) => (
+              <article className="storefront-hero-slide" hidden={heroIndex !== index} key={slide.image + slide.title} style={{ color: slide.textColor || "#ffffff" }}>
+                <img src={slide.image} alt="" onError={event => { event.currentTarget.style.visibility = "hidden"; }} />
                 <div>
                   {slide.label ? <span>{slide.label}</span> : null}
                   <h1>{slide.title}</h1>
