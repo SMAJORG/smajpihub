@@ -737,9 +737,7 @@ export const router = createBrowserRouter([
     path: "/app/services/education",
     element: (
       <ProtectedRoute>
-        <PrivateLayout>
-          <EducationPage />
-        </PrivateLayout>
+        <EducationPage />
       </ProtectedRoute>
     ),
   },
