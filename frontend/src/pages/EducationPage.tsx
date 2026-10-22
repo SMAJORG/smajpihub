@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
@@ -8,6 +8,10 @@ import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import DomainOutlinedIcon from "@mui/icons-material/DomainOutlined";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
+import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
+import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import AppLayout from "../layouts/AppLayout";
 import EducationHeader from "./education/EducationHeader";
 import { getEducationCategories, getEducationCourses, getEducationPartners } from "../lib/educationApi";
@@ -19,6 +23,9 @@ import "./EducationPage.css";
 
 const EducationPage = () => {
   const [searchParams] = useSearchParams();
+  const { pathname } = useLocation();
+  // The private Education route already gets this navigation from PrivateLayout.
+  const showBottomNavigation = !pathname.startsWith("/app/");
   const [categories, setCategories] = useState<string[]>([]);
   const [courses, setCourses] = useState<EducationCourse[]>([]);
   const [partners, setPartners] = useState<EducationPartner[]>([]);
@@ -80,7 +87,7 @@ const EducationPage = () => {
 
   return (
     <AppLayout showHeader={false} showFooter={false}>
-      <main className="education-page">
+      <main className={`education-page${showBottomNavigation ? " education-with-bottom-nav" : ""}`}>
         <EducationHeader query={query} onQueryChange={setQuery} />
         <section className="education-hero">
           <div className="education-hero-copy">
@@ -231,6 +238,15 @@ const EducationPage = () => {
           </article>
         </section>
       </main>
+      {showBottomNavigation ? (
+        <nav className="mobile-bottom-nav education-bottom-nav" aria-label="SMAJ PI HUB navigation">
+          <Link to="/dashboard"><DashboardOutlinedIcon /><span>Home</span></Link>
+          <Link to="/app/services" className="active"><AppsOutlinedIcon /><span>Services</span></Link>
+          <Link to="/search"><SearchOutlinedIcon /><span>Search</span></Link>
+          <Link to="/messages"><ChatOutlinedIcon /><span>Messages</span></Link>
+          <Link to="/settings"><PersonOutlineIcon /><span>You</span></Link>
+        </nav>
+      ) : null}
     </AppLayout>
   );
 };
