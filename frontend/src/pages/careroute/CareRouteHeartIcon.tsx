@@ -2,6 +2,10 @@ export default function CareRouteHeartIcon() {
   return (
     <svg
       className="cr-heart-mark"
+      width="24"
+      height="24"
+      width="24"
+      height="24"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
