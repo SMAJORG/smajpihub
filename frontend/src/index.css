@@ -22848,4 +22848,35 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
     min-height: 170px !important;
     padding: 14px 8px !important;
   }
+  .private-home .mobile-services-grid > a:has(div > strong) {
+    min-width: 0 !important;
+    min-height: 154px !important;
+    height: auto !important;
+    padding: 14px 10px !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    text-align: left !important;
+  }
+  .private-home .mobile-services-grid > a:has(div > strong) > div {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+  }
+  .private-home .mobile-services-grid > a:has(div > strong) strong,
+  .private-home .mobile-services-grid > a:has(div > strong) small {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    line-height: 1.35;
+  }
+  .private-home .mobile-services-grid > a:has(div > strong) > small {
+    margin-top: auto;
+    color: var(--smaj-text-secondary);
+    font-size: 10px;
+    line-height: 1.3;
+    text-align: right;
+  }
 }
