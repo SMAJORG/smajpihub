@@ -49,7 +49,8 @@ const CandidateProfileContent = ({ candidateId, onBack }: { candidateId: string;
 
       <section className="jobs-candidate-profile-section">
         <h2>About</h2>
-        <p>{candidate.summary || "No summary provided."}</p>
+        <p className="jobs-candidate-profile-about">{candidate.summary || "No summary provided."}</p>
+        {candidate.summary && candidate.summary.length > 260 ? <button type="button" className="jobs-candidate-read-more">Read more⌄</button> : null}
       </section>
 
       <section className="jobs-candidate-profile-section">
@@ -78,6 +79,13 @@ const CandidateProfileContent = ({ candidateId, onBack }: { candidateId: string;
           <p>No experience added yet.</p>
         )}
       </section>
+
+      {candidate.portfolio ? (
+        <section className="jobs-candidate-profile-section">
+          <h2>Portfolio</h2>
+          <a href={candidate.portfolio} target="_blank" rel="noreferrer">View portfolio</a>
+        </section>
+      ) : null}
 
       {candidate.cv ? (
         <section className="jobs-candidate-profile-section">

@@ -39,6 +39,8 @@ interface Environment {
   admin_pi_usernames: string[];
   cloudinary_cloud_name: string;
   cloudinary_upload_preset: string;
+  cloudinary_api_key: string;
+  cloudinary_api_secret: string;
   cloudinary_folder: string;
   marketplace_auto_approve_products: boolean;
   session_debug: boolean;
@@ -103,6 +105,8 @@ const env: Environment = {
     .filter(Boolean),
   cloudinary_cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
   cloudinary_upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET || "",
+  cloudinary_api_key: process.env.CLOUDINARY_API_KEY || "",
+  cloudinary_api_secret: process.env.CLOUDINARY_API_SECRET || "",
   cloudinary_folder: process.env.CLOUDINARY_FOLDER || "smajpihub",
   marketplace_auto_approve_products:
     String(
@@ -171,6 +175,8 @@ if (isProduction) {
     missing.push("MONGODB_DATABASE_NAME");
   if (!env.is_solohost && !env.cloudinary_cloud_name) missing.push("CLOUDINARY_CLOUD_NAME");
   if (!env.is_solohost && !env.cloudinary_upload_preset) missing.push("CLOUDINARY_UPLOAD_PRESET");
+  if (!env.is_solohost && !env.cloudinary_api_key) missing.push("CLOUDINARY_API_KEY");
+  if (!env.is_solohost && !env.cloudinary_api_secret) missing.push("CLOUDINARY_API_SECRET");
 
   if (missing.length) {
     throw new Error(

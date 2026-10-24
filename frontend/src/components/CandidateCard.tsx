@@ -20,16 +20,20 @@ const CandidateCard = ({ candidate }: CandidateCardProps) => (
         </div>
       </div>
       <div className="jobs-candidate-card-body">
-        {candidate.location ? <small>{candidate.location}</small> : null}
-        {candidate.availability ? <small>{candidate.availability}</small> : null}
+        <div className="jobs-candidate-card-meta">
+          {candidate.location ? <small>⌖ {candidate.location}</small> : null}
+          {candidate.availability ? <small className="jobs-candidate-availability">{candidate.availability}</small> : null}
+        </div>
         <div className="jobs-candidate-card-skills">
-          {candidate.skills.slice(0, 6).map(skill => (
+          {candidate.skills.slice(0, 3).map(skill => (
             <span key={skill}>{skill}</span>
           ))}
         </div>
+        {candidate.summary ? <p>{candidate.summary}</p> : null}
       </div>
       <footer>
-        <span>View CV</span>
+        <span>View profile →</span>
+        {candidate.cv ? <small>CV available</small> : null}
       </footer>
     </Link>
   </article>

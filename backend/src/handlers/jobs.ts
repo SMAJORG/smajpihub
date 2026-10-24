@@ -803,7 +803,7 @@ export default function mountJobsEndpoints(router: Router) {
     const cv = visibleCv(profile, user, company, application);
     if (!cv) return res.status(404).json({ message: "CV unavailable" });
     const asset = await req.app.locals.cvAssetCollection.findOne({ url: cv.url, ownerId: req.params.candidateId, protectedAsset: true });
-    const secret = process.env.CLOUDINARY_API_SECRET, key = process.env.CLOUDINARY_API_KEY;
+    const secret = env.cloudinary_api_secret, key = env.cloudinary_api_key;
     if (!asset || !secret || !key) return res.status(409).json({ message: "Re-upload this CV into protected storage" });
     const params = new URLSearchParams({ public_id: asset._id, type: "authenticated", format: "pdf", expires_at: String(Math.floor(Date.now()/1000)+60), timestamp: String(Math.floor(Date.now()/1000)) });
     const signed = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k+"="+v).join("&");

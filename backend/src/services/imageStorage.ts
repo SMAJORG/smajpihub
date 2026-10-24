@@ -97,7 +97,7 @@ export const uploadPdfToCloudinary = async (document: string, purpose = "documen
   params.set("folder", `${env.cloudinary_folder}/${safePurpose(purpose)}`);
   const protectedCv = safePurpose(purpose) === "jobs-private-cv";
   if (protectedCv) {
-    const secret = process.env.CLOUDINARY_API_SECRET, key = process.env.CLOUDINARY_API_KEY;
+    const secret = env.cloudinary_api_secret, key = env.cloudinary_api_key;
     if (!secret || !key) throw Object.assign(new Error("Protected CV storage is not configured"), { statusCode: 503 });
     params.delete("upload_preset");
     params.set("timestamp", String(Math.floor(Date.now() / 1000)));

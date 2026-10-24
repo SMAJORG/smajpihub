@@ -737,8 +737,8 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       const cv = await saveJobsCv({ url: upload.url, name: file.name, size: file.size, visibility: "applications" });
       setProfile(current => (current ? { ...current, cv } : current));
       setCvMessage("CV updated successfully.");
-    } catch {
-      setCvMessage("CV could not be uploaded. Try again.");
+    } catch (error: any) {
+      setCvMessage(error?.response?.data?.message || "CV could not be uploaded. Try again.");
     } finally {
       setCvSaving(false);
     }
