@@ -11,10 +11,9 @@ body {
   .private-home .dashboard-sports-card { width: min(240px, 72vw); }
   .private-home .mobile-feed-section:has(.mobile-media-strip) .mobile-media-strip { grid-auto-columns: min(240px, 78vw); gap: 12px; }
   .private-home .mobile-feed-section:has(.mobile-media-strip) .mobile-media-card { min-width: 0; border-radius: 18px; }
-  .private-home .mobile-feed-section:has(.mobile-services-grid) .mobile-services-grid { display: grid; grid-auto-flow: column; grid-auto-columns: min(190px, 55vw); grid-template-columns: none; grid-template-rows: 112px; overflow-x: auto; gap: 12px; padding-bottom: 6px; }
-  .private-home .mobile-feed-section:has(.mobile-services-grid) .mobile-services-grid > a { min-width: 0; min-height: 112px; height: 112px; padding: 12px; border-radius: 16px; }
-  .private-home .mobile-feed-section:has(.mobile-services-grid) .mobile-services-grid > a strong { font-size: 13px; }
-  .private-home .mobile-feed-section:has(.mobile-services-grid) .mobile-services-grid > a span { font-size: 10px; }
+  .private-home .dashboard-sports-card.highlight-card { display: none; }
+  .private-home .dashboard-sports-card.score-card,
+  .private-home .dashboard-sports-card.team-card { min-height: 180px; }
 }
 
 .private-home .mobile-service-app .live-rating-badge,
