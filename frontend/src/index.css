@@ -22815,3 +22815,37 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
     font-size: 11px;
   }
 }
+
+@media (max-width: 640px) {
+  .private-home .mobile-media-strip {
+    display: flex !important;
+    grid-auto-columns: unset !important;
+  }
+  .private-home .mobile-home-shell .mobile-media-card,
+  .private-home .mobile-media-card {
+    width: min(82vw, 360px) !important;
+    min-width: min(82vw, 360px) !important;
+    flex: 0 0 min(82vw, 360px) !important;
+  }
+  .private-home .dashboard-sports-grid {
+    grid-auto-columns: min(240px, 72vw) !important;
+  }
+  .private-home .dashboard-sports-card {
+    width: min(240px, 72vw) !important;
+    min-width: min(240px, 72vw) !important;
+    flex-basis: min(240px, 72vw) !important;
+  }
+  .private-home .discovery-service-group .mobile-services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    grid-auto-columns: unset !important;
+    grid-template-rows: none !important;
+    overflow: visible !important;
+    gap: 12px !important;
+  }
+  .private-home .discovery-service-group .mobile-services-grid > a {
+    height: auto !important;
+    min-height: 170px !important;
+    padding: 14px 8px !important;
+  }
+}
