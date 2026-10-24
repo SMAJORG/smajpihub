@@ -42,8 +42,8 @@ const CandidateProfileContent = ({ candidateId, onBack }: { candidateId: string;
           </div>
         </div>
         <div className="jobs-candidate-profile-actions">
-          <button type="button" className="private-primary-button">Contact candidate</button>
-          <button type="button" className="private-secondary-button">Save for later</button>
+          <button type="button" className="private-primary-button" onClick={() => window.location.assign(`/messages?candidate=${encodeURIComponent(candidate.userId)}`)}>Contact candidate</button>
+          <button type="button" className="private-secondary-button" onClick={event => { event.currentTarget.classList.toggle("is-saved"); }}>Save for later</button>
         </div>
       </header>
 

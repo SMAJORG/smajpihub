@@ -4287,6 +4287,26 @@
   display: grid;
   gap: 14px;
 }
+
+.jobs-candidate-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #e7e4ef;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(38, 24, 79, .05);
+}
+.jobs-candidate-toolbar > label { min-height: 52px; border: 0; border-radius: 14px; background: #f5f4f7; }
+.jobs-candidate-filter-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.jobs-candidate-filter, .jobs-candidate-filter-row select { min-height: 34px; padding: 0 12px; border: 1px solid #e5e1ea; border-radius: 999px; color: #26222c; background: #fff; font: inherit; font-size: 12px; font-weight: 750; }
+.jobs-candidate-filter.active { color: #fff; border-color: #17151d; background: #17151d; }
+.jobs-candidate-search-submit { min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px; color: #fff; background: #6d3df5; font-weight: 800; }
+.jobs-candidate-create-job { color: #6d3df5; font-size: 12px; font-weight: 800; text-decoration: none; }
+.jobs-candidate-profile-page > header { gap: 20px; }
+.jobs-candidate-profile-actions button { min-height: 48px; flex: 1 1 180px; border-radius: 999px; }
+.jobs-candidate-profile-actions .is-saved { color: #6d3df5; border-color: #6d3df5; background: #f4f0ff; }
 .jobs-candidate-loading {
   padding: 40px;
   text-align: center;
@@ -5203,6 +5223,12 @@
 .jobs-payment-actions button { width: auto; min-height: 40px; padding: 0 14px; border: 0; border-radius: 10px; color: #fff; background: #6d3df5; font: inherit; font-weight: 800; }
 .jobs-payment-actions button.secondary { color: #5b2bd9; background: #fff; border: 1px solid #5b2bd9; }
 @media (max-width: 600px) {
+  .jobs-candidate-toolbar { grid-template-columns: 1fr; padding: 12px; }
+  .jobs-candidate-search-submit { width: 100%; }
+  .jobs-candidate-create-job { justify-self: center; }
+  .jobs-candidate-profile-page { padding-inline: 14px; }
+  .jobs-candidate-profile-header { align-items: flex-start; }
+  .jobs-candidate-profile-header h1 { font-size: 25px; }
   .jobs-multi-select { padding: 12px; }
   .jobs-multi-select-entry { grid-template-columns: 1fr; }
   .jobs-multi-select-entry button { width: 100%; }

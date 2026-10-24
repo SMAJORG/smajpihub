@@ -468,6 +468,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   const [workspaceSwitchingTo, setWorkspaceSwitchingTo] = useState<"candidate" | "employer" | "">("");
   const [postAfterWorkspaceSwitch, setPostAfterWorkspaceSwitch] = useState(false);
   const [candidateQuery, setCandidateQuery] = useState("");
+  const [candidateLocation, setCandidateLocation] = useState("");
   const [candidateStageFilter, setCandidateStageFilter] = useState<"All" | (typeof candidateStages)[number]>("All");
   const [candidateView, setCandidateView] = useState<"pipeline" | "list">("list");
   const [candidateSearchResults, setCandidateSearchResults] = useState<JobsCandidateSearchResult[]>([]);
@@ -1046,6 +1047,8 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   useEffect(() => {
     if (!isCandidateSearchMode) return;
     let active = true;
+    setCandidateQuery(searchParams.get("q") || "");
+    setCandidateLocation(searchParams.get("location") || "");
     setCandidateSearchLoading(true);
     setCandidateSearchError("");
     searchCandidates({ q: searchParams.get("q") || "", location: searchParams.get("location") || "", pageSize: 50 })
@@ -2762,15 +2765,32 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
             {isCandidateSearchMode ? (
               <>
                 <div className="jobs-candidates-title">
-                  <h1>Candidate search results</h1>
+                  <h1>Find Candidates</h1>
                 </div>
-                <div className="jobs-candidate-toolbar">
+                <form className="jobs-candidate-toolbar" onSubmit={event => {
+                  event.preventDefault();
+                  const params = new URLSearchParams();
+                  if (candidateQuery.trim()) params.set("q", candidateQuery.trim());
+                  if (candidateLocation) params.set("location", candidateLocation);
+                  navigate(`/services/jobs/candidates${params.size ? `?${params.toString()}` : ""}`);
+                }}>
                   <label>
                     <SearchRoundedIcon />
-                    <input value={candidateQuery} readOnly placeholder="Search query" />
+                    <input value={candidateQuery} onChange={event => setCandidateQuery(event.target.value)} placeholder="Search by name, skill or role" />
                   </label>
-                  <Link to="/services/jobs/post" className="private-primary-button">Create new job</Link>
-                </div>
+                  <div className="jobs-candidate-filter-row">
+                    <button type="button" className="jobs-candidate-filter active" onClick={() => { setCandidateQuery(""); setCandidateLocation(""); navigate("/services/jobs/candidates"); }}>All candidates</button>
+                    <button type="button" className="jobs-candidate-filter" onClick={() => setCandidateQuery("available")}>Available now</button>
+                    <select aria-label="Filter by location" value={candidateLocation} onChange={event => setCandidateLocation(event.target.value)}>
+                      <option value="">Location</option>
+                      <option value="Remote">Remote</option>
+                      <option value="United States">United States</option>
+                      <option value="United Arab Emirates">United Arab Emirates</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="jobs-candidate-search-submit">Search</button>
+                  <Link to="/services/jobs/post" className="jobs-candidate-create-job">Create new job</Link>
+                </form>
                 {candidateSearchLoading ? (
                   <div className="jobs-candidate-loading">Loading candidates...</div>
                 ) : candidateSearchError ? (
