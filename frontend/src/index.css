@@ -14486,6 +14486,11 @@ html[data-private-theme="dark"] .storefront-product-card .storefront-seller-name
     cursor: pointer;
   }
 
+  /* Use the same Pi mark as the independent SMAJ AI workspace. */
+  .smaj-ai-trigger { text-decoration: none; }
+  .smaj-ai-trigger:focus-visible { outline: 3px solid var(--smaj-text); outline-offset: 3px; }
+  .smaj-ai-mark { font: 700 25px/1 Georgia, serif; }
+
   .live-activity-trigger svg { font-size: 18px !important; }
   .live-activity-trigger b {
     position: absolute;

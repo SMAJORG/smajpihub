@@ -499,7 +499,12 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       </nav> : null}
       {!fullScreen && !isStreamImmersive ? <CommunityFollowPrompt /> : null}
       {!fullScreen && !isStreamShell && !isStreamImmersive && location.pathname !== "/messages" && location.pathname !== "/add-product" ? (
-        <aside className={`live-activity-float ${liveFeedOpen ? "open" : ""}`} aria-label="Live activity">
+        <aside className={`live-activity-float ${liveFeedOpen ? "open" : ""}`} aria-label={location.pathname === "/dashboard" ? "SMAJ AI" : "Live activity"}>
+          {location.pathname === "/dashboard" ? (
+            <a className="live-activity-trigger smaj-ai-trigger" href="https://ai.smajpihub.com" target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label="Open SMAJ AI (opens in a new tab)" title="SMAJ AI">
+              <span className="smaj-ai-mark" aria-hidden="true">&#960;</span>
+            </a>
+          ) : <>
           {liveFeedOpen ? (
             <section className="live-activity-panel" aria-live="polite">
               <header>
@@ -523,6 +528,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
             <ForumOutlinedIcon />
             {liveMessageCount ? <b>{liveBadgeLabel}</b> : <i className="live-activity-status" />}
           </button>
+          </>}
         </aside>
       ) : null}
       {showProfileReminder && !isStreamImmersive && !fullScreen ? (
