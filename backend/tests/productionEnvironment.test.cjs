@@ -12,3 +12,24 @@ test('Render production retains Testnet default when PI_NETWORK is absent', () =
 test('explicit network selection is retained and whitespace normalized', () => { assert.equal(resolve({ PI_NETWORK: 'Pi Network' }).pi_network, 'Pi Network'); assert.equal(resolve({ PI_NETWORK: ' Pi Testnet ' }).pi_network, 'Pi Testnet'); });
 test('invalid explicit production payment network fails closed', () => { assert.throws(() => resolve({ PI_NETWORK: 'invalid-network' }), /PI_NETWORK/); });
 test('other required production configuration remains enforced', () => { assert.throws(() => resolve({ SESSION_SECRET: '' }), /SESSION_SECRET/); });
+
+test('Render starts without optional protected CV signing credentials', () => {
+  for (const credentials of [{}, { CLOUDINARY_API_KEY: 'test-key' }, { CLOUDINARY_API_SECRET: 'test-secret' }]) {
+    const env = resolve({ RENDER: 'true', ...credentials });
+    assert.equal(env.is_production, true);
+    assert.equal(env.cloudinary_api_key, credentials.CLOUDINARY_API_KEY || '');
+    assert.equal(env.cloudinary_api_secret, credentials.CLOUDINARY_API_SECRET || '');
+  }
+});
+
+test('configured protected CV signing credentials are retained', () => {
+  const env = resolve({ CLOUDINARY_API_KEY: 'test-key', CLOUDINARY_API_SECRET: 'test-secret' });
+  assert.equal(env.cloudinary_api_key, 'test-key');
+  assert.equal(env.cloudinary_api_secret, 'test-secret');
+});
+
+test('Render still rejects missing database, session and payment configuration', () => {
+  for (const overrides of [{ MONGODB_URI: '' }, { SESSION_SECRET: '' }, { PI_API_KEY: '' }]) {
+    assert.throws(() => resolve({ RENDER: 'true', ...overrides }), /Missing or invalid production environment configuration/);
+  }
+});

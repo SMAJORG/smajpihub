@@ -175,8 +175,12 @@ if (isProduction) {
     missing.push("MONGODB_DATABASE_NAME");
   if (!env.is_solohost && !env.cloudinary_cloud_name) missing.push("CLOUDINARY_CLOUD_NAME");
   if (!env.is_solohost && !env.cloudinary_upload_preset) missing.push("CLOUDINARY_UPLOAD_PRESET");
-  if (!env.is_solohost && !env.cloudinary_api_key) missing.push("CLOUDINARY_API_KEY");
-  if (!env.is_solohost && !env.cloudinary_api_secret) missing.push("CLOUDINARY_API_SECRET");
+  // Signing credentials belong to protected CV operations, which reject
+  // requests without them. Do not take unrelated services offline when this
+  // optional integration has not been configured on an existing deployment.
+  if (!env.cloudinary_api_key || !env.cloudinary_api_secret) {
+    console.warn("Protected CV storage is unavailable: configure CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to enable private CV uploads and downloads.");
+  }
 
   if (missing.length) {
     throw new Error(
