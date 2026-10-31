@@ -455,7 +455,8 @@ export default function mountJobsEndpoints(router: Router) {
     });
   });
   router.get("/jobs", async (req, res) => {
-    if (!env.is_production) await ensureSeedData(req);
+    // AI discovery must never seed or refresh sample data.
+    if (!env.is_production && req.query.catalog_read !== "true") await ensureSeedData(req);
     const page = clampPage(req.query.page);
     const pageSize = clampPageSize(req.query.pageSize);
     const query: Record<string, any> = { ...ACTIVE };
