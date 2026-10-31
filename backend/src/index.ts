@@ -1,3 +1,4 @@
+import mountAiEndpoints from "./handlers/ai";
 import { recoverJobsBilling } from "./services/jobsBillingRecovery";
 import { expireUnfundedReservations } from "./services/inventoryRecovery";
 import mountInstitutionEndpoints from "./handlers/institutions";
@@ -315,6 +316,10 @@ app.use("/api/stream", streamRouter);
 const sportsRouter = express.Router();
 mountSportsEndpoints(sportsRouter);
 app.use("/sports", sportsRouter);
+
+const aiRouter = express.Router();
+mountAiEndpoints(aiRouter);
+app.use("/ai", aiRouter);
 
 const jobsRouter = express.Router();
 mountJobsEndpoints(jobsRouter);

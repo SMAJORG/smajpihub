@@ -6,6 +6,6 @@ SMAJ AI uses public, read-only catalog GETs at `/jobs/jobs?catalog_read=true`, `
 
 Stream discovery exposes only existing public, approved, playback-allowed creator metadata. Missing Stream storage returns 503 rather than a misleading empty success. Metadata discovery does not authorize playback, downloads or subscriptions. No new streaming provider credential is required by the AI metadata adapter.
 
-No SSO server endpoints have been added. The AI client's expected `/sso/authorize` and `/sso/token` routes remain unavailable. Keep AI SSO client credentials unset until an independently tested authorization implementation is deployed. HUB session/Pi authentication continues to protect private APIs.
+The embedded `/ai` page uses the existing Hub Pi session through a server-to-server signed identity bridge. See [embedded AI deployment and device checks](embedded-ai.md). The standalone AI redirect client still expects `/sso/authorize` and `/sso/token`, which remain unavailable; the embedded flow does not use them. HUB session/Pi authentication continues to protect private APIs.
 
 Verification: backend TypeScript build; `NODE_ENV=test npx ts-node src/tests/catalogRead.test.ts`; `NODE_ENV=test npx ts-node src/tests/streamCreatorContent.test.ts`. AI separately tests each adapter, consent/approval, task ownership, outbound restrictions, payload validation and retained receipts on Meta failure. Live public endpoints returned HTTP 200 during integration; production credentials and deployment configuration remain operator-owned.

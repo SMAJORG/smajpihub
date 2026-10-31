@@ -1,3 +1,4 @@
+import AiPage from "./pages/private/AiPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
@@ -565,6 +566,10 @@ export const router = createBrowserRouter([
         <LastPrivateRouteRedirect />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/ai",
+    element: <ProtectedRoute><PrivateLayout><AiPage /></PrivateLayout></ProtectedRoute>,
   },
   {
     path: "/dashboard",

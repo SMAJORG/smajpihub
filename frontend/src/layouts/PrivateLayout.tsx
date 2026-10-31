@@ -501,9 +501,9 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       {!fullScreen && !isStreamShell && !isStreamImmersive && location.pathname !== "/messages" && location.pathname !== "/add-product" ? (
         <aside className={`live-activity-float ${liveFeedOpen ? "open" : ""}`} aria-label={location.pathname === "/dashboard" ? "SMAJ AI" : "Live activity"}>
           {location.pathname === "/dashboard" ? (
-            <a className="live-activity-trigger smaj-ai-trigger" href="https://ai.smajpihub.com" target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label="Open SMAJ AI (opens in a new tab)" title="SMAJ AI">
+            <Link className="live-activity-trigger smaj-ai-trigger" to="/ai" aria-label="Open SMAJ AI" title="SMAJ AI">
               <span className="smaj-ai-mark" aria-hidden="true">&#960;</span>
-            </a>
+            </Link>
           ) : <>
           {liveFeedOpen ? (
             <section className="live-activity-panel" aria-live="polite">
