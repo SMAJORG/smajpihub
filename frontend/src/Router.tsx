@@ -1,5 +1,5 @@
 import AiSignInPage from "./pages/AiSignInPage";
-import AiPage from "./pages/private/AiPage";
+import StandaloneAiRedirect from "./pages/StandaloneAiRedirect";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
@@ -571,11 +571,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/ai/history",
-    element: <ProtectedRoute><PrivateLayout><AiPage historyOnly /></PrivateLayout></ProtectedRoute>,
+    element: <StandaloneAiRedirect />,
   },
   {
     path: "/ai",
-    element: <ProtectedRoute><PrivateLayout><AiPage /></PrivateLayout></ProtectedRoute>,
+    element: <StandaloneAiRedirect />,
   },
   {
     path: "/dashboard",
