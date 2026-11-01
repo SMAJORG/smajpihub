@@ -8,14 +8,14 @@ export default function mountAiEndpoints(router: Router) {
   router.all("*", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const route = req.path;
-    const allowed = /^(?:\/tasks(?:\/[a-zA-Z0-9-]+(?:\/discover)?)?|\/connections|\/jobs|\/store|\/delegations(?:\/[a-zA-Z0-9-]+(?:\/(?:approve|execute|events))?)?)$/.test(route);
+    const allowed = /^(?:\/tasks(?:\/[a-zA-Z0-9-]+(?:\/(?:discover|approve))?)?|\/connections|\/jobs|\/store|\/delegations(?:\/[a-zA-Z0-9-]+(?:\/(?:approve|execute|events))?)?)$/.test(route);
     if (!allowed || !["GET", "POST", "DELETE"].includes(req.method)) return res.sendStatus(404);
     try {
       const user = await resolveCurrentUser(req);
       if (!user) return res.status(401).json({ message: "Your Pi session has expired. Please sign in to SMAJ PI HUB again." });
       const secret = process.env.SMAJ_AI_SSO_SECRET?.trim();
       const base = process.env.SMAJ_AI_BACKEND_URL?.trim();
-      if (!secret || secret.length < 32 || !base) return res.status(503).json({ message: "SMAJ AI is being connected. Please try again shortly." });
+      if (!secret || secret.length < 32 || !base) return res.status(503).json({ message: "SMAJ AI bridge is not configured: set server-only SMAJ_AI_BACKEND_URL and matching SMAJ_AI_SSO_SECRET (at least 32 characters)." });
       const upstream = new URL(base);
       if (upstream.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && upstream.hostname === "localhost")) throw new Error("Invalid AI backend URL");
       const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
@@ -25,11 +25,12 @@ export default function mountAiEndpoints(router: Router) {
         url: `${upstream.origin}/api${route}`, method: req.method,
         data: req.method === "POST" ? req.body : undefined,
         headers: { "X-SMAJ-Hub-Token": `${header}.${payload}.${signature}`, Origin: upstream.origin, "Content-Type": "application/json", ...(req.get("idempotency-key") ? { "Idempotency-Key": req.get("idempotency-key") } : {}) },
-        timeout: 60000, maxRedirects: 0, validateStatus: () => true,
+        timeout: 150000, maxRedirects: 0, validateStatus: () => true,
       });
       if (response.status >= 300 && response.status < 400) throw new Error("Unexpected AI redirect");
       return res.status(response.status).json(response.data);
-    } catch {
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.code === "ECONNABORTED") return res.status(504).json({ message: "SMAJ AI timed out waiting for its backend. No generated answer was received. Retry or reopen the saved task." });
       return res.status(502).json({ message: "SMAJ AI could not be reached. Please try again." });
     }
   });

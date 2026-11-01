@@ -810,8 +810,12 @@ const mountStreamEndpoints = (router: Router) => {
 
   router.get("/creator-content", async (req, res) => {
     if (!req.app.locals.streamContentCollection) return res.status(503).json({ error: "service_unavailable", message: "Stream content storage is not ready." });
-    const videos = await req.app.locals.streamContentCollection.find({ visibility: "public", moderationStatus: "approved", playbackAllowed: true }).sort({ createdAt: -1 }).limit(20).toArray();
-    return res.json({ videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, creatorName: video.creatorName, category: video.category, thumbnailUrl: video.thumbnailUrl, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentSource: video.contentSource, createdAt: video.createdAt })) });
+    const query: Record<string, any> = { visibility: "public", moderationStatus: "approved", playbackAllowed: true };
+    const search = String(req.query.search || "").trim().slice(0, 80).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (search) query.$or = ["title", "description", "category", "creatorName"].map(field => ({ [field]: { $regex: search, $options: "i" } }));
+    if (req.query.category) query.category = String(req.query.category).slice(0, 80);
+    const videos = await req.app.locals.streamContentCollection.find(query).sort({ createdAt: -1 }).limit(60).toArray();
+    return res.json({ videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, description: video.description, creatorName: video.creatorName, category: video.category, thumbnailUrl: video.thumbnailUrl, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentSource: video.contentSource, createdAt: video.createdAt })) });
   });
 
   router.get("/creators", async (req, res) => {

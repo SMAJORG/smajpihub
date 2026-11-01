@@ -19,7 +19,8 @@
     "sessions:cleanup": "ts-node ./src/scripts/cleanupUserSessions.ts",
     "storage:report": "ts-node ./src/scripts/storageReport.ts",
     "storage:migrate-images": "ts-node ./src/scripts/migrateBase64ImagesToCloudinary.ts",
-    "test:p0": "node --test tests/p0Integrity.test.cjs tests/p0MongoTransactions.test.cjs"
+    "test:p0": "node --test tests/p0Integrity.test.cjs tests/p0MongoTransactions.test.cjs",
+    "test:ai": "ts-node src/tests/catalogRead.test.ts && ts-node src/tests/aiBridge.test.ts && ts-node src/tests/aiDelegation.test.ts"
   },
   "dependencies": {
     "axios": "^1.7.9",

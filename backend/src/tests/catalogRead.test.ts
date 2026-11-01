@@ -16,9 +16,9 @@ async function main() {
   const stream = (streamRouter as any).stack.find((layer: any) => layer.route?.path === "/creator-content").route.stack[0].handle;
   let status = 200;
   const res = { status(value: number) { status = value; return this; }, json(value: any) { payload = value; } };
-  await stream({ app: { locals: {} } }, res); assert.equal(status, 503);
+  await stream({ query: {}, app: { locals: {} } }, res); assert.equal(status, 503);
   status = 200;
-  await stream({ app: { locals: { streamContentCollection: collection } } }, res);
+  await stream({ query: {}, app: { locals: { streamContentCollection: collection } } }, res);
   assert.equal(status, 200); assert.deepEqual(payload.videos, []);
   assert.deepEqual(query, { visibility: "public", moderationStatus: "approved", playbackAllowed: true });
   console.log("Catalog discovery skips seeding and enforces Stream public visibility/storage availability");

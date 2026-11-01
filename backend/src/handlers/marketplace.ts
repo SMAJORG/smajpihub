@@ -215,9 +215,10 @@ export default function mountMarketplaceEndpoints(router: Router) {
     if (location) query.location = { $regex: location, $options: "i" };
     if (country) query.country = { $regex: escapeRegex(country).slice(0, 80), $options: "i" };
     if (Number.isFinite(minPrice) || Number.isFinite(maxPrice)) {
-      query.pricePi = {};
-      if (Number.isFinite(minPrice)) query.pricePi.$gte = Math.max(0, minPrice);
-      if (Number.isFinite(maxPrice)) query.pricePi.$lte = Math.max(0, maxPrice);
+      const priceField = req.query.currency === "USD" ? "priceUsdt" : "pricePi";
+      query[priceField] = {};
+      if (Number.isFinite(minPrice)) query[priceField].$gte = Math.max(0, minPrice);
+      if (Number.isFinite(maxPrice)) query[priceField].$lte = Math.max(0, maxPrice);
     }
     if (verified) {
       query.verificationStatus = "approved";

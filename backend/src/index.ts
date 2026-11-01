@@ -1,4 +1,5 @@
 import mountAiEndpoints from "./handlers/ai";
+import mountAiDelegationEndpoints from "./handlers/aiDelegation";
 import { recoverJobsBilling } from "./services/jobsBillingRecovery";
 import { expireUnfundedReservations } from "./services/inventoryRecovery";
 import mountInstitutionEndpoints from "./handlers/institutions";
@@ -316,6 +317,10 @@ app.use("/api/stream", streamRouter);
 const sportsRouter = express.Router();
 mountSportsEndpoints(sportsRouter);
 app.use("/sports", sportsRouter);
+
+const aiDelegationRouter = express.Router();
+mountAiDelegationEndpoints(aiDelegationRouter);
+app.use("/ai-delegation", aiDelegationRouter);
 
 const aiRouter = express.Router();
 mountAiEndpoints(aiRouter);

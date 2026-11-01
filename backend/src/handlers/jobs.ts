@@ -459,7 +459,11 @@ export default function mountJobsEndpoints(router: Router) {
     if (!env.is_production && req.query.catalog_read !== "true") await ensureSeedData(req);
     const page = clampPage(req.query.page);
     const pageSize = clampPageSize(req.query.pageSize);
-    const query: Record<string, any> = { ...ACTIVE };
+    const query: Record<string, any> = { ...ACTIVE, expiresAt: { $gt: new Date().toISOString() } };
+    if (req.query.catalog_read === "true") {
+      query.employerId = { $type: "string", $ne: "" };
+      query.isDemo = { $ne: true };
+    }
     const search = String(req.query.search || "").trim();
     const location = String(req.query.location || "").trim();
     const category = String(req.query.category || "").trim();
