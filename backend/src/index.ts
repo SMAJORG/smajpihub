@@ -372,6 +372,7 @@ app.get("/health", async (_, res) => {
   );
 
   res.status(ready ? 200 : 503).json({
+    revision: process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || null,
     status: ready ? "ok" : "starting",
     service: "smaj-pi-hub-backend",
     database: env.use_memory_db ? "memory" : "mongodb",

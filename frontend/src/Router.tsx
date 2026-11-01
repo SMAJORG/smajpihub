@@ -568,6 +568,10 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/ai/history",
+    element: <ProtectedRoute><PrivateLayout><AiPage historyOnly /></PrivateLayout></ProtectedRoute>,
+  },
+  {
     path: "/ai",
     element: <ProtectedRoute><PrivateLayout><AiPage /></PrivateLayout></ProtectedRoute>,
   },

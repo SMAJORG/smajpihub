@@ -30,9 +30,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     if (!isAuthenticated && !isLoading) {
+      if (location.pathname.startsWith("/product/")) window.sessionStorage.setItem("smaj_post_auth_redirect", location.pathname + location.search + location.hash);
       requireAuth();
     }
-  }, [isAuthenticated, isLoading, requireAuth]);
+  }, [isAuthenticated, isLoading, requireAuth, location.pathname, location.search, location.hash]);
 
   if (isLoading) {
     if (location.pathname === "/dashboard") return <DashboardWelcomeLoader />;
@@ -42,6 +43,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         <PrivateSkeleton variant={skeleton.variant} count={skeleton.count} />
       </main>
     );
+  }
+
+  if (!isAuthenticated && location.pathname.startsWith("/product/")) {
+    return <main className="private-page" role="status"><p>Sign in with Pi to continue.</p><button type="button" onClick={requireAuth}>Sign in with Pi</button></main>;
   }
 
   if (!isAuthenticated) {

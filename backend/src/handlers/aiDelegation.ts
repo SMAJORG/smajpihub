@@ -23,6 +23,7 @@ export default function mountAiDelegationEndpoints(router: Router) {
       if (!user || user.blocked || user.isBlocked || user.accessTokenRevokedAt || user.status === "blocked") return res.status(403).json({ message: "Delegated user is unavailable" });
       const execute = req.params.operation === "execute";
       if (action.kind === "apply") {
+        if (claims.bindingConfirmed !== true) return res.status(400).json({ message: "Explicit confirmation of the reviewed job application is required" });
         const key = { candidateId: String(user._id), jobId: action.recordId };
         if (execute) {
           const job = await req.app.locals.jobCollection.findOne({ slug: action.recordId, employerId: { $type: "string", $ne: "" }, isDemo: { $ne: true }, status: "active", moderationStatus: "approved", expiresAt: { $gt: new Date().toISOString() } });

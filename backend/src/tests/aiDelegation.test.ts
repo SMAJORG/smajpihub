@@ -32,7 +32,7 @@ async function main() {
   const address = server.address() as {port:number}; const base = `http://127.0.0.1:${address.port}/ai-delegation`;
   const apply = { serviceId: "jobs", kind: "apply", recordId: "engineer", coverNote: "I work with TypeScript." };
   const save = { serviceId: "store", kind: "save_product", recordId: String(product._id) };
-  const claims = (action: any, operation: string) => ({ aud: "smaj-hub-delegation", sub: String(user._id), uid: user.uid, contractId: "approved-task", approvedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), exp: Math.floor(Date.now()/1000) + 60, action, operation });
+  const claims = (action: any, operation: string) => ({ aud: "smaj-hub-delegation", bindingConfirmed: true, sub: String(user._id), uid: user.uid, contractId: "approved-task", approvedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), exp: Math.floor(Date.now()/1000) + 60, action, operation });
   const post = (payload: any, path = payload.operation) => {
     const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
     const signature = createHmac("sha256", process.env.SMAJ_AI_DELEGATION_SECRET!).update(encoded).digest("base64url");
@@ -44,6 +44,8 @@ async function main() {
     assert.equal((await post({...claims(apply,"execute"), exp: 1})).status, 401);
     assert.equal((await post({...claims(apply,"execute"), uid:"other-user"})).status, 403);
     assert.equal((await post(claims({...apply, kind:"payment"},"execute"))).status, 400);
+    assert.equal((await post({...claims(apply,"execute"),bindingConfirmed:false})).status,400);
+    assert.equal(applications.length,0);
     assert.equal((await post(claims(apply,"verify"))).status, 409);
     profile = null; assert.equal((await post(claims(apply,"execute"))).status, 409);
     profile = { title: "Engineer", skills: ["TypeScript"], cv: { protectedAsset: "private", visibility: "private" } };

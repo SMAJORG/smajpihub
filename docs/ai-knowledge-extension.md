@@ -1,3 +1,5 @@
+> Current repair: compact functional search approval/cancel, live result media and exact listing links, `/ai/history`, backend-confirmed seller badges and separately confirmed Jobs submissions. PDF/JSON exports come only from verified live evidence. The existing Pi sign-in and checkout remain authoritative. See the companion `HACKATHON_READINESS.md` for configuration and API limitations.
+
 # Source-backed SMAJ AI information
 
 The companion `smaj-verified-delegation` repository now includes a snapshot of the original HUB White Paper and policy sections. Its sync script reads this repository without changing policy or White Paper text. Rebuild/redeploy the AI after approved source updates and a snapshot sync.

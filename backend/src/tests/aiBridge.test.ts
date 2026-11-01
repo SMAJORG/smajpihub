@@ -17,12 +17,15 @@ async function main() {
   process.env.SMAJ_AI_BACKEND_URL = "https://ai.example";
   (axios as any).request = async (config: any) => {
     calls++;
-    assert.equal(config.url, "https://ai.example/api/tasks");
+    const receipt = config.url.includes("/receipt");
+    assert.equal(config.url, receipt ? "https://ai.example/api/tasks/task-id/receipt?format=pdf" : "https://ai.example/api/tasks");
+    if (receipt) assert.equal(config.responseType, "arraybuffer");
     assert.equal(config.headers.Cookie, undefined);
     assert.equal(config.headers.Authorization, undefined);
     const [header, payload, signature] = config.headers["X-SMAJ-Hub-Token"].split(".");
     assert.equal(signature, createHmac("sha256", process.env.SMAJ_AI_SSO_SECRET!).update(`${header}.${payload}`).digest("base64url"));
     assert.equal(JSON.parse(Buffer.from(payload, "base64url").toString()).sub, "hub-user");
+    if (receipt) return { status: 200, data: Buffer.from("%PDF-1.4 fixture"), headers: {"content-type":"application/pdf","content-disposition":"attachment; filename=proof.pdf"} };
     return { status: 200, data: { tasks: [] } };
   };
   const app = express(); const router = express.Router(); mountAiEndpoints(router); app.use("/ai", router);
@@ -37,9 +40,12 @@ async function main() {
     assert.equal(response.status, 200); assert.equal(response.headers.get("cache-control"), "no-store");
     assert.deepEqual(await response.json(), { tasks: [] });
     assert.equal((await fetch(`${base}/auth/demo`)).status, 404);
+    const pdf = await fetch(`${base}/tasks/task-id/receipt?format=pdf`);
+    assert.equal(pdf.status,200); assert.equal(pdf.headers.get("content-type"),"application/pdf"); assert.match(await pdf.text(),/^%PDF-/);
+    assert.equal((await fetch(`${base}/delegations`)).status,404);
     delete process.env.SMAJ_AI_SSO_SECRET;
     assert.equal((await fetch(`${base}/tasks`)).status, 503);
-    assert.equal(calls, 1);
+    assert.equal(calls, 2);
     console.log("AI bridge: authentication, identity signature, credential isolation, allowlist and missing config passed");
   } finally {
     server.close(); (auth as any).resolveCurrentUser = originalResolve; axios.request = originalRequest;

@@ -1,3 +1,4 @@
+import { withSellerEvidence } from "../services/publicSellerEvidence";
 import { buildSellerDashboard } from "../services/sellerDashboard";
 import crypto from "crypto";
 import { financialTransaction, financialError } from "../services/financialIntegrity";
@@ -36,7 +37,7 @@ const withResolvedPiPrice = (document: Record<string, any>) => {
 };
 
 const publicProducts = async (req: Request, products: Record<string, any>[]) =>
-  (await enrichProfileAvatars(req, products, "product")).map(withResolvedPiPrice).map(serialize);
+  (await withSellerEvidence(req, await enrichProfileAvatars(req, products, "product"))).map(withResolvedPiPrice).map(serialize);
 
 const enrichOrdersWithProductPrices = async (req: Request, orders: any[]) => {
   const productIds = [...new Set(orders.map((order) => order.productId).filter(ObjectId.isValid))].map((id) => new ObjectId(id));
