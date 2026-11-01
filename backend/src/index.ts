@@ -1,3 +1,4 @@
+import mountSsoEndpoints from "./handlers/sso";
 import mountAiEndpoints from "./handlers/ai";
 import mountAiDelegationEndpoints from "./handlers/aiDelegation";
 import { recoverJobsBilling } from "./services/jobsBillingRecovery";
@@ -322,6 +323,10 @@ const aiDelegationRouter = express.Router();
 mountAiDelegationEndpoints(aiDelegationRouter);
 app.use("/ai-delegation", aiDelegationRouter);
 
+const ssoRouter = express.Router();
+mountSsoEndpoints(ssoRouter);
+app.use("/sso", ssoRouter);
+
 const aiRouter = express.Router();
 mountAiEndpoints(aiRouter);
 app.use("/ai", aiRouter);
@@ -418,6 +423,8 @@ const start = async () => {
       app.locals.orderDisputeCollection = db.collection("order_disputes");
       app.locals.productCollection = db.collection("products");
       app.locals.userCollection = db.collection("users");
+      app.locals.ssoCodeCollection = db.collection("sso_codes");
+      await app.locals.ssoCodeCollection.createIndex({expiresAt:1},{expireAfterSeconds:0});
       app.locals.reportCollection = db.collection("reports");
       app.locals.favoriteCollection = db.collection("favorites");
       app.locals.reviewCollection = db.collection("reviews");

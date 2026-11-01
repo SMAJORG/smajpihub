@@ -1,3 +1,4 @@
+import AiSignInPage from "./pages/AiSignInPage";
 import AiPage from "./pages/private/AiPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
@@ -261,6 +262,7 @@ const swapRoutes: Array<[string, SwapPageKind]> = [
 ];
 
 export const router = createBrowserRouter([
+  {path:"/ai/sign-in",element:<AiSignInPage/>},
   {
     path: "/signin/android",
     element: <MobilePiBridgePage />,
