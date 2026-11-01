@@ -12,6 +12,25 @@ async function main() {
   let payload: any;
   await jobs({ query: { catalog_read: "true" }, app: { locals: { jobCollection: collection } } }, { json(value: any) { payload = value; } });
   assert.deepEqual(payload.jobs, []); assert.equal(query.status, "active"); assert.equal(query.moderationStatus, "approved");
+  const apply = (jobRouter as any).stack.find((layer: any) => layer.route?.path === "/jobs/:jobId/apply").route.stack[0].handle;
+  const candidateId = "507f1f77bcf86cd799439011";
+  let applicationStatus = 200;
+  let applicationWrites = 0;
+  const response = {
+    status(value: number) { applicationStatus = value; return this; },
+    json(value: any) { payload = value; },
+  };
+  await apply({
+    params: { jobId: "react-sample" },
+    session: { user: { userId: candidateId } },
+    get() { return ""; },
+    app: { locals: {
+      userCollection: { async findOne() { return { _id: { toString: () => candidateId } }; } },
+      jobCollection: { async findOne() { return { slug: "react-sample", status: "active", moderationStatus: "approved" }; } },
+      jobApplicationCollection: { async insertOne() { applicationWrites++; } },
+    } },
+  }, response);
+  assert.equal(applicationStatus, 409); assert.equal(payload.error, "sample_listing"); assert.equal(applicationWrites, 0);
   const streamRouter = express.Router(); mountStream(streamRouter);
   const stream = (streamRouter as any).stack.find((layer: any) => layer.route?.path === "/creator-content").route.stack[0].handle;
   let status = 200;

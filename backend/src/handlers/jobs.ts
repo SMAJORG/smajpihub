@@ -14,6 +14,8 @@ const ACTIVE = {
   moderationStatus: "approved",
   expiresAt: { $gt: new Date().toISOString() },
 };
+export const isEmployerBackedJob = (job: Record<string, unknown> | null | undefined) =>
+  Boolean(job && typeof job.employerId === "string" && job.employerId.trim() && job.isDemo !== true);
 const APPLICATION_STATUSES = [
   "submitted",
   "reviewing",
@@ -1004,6 +1006,8 @@ export default function mountJobsEndpoints(router: Router) {
       return res
         .status(404)
         .json({ error: "not_found", message: "Job not found." });
+    if (!isEmployerBackedJob(job))
+      return res.status(409).json({ error: "sample_listing", message: "Sample listings are for discovery only and do not accept applications." });
     const key = { candidateId: userId(user), jobId: req.params.jobId };
     if (await req.app.locals.jobApplicationCollection.findOne(key))
       return res
