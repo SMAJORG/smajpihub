@@ -1,3 +1,5 @@
+> Current AI behavior is live-only. The companion application has retired all demo authentication, seeded workspaces and mock execution APIs. PDF/JSON proof is served only from validated live execution evidence. Existing user records are preserved. See companion `LIVE_ONLY.md`.
+
 # Source-backed SMAJ AI information
 
 The companion `smaj-verified-delegation` repository now includes a snapshot of the original HUB White Paper and policy sections. Its sync script reads this repository without changing policy or White Paper text. Rebuild/redeploy the AI after approved source updates and a snapshot sync.
