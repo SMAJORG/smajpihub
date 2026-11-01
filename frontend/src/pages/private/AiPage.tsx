@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { axiosClient } from "../../lib/axiosClient";
 import "./ai.css";
 
-type Task = { id: string; task: string; plan: { summary: string; warnings: string[]; services?: string[]; steps: { id: string; title: string; description: string }[]; discovery?: { results: { serviceId: string; status: string; error?: string; records: Record<string, unknown>[] }[] } } };
+type Task = { id: string; task: string; plan: { sources?: { id: string; title: string; url: string; file: string }[]; summary: string; warnings: string[]; services?: string[]; steps: { id: string; title: string; description: string }[]; discovery?: { results: { serviceId: string; status: string; error?: string; records: Record<string, unknown>[] }[] } } };
 const config = { timeout: 70000, headers: { "X-SMAJ-Silent": "true" }, smajSkipReadRetry: true };
 export default function AiPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -37,11 +37,11 @@ export default function AiPage() {
     setTasks(current => current.map(item => item.id === task.id ? data.task : item));
   });
   return <section className="hub-ai" aria-labelledby="hub-ai-title">
-    <header><Link to="/dashboard">← Hub</Link><h1 id="hub-ai-title">SMAJ AI</h1><p>Your assistant, using your existing Pi login.</p><Link to="/smaj-pi-jobs">Browse SMAJ Jobs</Link></header>
+    <header><Link to="/dashboard">← Hub</Link><span className="hub-ai-eyebrow">YOUR WORKSPACE</span><h1 id="hub-ai-title">AI Tasks &amp; Results.</h1><p>Every action planned. Every decision yours. Every result verifiable.</p><p>Ask about the White Paper, platform policies, and services. Informational answers need no task approval.</p><Link to="/smaj-pi-jobs">Browse SMAJ Jobs</Link></header>
     {error && <div role="alert"><p>{error}</p><button disabled={busy} onClick={() => void load()}>Retry connection</button></div>}
     {!loaded && busy && <p role="status">Connecting to SMAJ AI…</p>}
-    <form onSubmit={send}><label htmlFor="ai-message">How can I help?</label><textarea id="ai-message" value={message} onChange={e => setMessage(e.target.value)} maxLength={2000} rows={3} placeholder="Find remote jobs that match my skills…" required /><button disabled={busy || !message.trim()} type="submit">{busy ? "Please wait…" : "Send"}</button></form>
-    <div aria-live="polite">{tasks.map(task => <article key={task.id}><h2>{task.task}</h2><p className="hub-ai-summary">{task.plan.summary}</p>{task.plan.steps.map(step => <div key={step.id}><strong>{step.title}</strong><p>{step.description}</p></div>)}{task.plan.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
+    <form onSubmit={send}><label htmlFor="ai-message">How can I help?</label><textarea id="ai-message" value={message} onChange={e => setMessage(e.target.value)} maxLength={2000} rows={3} placeholder="What does the SMAJ PI HUB White Paper say?" required /><button disabled={busy || !message.trim()} type="submit">{busy ? "Please wait…" : "Send"}</button></form>
+    <div aria-live="polite">{tasks.map(task => <article key={task.id}><h2>{task.task}</h2><p className="hub-ai-summary">{task.plan.summary}</p>{task.plan.sources && task.plan.sources.length > 0 && <details><summary>Repository sources · {task.plan.sources.length} sections</summary><p>Source snapshot; current deployment availability may differ.</p><ul>{task.plan.sources.map(source => <li key={source.id}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small>{source.id} · {source.file}</small></li>)}</ul></details>}{task.plan.steps.map(step => <div key={step.id}><strong>{step.title}</strong><p>{step.description}</p></div>)}{task.plan.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
       {task.plan.services?.some(id => ["jobs", "store", "stream"].includes(id)) && <><p>Allow read-only catalog discovery and share listing metadata with the AI to find matches.</p><button disabled={busy} onClick={() => void discover(task)}>Approve and find matches</button></>}
       {task.plan.discovery?.results.map((result, index) => <div key={index}><h3>{result.serviceId}</h3>{result.error && <p>{result.error}</p>}{result.status === "read" && !result.records.length && <p>No matching listings found.</p>}{result.records.map((record, i) => <div key={i}><strong>{String(record.title || record.name || "Listing")}</strong><p>{String(record.company || record.summary || record.description || "")}</p></div>)}</div>)}
     </article>)}</div>
