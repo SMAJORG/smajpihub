@@ -3379,6 +3379,7 @@ h4, h5, h6 {
 .private-sidebar nav { display: grid; gap: 5px; margin-top: 22px; }
 .private-sidebar nav a { display: flex; align-items: center; gap: 11px; padding: 11px 12px; color: #aeb5c6; border-radius: 9px; font-size: 14px; font-weight: 600; text-decoration: none; }
 .private-sidebar nav a svg, .private-sidebar-logout svg { font-size: 20px; }
+.private-sidebar nav a .private-ai-nav-logo { width: 22px; height: 22px; object-fit: contain; }
 .private-sidebar nav a:hover { color: #fff; background: #1d2331; }
 .private-sidebar nav a.active { color: #fff; background: linear-gradient(90deg, #703be0, #6431cd); }
 .private-sidebar-logout { margin-top: auto; width: 100%; justify-content: flex-start; gap: 11px; padding: 11px 12px; color: #b4bac9; background: transparent; border: 0; }
@@ -14486,10 +14487,10 @@ html[data-private-theme="dark"] .storefront-product-card .storefront-seller-name
     cursor: pointer;
   }
 
-  /* Use the same Pi mark as the independent SMAJ AI workspace. */
+  /* Use the official SMAJ AI artwork without altering the source asset. */
   .smaj-ai-trigger { text-decoration: none; }
   .smaj-ai-trigger:focus-visible { outline: 3px solid var(--smaj-text); outline-offset: 3px; }
-  .smaj-ai-mark { font: 700 25px/1 Georgia, serif; }
+  .smaj-ai-mark { width: 27px; height: 27px; object-fit: contain; }
 
   .live-activity-trigger svg { font-size: 18px !important; }
   .live-activity-trigger b {

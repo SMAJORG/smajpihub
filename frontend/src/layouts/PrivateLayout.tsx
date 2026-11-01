@@ -79,6 +79,7 @@ const pageTitles: Record<string, string> = {
 };
 
 const links = [
+  { to: "/ai", label: "SMAJ AI", icon: <img className="private-ai-nav-logo" src="/smaj-ai-logo.png" alt="" /> },
   { to: "/dashboard", label: "Home", icon: <DashboardOutlinedIcon /> },
   { to: "/app/services", label: "Services", icon: <AppsOutlinedIcon /> },
   { to: "/store", label: "Marketplace", icon: <StorefrontOutlinedIcon /> },
@@ -473,7 +474,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           ) : null}
           <div className={`private-tab-page${fullScreen ? " full-screen-tab-page" : ""}`}>
             {children}
-            <NativeAdSlot />
+            {!fullScreen ? <NativeAdSlot /> : null}
           </div>
         </div>
       </div>
@@ -502,7 +503,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
         <aside className={`live-activity-float ${liveFeedOpen ? "open" : ""}`} aria-label={location.pathname === "/dashboard" ? "SMAJ AI" : "Live activity"}>
           {location.pathname === "/dashboard" ? (
             <Link className="live-activity-trigger smaj-ai-trigger" to="/ai" aria-label="Open SMAJ AI" title="SMAJ AI">
-              <span className="smaj-ai-mark" aria-hidden="true">&#960;</span>
+              <img className="smaj-ai-mark" src="/smaj-ai-logo.png" alt="" />
             </Link>
           ) : <>
           {liveFeedOpen ? (

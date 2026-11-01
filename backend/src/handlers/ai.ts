@@ -8,7 +8,7 @@ export default function mountAiEndpoints(router: Router) {
   router.all("*", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const route = req.path;
-    const allowed = /^(?:\/tasks(?:\/[a-zA-Z0-9-]+(?:\/(?:discover|approve|receipt))?)?|\/connections|\/jobs|\/store)$/.test(route);
+    const allowed = /^(?:\/tasks(?:\/[a-zA-Z0-9-]+(?:\/(?:discover|approve|retry|receipt(?:\/pdf)?))?)?|\/connections|\/jobs|\/store)$/.test(route);
     if (!allowed || !["GET", "POST", "DELETE"].includes(req.method)) return res.sendStatus(404);
     try {
       const user = await resolveCurrentUser(req);
@@ -21,10 +21,10 @@ export default function mountAiEndpoints(router: Router) {
       const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
       const payload = Buffer.from(JSON.stringify({ sub: user._id.toString(), uid: user.uid, piUsername: user.piUsername, iss: "smajpihub", aud: process.env.SMAJ_AI_CLIENT_ID || "smaj-ai", scope: "profile:read jobs:read store:read", exp: Math.floor(Date.now() / 1000) + 60 })).toString("base64url");
       const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
-      const receipt = route.endsWith("/receipt");
-      const format = req.query.format === "pdf" ? "pdf" : "json";
+      const receipt = route.includes("/receipt");
+      const format = route.endsWith("/pdf") || req.query.format === "pdf" ? "pdf" : "json";
       const response = await axios.request({
-        url: `${upstream.origin}/api${route}${receipt ? `?format=${format}` : ""}`, method: req.method,
+        url: `${upstream.origin}/api${route}${route.endsWith("/receipt") ? `?format=${format}` : ""}`, method: req.method,
         data: req.method === "POST" ? req.body : undefined,
         headers: { "X-SMAJ-Hub-Token": `${header}.${payload}.${signature}`, Origin: upstream.origin, "Content-Type": "application/json", ...(req.get("idempotency-key") ? { "Idempotency-Key": req.get("idempotency-key") } : {}) },
         ...(receipt ? { responseType: "arraybuffer" as const } : {}),

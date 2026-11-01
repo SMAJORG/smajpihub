@@ -1,5 +1,4 @@
 import AiSignInPage from "./pages/AiSignInPage";
-import StandaloneAiRedirect from "./pages/StandaloneAiRedirect";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
@@ -34,6 +33,7 @@ import { privatePages } from "./content/privatePages";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LastPrivateRouteRedirect from "./components/LastPrivateRouteRedirect";
 import PrivateLayout from "./layouts/PrivateLayout";
+import EmbeddedAiWorkspace from "./pages/private/EmbeddedAiWorkspace";
 import AppLayout from "./layouts/AppLayout";
 import PrivatePage from "./pages/private/PrivatePage";
 import RoleRoute from "./components/RoleRoute";
@@ -570,12 +570,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: "/ai/history",
-    element: <StandaloneAiRedirect />,
-  },
-  {
-    path: "/ai",
-    element: <StandaloneAiRedirect />,
+    path: "/ai/*",
+    element: (
+      <ProtectedRoute>
+        <PrivateLayout fullScreen>
+          <EmbeddedAiWorkspace />
+        </PrivateLayout>
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/dashboard",
