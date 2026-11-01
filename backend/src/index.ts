@@ -649,6 +649,10 @@ const start = async () => {
           { candidateId: 1, jobId: 1 },
           { unique: true },
         ),
+        app.locals.jobApplicationCollection.createIndex(
+          { idempotencyKey: 1 },
+          { unique: true, partialFilterExpression: { idempotencyKey: { $type: "string" } } },
+        ),
         app.locals.jobApplicationCollection.createIndex({
           employerId: 1,
           status: 1,

@@ -7,11 +7,26 @@ async function main() {
   const jobRouter = express.Router(); mountJobs(jobRouter);
   const jobs = (jobRouter as any).stack.find((layer: any) => layer.route?.path === "/jobs").route.stack[0].handle;
   let query: any;
-  const cursor = { sort() { return this; }, skip() { return this; }, limit() { return this; }, async toArray() { return []; } };
-  const collection = { find(q: any) { query = q; return cursor; }, async countDocuments() { return 0; }, insertMany() { throw new Error("Discovery must not seed"); }, updateOne() { throw new Error("Discovery must not update"); } };
+  let jobQuery: any;
+  const documents = [{ slug: "verified-job", title: "Engineer", companyId: "verified-company", employerId: "employer-1" }];
+  const cursor = { sort() { return this; }, skip() { return this; }, limit() { return this; }, async toArray() { return documents; } };
+  const collection = { find(q: any) { jobQuery = q; return cursor; }, async countDocuments() { return documents.length; }, insertMany() { throw new Error("Discovery must not seed"); }, updateOne() { throw new Error("Discovery must not update"); } };
+  const emptyCursor = { sort() { return this; }, limit() { return this; }, async toArray() { return []; } };
+  const streamCollection = { find(q: any) { query = q; return emptyCursor; } };
   let payload: any;
-  await jobs({ query: { catalog_read: "true" }, app: { locals: { jobCollection: collection } } }, { json(value: any) { payload = value; } });
-  assert.deepEqual(payload.jobs, []); assert.equal(query.status, "active"); assert.equal(query.moderationStatus, "approved");
+  const jobCompanyCollection = {
+    find() {
+      return {
+        project() { return this; },
+        async toArray() { return [{ slug: "verified-company", verified: true, verificationStatus: "verified", moderationStatus: "approved" }]; },
+      };
+    },
+  };
+  await jobs(
+    { query: { catalog_read: "true" }, app: { locals: { jobCollection: collection, jobCompanyCollection } } },
+    { json(value: any) { payload = value; } },
+  );
+  assert.equal(payload.jobs[0].employerVerified, true); assert.equal(jobQuery.status, "active"); assert.equal(jobQuery.moderationStatus, "approved");
   const apply = (jobRouter as any).stack.find((layer: any) => layer.route?.path === "/jobs/:jobId/apply").route.stack[0].handle;
   const candidateId = "507f1f77bcf86cd799439011";
   let applicationStatus = 200;
@@ -37,7 +52,7 @@ async function main() {
   const res = { status(value: number) { status = value; return this; }, json(value: any) { payload = value; } };
   await stream({ query: {}, app: { locals: {} } }, res); assert.equal(status, 503);
   status = 200;
-  await stream({ query: {}, app: { locals: { streamContentCollection: collection } } }, res);
+  await stream({ query: {}, app: { locals: { streamContentCollection: streamCollection } } }, res);
   assert.equal(status, 200); assert.deepEqual(payload.videos, []);
   assert.deepEqual(query, { visibility: "public", moderationStatus: "approved", playbackAllowed: true });
   console.log("Catalog discovery skips seeding and enforces Stream public visibility/storage availability");

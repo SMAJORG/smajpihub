@@ -16,6 +16,8 @@ const ACTIVE = {
 };
 export const isEmployerBackedJob = (job: Record<string, unknown> | null | undefined) =>
   Boolean(job && typeof job.employerId === "string" && job.employerId.trim() && job.isDemo !== true);
+export const isVerifiedEmployerCompany = (company: Record<string, unknown> | null | undefined) =>
+  Boolean(company?.verified === true && company.moderationStatus === "approved" && ["verified", "pi_kyb"].includes(String(company.verificationStatus)));
 const APPLICATION_STATUSES = [
   "submitted",
   "reviewing",
@@ -486,8 +488,16 @@ export default function mountJobsEndpoints(router: Router) {
         .toArray(),
       req.app.locals.jobCollection.countDocuments(query),
     ]);
+    const companySlugs = [...new Set(documents.map((job: any) => job.companyId).filter((slug: unknown): slug is string => typeof slug === "string" && slug.length > 0))];
+    const companies = companySlugs.length
+      ? await req.app.locals.jobCompanyCollection.find({ slug: { $in: companySlugs } }).project({ slug: 1, verified: 1, verificationStatus: 1, moderationStatus: 1 }).toArray()
+      : [];
+    const companiesBySlug = new Map<string, Record<string, unknown>>(companies.map((company: any) => [String(company.slug), company]));
     res.json({
-      jobs: documents.map(serializeJobDocument),
+      jobs: documents.map((job: any) => ({
+        ...serializeJobDocument(job),
+        employerVerified: isVerifiedEmployerCompany(companiesBySlug.get(job.companyId)),
+      })),
       pagination: { page, pageSize, total, pages: Math.ceil(total / pageSize) },
     });
   });
@@ -1008,6 +1018,9 @@ export default function mountJobsEndpoints(router: Router) {
         .json({ error: "not_found", message: "Job not found." });
     if (!isEmployerBackedJob(job))
       return res.status(409).json({ error: "sample_listing", message: "Sample listings are for discovery only and do not accept applications." });
+    const applicationCompany = await req.app.locals.jobCompanyCollection.findOne({ slug: job.companyId });
+    if (!isVerifiedEmployerCompany(applicationCompany))
+      return res.status(409).json({ error: "unverified_employer", message: "Applications are available only for jobs from verified employers." });
     const key = { candidateId: userId(user), jobId: req.params.jobId };
     if (await req.app.locals.jobApplicationCollection.findOne(key))
       return res
@@ -1022,10 +1035,9 @@ export default function mountJobsEndpoints(router: Router) {
         message: "Complete your professional profile before applying.",
       });
     const now = new Date().toISOString();
-    const applicationCompany = await req.app.locals.jobCompanyCollection.findOne({ slug: job.companyId });
-    const shareCv = profile.cv?.protectedAsset &&
+    const shareCv = profile.cv?.protectedAsset === true &&
       (profile.cv?.visibility === "applications" ||
-      (profile.cv?.visibility === "verified_employers" && applicationCompany?.verified === true));
+      (profile.cv?.visibility === "verified_employers" && isVerifiedEmployerCompany(applicationCompany)));
     const application = {
       ...key,
       employerId: job.employerId,

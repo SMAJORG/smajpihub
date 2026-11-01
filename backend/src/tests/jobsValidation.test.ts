@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { clampPage, clampPageSize, cleanJobInput, isEmployerBackedJob, serializeJobDocument } from "../handlers/jobs";
+import { clampPage, clampPageSize, cleanJobInput, isEmployerBackedJob, isVerifiedEmployerCompany, serializeJobDocument } from "../handlers/jobs";
 
 const job = cleanJobInput({ title: "  Engineer  ", companyId: "owned-company", location: "Remote", type: "Project", mode: "Remote", salary: "100 Pi", category: "Engineering", summary: "A sufficiently detailed opportunity description for validation.", skills: [" TypeScript ", "", "Node.js"], durationDays: 999 });
 assert.equal(job.title, "Engineer");
@@ -13,4 +13,7 @@ assert.deepEqual(serializeJobDocument({ _id: { toString: () => "mongo-id" }, tit
 assert.equal(isEmployerBackedJob({ employerId: "employer-1" }), true);
 assert.equal(isEmployerBackedJob({ companyId: "orbit-commerce" }), false);
 assert.equal(isEmployerBackedJob({ employerId: "employer-1", isDemo: true }), false);
+assert.equal(isVerifiedEmployerCompany({ verified: true, verificationStatus: "verified", moderationStatus: "approved" }), true);
+assert.equal(isVerifiedEmployerCompany({ verified: true, verificationStatus: "pending", moderationStatus: "approved" }), false);
+assert.equal(isVerifiedEmployerCompany({ verified: true, verificationStatus: "verified", moderationStatus: "pending" }), false);
 console.log("Jobs validation tests passed.");
