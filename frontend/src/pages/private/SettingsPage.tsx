@@ -630,6 +630,16 @@ const SettingsPage = () => {
               </span>
               <ChevronRightOutlinedIcon aria-hidden="true" />
             </Link>
+            <Link className="settings-device-link" to="/delete-account">
+              <span className="settings-device-icon" aria-hidden="true">
+                <ShieldOutlinedIcon />
+              </span>
+              <span>
+                <strong>Account deletion</strong>
+                <small>Review the process or submit a deletion request</small>
+              </span>
+              <ChevronRightOutlinedIcon aria-hidden="true" />
+            </Link>
             <label className="setting-line toggle-line">
               <span>
                 <strong>Show profile publicly</strong>

@@ -14,6 +14,7 @@ import ServicesPage from "./pages/ServicesPage.tsx";
 import HowItWorksPage from "./pages/HowItWorksPage.tsx";
 import FaqPage from "./pages/FaqPage.tsx";
 import ContactPage from "./pages/ContactPage.tsx";
+import DeleteAccountPage from "./pages/DeleteAccountPage.tsx";
 import DownloadPage from "./pages/DownloadPage.tsx";
 import WhitePaperPage from "./pages/WhitePaperPage.tsx";
 import DocumentationPage from "./pages/DocumentationPage.tsx";
@@ -306,6 +307,10 @@ export const router = createBrowserRouter([
   {
     path: "/contact",
     element: <ContactPage />,
+  },
+  {
+    path: "/delete-account",
+    element: <DeleteAccountPage />,
   },
   {
     path: "/download",
