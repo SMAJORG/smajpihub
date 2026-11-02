@@ -8,6 +8,7 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { serviceCatalog } from "../../content/serviceCatalog";
 import { axiosClient } from "../../lib/axiosClient";
+import { showFeedback } from "../../lib/feedback";
 import "./embedded-ai.css";
 
 type AiAction = {
@@ -207,6 +208,9 @@ export default function EmbeddedAiWorkspace() {
   }, []);
 
   useEffect(() => { void loadWorkspace(); }, [loadWorkspace]);
+  useEffect(() => {
+    if (error) showFeedback(error, "error");
+  }, [error]);
   useEffect(() => {
     if (draft) return;
     const timer = window.setInterval(() => setPlaceholderIndex(index => (index + 1) % serviceCatalog.length), 3000);
@@ -534,7 +538,6 @@ export default function EmbeddedAiWorkspace() {
           onClick={() => navigate(item.path)}
         >{item.label}</button>)}
       </nav>
-      {error && <div className="embeddedAiError" role="alert">{error}<button type="button" onClick={() => setError("")} aria-label="Dismiss error">×</button></div>}
       <main className="embeddedAiMain" aria-busy={loading || isBusy}>
         {loading ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Loading your SMAJ AI workspace…</div>
           : initialLoadFailed ? <div className="embeddedAiEmpty"><h2>Workspace unavailable</h2><p>Your Pi session and saved work are unchanged. Check your connection or try again.</p><button type="button" onClick={() => void loadWorkspace()}>Try again</button></div>

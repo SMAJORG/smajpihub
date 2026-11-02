@@ -26,7 +26,7 @@ export default function mountAiEndpoints(router: Router) {
       const upstream = new URL(base);
       if (upstream.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && upstream.hostname === "localhost")) throw new Error("Invalid AI backend URL");
       const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-      const payload = Buffer.from(JSON.stringify({ sub: user._id.toString(), uid: user.uid, piUsername: user.piUsername, iss: "smajpihub", aud: process.env.SMAJ_AI_CLIENT_ID || "smaj-ai", scope: "profile:read jobs:read store:read ai:preferences:read ai:preferences:write ai:conversations:read ai:conversations:write", exp: Math.floor(Date.now() / 1000) + 60 })).toString("base64url");
+      const payload = Buffer.from(JSON.stringify({ sub: user._id.toString(), uid: user.uid, piUsername: user.piUsername, iss: "smajpihub", aud: process.env.SMAJ_AI_CLIENT_ID || "smaj-ai", scope: "profile:read jobs:read store:read ai:tasks:read ai:tasks:write ai:preferences:read ai:preferences:write ai:conversations:read ai:conversations:write", exp: Math.floor(Date.now() / 1000) + 60 })).toString("base64url");
       const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
       const receipt = route.includes("/receipt");
       const format = route.endsWith("/pdf") || req.query.format === "pdf" ? "pdf" : "json";
