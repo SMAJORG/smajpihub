@@ -49,15 +49,13 @@ type AiPlan = {
   };
 };
 type AiTask = { id: string; task: string; plan: AiPlan; createdAt: string; conversationId?: string; requestKey?: string };
-type AiConversation = { id: string; title: string; createdAt: string; updatedAt: string; taskCount: number; latestTaskId: string; lastMessage: string };
 type PendingMessage = { id: string; text: string; conversationId: string; persistedConversation: boolean; requestKey: string; status: "sending" | "failed"; error?: string };
 type AiConnection = { serviceId: string; connected: boolean; available: boolean; adapterMode: string };
 type AiResponse<T> = T;
-type Section = "chat" | "tasks" | "conversations" | "apps" | "approvals" | "results" | "settings";
+type Section = "chat" | "tasks" | "apps" | "approvals" | "results" | "settings";
 
 const navigation: Array<{ section: Section; label: string; path: string }> = [
   { section: "chat", label: "Ask AI", path: "/ai" },
-  { section: "conversations", label: "Conversations", path: "/ai/conversations" },
   { section: "tasks", label: "All Tasks", path: "/ai/tasks" },
   { section: "apps", label: "Connect Apps", path: "/ai/apps" },
   { section: "approvals", label: "Approvals", path: "/ai/approvals" },
@@ -68,19 +66,21 @@ const navigation: Array<{ section: Section; label: string; path: string }> = [
 const sectionTitles: Record<Section, string> = {
   chat: "Ask AI",
   tasks: "All Tasks",
-  conversations: "Conversations",
   apps: "Connect Apps",
   approvals: "Approvals",
   results: "Results",
   settings: "Settings",
 };
 
-const getSection = (path: string): { section: Section; taskId?: string } => {
+const getSection = (path: string): { section: Section; taskId?: string; legacyConversationId?: string; legacyConversationList?: boolean } => {
   const parts = path.replace(/^\/ai\/?/, "").split("/").filter(Boolean);
   const section = navigation.find(item => item.section === parts[0] || item.path === `/ai/${parts[0]}`)?.section;
   if (!parts.length) return { section: "chat" };
   if (parts[0] === "history") return { section: "tasks" };
-  if (parts[0] === "conversations" || parts[0] === "results") return { section: parts[0], taskId: parts[1] };
+  if (parts[0] === "conversations") return parts[1]
+    ? { section: "results", legacyConversationId: parts[1] }
+    : { section: "tasks", legacyConversationList: true };
+  if (parts[0] === "results") return { section: "results", taskId: parts[1] };
   return { section: section || "chat" };
 };
 
@@ -161,7 +161,6 @@ export default function EmbeddedAiWorkspace() {
   const active = getSection(location.pathname);
   const [tasks, setTasks] = useState<AiTask[]>([]);
   const tasksRef = useRef<AiTask[]>([]);
-  const [conversations, setConversations] = useState<AiConversation[]>([]);
   const [connections, setConnections] = useState<AiConnection[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingMessage|null>(null);
   const [draft, setDraft] = useState("");
@@ -180,24 +179,18 @@ export default function EmbeddedAiWorkspace() {
   const [preferencesDraft, setPreferencesDraft] = useState("");
   const [preferencesStatus, setPreferencesStatus] = useState("");
   const [preferencesBusy, setPreferencesBusy] = useState(false);
-  const [conversationQuery, setConversationQuery] = useState("");
   const [taskQuery, setTaskQuery] = useState("");
-  const [conversationServiceFilter, setConversationServiceFilter] = useState("all");
   const [taskServiceFilter, setTaskServiceFilter] = useState("all");
-  const [conversationFilterOpen, setConversationFilterOpen] = useState(false);
   const [taskFilterOpen, setTaskFilterOpen] = useState(false);
-  const [renamingConversation, setRenamingConversation] = useState("");
-  const [conversationTitleDraft, setConversationTitleDraft] = useState("");
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);
     setInitialLoadFailed(false);
     setError("");
     try {
-      const [taskResponse, connectionResponse, conversationResponse] = await Promise.all([
+      const [taskResponse, connectionResponse] = await Promise.all([
         axiosClient.get<AiResponse<{ tasks: AiTask[] }>>("/ai/tasks", { smajSkipReadRetry: true }),
         axiosClient.get<AiResponse<{ connections: AiConnection[] }>>("/ai/connections", { smajSkipReadRetry: true }),
-        axiosClient.get<AiResponse<{ conversations: AiConversation[] }>>("/ai/conversations", { smajSkipReadRetry: true }),
       ]);
       const loadedTasks = taskResponse.data.tasks || [];
       setTasks(loadedTasks);
@@ -215,7 +208,6 @@ export default function EmbeddedAiWorkspace() {
         });
       }
       setConnections(connectionResponse.data.connections || []);
-      setConversations(conversationResponse.data.conversations || []);
     } catch (loadError) {
       setInitialLoadFailed(true);
       setError(await responseMessage(loadError));
@@ -227,21 +219,40 @@ export default function EmbeddedAiWorkspace() {
   useEffect(() => { void loadWorkspace(); }, [loadWorkspace]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => {
-    if (!active.taskId || loading || !["conversations", "results"].includes(active.section)) return;
+    if (!active.legacyConversationId || loading) return;
+    let activeRequest = true;
+    void axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(active.legacyConversationId)}`, { smajSkipReadRetry: true })
+      .then(({ data }) => {
+        if (!activeRequest) return;
+        const history = data.tasks || [];
+        setTasks(current => [...current.filter(item => !history.some(saved => saved.id === item.id)), ...history]);
+        const latest = history.at(-1);
+        navigate(latest ? `/ai/results/${encodeURIComponent(latest.id)}` : "/ai/tasks", { replace: true });
+      })
+      .catch(async failure => {
+        if (activeRequest) {
+          setError(await responseMessage(failure));
+          navigate("/ai/tasks", { replace: true });
+        }
+      });
+    return () => { activeRequest = false; };
+  }, [active.legacyConversationId, loading, navigate]);
+  useEffect(() => {
+    if (!active.taskId || loading || active.section !== "results" || pendingMessage?.id === active.taskId) return;
     let activeRequest = true;
     void (async () => {
       try {
-        let task = active.section === "results" ? tasksRef.current.find(item => item.id === active.taskId) : undefined;
-        if (active.section === "results" && !task) {
+        let task = tasksRef.current.find(item => item.id === active.taskId);
+        if (!task) {
           const response = await axiosClient.get<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(active.taskId!)}`, { smajSkipReadRetry: true });
           task = response.data.task;
         }
-        const conversationId = active.section === "conversations" ? active.taskId! : task?.conversationId || task?.id;
+        const conversationId = task?.conversationId || task?.id;
         if (!conversationId) return;
         const { data } = await axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(conversationId)}`, { smajSkipReadRetry: true });
         if (!activeRequest) return;
         const history = data.tasks || [];
-        setTasks(current => [...current, ...history.filter(saved => !current.some(item => item.id === saved.id))]);
+        setTasks(current => [...current.filter(item => !history.some(saved => saved.id === item.id)), ...history]);
         const latest = history.at(-1);
         const latestRequestKey = latest?.requestKey;
         if (latest && latestRequestKey && (latest.plan.generationStatus === "pending" || latest.plan.generationStatus === "failed")) {
@@ -255,13 +266,15 @@ export default function EmbeddedAiWorkspace() {
             error: latest.plan.generationError || "Your message is saved. Retry to get the AI response.",
           });
         }
-        if (active.section === "conversations" && latest) navigate(`/ai/results/${encodeURIComponent(latest.id)}`, { replace: true });
       } catch (failure) {
         if (activeRequest) setError(await responseMessage(failure));
       }
     })();
     return () => { activeRequest = false; };
-  }, [active.section, active.taskId, loading]);
+  }, [active.section, active.taskId, loading, pendingMessage?.id]);
+  useEffect(() => {
+    if (active.legacyConversationList) navigate("/ai/tasks", { replace: true });
+  }, [active.legacyConversationList, navigate]);
   useEffect(() => {
     if (error) showFeedback(error, "error");
   }, [error]);
@@ -275,34 +288,14 @@ export default function EmbeddedAiWorkspace() {
     () => active.taskId ? tasks.find(task => task.id === active.taskId) : undefined,
     [active.taskId, tasks],
   );
-  const activeConversationId = active.taskId
-    ? tasks.find(task => task.id === active.taskId)?.conversationId || active.taskId
-    : undefined;
+  const activeConversationId = selectedTask?.conversationId || selectedTask?.id;
   const conversationTasks = useMemo(
     () => activeConversationId ? tasks.filter(task => (task.conversationId || task.id) === activeConversationId).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) : [],
     [activeConversationId, tasks],
   );
-  const activeConversationTask = active.section === "conversations" && active.taskId
-    ? conversationTasks.at(-1)
-    : selectedTask;
   const updateTask = (task: AiTask) => setTasks(current => [task, ...current.filter(item => item.id !== task.id)]);
-  const updateConversationForTask = (task: AiTask) => {
-    const id = task.conversationId || task.id;
-    setConversations(current => {
-      const existing = current.find(conversation => conversation.id === id);
-      return [{
-        id,
-        title: existing?.title || task.task.slice(0, 120),
-        createdAt: existing?.createdAt || task.createdAt,
-        updatedAt: task.createdAt,
-        taskCount: (existing?.taskCount || 0) + 1,
-        latestTaskId: task.id,
-        lastMessage: task.task,
-      }, ...current.filter(conversation => conversation.id !== id)];
-    });
-  };
   useEffect(() => {
-    const task = active.section === "conversations" ? activeConversationTask : selectedTask;
+    const task = selectedTask;
     if (!task || !["queued", "running", "retrying", "verifying"].includes(task.plan.execution?.status || "")) return;
     const controller = new AbortController();
     const timer = window.setInterval(() => {
@@ -317,20 +310,10 @@ export default function EmbeddedAiWorkspace() {
       });
     }, 2500);
     return () => { window.clearInterval(timer); controller.abort(); };
-  }, [active.section, activeConversationTask?.id, activeConversationTask?.plan.execution?.status, selectedTask?.id, selectedTask?.plan.execution?.status]);
-  const openConversation = (conversationId: string) => {
+  }, [selectedTask?.id, selectedTask?.plan.execution?.status]);
+  const openTask = (task: AiTask) => {
     setSelectedActions([]);
-    const conversation = conversations.find(item => item.id === conversationId);
-    const latestTask = tasks.find(item => item.id === conversation?.latestTaskId)
-      || tasks.filter(item => (item.conversationId || item.id) === conversationId).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-    navigate(latestTask
-      ? `/ai/results/${encodeURIComponent(latestTask.id)}`
-      : `/ai/conversations/${encodeURIComponent(conversationId)}`);
-  };
-  const openTask = (task: AiTask, section: "conversations" | "results" = "results") => {
-    setSelectedActions([]);
-    if (section === "conversations") openConversation(task.conversationId || task.id);
-    else navigate(`/ai/${section}/${encodeURIComponent(task.id)}`);
+    navigate(`/ai/results/${encodeURIComponent(task.id)}`);
   };
 
   const createTask = async (event: FormEvent) => {
@@ -354,12 +337,11 @@ export default function EmbeddedAiWorkspace() {
     setBusy("create");
     setError("");
     setPendingMessage({ ...optimistic, status: "sending", error: undefined });
-    if (!conversationId) openConversation(optimistic.conversationId);
+    if (!conversationId) navigate(`/ai/results/${encodeURIComponent(optimistic.id)}`);
     try {
       const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 150000, headers: { "Idempotency-Key": optimistic.requestKey } });
       if (!data.task?.plan) throw new Error("SMAJ AI could not answer. Please try again.");
       updateTask(data.task);
-      updateConversationForTask(data.task);
       setDraft("");
       setPendingMessage({ ...optimistic, id: data.task.id, conversationId: data.task.conversationId || data.task.id, persistedConversation: true, status: "sending", error: undefined });
       navigate(`/ai/results/${encodeURIComponent(data.task.id)}`);
@@ -453,44 +435,7 @@ export default function EmbeddedAiWorkspace() {
     try {
       await axiosClient.delete(`/ai/tasks/${encodeURIComponent(task.id)}`);
       setTasks(current => current.filter(item => item.id !== task.id));
-      const conversationId = task.conversationId || task.id;
-      if (!tasks.some(item => item.id !== task.id && (item.conversationId || item.id) === conversationId)) {
-        setConversations(current => current.filter(item => item.id !== conversationId));
-      }
       if (active.taskId === task.id) navigate("/ai/tasks");
-    } catch (deleteError) {
-      setError(await responseMessage(deleteError));
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const renameConversation = async (conversation: AiConversation) => {
-    const title = conversationTitleDraft.trim();
-    if (!title || busy) return;
-    setBusy(`rename:${conversation.id}`);
-    setError("");
-    try {
-      const { data } = await axiosClient.patch<AiResponse<{ conversation: AiConversation }>>(`/ai/conversations/${encodeURIComponent(conversation.id)}`, { title });
-      setConversations(current => current.map(item => item.id === conversation.id ? data.conversation : item));
-      setRenamingConversation("");
-      setConversationTitleDraft("");
-    } catch (renameError) {
-      setError(await responseMessage(renameError));
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const deleteConversation = async (conversation: AiConversation) => {
-    if (!window.confirm("Delete this conversation and all of its saved tasks?")) return;
-    setBusy(`delete-conversation:${conversation.id}`);
-    setError("");
-    try {
-      await axiosClient.delete(`/ai/conversations/${encodeURIComponent(conversation.id)}`);
-      setTasks(current => current.filter(task => (task.conversationId || task.id) !== conversation.id));
-      setConversations(current => current.filter(item => item.id !== conversation.id));
-      if (activeConversationId === conversation.id) navigate("/ai/conversations");
     } catch (deleteError) {
       setError(await responseMessage(deleteError));
     } finally {
@@ -553,9 +498,7 @@ export default function EmbeddedAiWorkspace() {
     }
   };
 
-  const sectionTitle = active.taskId
-    ? active.section === "results" ? "Results" : conversations.find(conversation => conversation.id === activeConversationId)?.title || "Conversation"
-    : sectionTitles[active.section];
+  const sectionTitle = sectionTitles[active.section];
   const isBusy = Boolean(busy);
   const orderedServices = useMemo(() => {
     const availableServices = connections.map(connection => ({
@@ -568,13 +511,6 @@ export default function EmbeddedAiWorkspace() {
   }, [connections]);
   const visibleServices = showAllServices ? orderedServices : orderedServices.slice(0, 5);
   const placeholderService = serviceCatalog[placeholderIndex % serviceCatalog.length];
-  const filteredConversations = conversations.filter(conversation => {
-    const turns = tasks.filter(task => (task.conversationId || task.id) === conversation.id);
-    const searchable = `${conversation.title} ${conversation.lastMessage} ${turns.map(task => `${task.task} ${task.plan.summary}`).join(" ")}`;
-    const services = new Set(turns.flatMap(task => [...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)]));
-    const matchesService = conversationServiceFilter === "all" || services.has(conversationServiceFilter);
-    return matchesService && searchable.toLowerCase().includes(conversationQuery.trim().toLowerCase());
-  });
   const filteredTasks = tasks.filter(task => {
     const services = [...new Set([...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)])];
     const matchesService = taskServiceFilter === "all" || services.includes(taskServiceFilter);
@@ -656,97 +592,33 @@ export default function EmbeddedAiWorkspace() {
                   <div className="embeddedAiSettings"><span>Pi account</span><strong>{user?.piUsername || user?.username || "Signed in with Pi"}</strong><span>Saved tasks</span><strong>{tasks.length}</strong><span>Connected apps</span><strong>{connections.filter(connection => connection.connected).length}</strong><button type="button" onClick={() => navigate("/settings")}>Open SMAJ PI HUB account settings</button></div>
                   <form className="embeddedAiPreferences" onSubmit={savePreferences}><h2>AI preferences</h2><p>Save up to 10 preferences to personalize recommendations. Avoid passwords, payment details, and sensitive personal information.</p><label htmlFor="embedded-ai-preferences">One preference per line</label><textarea id="embedded-ai-preferences" value={preferencesDraft} maxLength={1210} rows={5} onChange={event => setPreferencesDraft(event.target.value)} placeholder={"Remote work\nPrefer Pi-denominated prices"}/><small>{preferences.length}/10 saved</small><button type="submit" disabled={preferencesBusy}>{preferencesBusy ? "Saving…" : "Save preferences"}</button>{preferencesStatus&&<p role="status">{preferencesStatus}</p>}</form>
                 </section>
-                  : active.taskId && active.section === "conversations" ? <div className="embeddedAiEmpty"><h2>Opening conversation…</h2><p>Loading the saved conversation in Results.</p></div>
+                  : active.taskId && pendingMessage?.id === active.taskId ? <section className="embeddedAiPage embeddedAiConversation">
+                    <div className="embeddedAiConversationScroll"><div className="embeddedAiMessage user"><span>You</span><p>{pendingMessage.text}</p></div>
+                      {pendingMessage.status === "sending" ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
+                        : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={isBusy} onClick={retryPendingMessage}>Retry</button></div>}
+                    </div><FollowUpComposer busy={isBusy} onSubmit={message => submitTask(message, pendingMessage.persistedConversation ? pendingMessage.conversationId : undefined)}/>
+                  </section>
                     : active.taskId ? selectedTask
-                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.id === selectedTask.id ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId)} />
+                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === (selectedTask.conversationId || selectedTask.id) ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId || selectedTask.id)} />
                       : <div className="embeddedAiEmpty"><h2>Task not found</h2><p>This saved task may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate("/ai/tasks")}>Back to All Tasks</button></div>
                     : active.section === "approvals" ? <section className="embeddedAiPage"><h1>Approvals</h1><p className="embeddedAiIntro">Review actions that SMAJ AI prepared. Nothing is submitted until you approve it.</p><TaskList tasks={tasks.filter(task => task.plan.proposedActions?.length && !task.plan.execution)} openTask={task => openTask(task)} empty="No actions are waiting for approval." /></section>
-                      : active.section === "results" ? <section className="embeddedAiPage"><h1>Results</h1><p className="embeddedAiIntro">Completed searches and verified task results.</p><TaskList tasks={tasks.filter(task => task.plan.discovery || task.plan.execution)} openTask={task => openTask(task, "results")} empty="Your results will appear here after a search." /></section>
-                        : active.section === "conversations" ? <section className="embeddedAiPage embeddedAiHistoryPage">
-                          <h1>Conversations</h1>
-                          <div className="embeddedAiHistoryFilters">
-                            <div className="embeddedAiHistoryToolbar">
-                              <label className="embeddedAiHistorySearch"><span className="embeddedAiSrOnly">Search conversations</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" value={conversationQuery} onChange={event => setConversationQuery(event.target.value)} placeholder="Search conversations"/></label>
-                              <button type="button" className={`embeddedAiHistoryFilter${conversationServiceFilter !== "all" ? " active" : ""}`} aria-label="Filter by service" aria-expanded={conversationFilterOpen} aria-controls="embedded-ai-conversation-filter" onClick={() => setConversationFilterOpen(value => !value)}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16l-6.2 7.1v5.2l-3.6 1.8v-7z"/></svg></button>
-                              {conversationFilterOpen && <div className="embeddedAiServiceMenu" id="embedded-ai-conversation-filter" role="group" aria-label="Filter conversations by service">{serviceCatalog.map(service => <button type="button" key={service.slug} className={conversationServiceFilter === service.slug ? "selected" : ""} aria-pressed={conversationServiceFilter === service.slug} onClick={() => {setConversationServiceFilter(service.slug);setConversationFilterOpen(false);}}>{service.name.replace(/^SMAJ /, "")}</button>)}<button type="button" className="clear" onClick={() => {setConversationServiceFilter("all");setConversationFilterOpen(false);}}>Clear filter</button></div>}
-                            </div>
-                          </div>
-                          <p className="embeddedAiHistoryIntro">Open a saved request to review its conversation, results, approvals, and status.</p>
-                          <ConversationList conversations={filteredConversations} tasks={tasks} openConversation={openConversation} renameConversation={conversation => {setRenamingConversation(conversation.id);setConversationTitleDraft(conversation.title);}} deleteConversation={deleteConversation} renamingConversation={renamingConversation} conversationTitleDraft={conversationTitleDraft} setConversationTitleDraft={setConversationTitleDraft} saveRename={renameConversation} cancelRename={() => {setRenamingConversation("");setConversationTitleDraft("");}} busy={busy} empty={conversationQuery || conversationServiceFilter !== "all" ? "No conversations match your search." : "Your saved conversations will appear here."}/>
-                        </section>
-                          : active.section === "tasks" ? <section className="embeddedAiPage embeddedAiHistoryPage">
+                      : active.section === "results" ? <section className="embeddedAiPage"><h1>Results</h1><p className="embeddedAiIntro">Completed searches and verified task results.</p><TaskList tasks={tasks.filter(task => task.plan.discovery || task.plan.execution)} openTask={openTask} empty="Your results will appear here after a search." /></section>
+                        : active.section === "tasks" ? <section className="embeddedAiPage embeddedAiHistoryPage">
                             <h1>All Tasks</h1>
                             <div className="embeddedAiHistoryFilters">
                               <div className="embeddedAiHistoryToolbar">
-                                <label className="embeddedAiHistorySearch"><span className="embeddedAiSrOnly">Search saved tasks</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" value={taskQuery} onChange={event => setTaskQuery(event.target.value)} placeholder="Search conversations and tasks"/></label>
+                                <label className="embeddedAiHistorySearch"><span className="embeddedAiSrOnly">Search saved tasks and messages</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" value={taskQuery} onChange={event => setTaskQuery(event.target.value)} placeholder="Search saved tasks and messages"/></label>
                                 <button type="button" className={`embeddedAiHistoryFilter${taskServiceFilter !== "all" ? " active" : ""}`} aria-label="Filter by service" aria-expanded={taskFilterOpen} aria-controls="embedded-ai-task-filter" onClick={() => setTaskFilterOpen(value => !value)}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16l-6.2 7.1v5.2l-3.6 1.8v-7z"/></svg></button>
                                 {taskFilterOpen && <div className="embeddedAiServiceMenu" id="embedded-ai-task-filter" role="group" aria-label="Filter tasks by service">{serviceCatalog.map(service => <button type="button" key={service.slug} className={taskServiceFilter === service.slug ? "selected" : ""} aria-pressed={taskServiceFilter === service.slug} onClick={() => {setTaskServiceFilter(service.slug);setTaskFilterOpen(false);}}>{service.name.replace(/^SMAJ /, "")}</button>)}<button type="button" className="clear" onClick={() => {setTaskServiceFilter("all");setTaskFilterOpen(false);}}>Clear filter</button></div>}
                               </div>
                             </div>
                             <p className="embeddedAiHistoryIntro">Open a saved request to review its conversation, results, approvals, and status.</p>
-                            <TaskHistoryList tasks={filteredTasks} busy={busy} openTask={task => openTask(task, "results")} deleteTask={deleteTask} empty={taskQuery || taskServiceFilter !== "all" ? "No tasks match your search." : "Your saved tasks will appear here."}/>
+                            <TaskHistoryList tasks={filteredTasks} busy={busy} openTask={openTask} deleteTask={deleteTask} empty={taskQuery || taskServiceFilter !== "all" ? "No tasks match your search." : "Your saved tasks will appear here."}/>
                           </section>
-                            : <section className="embeddedAiPage"><h1>{sectionTitle}</h1><p className="embeddedAiIntro">Your SMAJ AI workspace.</p><TaskList tasks={tasks} openTask={task => openTask(task)} empty="Your saved conversations will appear here." /></section>}
+                            : <section className="embeddedAiPage"><h1>{sectionTitle}</h1><p className="embeddedAiIntro">Your SMAJ AI workspace.</p><TaskList tasks={tasks} openTask={openTask} empty="Your saved tasks will appear here." /></section>}
       </main>
     </div>
   </div>;
-}
-
-function ConversationList({
-  conversations, tasks, openConversation, empty, renameConversation, deleteConversation, renamingConversation,
-  conversationTitleDraft, setConversationTitleDraft, saveRename, cancelRename, busy,
-}: {
-  conversations: AiConversation[];
-  tasks: AiTask[];
-  openConversation: (id: string) => void;
-  empty: string;
-  renameConversation?: (conversation: AiConversation) => void;
-  deleteConversation?: (conversation: AiConversation) => void;
-  renamingConversation?: string;
-  conversationTitleDraft?: string;
-  setConversationTitleDraft?: (value: string) => void;
-  saveRename?: (conversation: AiConversation) => void;
-  cancelRename?: () => void;
-  busy?: string;
-}) {
-  if (!conversations.length) return <p className="embeddedAiHistoryEmpty">{empty}</p>;
-  const grouped = new Map<string, AiConversation[]>();
-  for (const conversation of [...conversations].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))) {
-    const label = dateGroup(conversation.updatedAt);
-    grouped.set(label, [...(grouped.get(label) || []), conversation]);
-  }
-  return <div className="embeddedAiHistoryGroups">{[...grouped.entries()].map(([label, entries]) => <section className="embeddedAiHistoryGroup" key={label} aria-label={label}>
-    <h2>{label}</h2>
-    <div>{entries.map(conversation => {
-      const editing = renamingConversation === conversation.id && setConversationTitleDraft && saveRename;
-      const menuId = `conversation:${conversation.id}`;
-      const serviceIds = [...new Set(tasks.filter(task => (task.conversationId || task.id) === conversation.id).flatMap(task => [...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)]))];
-      return <article className="embeddedAiHistoryRow" key={menuId}>
-        {editing
-          ? <form className="embeddedAiRenameForm" onSubmit={event => {event.preventDefault(); saveRename(conversation);}}>
-            <label className="embeddedAiSrOnly" htmlFor={`conversation-title-${conversation.id}`}>Conversation name</label>
-            <input id={`conversation-title-${conversation.id}`} value={conversationTitleDraft || ""} maxLength={120} onChange={event => setConversationTitleDraft(event.target.value)} autoFocus/>
-            <button type="submit" disabled={!conversationTitleDraft?.trim() || busy === `rename:${conversation.id}`}>{busy === `rename:${conversation.id}` ? "Saving…" : "Save"}</button>
-            <button type="button" className="secondary" onClick={cancelRename}>Cancel</button>
-          </form>
-          : <>
-            <button type="button" className="embeddedAiHistoryOpen" onClick={() => openConversation(conversation.id)}>
-              <span className="embeddedAiHistoryTitle">{conversation.title}</span>
-              <span className="embeddedAiHistoryMeta">{taskTimestamp(conversation.updatedAt)} · {serviceIds.length ? serviceIds.map(serviceName).join(", ") : "SMAJ AI"}</span>
-              <span className="embeddedAiHistoryPreview">{conversation.lastMessage}</span>
-            </button>
-            <details className="embeddedAiHistoryMenu">
-              <summary aria-label={`More actions for ${conversation.title}`}><span aria-hidden="true">⋮</span></summary>
-              <div>
-                <button type="button" disabled={Boolean(busy)} onClick={event => {event.currentTarget.closest("details")?.removeAttribute("open");openConversation(conversation.id);}}>Open/Continue</button>
-                {renameConversation && <button type="button" disabled={Boolean(busy)} onClick={event => {event.currentTarget.closest("details")?.removeAttribute("open");renameConversation(conversation);}}>Rename</button>}
-                {deleteConversation && <button type="button" className="delete" disabled={Boolean(busy)} onClick={event => {event.currentTarget.closest("details")?.removeAttribute("open");deleteConversation(conversation);}}>Delete</button>}
-              </div>
-            </details>
-          </>}
-      </article>;
-    })}</div>
-  </section>)}</div>;
 }
 
 function TaskHistoryList({ tasks, busy, openTask, deleteTask, empty }: {
@@ -815,7 +687,7 @@ function TaskConversation({
 }) {
   const plan = task.plan;
   const execution = plan.execution;
-  const showResults = section === "results" || section === "conversations";
+  const showResults = section === "results";
   const pendingIsCurrentTask = pending?.id === task.id;
   return <section className="embeddedAiPage embeddedAiConversation">
     <div className="embeddedAiConversationScroll">
