@@ -21,6 +21,7 @@ async function main() {
     forwarded.push(config);
     const receipt = config.url.includes("/receipt");
     if (config.url.endsWith("/tasks")) assert.equal(config.url, "https://ai.example/api/tasks");
+    if (config.url.endsWith("/preferences")) assert.equal(config.url, "https://ai.example/api/preferences");
     if (config.url.includes("/retry")) assert.equal(config.url, "https://ai.example/api/tasks/task-id/retry");
     if (config.url.endsWith("/receipt?format=pdf")) assert.equal(config.url, "https://ai.example/api/tasks/task-id/receipt?format=pdf");
     if (config.url.endsWith("/receipt/pdf")) assert.equal(config.url, "https://ai.example/api/tasks/task-id/receipt/pdf");
@@ -53,10 +54,15 @@ async function main() {
     assert.equal(retry.status,200);
     assert.equal(forwarded.at(-1).headers["Idempotency-Key"],"retry-key");
     assert.deepEqual(forwarded.at(-1).data,{});
+    assert.equal((await fetch(`${base}/preferences`)).status,200);
+    const preferences = await fetch(`${base}/preferences`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferences: ["Remote work"] }) });
+    assert.equal(preferences.status,200);
+    assert.deepEqual(forwarded.at(-1).data,{preferences:["Remote work"]});
+    assert.match(Buffer.from(forwarded.at(-1).headers["X-SMAJ-Hub-Token"].split(".")[1],"base64url").toString(),/ai:preferences:write/);
     assert.equal((await fetch(`${base}/delegations`)).status,404);
     delete process.env.SMAJ_AI_SSO_SECRET;
     assert.equal((await fetch(`${base}/tasks`)).status, 503);
-    assert.equal(calls, 4);
+    assert.equal(calls, 6);
     console.log("AI bridge: authentication, identity signature, credential isolation, task retry, PDF receipts, allowlist and missing config passed");
   } finally {
     server.close(); (auth as any).resolveCurrentUser = originalResolve; axios.request = originalRequest;

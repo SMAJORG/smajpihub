@@ -52,6 +52,13 @@
 .embeddedAiSettings{display:grid;grid-template-columns:minmax(110px,.5fr) minmax(0,1fr);gap:14px;padding:18px;border:1px solid #ece7f1;border-radius:16px;background:#fff}
 .embeddedAiSettings>span{color:var(--ai-muted);font-size:12px}.embeddedAiSettings>strong{font-size:12px;overflow-wrap:anywhere}
 .embeddedAiSettings button{grid-column:1/-1;justify-self:start;min-height:38px;padding:8px 12px;border:1px solid #ded5ea;border-radius:10px;background:#fff;color:#614091;font-size:11px;font-weight:700}
+.embeddedAiPreferences,.embeddedAiFollowUp{display:grid;gap:8px;margin:18px 0;padding:14px;border:1px solid #ece7f1;border-radius:15px;background:#fff}
+.embeddedAiPreferences h2{margin:0;font-size:14px}.embeddedAiPreferences p{margin:0;color:var(--ai-muted);font-size:11px;line-height:1.5}
+.embeddedAiPreferences label,.embeddedAiPreferences small,.embeddedAiFollowUp label{color:#766d81;font-size:10px;font-weight:700}
+.embeddedAiPreferences textarea,.embeddedAiFollowUp textarea{width:100%;min-width:0;resize:vertical;padding:10px;border:1px solid #e6e1eb;border-radius:10px;background:#fff;color:var(--ai-ink);font:inherit;font-size:12px}
+.embeddedAiPreferences button,.embeddedAiFollowUp button{justify-self:end;display:inline-flex;min-height:38px;align-items:center;gap:7px;padding:8px 12px;border:0;border-radius:10px;background:var(--ai-purple);color:white;font-size:11px;font-weight:700}
+.embeddedAiPreferences button:disabled,.embeddedAiFollowUp button:disabled{opacity:.55}
+.embeddedAiFollowUp button svg{width:15px;height:15px}
 .embeddedAiConversation{max-width:850px}
 .embeddedAiMessage{display:flex;gap:11px;margin:18px 0;min-width:0}
 .embeddedAiMessage>span,.embeddedAiMessage>div>span{display:block;margin:0 0 6px;color:#8b76b4;font-size:10px;font-weight:750;letter-spacing:.3px}
