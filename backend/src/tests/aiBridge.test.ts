@@ -21,6 +21,8 @@ async function main() {
     forwarded.push(config);
     const receipt = config.url.includes("/receipt");
     if (config.url.endsWith("/tasks")) assert.equal(config.url, "https://ai.example/api/tasks");
+    if (config.url.endsWith("/conversations")) assert.equal(config.url, "https://ai.example/api/conversations");
+    if (config.url.endsWith("/conversations/conversation-id")) assert.equal(config.url, "https://ai.example/api/conversations/conversation-id");
     if (config.url.endsWith("/preferences")) assert.equal(config.url, "https://ai.example/api/preferences");
     if (config.url.includes("/retry")) assert.equal(config.url, "https://ai.example/api/tasks/task-id/retry");
     if (config.url.endsWith("/receipt?format=pdf")) assert.equal(config.url, "https://ai.example/api/tasks/task-id/receipt?format=pdf");
@@ -59,11 +61,18 @@ async function main() {
     assert.equal(preferences.status,200);
     assert.deepEqual(forwarded.at(-1).data,{preferences:["Remote work"]});
     assert.match(Buffer.from(forwarded.at(-1).headers["X-SMAJ-Hub-Token"].split(".")[1],"base64url").toString(),/ai:preferences:write/);
+    assert.equal((await fetch(`${base}/conversations`)).status,200);
+    const renamed = await fetch(`${base}/conversations/conversation-id`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title:"Renamed"}) });
+    assert.equal(renamed.status,200);
+    assert.deepEqual(forwarded.at(-1).data,{title:"Renamed"});
+    assert.match(Buffer.from(forwarded.at(-1).headers["X-SMAJ-Hub-Token"].split(".")[1],"base64url").toString(),/ai:conversations:write/);
+    assert.equal((await fetch(`${base}/conversations/conversation-id`,{method:"DELETE"})).status,200);
+    assert.equal((await fetch(`${base}/conversations/conversation-id`,{method:"POST"})).status,404);
     assert.equal((await fetch(`${base}/delegations`)).status,404);
     delete process.env.SMAJ_AI_SSO_SECRET;
     assert.equal((await fetch(`${base}/tasks`)).status, 503);
-    assert.equal(calls, 6);
-    console.log("AI bridge: authentication, identity signature, credential isolation, task retry, PDF receipts, allowlist and missing config passed");
+    assert.equal(calls, 9);
+    console.log("AI bridge: authentication, identity signature, credential isolation, task retry, PDF receipts, conversation management allowlist and missing config passed");
   } finally {
     server.close(); (auth as any).resolveCurrentUser = originalResolve; axios.request = originalRequest;
     if (previousSecret === undefined) delete process.env.SMAJ_AI_SSO_SECRET; else process.env.SMAJ_AI_SSO_SECRET = previousSecret;
