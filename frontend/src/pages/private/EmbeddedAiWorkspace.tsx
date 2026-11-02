@@ -9,6 +9,7 @@ import { useAuthContext } from "../../contexts/AuthContext";
 import { serviceCatalog } from "../../content/serviceCatalog";
 import { axiosClient } from "../../lib/axiosClient";
 import { showFeedback } from "../../lib/feedback";
+import EmbeddedServiceIcon from "./EmbeddedServiceIcon";
 import "./embedded-ai.css";
 
 type AiAction = {
@@ -672,16 +673,17 @@ export default function EmbeddedAiWorkspace() {
   const sectionTitle = sectionTitles[active.section];
   const isBusy = Boolean(busy);
   const orderedServices = useMemo(() => {
-    const availableServices = connections.map(connection => ({
-      connection,
-      service: serviceCatalog.find(item => item.slug === connection.serviceId),
-    })).filter((item): item is { connection: AiConnection; service: (typeof serviceCatalog)[number] } => Boolean(item.service));
-    const connected = availableServices.filter(item => item.connection.available && item.connection.connected);
-    const connectedIds = new Set(connected.map(item => item.connection.serviceId));
-    return [...connected, ...availableServices.filter(item => !connectedIds.has(item.connection.serviceId))];
+    const connectionById = new Map(connections.map(connection => [connection.serviceId, connection]));
+    const allServices = serviceCatalog.map(service => ({ service, connection: connectionById.get(service.slug) }));
+    const connected = allServices.filter(item => item.connection?.available && item.connection.connected);
+    const connectedIds = new Set(connected.map(item => item.service.slug));
+    return [...connected, ...allServices.filter(item => !connectedIds.has(item.service.slug))];
   }, [connections]);
   const visibleServices = showAllServices ? orderedServices : orderedServices.slice(0, 5);
   const placeholderService = serviceCatalog[placeholderIndex % serviceCatalog.length];
+  const selectedServiceDefinition = serviceCatalog.find(service => service.slug === selectedService);
+  const selectedConnection = connections.find(connection => connection.serviceId === selectedService);
+  const selectedServiceState = !selectedConnection?.available ? "planned" : selectedConnection.connected ? "connected" : "disconnected";
   const filteredTasks = tasks.filter(task => {
     const services = [...new Set([...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)])];
     const matchesService = taskServiceFilter === "all" || services.includes(taskServiceFilter);
@@ -709,46 +711,37 @@ export default function EmbeddedAiWorkspace() {
       <main className={`embeddedAiMain${active.taskId && active.section === "results" ? " embeddedAiMainChat" : ""}`} aria-busy={loading || isBusy}>
         {loading ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Loading your SMAJ AI workspace…</div>
           : initialLoadFailed ? <div className="embeddedAiEmpty"><h2>Workspace unavailable</h2><p>Your Pi session and saved work are unchanged. Check your connection or try again.</p><button type="button" onClick={() => void loadWorkspace()}>Try again</button></div>
-            : active.section === "chat" && !active.taskId ? <section className="embeddedAiChatHome">
+            : active.section === "chat" && !active.taskId ? <section className="embeddedAiChatHome launcherHome">
               <p className="embeddedAiEyebrow">YOUR WORKSPACE</p>
               <h1>What can I help you do?</h1>
-              <form className="embeddedAiComposer" onSubmit={createTask}>
-                <label className="embeddedAiSrOnly" htmlFor="embedded-ai-prompt">Your request</label>
+              <form className="embeddedAiComposer compactComposer" onSubmit={createTask} aria-label="Create an AI task" aria-busy={busy === "create"}>
+                <label className="embeddedAiSrOnly" htmlFor="embedded-ai-prompt">Your AI task</label>
                 <div className="embeddedAiPromptInput">
                   <textarea ref={promptInput} id="embedded-ai-prompt" value={draft} maxLength={1900} rows={3} placeholder="" onChange={event => setDraft(event.target.value)} />
                   {!draft && <span key={placeholderService.slug}>{serviceExamples[placeholderService.slug] || "Tell SMAJ AI what you need"}…</span>}
                 </div>
                 <div className="embeddedAiComposerToolbar">
-                  {selectedService && (() => {
-                    const selected = serviceCatalog.find(service => service.slug === selectedService);
-                    return selected && <button type="button" className="embeddedAiSelectedService" onClick={() => setSelectedService("")} aria-label={`Clear ${selected.name} context`}><img src={`/assets/services/${selected.slug}.png`} alt=""/><span>{selected.name}</span><b aria-hidden="true">×</b></button>;
-                  })()}
-                  <span className="embeddedAiSavedNote">Requests and progress are saved to your Pi account.</span>
-                  <button type="submit" disabled={!draft.trim() || isBusy}>{busy === "create" ? <><span className="embeddedAiSpinner"/>Asking AI…</> : <>Ask SMAJ AI <SendOutlinedIcon/></>}</button>
+                  {selectedServiceDefinition && <button type="button" className="embeddedAiSelectedService" onClick={() => setSelectedService("")} aria-label={`Clear ${selectedServiceDefinition.name} context`}><EmbeddedServiceIcon service={selectedServiceDefinition}/><span>{selectedServiceDefinition.name.replace(/^SMAJ /, "")}</span><b className="embeddedAiSelectedClear" aria-hidden="true">×</b></button>}
+                  <button type="submit" className="embeddedAiAskButton" disabled={!draft.trim() || isBusy}>{busy === "create" ? <><span className="embeddedAiSpinner"/>Asking AI…</> : <>Ask SMAJ AI <span aria-hidden="true">↗</span></>}</button>
                 </div>
               </form>
-              {selectedService && (() => {
-                const selected = serviceCatalog.find(service => service.slug === selectedService);
-                const connection = connections.find(item => item.serviceId === selectedService);
-                const state = !connection?.available ? "Planned" : connection.connected ? "Connected" : "Not connected";
-                return selected && <div className="embeddedAiServiceContext" role="status"><strong>{selected.name}</strong> · {state}{state === "Planned" ? " — integration not available yet." : state === "Not connected" ? " — use Connect Apps to connect this app." : " — task context selected."}</div>;
-              })()}
+              {selectedServiceDefinition && <div className="serviceContext" role="status"><span><strong>{selectedServiceDefinition.name}</strong> · {selectedServiceState === "planned" ? "Planned" : selectedServiceState === "connected" ? "Connected" : "Not connected"}{selectedServiceState === "planned" ? " — integration not available yet." : selectedServiceState === "disconnected" ? " — use Connect Apps to connect this app." : " — task context selected."}</span></div>}
               <div className="embeddedAiSuggestions" aria-label="Suggested requests">{[
                 { label: "Find jobs", prompt: "Find software engineering jobs" },
                 { label: "Shop cars", prompt: "Find cars under $30,000" },
                 { label: "Explore courses", prompt: "Show available online courses" },
                 { label: "Health services", prompt: "Find nearby health services" },
               ].map(suggestion => <button key={suggestion.label} type="button" onClick={() => {setSelectedService("");setDraft(suggestion.prompt);promptInput.current?.focus({preventScroll:true});}}>{suggestion.label}</button>)}</div>
-              <div className="embeddedAiServicesHeading"><h2>Connected services</h2></div>
-              <div className="embeddedAiServiceLegend" aria-label="Service status legend"><span><i className="connected"/>Connected</span><span><i className="disconnected"/>Not connected</span><span><i className="planned"/>Planned</span></div>
-              <div className="embeddedAiServiceGrid" aria-label="Choose a service">{visibleServices.map(({ connection, service }) => {
-                const state = !connection.available ? "planned" : connection.connected ? "connected" : "disconnected";
+              <div className="embeddedAiServicesHeading"><div><h2>Connected services</h2></div></div>
+              <div className="launcherLegend" aria-label="Service status legend"><span><i className="statusDot connected"/>Connected</span><span><i className="statusDot disconnected"/>Not connected</span><span><i className="statusDot unavailable"/>Planned</span></div>
+              <div id="home-services-list" className="embeddedAiServiceGrid" aria-label="Choose a service">{visibleServices.map(({ connection, service }) => {
+                const state = !connection?.available ? "planned" : connection.connected ? "connected" : "disconnected";
                 return <button key={service.slug} type="button" aria-pressed={selectedService === service.slug} aria-label={`${service.name}, ${state === "planned" ? "Planned" : state === "connected" ? "Connected" : "Not connected"}`} onClick={() => {setSelectedService(service.slug);setDraft(serviceExamples[service.slug] || "");promptInput.current?.focus({preventScroll:true});}}>
-                  <span className="embeddedAiServiceArt"><img src={service.slug === "stream" ? "/assets/smaj-stream-logo.png" : `/assets/services/${service.slug}.png`} alt="" onError={event => {event.currentTarget.hidden = true;}}/></span>
-                  <span>{service.name.replace(/^SMAJ /, "")}<i className={state}/></span>
+                  <span className="embeddedAiServiceArt"><EmbeddedServiceIcon service={service}/></span>
+                  <span>{service.name.replace(/^SMAJ /, "")}<i className={`statusDot ${state === "planned" ? "unavailable" : state}`}/></span>
                 </button>;
               })}</div>
-              {orderedServices.length > 5 && <button type="button" className="embeddedAiShowAll" aria-expanded={showAllServices} onClick={() => setShowAllServices(value => !value)}>{showAllServices ? "Show fewer services" : "Show all services"}</button>}
+              {orderedServices.length > 5 && <button type="button" className="embeddedAiShowAll" aria-expanded={showAllServices} aria-controls="home-services-list" onClick={() => setShowAllServices(value => !value)}>{showAllServices ? "Show fewer services" : "Show all services"}</button>}
             </section>
               : active.section === "apps" ? <section className="embeddedAiPage">
                 <h1>Connect Apps</h1><p className="embeddedAiIntro">Choose which SMAJ services SMAJ AI may use for approved requests.</p>
