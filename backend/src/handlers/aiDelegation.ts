@@ -51,6 +51,7 @@ const getStoreContext = async (req: any, user: any, claims: any, action: any) =>
   }
   const productPreview = {
     recordId: String(product._id),
+    sellerId: String(seller.uid),
     title: String(product.title || ""),
     sellerName: String(seller.displayName || seller.piUsername || seller.username || seller.uid),
     pricePi: Math.round(pricePi * 1e7) / 1e7,
@@ -64,6 +65,7 @@ const getStoreContext = async (req: any, user: any, claims: any, action: any) =>
     ownerUid: String(user.uid),
     product: {
       recordId: productPreview.recordId,
+      sellerId: productPreview.sellerId,
       title: productPreview.title,
       sellerName: productPreview.sellerName,
       pricePi: productPreview.pricePi,
@@ -86,6 +88,7 @@ const approvedStoreContext = async (req: any, user: any, claims: any, action: an
   const currentProduct = context.preview.product;
   const productDetailsMatch = approvedProduct
     && approvedProduct.recordId === currentProduct.recordId
+    && approvedProduct.sellerId === currentProduct.sellerId
     && approvedProduct.title === currentProduct.title
     && approvedProduct.sellerName === currentProduct.sellerName
     && approvedProduct.pricePi === currentProduct.pricePi
@@ -105,6 +108,7 @@ const approvedStoreDetailsHash = (user: any, claims: any, action: any) => hash({
   ownerUid: String(user.uid),
   product: {
     recordId: action.storePreview.product.recordId,
+    sellerId: action.storePreview.product.sellerId,
     title: action.storePreview.product.title,
     sellerName: action.storePreview.product.sellerName,
     pricePi: action.storePreview.product.pricePi,
@@ -365,8 +369,8 @@ export default function mountAiDelegationEndpoints(router: Router) {
         const wrapperKeys = storePreview && typeof storePreview === "object" ? Object.keys(storePreview).sort() : [];
         const keys = preview && typeof preview === "object" ? Object.keys(preview).sort() : [];
         if (stableStringify(wrapperKeys) !== stableStringify(["product"]) ||
-          stableStringify(keys) !== stableStringify(["pricePi", "quantityAvailable", "recordId", "sellerName", "title"]) ||
-          preview.recordId !== action.recordId || typeof preview.title !== "string" || typeof preview.sellerName !== "string" ||
+          stableStringify(keys) !== stableStringify(["pricePi", "quantityAvailable", "recordId", "sellerId", "sellerName", "title"]) ||
+          preview.recordId !== action.recordId || typeof preview.sellerId !== "string" || !preview.sellerId || typeof preview.title !== "string" || typeof preview.sellerName !== "string" ||
           !Number.isFinite(preview.pricePi) || !Number.isInteger(preview.quantityAvailable) || preview.quantityAvailable < 0) {
           return res.status(400).json({ message: "Approved Store product details are required." });
         }
@@ -555,7 +559,7 @@ export default function mountAiDelegationEndpoints(router: Router) {
         }).sort({ createdAt: -1 }).limit(50).toArray();
         return res.json({ evidence: {
           serviceId: "store", kind: "contact_seller", recordId: action.recordId, ownerId: String(user._id), contractId: claims.contractId,
-          backendId: String(message._id), status: "sent", createdAt: message.createdAt, conversationId: String(conversation._id), messageId: String(message._id),
+          backendId: String(message._id), status: "sent", createdAt: message.createdAt, conversationId: String(conversation._id), messageId: String(message._id), sellerId: String(message.sellerId),
           messages: messages.reverse().map((entry: any) => ({
             id: String(entry._id),
             senderId: String(entry.senderId),

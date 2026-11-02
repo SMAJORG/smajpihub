@@ -35,7 +35,7 @@ export default function mountAiEndpoints(router: Router) {
         data: ["POST", "PUT", "PATCH"].includes(req.method) ? req.body : undefined,
         headers: { "X-SMAJ-Hub-Token": `${header}.${payload}.${signature}`, Origin: upstream.origin, "Content-Type": "application/json", ...(req.get("idempotency-key") ? { "Idempotency-Key": req.get("idempotency-key") } : {}) },
         ...(receipt ? { responseType: "arraybuffer" as const } : {}),
-        timeout: 150000, maxRedirects: 0, validateStatus: () => true,
+        timeout: 260000, maxRedirects: 0, validateStatus: () => true,
       });
       if (response.status >= 300 && response.status < 400) throw new Error("Unexpected AI redirect");
       if (receipt) {

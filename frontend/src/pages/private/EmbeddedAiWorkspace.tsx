@@ -18,6 +18,10 @@ type AiAction = {
   kind: string;
   title: string;
   coverNote?: string;
+  message?: string;
+  storePreview?: {
+    product: { recordId: string; sellerId: string; title: string; sellerName: string; pricePi: number; quantityAvailable: number };
+  };
   applicationPreview?: {
     job: { title: string; company: string; location: string; type: string; mode: string; salary: string; category: string };
     profile: { title: string; skills: string[]; location: string; portfolio: string; summary: string; profilePhoto: string };
@@ -168,6 +172,7 @@ export default function EmbeddedAiWorkspace() {
   const [busy, setBusy] = useState("");
   const [connectionBusy, setConnectionBusy] = useState<string[]>([]);
   const pendingConnections = useRef(new Set<string>());
+  const taskSubmissionPending = useRef(false);
   const promptInput = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState("");
   const [selectedService, setSelectedService] = useState("");
@@ -325,7 +330,8 @@ export default function EmbeddedAiWorkspace() {
   };
 
   const submitTask = async (request: string, conversationId?: string, retryPending?: PendingMessage): Promise<boolean> => {
-    if (!request.trim() || busy) return false;
+    if (!request.trim() || busy || taskSubmissionPending.current) return false;
+    taskSubmissionPending.current = true;
     const optimistic = retryPending || {
       id: `pending-${crypto.randomUUID()}`,
       text: request.trim(),
@@ -339,7 +345,7 @@ export default function EmbeddedAiWorkspace() {
     setPendingMessage({ ...optimistic, status: "sending", error: undefined });
     if (!conversationId) navigate(`/ai/results/${encodeURIComponent(optimistic.id)}`);
     try {
-      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 150000, headers: { "Idempotency-Key": optimistic.requestKey } });
+      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 250000, headers: { "Idempotency-Key": optimistic.requestKey } });
       if (!data.task?.plan) throw new Error("SMAJ AI could not answer. Please try again.");
       updateTask(data.task);
       setDraft("");
@@ -354,6 +360,7 @@ export default function EmbeddedAiWorkspace() {
       setPendingMessage(current => current?.id === optimistic.id ? { ...current, status: "failed", error: message } : current);
       return false;
     } finally {
+      taskSubmissionPending.current = false;
       setBusy("");
     }
   };
@@ -366,7 +373,7 @@ export default function EmbeddedAiWorkspace() {
     setBusy(`discover:${task.id}`);
     setError("");
     try {
-      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(task.id)}/discover`, {}, { timeout: 180000 });
+      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(task.id)}/discover`, {}, { timeout: 240000 });
       updateTask(data.task);
     } catch (discoveryError) {
       setError(await responseMessage(discoveryError));
@@ -721,7 +728,7 @@ function TaskConversation({
       return <article key={String(record.id || index)}><strong>{String(record.title || "SMAJ PI HUB listing")}</strong><span>{String(record.company || record.creatorName || record.sellerName || serviceName(result.serviceId))}</span>{record.salary != null && <span>{String(record.salary)}</span>}{result.serviceId === "jobs" && <b>{sample ? "Sample listing · Not verified" : record.employerVerified === true ? "Verified employer" : "Employer not verified"}</b>}</article>;
     })}</div></section>)}</section>}
       {!pendingIsCurrentTask&&!plan.discovery && plan.services?.some(id => ["jobs", "store", "stream"].includes(id)) && !execution && <div className="embeddedAiApproval"><strong>Public search is ready</strong><p>SMAJ AI reads published listings only. No purchase or application will be made.</p><button type="button" disabled={busy} onClick={() => runDiscovery(task)}>{busy ? "Searching…" : "Search public listings"}</button></div>}
-      {!pendingIsCurrentTask&&!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
+      {!pendingIsCurrentTask&&!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.message && <small>Exact message to seller: “{action.message}”</small>}{action.storePreview?.product && <small>Verified product: {action.storePreview.product.title} · Seller: {action.storePreview.product.sellerName} · Seller ID: {action.storePreview.product.sellerId} · {action.storePreview.product.pricePi} Pi</small>}{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
       {!pendingIsCurrentTask&&execution && <section className="embeddedAiExecution"><h2>Task status · {execution.status.replaceAll("_", " ")}</h2>{execution.error && <p className="embeddedAiInlineError" role="alert">{execution.error}</p>}{execution.events?.map((event, index) => <p key={`${event.at}:${index}`}>{event.message}</p>)}{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><p>Independently verified · {execution.receipt.verifiedAt || "Verified"}</p><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download PDF receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download verification data</button></div>}</section>}
       {!pendingIsCurrentTask&&<div className="embeddedAiConversationActions"><span>{statusLabel(plan)}</span><button type="button" disabled={busy} onClick={() => deleteTask(task)}><DeleteOutlineOutlinedIcon/> Delete task</button></div>}
     </div>
@@ -732,6 +739,7 @@ function TaskConversation({
 function FollowUpComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string)=>Promise<boolean>}){
   const [message,setMessage]=useState("");
   const [sending,setSending]=useState(false);
+  const sendingRef=useRef(false);
   const inputRef=useRef<HTMLTextAreaElement>(null);
   useEffect(()=>{
     const input=inputRef.current;
@@ -740,7 +748,7 @@ function FollowUpComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string
     input.style.height=`${Math.min(input.scrollHeight,160)}px`;
     input.style.overflowY=input.scrollHeight>160?"auto":"hidden";
   },[message]);
-  const submit=async(event:FormEvent)=>{event.preventDefault();if(!message.trim()||busy||sending)return;setSending(true);try{if(await onSubmit(message.trim()))setMessage("");}finally{setSending(false);}};
+  const submit=async(event:FormEvent)=>{event.preventDefault();const submitted=message.trim();if(!submitted||busy||sendingRef.current)return;sendingRef.current=true;setMessage("");setSending(true);try{await onSubmit(submitted);}finally{sendingRef.current=false;setSending(false);}};
   return <form className="embeddedAiFollowUp" onSubmit={submit}>
     <label className="embeddedAiSrOnly" htmlFor="embedded-ai-follow-up">Message SMAJ AI</label>
     <textarea ref={inputRef} id="embedded-ai-follow-up" value={message} maxLength={1900} rows={1} placeholder="Message SMAJ AI…" onChange={event=>setMessage(event.target.value)}/>
