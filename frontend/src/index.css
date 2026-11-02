@@ -14488,7 +14488,7 @@ html[data-private-theme="dark"] .storefront-product-card .storefront-seller-name
   }
 
   /* Use the official SMAJ AI artwork without altering the source asset. */
-  .smaj-ai-trigger { text-decoration: none; }
+  .smaj-ai-trigger { text-decoration: none; background: transparent; border: 0; box-shadow: none; }
   .smaj-ai-trigger:focus-visible { outline: 3px solid var(--smaj-text); outline-offset: 3px; }
   .smaj-ai-mark { width: 27px; height: 27px; object-fit: contain; }
 
