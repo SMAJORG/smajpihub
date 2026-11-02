@@ -160,6 +160,7 @@ export default function EmbeddedAiWorkspace() {
   const navigate = useNavigate();
   const active = getSection(location.pathname);
   const [tasks, setTasks] = useState<AiTask[]>([]);
+  const tasksRef = useRef<AiTask[]>([]);
   const [conversations, setConversations] = useState<AiConversation[]>([]);
   const [connections, setConnections] = useState<AiConnection[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingMessage|null>(null);
@@ -224,30 +225,41 @@ export default function EmbeddedAiWorkspace() {
   }, []);
 
   useEffect(() => { void loadWorkspace(); }, [loadWorkspace]);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => {
-    if (active.section !== "conversations" || !active.taskId || loading) return;
+    if (!active.taskId || loading || !["conversations", "results"].includes(active.section)) return;
     let activeRequest = true;
-    void axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(active.taskId)}`, { smajSkipReadRetry: true })
-      .then(({ data }) => {
+    void (async () => {
+      try {
+        let task = active.section === "results" ? tasksRef.current.find(item => item.id === active.taskId) : undefined;
+        if (active.section === "results" && !task) {
+          const response = await axiosClient.get<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(active.taskId!)}`, { smajSkipReadRetry: true });
+          task = response.data.task;
+        }
+        const conversationId = active.section === "conversations" ? active.taskId! : task?.conversationId || task?.id;
+        if (!conversationId) return;
+        const { data } = await axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(conversationId)}`, { smajSkipReadRetry: true });
         if (!activeRequest) return;
         const history = data.tasks || [];
-        setTasks(current => [...history, ...current.filter(task => !history.some(saved => saved.id === task.id))]);
+        setTasks(current => [...history, ...current.filter(item => !history.some(saved => saved.id === item.id))]);
         const latest = history.at(-1);
-        if (latest?.requestKey && (latest.plan.generationStatus === "pending" || latest.plan.generationStatus === "failed")) {
+        const latestRequestKey = latest?.requestKey;
+        if (latest && latestRequestKey && (latest.plan.generationStatus === "pending" || latest.plan.generationStatus === "failed")) {
           setPendingMessage(current => current || {
             id: latest.id,
             text: latest.task,
             conversationId: latest.conversationId || latest.id,
             persistedConversation: true,
-            requestKey: latest.requestKey!,
+            requestKey: latestRequestKey,
             status: "failed",
             error: latest.plan.generationError || "Your message is saved. Retry to get the AI response.",
           });
         }
-      })
-      .catch(async failure => {
+        if (active.section === "conversations" && latest) navigate(`/ai/results/${encodeURIComponent(latest.id)}`, { replace: true });
+      } catch (failure) {
         if (activeRequest) setError(await responseMessage(failure));
-      });
+      }
+    })();
     return () => { activeRequest = false; };
   }, [active.section, active.taskId, loading]);
   useEffect(() => {
@@ -267,7 +279,7 @@ export default function EmbeddedAiWorkspace() {
     ? tasks.find(task => task.id === active.taskId)?.conversationId || active.taskId
     : undefined;
   const conversationTasks = useMemo(
-    () => activeConversationId ? tasks.filter(task => (task.conversationId || task.id) === activeConversationId && task.plan.generationStatus !== "pending" && task.plan.generationStatus !== "failed").sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) : [],
+    () => activeConversationId ? tasks.filter(task => (task.conversationId || task.id) === activeConversationId).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) : [],
     [activeConversationId, tasks],
   );
   const activeConversationTask = active.section === "conversations" && active.taskId
@@ -308,7 +320,12 @@ export default function EmbeddedAiWorkspace() {
   }, [active.section, activeConversationTask?.id, activeConversationTask?.plan.execution?.status, selectedTask?.id, selectedTask?.plan.execution?.status]);
   const openConversation = (conversationId: string) => {
     setSelectedActions([]);
-    navigate(`/ai/conversations/${encodeURIComponent(conversationId)}`);
+    const conversation = conversations.find(item => item.id === conversationId);
+    const latestTask = tasks.find(item => item.id === conversation?.latestTaskId)
+      || tasks.filter(item => (item.conversationId || item.id) === conversationId).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+    navigate(latestTask
+      ? `/ai/results/${encodeURIComponent(latestTask.id)}`
+      : `/ai/conversations/${encodeURIComponent(conversationId)}`);
   };
   const openTask = (task: AiTask, section: "conversations" | "results" = "results") => {
     setSelectedActions([]);
@@ -581,7 +598,7 @@ export default function EmbeddedAiWorkspace() {
           onClick={() => navigate(item.path)}
         >{item.label}</button>)}
       </nav>
-      <main className={`embeddedAiMain${active.taskId && ["conversations", "results"].includes(active.section) ? " embeddedAiMainChat" : ""}`} aria-busy={loading || isBusy}>
+      <main className={`embeddedAiMain${active.taskId && active.section === "results" ? " embeddedAiMainChat" : ""}`} aria-busy={loading || isBusy}>
         {loading ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Loading your SMAJ AI workspace…</div>
           : initialLoadFailed ? <div className="embeddedAiEmpty"><h2>Workspace unavailable</h2><p>Your Pi session and saved work are unchanged. Check your connection or try again.</p><button type="button" onClick={() => void loadWorkspace()}>Try again</button></div>
             : active.section === "chat" && !active.taskId ? <section className="embeddedAiChatHome">
@@ -638,11 +655,10 @@ export default function EmbeddedAiWorkspace() {
                   <div className="embeddedAiSettings"><span>Pi account</span><strong>{user?.piUsername || user?.username || "Signed in with Pi"}</strong><span>Saved tasks</span><strong>{tasks.length}</strong><span>Connected apps</span><strong>{connections.filter(connection => connection.connected).length}</strong><button type="button" onClick={() => navigate("/settings")}>Open SMAJ PI HUB account settings</button></div>
                   <form className="embeddedAiPreferences" onSubmit={savePreferences}><h2>AI preferences</h2><p>Save up to 10 preferences to personalize recommendations. Avoid passwords, payment details, and sensitive personal information.</p><label htmlFor="embedded-ai-preferences">One preference per line</label><textarea id="embedded-ai-preferences" value={preferencesDraft} maxLength={1210} rows={5} onChange={event => setPreferencesDraft(event.target.value)} placeholder={"Remote work\nPrefer Pi-denominated prices"}/><small>{preferences.length}/10 saved</small><button type="submit" disabled={preferencesBusy}>{preferencesBusy ? "Saving…" : "Save preferences"}</button>{preferencesStatus&&<p role="status">{preferencesStatus}</p>}</form>
                 </section>
-                  : active.taskId ? active.section === "conversations" && (activeConversationTask || pendingMessage?.conversationId === activeConversationId)
-                    ? <ConversationThread title={conversations.find(conversation => conversation.id === activeConversationId)?.title || "Conversation"} turns={conversationTasks} latestTask={activeConversationTask} pending={pendingMessage?.conversationId === activeConversationId ? pendingMessage : null} retryPending={retryPendingMessage} openTask={task => openTask(task, "results")} onFollowUp={message => submitTask(message, activeConversationTask?.conversationId || activeConversationId)} busy={isBusy}/>
-                    : selectedTask
-                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === selectedTask.conversationId ? pendingMessage : null} retryPending={retryPendingMessage} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId)} />
-                      : <div className="embeddedAiEmpty"><h2>{active.section === "conversations" ? "Conversation not found" : "Task not found"}</h2><p>This saved work may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate(active.section === "conversations" ? "/ai/conversations" : "/ai/tasks")}>Back to {active.section === "conversations" ? "Conversations" : "All Tasks"}</button></div>
+                  : active.taskId && active.section === "conversations" ? <div className="embeddedAiEmpty"><h2>Opening conversation…</h2><p>Loading the saved conversation in Results.</p></div>
+                    : active.taskId ? selectedTask
+                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.id === selectedTask.id ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId)} />
+                      : <div className="embeddedAiEmpty"><h2>Task not found</h2><p>This saved task may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate("/ai/tasks")}>Back to All Tasks</button></div>
                     : active.section === "approvals" ? <section className="embeddedAiPage"><h1>Approvals</h1><p className="embeddedAiIntro">Review actions that SMAJ AI prepared. Nothing is submitted until you approve it.</p><TaskList tasks={tasks.filter(task => task.plan.proposedActions?.length && !task.plan.execution)} openTask={task => openTask(task)} empty="No actions are waiting for approval." /></section>
                       : active.section === "results" ? <section className="embeddedAiPage"><h1>Results</h1><p className="embeddedAiIntro">Completed searches and verified task results.</p><TaskList tasks={tasks.filter(task => task.plan.discovery || task.plan.execution)} openTask={task => openTask(task, "results")} empty="Your results will appear here after a search." /></section>
                         : active.section === "conversations" ? <section className="embeddedAiPage embeddedAiHistoryPage">
@@ -771,34 +787,6 @@ function TaskHistoryList({ tasks, busy, openTask, deleteTask, empty }: {
   </section>)}</div>;
 }
 
-function ConversationThread({ title, turns, latestTask, pending, retryPending, openTask, onFollowUp, busy }: {
-  title: string;
-  turns: AiTask[];
-  latestTask?: AiTask;
-  pending: PendingMessage|null;
-  retryPending: () => void;
-  openTask: (task: AiTask) => void;
-  onFollowUp: (message: string) => Promise<boolean>;
-  busy: boolean;
-}) {
-  return <section className="embeddedAiPage embeddedAiConversation">
-    <div className="embeddedAiConversationScroll">
-      <h1>{title}</h1><p className="embeddedAiIntro">Saved conversation · {turns.length} {turns.length === 1 ? "message" : "messages"}</p>
-      {turns.map(task => <article className="embeddedAiThreadTurn" key={task.id}>
-        <div className="embeddedAiMessage user"><span>You · {taskTime(task.createdAt)}</span><p>{task.task}</p></div>
-        <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{task.plan.summary || "Your request is ready for review."}</p><small className="embeddedAiTurnStatus">{statusLabel(task.plan)}</small><button type="button" className="embeddedAiViewTask" onClick={() => openTask(task)}>View task details</button></div></div>
-      </article>)}
-      {pending&&<article className="embeddedAiThreadTurn" key={pending.id}>
-        <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
-        {pending.status === "sending"
-          ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-          : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
-      </article>}
-    </div>
-    {latestTask&&<FollowUpComposer key={latestTask.conversationId || latestTask.id} busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>}
-  </section>;
-}
-
 function TaskList({ tasks, openTask, empty }: { tasks: AiTask[]; openTask: (task: AiTask) => void; empty: string }) {
   if (!tasks.length) return <div className="embeddedAiEmpty"><p>{empty}</p></div>;
   return <div className="embeddedAiTaskList">{tasks.map(task => <button key={task.id} type="button" onClick={() => openTask(task)}>
@@ -807,13 +795,14 @@ function TaskList({ tasks, openTask, empty }: { tasks: AiTask[]; openTask: (task
 }
 
 function TaskConversation({
-  task, section, busy, pending, retryPending, selectedActions, setSelectedActions, runDiscovery, approveActions, retryTask, downloadReceipt, deleteTask, onFollowUp,
+  task, section, busy, pending, retryPending, turns, selectedActions, setSelectedActions, runDiscovery, approveActions, retryTask, downloadReceipt, deleteTask, onFollowUp,
 }: {
   task: AiTask;
   section: Section;
   busy: boolean;
   pending: PendingMessage|null;
   retryPending: () => void;
+  turns: AiTask[];
   selectedActions: string[];
   setSelectedActions: (update: (current: string[]) => string[]) => void;
   runDiscovery: (task: AiTask) => void;
@@ -826,13 +815,25 @@ function TaskConversation({
   const plan = task.plan;
   const execution = plan.execution;
   const showResults = section === "results" || section === "conversations";
+  const pendingIsCurrentTask = pending?.id === task.id;
   return <section className="embeddedAiPage embeddedAiConversation">
     <div className="embeddedAiConversationScroll">
       <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
+      {turns.map(turn => <article className="embeddedAiThreadTurn" key={turn.id}>
+        <div className="embeddedAiMessage user"><span>You · {taskTime(turn.createdAt)}</span><p>{turn.task}</p></div>
+        <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt=""/><div><p>{turn.plan.generationStatus === "failed" ? turn.plan.generationError || "This response did not complete." : turn.plan.generationStatus === "pending" ? "SMAJ AI is preparing a response…" : turn.plan.summary || "Your request is ready for review."}</p><small className="embeddedAiTurnStatus">{statusLabel(turn.plan)}</small>
+          {turn.plan.discovery?.results.map(result => <section className="embeddedAiCards" key={result.serviceId} aria-label={`${serviceName(result.serviceId)} results`}>
+            {result.records.map((item, index) => {
+              const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
+              return <article key={String(record.id || index)}><strong>{String(record.title || "SMAJ PI HUB listing")}</strong><span>{String(record.company || record.creatorName || record.sellerName || serviceName(result.serviceId))}</span>{record.salary != null && <span>{String(record.salary)}</span>}</article>;
+            })}
+          </section>)}
+        </div></div>
+      </article>)}
       <div className="embeddedAiMessage user"><span>You</span><p>{task.task}</p></div>
-      <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{plan.summary || "Your request is ready for review."}</p></div></div>
+      {!pendingIsCurrentTask&&<div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{plan.summary || "Your request is ready for review."}</p></div></div>}
       {pending&&<article className="embeddedAiThreadTurn">
-        <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
+        {!pendingIsCurrentTask&&<div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>}
         {pending.status === "sending"
           ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
           : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
