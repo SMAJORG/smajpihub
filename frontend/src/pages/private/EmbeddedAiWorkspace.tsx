@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
@@ -81,13 +81,43 @@ const getSection = (path: string): { section: Section; taskId?: string } => {
 };
 
 const statusLabel = (plan: AiPlan) => {
-  if (plan.execution?.status) return plan.execution.status.replaceAll("_", " ");
+  if (plan.execution?.status) {
+    const labels: Record<string, string> = {
+      awaiting_approval: "Awaiting approval",
+      approved: "Approved",
+      queued: "Queued",
+      running: "Working",
+      executing: "Executing",
+      retrying: "Recovering",
+      verifying: "Verifying",
+      verified: "Verified",
+      failed: "Needs attention",
+    };
+    return labels[plan.execution.status] || plan.execution.status.replaceAll("_", " ");
+  }
   if (plan.proposedActions?.length) return "Awaiting approval";
   if (plan.discovery) return "Results ready";
   return "New";
 };
 
 const serviceName = (id: string) => serviceCatalog.find(service => service.slug === id)?.name || id;
+const serviceExamples: Record<string, string> = {
+  store: "Find a product and ask its seller if it is available",
+  stream: "Build a weekend watchlist",
+  jobs: "Find matching jobs and prepare applications",
+  education: "Create a learning path for product design",
+  sports: "Plan which matches to follow this week",
+  food: "Plan affordable meals near me",
+  health: "Prepare questions for a doctor visit",
+  transport: "Plan transport for my appointments",
+  agro: "Create a crop-to-market checklist",
+  energy: "Create an energy-saving plan",
+  charity: "Help me assess causes before donating",
+  housing: "Prepare a safe rental search",
+  events: "Plan events for my weekend",
+  swap: "Explain the peer-to-peer exchange vision",
+  token: "Explain available reward pathways",
+};
 const responseMessage = async (error: unknown) => {
   const data = (error as { response?: { data?: unknown } })?.response?.data;
   if (data instanceof Blob) {
@@ -103,6 +133,22 @@ const taskTime = (date: string) => {
   const parsed = new Date(date);
   return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 };
+const taskTimestamp = (date: string) => {
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+};
+const dateGroup = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Earlier";
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const daysAgo = Math.round((todayStart - day) / 86_400_000);
+  if (daysAgo === 0) return "Today";
+  if (daysAgo === 1) return "Yesterday";
+  if (daysAgo >= 2 && daysAgo < 7) return "Previous 7 days";
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+};
 
 export default function EmbeddedAiWorkspace() {
   const { user } = useAuthContext();
@@ -115,7 +161,13 @@ export default function EmbeddedAiWorkspace() {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
+  const [connectionBusy, setConnectionBusy] = useState<string[]>([]);
+  const pendingConnections = useRef(new Set<string>());
+  const promptInput = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState("");
+  const [selectedService, setSelectedService] = useState("");
+  const [showAllServices, setShowAllServices] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
   const [preferences, setPreferences] = useState<string[]>([]);
@@ -124,6 +176,10 @@ export default function EmbeddedAiWorkspace() {
   const [preferencesBusy, setPreferencesBusy] = useState(false);
   const [conversationQuery, setConversationQuery] = useState("");
   const [taskQuery, setTaskQuery] = useState("");
+  const [conversationServiceFilter, setConversationServiceFilter] = useState("all");
+  const [taskServiceFilter, setTaskServiceFilter] = useState("all");
+  const [conversationFilterOpen, setConversationFilterOpen] = useState(false);
+  const [taskFilterOpen, setTaskFilterOpen] = useState(false);
   const [renamingConversation, setRenamingConversation] = useState("");
   const [conversationTitleDraft, setConversationTitleDraft] = useState("");
 
@@ -149,6 +205,11 @@ export default function EmbeddedAiWorkspace() {
   }, []);
 
   useEffect(() => { void loadWorkspace(); }, [loadWorkspace]);
+  useEffect(() => {
+    if (draft) return;
+    const timer = window.setInterval(() => setPlaceholderIndex(index => (index + 1) % serviceCatalog.length), 3000);
+    return () => window.clearInterval(timer);
+  }, [draft]);
 
   const selectedTask = useMemo(
     () => active.taskId ? tasks.find(task => task.id === active.taskId) : undefined,
@@ -211,7 +272,8 @@ export default function EmbeddedAiWorkspace() {
     event.preventDefault();
     const request = draft.trim();
     if (!request || busy) return;
-    await submitTask(request);
+    const service = serviceCatalog.find(item => item.slug === selectedService);
+    await submitTask(service ? `${service.name}: ${request}` : request);
   };
 
   const submitTask = async (request: string, conversationId?: string) => {
@@ -278,18 +340,23 @@ export default function EmbeddedAiWorkspace() {
   };
 
   const toggleConnection = async (connection: AiConnection) => {
-    setBusy(`connection:${connection.serviceId}`);
+    if (pendingConnections.current.has(connection.serviceId)) return;
+    pendingConnections.current.add(connection.serviceId);
+    setConnectionBusy(current => [...current, connection.serviceId]);
     setError("");
     try {
       const { data } = await axiosClient.post<AiResponse<{ connections: AiConnection[] }>>("/ai/connections", {
         serviceId: connection.serviceId,
         connected: !connection.connected,
       });
-      setConnections(data.connections || []);
+      const updated = data.connections?.find(item => item.serviceId === connection.serviceId);
+      if (!updated) throw new Error("The app connection state could not be confirmed.");
+      setConnections(current => current.map(item => item.serviceId === connection.serviceId ? updated : item));
     } catch (connectionError) {
       setError(await responseMessage(connectionError));
     } finally {
-      setBusy("");
+      pendingConnections.current.delete(connection.serviceId);
+      setConnectionBusy(current => current.filter(id => id !== connection.serviceId));
     }
   };
 
@@ -404,12 +471,29 @@ export default function EmbeddedAiWorkspace() {
     ? active.section === "results" ? "Results" : conversations.find(conversation => conversation.id === activeConversationId)?.title || "Conversation"
     : sectionTitles[active.section];
   const isBusy = Boolean(busy);
+  const orderedServices = useMemo(() => {
+    const availableServices = connections.map(connection => ({
+      connection,
+      service: serviceCatalog.find(item => item.slug === connection.serviceId),
+    })).filter((item): item is { connection: AiConnection; service: (typeof serviceCatalog)[number] } => Boolean(item.service));
+    const connected = availableServices.filter(item => item.connection.available && item.connection.connected);
+    const connectedIds = new Set(connected.map(item => item.connection.serviceId));
+    return [...connected, ...availableServices.filter(item => !connectedIds.has(item.connection.serviceId))];
+  }, [connections]);
+  const visibleServices = showAllServices ? orderedServices : orderedServices.slice(0, 5);
+  const placeholderService = serviceCatalog[placeholderIndex % serviceCatalog.length];
   const filteredConversations = conversations.filter(conversation => {
     const turns = tasks.filter(task => (task.conversationId || task.id) === conversation.id);
     const searchable = `${conversation.title} ${conversation.lastMessage} ${turns.map(task => `${task.task} ${task.plan.summary}`).join(" ")}`;
-    return searchable.toLowerCase().includes(conversationQuery.trim().toLowerCase());
+    const services = new Set(turns.flatMap(task => [...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)]));
+    const matchesService = conversationServiceFilter === "all" || services.has(conversationServiceFilter);
+    return matchesService && searchable.toLowerCase().includes(conversationQuery.trim().toLowerCase());
   });
-  const filteredTasks = tasks.filter(task => `${task.task} ${task.plan.services.map(serviceName).join(" ")} ${statusLabel(task.plan)}`.toLowerCase().includes(taskQuery.trim().toLowerCase()));
+  const filteredTasks = tasks.filter(task => {
+    const services = [...new Set([...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)])];
+    const matchesService = taskServiceFilter === "all" || services.includes(taskServiceFilter);
+    return matchesService && JSON.stringify(task).toLowerCase().includes(taskQuery.trim().toLowerCase());
+  });
 
   return <div className="embeddedAi">
     <header className="embeddedAiHeader">
@@ -434,23 +518,52 @@ export default function EmbeddedAiWorkspace() {
         {loading ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Loading your SMAJ AI workspace…</div>
           : initialLoadFailed ? <div className="embeddedAiEmpty"><h2>Workspace unavailable</h2><p>Your Pi session and saved work are unchanged. Check your connection or try again.</p><button type="button" onClick={() => void loadWorkspace()}>Try again</button></div>
             : active.section === "chat" && !active.taskId ? <section className="embeddedAiChatHome">
-              <p className="embeddedAiEyebrow">YOUR SMAJ AI WORKSPACE</p>
+              <p className="embeddedAiEyebrow">YOUR WORKSPACE</p>
               <h1>What can I help you do?</h1>
-              <p className="embeddedAiIntro">Describe a request. Connected public listings are searched automatically; review and approve any account actions before they run.</p>
               <form className="embeddedAiComposer" onSubmit={createTask}>
                 <label className="embeddedAiSrOnly" htmlFor="embedded-ai-prompt">Your request</label>
-                <textarea id="embedded-ai-prompt" value={draft} maxLength={1900} rows={3} placeholder="Ask SMAJ AI anything…" onChange={event => setDraft(event.target.value)} />
-                <div><span>Requests and progress are saved to your Pi account.</span><button type="submit" disabled={!draft.trim() || isBusy}>{busy === "create" ? <><span className="embeddedAiSpinner"/>Thinking…</> : <>Ask SMAJ AI <SendOutlinedIcon/></>}</button></div>
+                <div className="embeddedAiPromptInput">
+                  <textarea ref={promptInput} id="embedded-ai-prompt" value={draft} maxLength={1900} rows={3} placeholder="" onChange={event => setDraft(event.target.value)} />
+                  {!draft && <span key={placeholderService.slug}>{serviceExamples[placeholderService.slug] || "Tell SMAJ AI what you need"}…</span>}
+                </div>
+                <div className="embeddedAiComposerToolbar">
+                  {selectedService && (() => {
+                    const selected = serviceCatalog.find(service => service.slug === selectedService);
+                    return selected && <button type="button" className="embeddedAiSelectedService" onClick={() => setSelectedService("")} aria-label={`Clear ${selected.name} context`}><img src={`/assets/services/${selected.slug}.png`} alt=""/><span>{selected.name}</span><b aria-hidden="true">×</b></button>;
+                  })()}
+                  <span className="embeddedAiSavedNote">Requests and progress are saved to your Pi account.</span>
+                  <button type="submit" disabled={!draft.trim() || isBusy}>{busy === "create" ? <><span className="embeddedAiSpinner"/>Asking AI…</> : <>Ask SMAJ AI <SendOutlinedIcon/></>}</button>
+                </div>
               </form>
-              <div className="embeddedAiSuggestions">{["Find verified jobs for me", "Compare products in the Store", "Find creator videos on Stream"].map(text => <button key={text} type="button" disabled={isBusy} onClick={() => setDraft(text)}>{text}</button>)}</div>
-              <ConversationList conversations={conversations.slice(0, 5)} openConversation={openConversation} empty="Your saved conversations will appear here." />
+              {selectedService && (() => {
+                const selected = serviceCatalog.find(service => service.slug === selectedService);
+                const connection = connections.find(item => item.serviceId === selectedService);
+                const state = !connection?.available ? "Planned" : connection.connected ? "Connected" : "Not connected";
+                return selected && <div className="embeddedAiServiceContext" role="status"><strong>{selected.name}</strong> · {state}{state === "Planned" ? " — integration not available yet." : state === "Not connected" ? " — use Connect Apps to connect this app." : " — task context selected."}</div>;
+              })()}
+              <div className="embeddedAiSuggestions" aria-label="Suggested requests">{[
+                { label: "Find jobs", prompt: "Find software engineering jobs" },
+                { label: "Shop cars", prompt: "Find cars under $30,000" },
+                { label: "Explore courses", prompt: "Show available online courses" },
+                { label: "Health services", prompt: "Find nearby health services" },
+              ].map(suggestion => <button key={suggestion.label} type="button" onClick={() => {setSelectedService("");setDraft(suggestion.prompt);promptInput.current?.focus({preventScroll:true});}}>{suggestion.label}</button>)}</div>
+              <div className="embeddedAiServicesHeading"><h2>Connected services</h2></div>
+              <div className="embeddedAiServiceLegend" aria-label="Service status legend"><span><i className="connected"/>Connected</span><span><i className="disconnected"/>Not connected</span><span><i className="planned"/>Planned</span></div>
+              <div className="embeddedAiServiceGrid" aria-label="Choose a service">{visibleServices.map(({ connection, service }) => {
+                const state = !connection.available ? "planned" : connection.connected ? "connected" : "disconnected";
+                return <button key={service.slug} type="button" aria-pressed={selectedService === service.slug} aria-label={`${service.name}, ${state === "planned" ? "Planned" : state === "connected" ? "Connected" : "Not connected"}`} onClick={() => {setSelectedService(service.slug);setDraft(serviceExamples[service.slug] || "");promptInput.current?.focus({preventScroll:true});}}>
+                  <span className="embeddedAiServiceArt"><img src={service.slug === "stream" ? "/assets/smaj-stream-logo.png" : `/assets/services/${service.slug}.png`} alt="" onError={event => {event.currentTarget.hidden = true;}}/></span>
+                  <span>{service.name.replace(/^SMAJ /, "")}<i className={state}/></span>
+                </button>;
+              })}</div>
+              {orderedServices.length > 5 && <button type="button" className="embeddedAiShowAll" aria-expanded={showAllServices} onClick={() => setShowAllServices(value => !value)}>{showAllServices ? "Show fewer services" : "Show all services"}</button>}
             </section>
               : active.section === "apps" ? <section className="embeddedAiPage">
                 <h1>Connect Apps</h1><p className="embeddedAiIntro">Choose which SMAJ services SMAJ AI may use for approved requests.</p>
                 <div className="embeddedAiConnections">{connections.map(connection => {
                   const service = serviceCatalog.find(item => item.slug === connection.serviceId);
-                  const pending = busy === `connection:${connection.serviceId}`;
-                  return <article key={connection.serviceId}><img src={connection.serviceId === "stream" ? "/assets/smaj-stream-logo.png" : `/assets/services/${connection.serviceId}.png`} alt="" onError={event => { event.currentTarget.hidden = true; }}/><div><h2>{service?.name || connection.serviceId}</h2><p>{service?.description || "SMAJ PI HUB service"}</p><small>{!connection.available ? "Planned" : connection.connected ? "Connected" : "Not connected"}</small></div><button type="button" disabled={!connection.available || pending || isBusy} onClick={() => void toggleConnection(connection)}>{pending ? "Updating…" : connection.connected ? "Disconnect" : connection.available ? "Connect" : "Unavailable"}</button></article>;
+                  const pending = connectionBusy.includes(connection.serviceId);
+                  return <article key={connection.serviceId}><img src={connection.serviceId === "stream" ? "/assets/smaj-stream-logo.png" : `/assets/services/${connection.serviceId}.png`} alt="" onError={event => { event.currentTarget.hidden = true; }}/><div><h2>{service?.name || connection.serviceId}</h2><p>{service?.description || "SMAJ PI HUB service"}</p><small>{!connection.available ? "Planned" : connection.connected ? "Connected" : "Not connected"}</small></div><button type="button" aria-busy={pending} disabled={!connection.available || pending} onClick={() => void toggleConnection(connection)}>{pending ? "Updating…" : connection.connected ? "Disconnect" : connection.available ? "Connect" : "Unavailable"}</button></article>;
                 })}</div>
               </section>
                 : active.section === "settings" ? <section className="embeddedAiPage">
@@ -465,8 +578,30 @@ export default function EmbeddedAiWorkspace() {
                       : <div className="embeddedAiEmpty"><h2>{active.section === "conversations" ? "Conversation not found" : "Task not found"}</h2><p>This saved work may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate(active.section === "conversations" ? "/ai/conversations" : "/ai/tasks")}>Back to {active.section === "conversations" ? "Conversations" : "All Tasks"}</button></div>
                     : active.section === "approvals" ? <section className="embeddedAiPage"><h1>Approvals</h1><p className="embeddedAiIntro">Review actions that SMAJ AI prepared. Nothing is submitted until you approve it.</p><TaskList tasks={tasks.filter(task => task.plan.proposedActions?.length && !task.plan.execution)} openTask={task => openTask(task)} empty="No actions are waiting for approval." /></section>
                       : active.section === "results" ? <section className="embeddedAiPage"><h1>Results</h1><p className="embeddedAiIntro">Completed searches and verified task results.</p><TaskList tasks={tasks.filter(task => task.plan.discovery || task.plan.execution)} openTask={task => openTask(task, "results")} empty="Your results will appear here after a search." /></section>
-                        : active.section === "conversations" ? <section className="embeddedAiPage"><h1>Conversations</h1><p className="embeddedAiIntro">Search and reopen your saved chats, or continue where you left off.</p><label className="embeddedAiSearch"><span className="embeddedAiSrOnly">Search conversations</span><input type="search" value={conversationQuery} onChange={event => setConversationQuery(event.target.value)} placeholder="Search conversations"/></label><ConversationList conversations={filteredConversations} openConversation={openConversation} renameConversation={conversation => {setRenamingConversation(conversation.id);setConversationTitleDraft(conversation.title);}} deleteConversation={deleteConversation} renamingConversation={renamingConversation} conversationTitleDraft={conversationTitleDraft} setConversationTitleDraft={setConversationTitleDraft} saveRename={renameConversation} cancelRename={() => {setRenamingConversation("");setConversationTitleDraft("");}} busy={busy} empty={conversationQuery ? "No conversations match your search." : "Your saved conversations will appear here."}/></section>
-                          : active.section === "tasks" ? <section className="embeddedAiPage"><h1>All Tasks</h1><p className="embeddedAiIntro">Track each request, its progress, approvals, and verified results.</p><label className="embeddedAiSearch"><span className="embeddedAiSrOnly">Search tasks</span><input type="search" value={taskQuery} onChange={event => setTaskQuery(event.target.value)} placeholder="Search tasks and services"/></label><TaskRecordsList tasks={filteredTasks} openTask={task => openTask(task, "results")} empty={taskQuery ? "No tasks match your search." : "Your saved tasks will appear here."}/></section>
+                        : active.section === "conversations" ? <section className="embeddedAiPage embeddedAiHistoryPage">
+                          <h1>Conversations</h1>
+                          <div className="embeddedAiHistoryFilters">
+                            <div className="embeddedAiHistoryToolbar">
+                              <label className="embeddedAiHistorySearch"><span className="embeddedAiSrOnly">Search conversations</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" value={conversationQuery} onChange={event => setConversationQuery(event.target.value)} placeholder="Search conversations"/></label>
+                              <button type="button" className={`embeddedAiHistoryFilter${conversationServiceFilter !== "all" ? " active" : ""}`} aria-label="Filter by service" aria-expanded={conversationFilterOpen} aria-controls="embedded-ai-conversation-filter" onClick={() => setConversationFilterOpen(value => !value)}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16l-6.2 7.1v5.2l-3.6 1.8v-7z"/></svg></button>
+                              {conversationFilterOpen && <div className="embeddedAiServiceMenu" id="embedded-ai-conversation-filter" role="group" aria-label="Filter conversations by service">{serviceCatalog.map(service => <button type="button" key={service.slug} className={conversationServiceFilter === service.slug ? "selected" : ""} aria-pressed={conversationServiceFilter === service.slug} onClick={() => {setConversationServiceFilter(service.slug);setConversationFilterOpen(false);}}>{service.name.replace(/^SMAJ /, "")}</button>)}<button type="button" className="clear" onClick={() => {setConversationServiceFilter("all");setConversationFilterOpen(false);}}>Clear filter</button></div>}
+                            </div>
+                          </div>
+                          <p className="embeddedAiHistoryIntro">Open a saved request to review its conversation, results, approvals, and status.</p>
+                          <ConversationList conversations={filteredConversations} tasks={tasks} openConversation={openConversation} renameConversation={conversation => {setRenamingConversation(conversation.id);setConversationTitleDraft(conversation.title);}} deleteConversation={deleteConversation} renamingConversation={renamingConversation} conversationTitleDraft={conversationTitleDraft} setConversationTitleDraft={setConversationTitleDraft} saveRename={renameConversation} cancelRename={() => {setRenamingConversation("");setConversationTitleDraft("");}} busy={busy} empty={conversationQuery || conversationServiceFilter !== "all" ? "No conversations match your search." : "Your saved conversations will appear here."}/>
+                        </section>
+                          : active.section === "tasks" ? <section className="embeddedAiPage embeddedAiHistoryPage">
+                            <h1>All Tasks</h1>
+                            <div className="embeddedAiHistoryFilters">
+                              <div className="embeddedAiHistoryToolbar">
+                                <label className="embeddedAiHistorySearch"><span className="embeddedAiSrOnly">Search saved tasks</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" value={taskQuery} onChange={event => setTaskQuery(event.target.value)} placeholder="Search conversations and tasks"/></label>
+                                <button type="button" className={`embeddedAiHistoryFilter${taskServiceFilter !== "all" ? " active" : ""}`} aria-label="Filter by service" aria-expanded={taskFilterOpen} aria-controls="embedded-ai-task-filter" onClick={() => setTaskFilterOpen(value => !value)}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16l-6.2 7.1v5.2l-3.6 1.8v-7z"/></svg></button>
+                                {taskFilterOpen && <div className="embeddedAiServiceMenu" id="embedded-ai-task-filter" role="group" aria-label="Filter tasks by service">{serviceCatalog.map(service => <button type="button" key={service.slug} className={taskServiceFilter === service.slug ? "selected" : ""} aria-pressed={taskServiceFilter === service.slug} onClick={() => {setTaskServiceFilter(service.slug);setTaskFilterOpen(false);}}>{service.name.replace(/^SMAJ /, "")}</button>)}<button type="button" className="clear" onClick={() => {setTaskServiceFilter("all");setTaskFilterOpen(false);}}>Clear filter</button></div>}
+                              </div>
+                            </div>
+                            <p className="embeddedAiHistoryIntro">Open a saved request to review its conversation, results, approvals, and status.</p>
+                            <TaskHistoryList tasks={filteredTasks} busy={busy} openTask={task => openTask(task, "results")} deleteTask={deleteTask} empty={taskQuery || taskServiceFilter !== "all" ? "No tasks match your search." : "Your saved tasks will appear here."}/>
+                          </section>
                             : <section className="embeddedAiPage"><h1>{sectionTitle}</h1><p className="embeddedAiIntro">Your SMAJ AI workspace.</p><TaskList tasks={tasks} openTask={task => openTask(task)} empty="Your saved conversations will appear here." /></section>}
       </main>
     </div>
@@ -474,10 +609,11 @@ export default function EmbeddedAiWorkspace() {
 }
 
 function ConversationList({
-  conversations, openConversation, empty, renameConversation, deleteConversation, renamingConversation,
+  conversations, tasks, openConversation, empty, renameConversation, deleteConversation, renamingConversation,
   conversationTitleDraft, setConversationTitleDraft, saveRename, cancelRename, busy,
 }: {
   conversations: AiConversation[];
+  tasks: AiTask[];
   openConversation: (id: string) => void;
   empty: string;
   renameConversation?: (conversation: AiConversation) => void;
@@ -489,45 +625,83 @@ function ConversationList({
   cancelRename?: () => void;
   busy?: string;
 }) {
-  if (!conversations.length) return <div className="embeddedAiEmpty"><p>{empty}</p></div>;
-  return <div className="embeddedAiConversationList">{conversations.map(conversation => <article key={conversation.id} className="embeddedAiConversationRow">
-    {renamingConversation === conversation.id && setConversationTitleDraft && saveRename
-      ? <form className="embeddedAiRenameForm" onSubmit={event => {event.preventDefault(); saveRename(conversation);}}>
-        <label className="embeddedAiSrOnly" htmlFor={`conversation-title-${conversation.id}`}>Conversation name</label>
-        <input id={`conversation-title-${conversation.id}`} value={conversationTitleDraft || ""} maxLength={120} onChange={event => setConversationTitleDraft(event.target.value)} autoFocus/>
-        <button type="submit" disabled={!conversationTitleDraft?.trim() || busy === `rename:${conversation.id}`}>{busy === `rename:${conversation.id}` ? "Saving…" : "Save"}</button>
-        <button type="button" className="secondary" onClick={cancelRename}>Cancel</button>
-      </form>
-      : <button type="button" className="embeddedAiConversationOpen" onClick={() => openConversation(conversation.id)}>
-        <strong>{conversation.title}</strong><span>{conversation.lastMessage}</span><small>{conversation.taskCount} {conversation.taskCount === 1 ? "message" : "messages"} · {taskTime(conversation.updatedAt)}</small>
-      </button>}
-    {(renameConversation || deleteConversation) && <div className="embeddedAiConversationManage">
-      <button type="button" disabled={Boolean(busy)} onClick={() => openConversation(conversation.id)}>Continue</button>
-      {renameConversation && <button type="button" disabled={Boolean(busy)} onClick={() => renameConversation(conversation)}>Rename</button>}
-      {deleteConversation && <button type="button" className="delete" disabled={Boolean(busy)} onClick={() => deleteConversation(conversation)}>Delete conversation</button>}
-    </div>}
-  </article>)}</div>;
+  if (!conversations.length) return <p className="embeddedAiHistoryEmpty">{empty}</p>;
+  const grouped = new Map<string, AiConversation[]>();
+  for (const conversation of [...conversations].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))) {
+    const label = dateGroup(conversation.updatedAt);
+    grouped.set(label, [...(grouped.get(label) || []), conversation]);
+  }
+  return <div className="embeddedAiHistoryGroups">{[...grouped.entries()].map(([label, entries]) => <section className="embeddedAiHistoryGroup" key={label} aria-label={label}>
+    <h2>{label}</h2>
+    <div>{entries.map(conversation => {
+      const editing = renamingConversation === conversation.id && setConversationTitleDraft && saveRename;
+      const menuId = `conversation:${conversation.id}`;
+      const serviceIds = [...new Set(tasks.filter(task => (task.conversationId || task.id) === conversation.id).flatMap(task => [...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)]))];
+      return <article className="embeddedAiHistoryRow" key={menuId}>
+        {editing
+          ? <form className="embeddedAiRenameForm" onSubmit={event => {event.preventDefault(); saveRename(conversation);}}>
+            <label className="embeddedAiSrOnly" htmlFor={`conversation-title-${conversation.id}`}>Conversation name</label>
+            <input id={`conversation-title-${conversation.id}`} value={conversationTitleDraft || ""} maxLength={120} onChange={event => setConversationTitleDraft(event.target.value)} autoFocus/>
+            <button type="submit" disabled={!conversationTitleDraft?.trim() || busy === `rename:${conversation.id}`}>{busy === `rename:${conversation.id}` ? "Saving…" : "Save"}</button>
+            <button type="button" className="secondary" onClick={cancelRename}>Cancel</button>
+          </form>
+          : <>
+            <button type="button" className="embeddedAiHistoryOpen" onClick={() => openConversation(conversation.id)}>
+              <span className="embeddedAiHistoryTitle">{conversation.title}</span>
+              <span className="embeddedAiHistoryMeta">{taskTimestamp(conversation.updatedAt)} · {serviceIds.length ? serviceIds.map(serviceName).join(", ") : "SMAJ AI"}</span>
+              <span className="embeddedAiHistoryPreview">{conversation.lastMessage}</span>
+            </button>
+            <details className="embeddedAiHistoryMenu">
+              <summary aria-label={`More actions for ${conversation.title}`}><span aria-hidden="true">⋮</span></summary>
+              <div>
+                <button type="button" disabled={Boolean(busy)} onClick={event => {event.currentTarget.closest("details")?.removeAttribute("open");openConversation(conversation.id);}}>Open/Continue</button>
+                {renameConversation && <button type="button" disabled={Boolean(busy)} onClick={event => {event.currentTarget.closest("details")?.removeAttribute("open");renameConversation(conversation);}}>Rename</button>}
+                {deleteConversation && <button type="button" className="delete" disabled={Boolean(busy)} onClick={event => {event.currentTarget.closest("details")?.removeAttribute("open");deleteConversation(conversation);}}>Delete</button>}
+              </div>
+            </details>
+          </>}
+      </article>;
+    })}</div>
+  </section>)}</div>;
 }
 
-function TaskRecordsList({ tasks, openTask, empty }: { tasks: AiTask[]; openTask: (task: AiTask) => void; empty: string }) {
-  if (!tasks.length) return <div className="embeddedAiEmpty"><p>{empty}</p></div>;
-  return <div className="embeddedAiTaskRecords">{tasks.map(task => {
-    const progress = task.plan.execution?.events?.at(-1)?.message || task.plan.steps?.find(step => step.status === "running")?.title;
-    const results = task.plan.discovery?.results.reduce((total, result) => total + result.records.length, 0) || 0;
-    const pendingApprovals = task.plan.execution ? 0 : task.plan.proposedActions?.length || 0;
-    const approvedActions = task.plan.execution?.actions?.length || 0;
-    return <article key={task.id}>
-      <button type="button" className="embeddedAiTaskRecordOpen" onClick={() => openTask(task)}>
-        <span><strong>{task.task}</strong><small>{taskTime(task.createdAt)} · {task.plan.services.map(serviceName).join(", ") || "SMAJ AI"}</small>{progress && <small className="progress">{progress}</small>}</span>
-        <i>{statusLabel(task.plan)}</i>
-      </button>
-      <div className="embeddedAiTaskRecordMeta">
-        {pendingApprovals ? <span>{pendingApprovals} pending approval{pendingApprovals === 1 ? "" : "s"}</span> : approvedActions ? <span>{approvedActions} approved action{approvedActions === 1 ? "" : "s"}</span> : <span>No approval required</span>}
-        {task.plan.discovery && <span>{results} {results === 1 ? "result" : "results"}</span>}
-        {task.plan.execution?.receipt && <span className="verified">Verified receipt</span>}
-      </div>
-    </article>;
-  })}</div>;
+function TaskHistoryList({ tasks, busy, openTask, deleteTask, empty }: {
+  tasks: AiTask[];
+  busy: string;
+  openTask: (task: AiTask) => void;
+  deleteTask: (task: AiTask) => void;
+  empty: string;
+}) {
+  if (!tasks.length) return <p className="embeddedAiHistoryEmpty">{empty}</p>;
+  const grouped = new Map<string, AiTask[]>();
+  for (const task of [...tasks].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
+    const label = dateGroup(task.createdAt);
+    grouped.set(label, [...(grouped.get(label) || []), task]);
+  }
+  return <div className="embeddedAiHistoryGroups">{[...grouped.entries()].map(([label, entries]) => <section className="embeddedAiHistoryGroup" key={label} aria-label={label}>
+    <h2>{label}</h2>
+    <div>{entries.map(task => {
+      const serviceIds = [...new Set([...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)])];
+      const results = task.plan.discovery?.results.reduce((total, result) => total + result.records.length, 0) || 0;
+      const approvalCount = task.plan.execution ? task.plan.execution.actions?.length || 0 : task.plan.proposedActions?.length || 0;
+      return <article className="embeddedAiHistoryRow" key={task.id}>
+        <button type="button" className="embeddedAiHistoryOpen" onClick={() => openTask(task)}>
+          <span className="embeddedAiHistoryTitle">{task.task}</span>
+          <span className="embeddedAiHistoryMeta">{taskTimestamp(task.createdAt)} · {serviceIds.length ? serviceIds.map(serviceName).join(", ") : "SMAJ AI"}</span>
+        </button>
+        <span className={`embeddedAiHistoryStatus status-${task.plan.execution?.status || (task.plan.proposedActions?.length ? "awaiting_approval" : task.plan.discovery ? "results" : "new")}`}>{statusLabel(task.plan)}</span>
+        <details className="embeddedAiHistoryMenu">
+          <summary aria-label={`More actions for ${task.task}`}><span aria-hidden="true">⋮</span></summary>
+          <div><button type="button" className="delete" disabled={Boolean(busy)} onClick={event => {event.currentTarget.closest("details")?.removeAttribute("open");deleteTask(task);}}>{busy === `delete:${task.id}` ? "Deleting…" : "Delete task"}</button></div>
+        </details>
+        {(approvalCount > 0 || task.plan.discovery || task.plan.execution?.receipt) && <div className="embeddedAiHistoryDetails">
+          {approvalCount > 0 && <span>{approvalCount} {task.plan.execution ? "approved" : "pending approval"} {approvalCount === 1 ? "action" : "actions"}</span>}
+          {task.plan.discovery && <span>{results} {results === 1 ? "result" : "results"}</span>}
+          {task.plan.execution?.receipt && <span className="verified">Verified receipt</span>}
+        </div>}
+      </article>;
+    })}</div>
+  </section>)}</div>;
 }
 
 function ConversationThread({ title, turns, latestTask, openTask, onFollowUp, busy }: {

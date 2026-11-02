@@ -131,24 +131,25 @@ test("authenticated Pi workspace saves, searches, continues, renames, deletes, a
 
   await page.getByRole("button", { name: "All Tasks" }).click();
   await expect(page.getByText("Find verified engineering jobs", { exact: true })).toBeVisible();
-  await expect(page.locator(".embeddedAiTaskRecords")).toContainText("1 approved action");
+  await expect(page.locator(".embeddedAiHistoryDetails")).toContainText("1 approved action");
   await page.getByRole("button", { name: "Conversations" }).click();
   await page.getByLabel("Search conversations").fill("verified engineering");
-  await page.locator(".embeddedAiConversationOpen").click();
+  await expect(page.locator(".embeddedAiConversationManage")).toHaveCount(0);
+  await page.locator(".embeddedAiHistoryMenu").getByRole("button", { name: "Open/Continue" }).click();
   await expect(page.getByRole("heading", { name: "Find verified engineering jobs" })).toBeVisible();
   await page.getByLabel("Continue this conversation").fill("Only show remote roles");
   await page.getByRole("button", { name: /Send follow-up/ }).click();
   await expect(page.getByText("Only show remote roles", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Conversations" }).click();
-  await page.locator(".embeddedAiConversationManage").getByRole("button", { name: "Rename" }).click();
+  await page.locator(".embeddedAiHistoryMenu").getByRole("button", { name: "Rename" }).click();
   await page.getByLabel("Conversation name").fill("Remote engineering search");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.locator(".embeddedAiConversationOpen")).toContainText("Remote engineering search");
+  await expect(page.locator(".embeddedAiHistoryOpen")).toContainText("Remote engineering search");
   for (const width of [320, 375, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
     expect(dimensions.document, `conversation page overflow at ${width}px`).toBeLessThanOrEqual(dimensions.viewport);
-    const row = await page.locator(".embeddedAiConversationRow").boundingBox();
+    const row = await page.locator(".embeddedAiHistoryRow").boundingBox();
     expect(row?.x).toBeGreaterThanOrEqual(0);
     expect((row?.x || 0) + (row?.width || 0)).toBeLessThanOrEqual(width);
   }
@@ -157,20 +158,42 @@ test("authenticated Pi workspace saves, searches, continues, renames, deletes, a
     await page.setViewportSize({ width, height: 844 });
     const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
     expect(dimensions.document, `tasks page overflow at ${width}px`).toBeLessThanOrEqual(dimensions.viewport);
-    const row = await page.locator(".embeddedAiTaskRecords article").first().boundingBox();
+    const row = await page.locator(".embeddedAiHistoryRow").first().boundingBox();
     expect(row?.x).toBeGreaterThanOrEqual(0);
     expect((row?.x || 0) + (row?.width || 0)).toBeLessThanOrEqual(width);
   }
   await page.getByRole("button", { name: "Conversations" }).click();
   page.once("dialog", dialog => dialog.accept());
-  await page.locator(".embeddedAiConversationManage").getByRole("button", { name: "Delete conversation" }).click();
-  await expect(page.locator(".embeddedAiEmpty")).toContainText("Your saved conversations will appear here.");
+  await page.locator(".embeddedAiHistoryMenu").getByRole("button", { name: "Delete" }).click();
+  await expect(page.locator(".embeddedAiHistoryEmpty")).toContainText("Your saved conversations will appear here.");
   await page.getByRole("button", { name: "Connect Apps" }).click();
   const jobsConnection = page.locator(".embeddedAiConnections article").filter({ hasText: "SMAJ Jobs" });
   await jobsConnection.getByRole("button", { name: "Disconnect" }).click();
   await expect(jobsConnection.getByText("Not connected", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to SMAJ PI HUB" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+});
+
+test("app connections update independently without changing other apps", async ({ page }) => {
+  await page.goto("/ai");
+  await page.getByRole("button", { name: "Connect Apps" }).click();
+  const jobsConnection = page.locator(".embeddedAiConnections article").filter({ hasText: "SMAJ Jobs" });
+  const storeConnection = page.locator(".embeddedAiConnections article").filter({ hasText: "SMAJ Store" });
+  const streamConnection = page.locator(".embeddedAiConnections article").filter({ hasText: "SMAJ Stream" });
+  const updatedServices = [];
+  page.on("request", request => {
+    if (new URL(request.url()).pathname === "/ai/connections" && request.method() === "POST") {
+      updatedServices.push(request.postDataJSON().serviceId);
+    }
+  });
+  await Promise.all([
+    jobsConnection.getByRole("button", { name: "Disconnect" }).click(),
+    storeConnection.getByRole("button", { name: "Connect" }).evaluate(button => {button.click();button.click();}),
+  ]);
+  await expect(jobsConnection.getByText("Not connected", { exact: true })).toBeVisible();
+  await expect(storeConnection.getByText("Connected", { exact: true })).toBeVisible();
+  await expect(streamConnection.getByText("Not connected", { exact: true })).toBeVisible();
+  expect(updatedServices.sort()).toEqual(["jobs", "store"]);
 });
 
 test("workspace content and service cards fit narrow mobile viewports", async ({ page }) => {
