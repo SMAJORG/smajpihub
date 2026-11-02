@@ -202,6 +202,7 @@ export default function EmbeddedAiWorkspace() {
   const pendingConnections = useRef(new Set<string>());
   const taskSubmissionPending = useRef(false);
   const discoveryInFlight = useRef(new Set<string>());
+  const automaticDiscoveryStarted = useRef(new Set<string>());
   const promptInput = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState("");
   const [selectedService, setSelectedService] = useState("");
@@ -451,8 +452,8 @@ export default function EmbeddedAiWorkspace() {
   useEffect(() => {
     const task = selectedTask;
     if (active.section !== "results" || !task || task.plan.generationStatus !== "complete" || task.plan.discovery || task.plan.execution || !task.plan.services.some(id => ["jobs", "store", "stream"].includes(id))) return;
-    const stored = readStoredPendingRequest();
-    if (!stored || stored.requestKey !== task.requestKey) return;
+    if (automaticDiscoveryStarted.current.has(task.id)) return;
+    automaticDiscoveryStarted.current.add(task.id);
     void runDiscovery(task);
   }, [active.section, selectedTask?.id, selectedTask?.plan.generationStatus, selectedTask?.plan.discovery, selectedTask?.plan.execution]);
   const openTask = (task: AiTask) => {
@@ -770,7 +771,7 @@ export default function EmbeddedAiWorkspace() {
                   </section>
                     : active.taskId && resolvingTaskId === active.taskId ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Restoring your saved task…</div>
                       : active.taskId ? selectedTask
-                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === (selectedTask.conversationId || selectedTask.id) ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId || selectedTask.id)} />
+                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === (selectedTask.conversationId || selectedTask.id) ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId || selectedTask.id)} />
                       : <div className="embeddedAiEmpty"><h2>Task not found</h2><p>This saved task may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate("/ai/tasks")}>Back to All Tasks</button></div>
                     : active.section === "approvals" ? <section className="embeddedAiPage"><h1>Approvals</h1><p className="embeddedAiIntro">Review actions that SMAJ AI prepared. Nothing is submitted until you approve it.</p><TaskList tasks={tasks.filter(task => task.plan.proposedActions?.length && !task.plan.execution)} openTask={task => openTask(task)} empty="No actions are waiting for approval." /></section>
                       : active.section === "results" ? <section className="embeddedAiPage"><h1>Results</h1><p className="embeddedAiIntro">Completed searches and verified task results.</p><TaskList tasks={tasks.filter(task => task.plan.discovery || task.plan.execution)} openTask={openTask} empty="Your results will appear here after a search." /></section>
@@ -839,7 +840,7 @@ function TaskList({ tasks, openTask, empty }: { tasks: AiTask[]; openTask: (task
 }
 
 function TaskConversation({
-  task, section, busy, pending, retryPending, turns, selectedActions, setSelectedActions, runDiscovery, approveActions, retryTask, downloadReceipt, deleteTask, onFollowUp,
+  task, section, busy, pending, retryPending, turns, selectedActions, setSelectedActions, approveActions, retryTask, downloadReceipt, deleteTask, onFollowUp,
 }: {
   task: AiTask;
   section: Section;
@@ -849,7 +850,6 @@ function TaskConversation({
   turns: AiTask[];
   selectedActions: string[];
   setSelectedActions: (update: (current: string[]) => string[]) => void;
-  runDiscovery: (task: AiTask) => void;
   approveActions: (task: AiTask) => void;
   retryTask: (task: AiTask) => void;
   downloadReceipt: (task: AiTask, format: "pdf" | "json") => void;
@@ -865,7 +865,7 @@ function TaskConversation({
       <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
       {turns.map(turn => <article className="embeddedAiThreadTurn" key={turn.id}>
         <div className="embeddedAiMessage user"><span>You · {taskTime(turn.createdAt)}</span><p>{turn.task}</p></div>
-        <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt=""/><div><p>{turn.plan.generationStatus === "failed" ? turn.plan.generationError || "This response did not complete." : turn.plan.generationStatus === "pending" ? "SMAJ AI is preparing a response…" : turn.plan.summary || "Your request is ready for review."}</p><small className="embeddedAiTurnStatus">{statusLabel(turn.plan)}</small>
+        <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt=""/><div><ProgressiveResponse text={turn.plan.generationStatus === "failed" ? turn.plan.generationError || "This response did not complete." : turn.plan.generationStatus === "pending" ? "SMAJ AI is preparing a response…" : turn.plan.summary || "Your request is ready for review."} />
           {turn.plan.discovery?.results.map(result => <section className="embeddedAiCards" key={result.serviceId} aria-label={`${serviceName(result.serviceId)} results`}>
             {result.records.map((item, index) => {
               const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
@@ -875,29 +875,64 @@ function TaskConversation({
         </div></div>
       </article>)}
       <div className="embeddedAiMessage user"><span>You</span><p>{task.task}</p></div>
-      {!pendingIsCurrentTask&&<div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{plan.summary || "Your request is ready for review."}</p></div></div>}
+      {!pendingIsCurrentTask&&<div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><ProgressiveResponse text={plan.summary || "Your request is ready for review."}/>
+        {showResults&&plan.discovery&&<TaskResults plan={plan}/>}
+      </div></div>}
       {pending&&<article className="embeddedAiThreadTurn">
         {!pendingIsCurrentTask&&<div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>}
         {pending.status === "sending"
           ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
           : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
       </article>}
-      {!pendingIsCurrentTask&&!!plan.steps?.length && <section className="embeddedAiPlan"><h2>Plan</h2>{plan.steps.map(step => <article key={`${step.serviceId}:${step.title}`}><strong>{step.title}</strong><span>{serviceName(step.serviceId)} · {step.status.replaceAll("_", " ")}</span>{step.description && <p>{step.description}</p>}{step.reason && <small>{step.reason}</small>}</article>)}</section>}
-      {!pendingIsCurrentTask&&!!plan.sources?.length && <details className="embeddedAiSources"><summary>Sources used</summary>{plan.sources.map(source => <p key={`${source.file}:${source.title}`}>{source.title} · {source.file}</p>)}</details>}
-      {!pendingIsCurrentTask&&!!plan.warnings?.length && <div className="embeddedAiWarnings">{plan.warnings.map((warning, index) => <p key={`${index}:${warning}`}>{warning}</p>)}</div>}
-      {!pendingIsCurrentTask&&plan.summaryError && <p className="embeddedAiInlineError" role="alert">{plan.summaryError.message}</p>}
-      {!pendingIsCurrentTask&&showResults && plan.discovery && <section className="embeddedAiResults"><h2>Live results</h2>{plan.discovery.results.map(result => <section key={result.serviceId}><h3>{serviceName(result.serviceId)} · {result.status === "read" ? "Results" : "Unavailable"}</h3>{result.error && <p className="embeddedAiInlineError">{result.error}</p>}{result.status === "read" && !result.records.length && <p>No matching listings were found.</p>}<div className="embeddedAiCards">{result.records.map((item, index) => {
-      const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
-      const sample = result.serviceId === "jobs" && record.listingProvenance !== "employer_backed";
-      return <article key={String(record.id || index)}><strong>{String(record.title || "SMAJ PI HUB listing")}</strong><span>{String(record.company || record.creatorName || record.sellerName || serviceName(result.serviceId))}</span>{record.salary != null && <span>{String(record.salary)}</span>}{result.serviceId === "jobs" && <b>{sample ? "Sample listing · Not verified" : record.employerVerified === true ? "Verified employer" : "Employer not verified"}</b>}</article>;
-    })}</div></section>)}</section>}
-      {!pendingIsCurrentTask&&!plan.discovery && plan.services?.some(id => ["jobs", "store", "stream"].includes(id)) && !execution && <div className="embeddedAiApproval"><strong>Public search is ready</strong><p>SMAJ AI reads published listings only. No purchase or application will be made.</p><button type="button" disabled={busy} onClick={() => runDiscovery(task)}>{busy ? "Searching…" : "Search public listings"}</button></div>}
       {!pendingIsCurrentTask&&!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.message && <small>Exact message to seller: “{action.message}”</small>}{action.storePreview?.product && <small>Verified product: {action.storePreview.product.title} · Seller: {action.storePreview.product.sellerName} · Seller ID: {action.storePreview.product.sellerId} · {action.storePreview.product.pricePi} Pi</small>}{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
-      {!pendingIsCurrentTask&&execution && <section className="embeddedAiExecution"><h2>Task status · {execution.status.replaceAll("_", " ")}</h2>{execution.error && <p className="embeddedAiInlineError" role="alert">{execution.error}</p>}{execution.events?.map((event, index) => <p key={`${event.at}:${index}`}>{event.message}</p>)}{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><p>Independently verified · {execution.receipt.verifiedAt || "Verified"}</p><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download PDF receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download verification data</button></div>}</section>}
-      {!pendingIsCurrentTask&&<div className="embeddedAiConversationActions"><span>{statusLabel(plan)}</span><button type="button" disabled={busy} onClick={() => deleteTask(task)}><DeleteOutlineOutlinedIcon/> Delete task</button></div>}
+      {!pendingIsCurrentTask&&execution && (execution.status === "failed" && execution.retryable || execution.receipt && execution.status === "verified") && <section className="embeddedAiExecution">{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><span>Verified · {execution.receipt.verifiedAt || "Complete"}</span><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download data</button></div>}</section>}
+      {!pendingIsCurrentTask&&<div className="embeddedAiConversationActions"><button type="button" disabled={busy} onClick={() => deleteTask(task)}><DeleteOutlineOutlinedIcon/> Delete task</button></div>}
     </div>
     <FollowUpComposer busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>
   </section>;
+}
+
+function ProgressiveResponse({ text }: { text: string }) {
+  const [visibleLength, setVisibleLength] = useState(0);
+  useEffect(() => {
+    setVisibleLength(0);
+    if (!text) return;
+    let position = 0;
+    let frame = 0;
+    let lastUpdate = 0;
+    const renderFrame = (now: number) => {
+      if (now - lastUpdate >= 18) {
+        position = Math.min(text.length, position + Math.max(1, Math.ceil(text.length / 500)));
+        setVisibleLength(position);
+        lastUpdate = now;
+      }
+      if (position < text.length) frame = requestAnimationFrame(renderFrame);
+    };
+    frame = requestAnimationFrame(renderFrame);
+    return () => cancelAnimationFrame(frame);
+  }, [text]);
+  return <p className="embeddedAiResponseText">{text.slice(0, visibleLength)}{visibleLength < text.length && <span className="embeddedAiTypingCursor" aria-hidden="true"/>}</p>;
+}
+
+function TaskResults({ plan }: { plan: AiPlan }) {
+  return <div className="embeddedAiResults" aria-label="Task results">
+    {plan.discovery?.results.map(result => <section key={result.serviceId} aria-label={`${serviceName(result.serviceId)} results`}>
+      <h2>{serviceName(result.serviceId)}{result.status === "unavailable" ? " · Unavailable" : ""}</h2>
+      {result.status === "unavailable" && <p className="embeddedAiInlineError">{result.error || "Results are temporarily unavailable."}</p>}
+      {result.status === "read" && !result.records.length && <p>No matching listings were found.</p>}
+      <div className="embeddedAiCards">{result.records.map((item, index) => {
+        const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
+        const sample = result.serviceId === "jobs" && record.listingProvenance !== "employer_backed";
+        return <article key={String(record.id || index)}>
+          <strong>{String(record.title || "SMAJ PI HUB listing")}</strong>
+          <span>{String(record.company || record.creatorName || record.sellerName || serviceName(result.serviceId))}</span>
+          {record.salary != null && <span>{String(record.salary)}</span>}
+          {record.pricePi != null && <span>{String(record.pricePi)} Pi</span>}
+          {result.serviceId === "jobs" && <b>{sample ? "Sample listing · Not verified" : record.employerVerified === true ? "Verified employer" : "Employer not verified"}</b>}
+        </article>;
+      })}</div>
+    </section>)}
+  </div>;
 }
 
 function FollowUpComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string)=>Promise<boolean>}){
