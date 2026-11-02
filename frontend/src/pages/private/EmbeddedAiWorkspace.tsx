@@ -47,6 +47,7 @@ type AiPlan = {
 };
 type AiTask = { id: string; task: string; plan: AiPlan; createdAt: string; conversationId?: string };
 type AiConversation = { id: string; title: string; createdAt: string; updatedAt: string; taskCount: number; latestTaskId: string; lastMessage: string };
+type PendingMessage = { id: string; text: string; conversationId: string; persistedConversation: boolean; status: "sending" | "failed"; error?: string };
 type AiConnection = { serviceId: string; connected: boolean; available: boolean; adapterMode: string };
 type AiResponse<T> = T;
 type Section = "chat" | "tasks" | "conversations" | "apps" | "approvals" | "results" | "settings";
@@ -158,6 +159,7 @@ export default function EmbeddedAiWorkspace() {
   const [tasks, setTasks] = useState<AiTask[]>([]);
   const [conversations, setConversations] = useState<AiConversation[]>([]);
   const [connections, setConnections] = useState<AiConnection[]>([]);
+  const [pendingMessage, setPendingMessage] = useState<PendingMessage|null>(null);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -276,22 +278,41 @@ export default function EmbeddedAiWorkspace() {
     await submitTask(service ? `${service.name}: ${request}` : request);
   };
 
-  const submitTask = async (request: string, conversationId?: string) => {
-    if (!request.trim() || busy) return;
+  const submitTask = async (request: string, conversationId?: string, retryPending?: PendingMessage): Promise<boolean> => {
+    if (!request.trim() || busy) return false;
+    const optimistic = retryPending || {
+      id: `pending-${crypto.randomUUID()}`,
+      text: request.trim(),
+      conversationId: conversationId || crypto.randomUUID(),
+      persistedConversation: Boolean(conversationId),
+      status: "sending" as const,
+    };
     setBusy("create");
     setError("");
+    setPendingMessage({ ...optimistic, status: "sending", error: undefined });
+    if (!conversationId) openConversation(optimistic.conversationId);
     try {
       const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 150000 });
+      if (!data.task?.plan) throw new Error("SMAJ AI could not answer. Please try again.");
       updateTask(data.task);
       updateConversationForTask(data.task);
       setDraft("");
+      setPendingMessage(null);
       openConversation(data.task.conversationId || data.task.id);
       if (data.task.plan.services.some(id => ["jobs", "store", "stream"].includes(id))) await runDiscovery(data.task);
+      return true;
     } catch (createError) {
-      setError(await responseMessage(createError));
+      const message = await responseMessage(createError);
+      setError(message);
+      setPendingMessage(current => current?.id === optimistic.id ? { ...current, status: "failed", error: message } : current);
+      return false;
     } finally {
       setBusy("");
     }
+  };
+  const retryPendingMessage = () => {
+    if (!pendingMessage) return;
+    void submitTask(pendingMessage.text, pendingMessage.persistedConversation ? pendingMessage.conversationId : undefined, pendingMessage);
   };
 
   const runDiscovery = async (task: AiTask) => {
@@ -571,10 +592,10 @@ export default function EmbeddedAiWorkspace() {
                   <div className="embeddedAiSettings"><span>Pi account</span><strong>{user?.piUsername || user?.username || "Signed in with Pi"}</strong><span>Saved tasks</span><strong>{tasks.length}</strong><span>Connected apps</span><strong>{connections.filter(connection => connection.connected).length}</strong><button type="button" onClick={() => navigate("/settings")}>Open SMAJ PI HUB account settings</button></div>
                   <form className="embeddedAiPreferences" onSubmit={savePreferences}><h2>AI preferences</h2><p>Save up to 10 preferences to personalize recommendations. Avoid passwords, payment details, and sensitive personal information.</p><label htmlFor="embedded-ai-preferences">One preference per line</label><textarea id="embedded-ai-preferences" value={preferencesDraft} maxLength={1210} rows={5} onChange={event => setPreferencesDraft(event.target.value)} placeholder={"Remote work\nPrefer Pi-denominated prices"}/><small>{preferences.length}/10 saved</small><button type="submit" disabled={preferencesBusy}>{preferencesBusy ? "Saving…" : "Save preferences"}</button>{preferencesStatus&&<p role="status">{preferencesStatus}</p>}</form>
                 </section>
-                  : active.taskId ? active.section === "conversations" && activeConversationTask
-                    ? <ConversationThread title={conversations.find(conversation => conversation.id === activeConversationId)?.title || "Conversation"} turns={conversationTasks} latestTask={activeConversationTask} openTask={task => openTask(task, "results")} onFollowUp={message => submitTask(message, activeConversationId)} busy={isBusy}/>
+                  : active.taskId ? active.section === "conversations" && (activeConversationTask || pendingMessage?.conversationId === activeConversationId)
+                    ? <ConversationThread title={conversations.find(conversation => conversation.id === activeConversationId)?.title || "Conversation"} turns={conversationTasks} latestTask={activeConversationTask} pending={pendingMessage?.conversationId === activeConversationId ? pendingMessage : null} retryPending={retryPendingMessage} openTask={task => openTask(task, "results")} onFollowUp={message => submitTask(message, activeConversationTask?.conversationId || activeConversationId)} busy={isBusy}/>
                     : selectedTask
-                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId)} />
+                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === selectedTask.conversationId ? pendingMessage : null} retryPending={retryPendingMessage} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId)} />
                       : <div className="embeddedAiEmpty"><h2>{active.section === "conversations" ? "Conversation not found" : "Task not found"}</h2><p>This saved work may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate(active.section === "conversations" ? "/ai/conversations" : "/ai/tasks")}>Back to {active.section === "conversations" ? "Conversations" : "All Tasks"}</button></div>
                     : active.section === "approvals" ? <section className="embeddedAiPage"><h1>Approvals</h1><p className="embeddedAiIntro">Review actions that SMAJ AI prepared. Nothing is submitted until you approve it.</p><TaskList tasks={tasks.filter(task => task.plan.proposedActions?.length && !task.plan.execution)} openTask={task => openTask(task)} empty="No actions are waiting for approval." /></section>
                       : active.section === "results" ? <section className="embeddedAiPage"><h1>Results</h1><p className="embeddedAiIntro">Completed searches and verified task results.</p><TaskList tasks={tasks.filter(task => task.plan.discovery || task.plan.execution)} openTask={task => openTask(task, "results")} empty="Your results will appear here after a search." /></section>
@@ -704,21 +725,29 @@ function TaskHistoryList({ tasks, busy, openTask, deleteTask, empty }: {
   </section>)}</div>;
 }
 
-function ConversationThread({ title, turns, latestTask, openTask, onFollowUp, busy }: {
+function ConversationThread({ title, turns, latestTask, pending, retryPending, openTask, onFollowUp, busy }: {
   title: string;
   turns: AiTask[];
-  latestTask: AiTask;
+  latestTask?: AiTask;
+  pending: PendingMessage|null;
+  retryPending: () => void;
   openTask: (task: AiTask) => void;
-  onFollowUp: (message: string) => void;
+  onFollowUp: (message: string) => Promise<boolean>;
   busy: boolean;
 }) {
   return <section className="embeddedAiPage embeddedAiConversation">
     <h1>{title}</h1><p className="embeddedAiIntro">Saved conversation · {turns.length} {turns.length === 1 ? "message" : "messages"}</p>
     {turns.map(task => <article className="embeddedAiThreadTurn" key={task.id}>
       <div className="embeddedAiMessage user"><span>You · {taskTime(task.createdAt)}</span><p>{task.task}</p></div>
-      <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><span>SMAJ AI · {task.plan.model || "Meta AI"}</span><p>{task.plan.summary || "Your request is ready for review."}</p><small className="embeddedAiTurnStatus">{statusLabel(task.plan)}</small><button type="button" className="embeddedAiViewTask" onClick={() => openTask(task)}>View task details</button></div></div>
+      <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{task.plan.summary || "Your request is ready for review."}</p><small className="embeddedAiTurnStatus">{statusLabel(task.plan)}</small><button type="button" className="embeddedAiViewTask" onClick={() => openTask(task)}>View task details</button></div></div>
     </article>)}
-    <FollowUpComposer key={latestTask.conversationId || latestTask.id} busy={busy} onSubmit={onFollowUp}/>
+    {pending&&<article className="embeddedAiThreadTurn" key={pending.id}>
+      <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
+      {pending.status === "sending"
+        ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
+        : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+    </article>}
+    {latestTask&&<FollowUpComposer key={latestTask.conversationId || latestTask.id} busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>}
   </section>;
 }
 
@@ -730,11 +759,13 @@ function TaskList({ tasks, openTask, empty }: { tasks: AiTask[]; openTask: (task
 }
 
 function TaskConversation({
-  task, section, busy, selectedActions, setSelectedActions, runDiscovery, approveActions, retryTask, downloadReceipt, deleteTask, onFollowUp,
+  task, section, busy, pending, retryPending, selectedActions, setSelectedActions, runDiscovery, approveActions, retryTask, downloadReceipt, deleteTask, onFollowUp,
 }: {
   task: AiTask;
   section: Section;
   busy: boolean;
+  pending: PendingMessage|null;
+  retryPending: () => void;
   selectedActions: string[];
   setSelectedActions: (update: (current: string[]) => string[]) => void;
   runDiscovery: (task: AiTask) => void;
@@ -742,7 +773,7 @@ function TaskConversation({
   retryTask: (task: AiTask) => void;
   downloadReceipt: (task: AiTask, format: "pdf" | "json") => void;
   deleteTask: (task: AiTask) => void;
-  onFollowUp: (message: string) => void;
+  onFollowUp: (message: string) => Promise<boolean>;
 }) {
   const plan = task.plan;
   const execution = plan.execution;
@@ -750,7 +781,13 @@ function TaskConversation({
   return <section className="embeddedAiPage embeddedAiConversation">
     <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
     <div className="embeddedAiMessage user"><span>You</span><p>{task.task}</p></div>
-    <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><span>SMAJ AI · {plan.model || "Meta AI"}</span><p>{plan.summary || "Your request is ready for review."}</p></div></div>
+    <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{plan.summary || "Your request is ready for review."}</p></div></div>
+    {pending&&<article className="embeddedAiThreadTurn">
+      <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
+      {pending.status === "sending"
+        ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
+        : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+    </article>}
     {!!plan.steps?.length && <section className="embeddedAiPlan"><h2>Plan</h2>{plan.steps.map(step => <article key={`${step.serviceId}:${step.title}`}><strong>{step.title}</strong><span>{serviceName(step.serviceId)} · {step.status.replaceAll("_", " ")}</span>{step.description && <p>{step.description}</p>}{step.reason && <small>{step.reason}</small>}</article>)}</section>}
     {!!plan.sources?.length && <details className="embeddedAiSources"><summary>Sources used</summary>{plan.sources.map(source => <p key={`${source.file}:${source.title}`}>{source.title} · {source.file}</p>)}</details>}
     {!!plan.warnings?.length && <div className="embeddedAiWarnings">{plan.warnings.map((warning, index) => <p key={`${index}:${warning}`}>{warning}</p>)}</div>}
@@ -763,16 +800,18 @@ function TaskConversation({
     {!plan.discovery && plan.services?.some(id => ["jobs", "store", "stream"].includes(id)) && !execution && <div className="embeddedAiApproval"><strong>Public search is ready</strong><p>SMAJ AI reads published listings only. No purchase or application will be made.</p><button type="button" disabled={busy} onClick={() => runDiscovery(task)}>{busy ? "Searching…" : "Search public listings"}</button></div>}
     {!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
     {execution && <section className="embeddedAiExecution"><h2>Task status · {execution.status.replaceAll("_", " ")}</h2>{execution.error && <p className="embeddedAiInlineError" role="alert">{execution.error}</p>}{execution.events?.map((event, index) => <p key={`${event.at}:${index}`}>{event.message}</p>)}{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><p>Independently verified · {execution.receipt.verifiedAt || "Verified"}</p><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download PDF receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download verification data</button></div>}</section>}
-    <FollowUpComposer busy={busy} onSubmit={onFollowUp}/>
+    <FollowUpComposer busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>
     <div className="embeddedAiConversationActions"><span>{statusLabel(plan)}</span><button type="button" disabled={busy} onClick={() => deleteTask(task)}><DeleteOutlineOutlinedIcon/> Delete task</button></div>
   </section>;
 }
 
-function FollowUpComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string)=>void}){
+function FollowUpComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string)=>Promise<boolean>}){
   const [message,setMessage]=useState("");
-  return <form className="embeddedAiFollowUp" onSubmit={event=>{event.preventDefault();if(!message.trim()||busy)return;onSubmit(message.trim());setMessage("");}}>
+  const [sending,setSending]=useState(false);
+  const submit=async(event:FormEvent)=>{event.preventDefault();if(!message.trim()||busy||sending)return;setSending(true);try{if(await onSubmit(message.trim()))setMessage("");}finally{setSending(false);}};
+  return <form className="embeddedAiFollowUp" onSubmit={submit}>
     <label htmlFor="embedded-ai-follow-up">Continue this conversation</label>
     <textarea id="embedded-ai-follow-up" value={message} maxLength={1900} rows={2} placeholder="Ask a follow-up or refine your request" onChange={event=>setMessage(event.target.value)}/>
-    <button type="submit" disabled={busy||!message.trim()}>{busy?"Working…":"Send follow-up"} <SendOutlinedIcon/></button>
+    <button type="submit" disabled={busy||sending||!message.trim()}>{busy||sending?"Working…":"Send follow-up"} <SendOutlinedIcon/></button>
   </form>;
 }

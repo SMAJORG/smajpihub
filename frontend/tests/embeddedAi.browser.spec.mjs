@@ -196,6 +196,54 @@ test("app connections update independently without changing other apps", async (
   expect(updatedServices.sort()).toEqual(["jobs", "store"]);
 });
 
+test("chat shows the sent message and logo-only typing dots before a response arrives", async ({ page }) => {
+  let releaseResponse;
+  await page.route("**/ai/tasks", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await new Promise(resolve => { releaseResponse = resolve; });
+    const body = await route.request().postDataJSON();
+    const createdAt = new Date().toISOString();
+    return route.fulfill({ status: 201, json: { task: {
+      id: "task-delayed", task: body.task, conversationId: "conversation-delayed", createdAt,
+      plan: { model: "Meta AI", summary: "The delayed answer arrived.", services: [], steps: [], proposedActions: [] },
+    } } });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/ai");
+  await page.getByLabel("Your request").fill("Tell me a quick fact");
+  await page.getByRole("button", { name: /Ask SMAJ AI/ }).click();
+  await expect(page.getByText("Tell me a quick fact", { exact: true })).toBeVisible();
+  await expect(page.locator(".embeddedAiTyping")).toBeVisible();
+  await expect(page.locator(".embeddedAiTyping img")).toBeVisible();
+  await expect(page.locator(".embeddedAiTypingDots i")).toHaveCount(3);
+  await expect(page.locator(".embeddedAiMessage.assistant span")).toHaveCount(0);
+  releaseResponse();
+  await expect(page.getByText("The delayed answer arrived.")).toBeVisible();
+  await expect(page.locator(".embeddedAiTyping")).toHaveCount(0);
+  const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+});
+
+test("failed message sending stays visible and retry recovers without losing the prompt", async ({ page }) => {
+  let requests = 0;
+  await page.route("**/ai/tasks", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    requests++;
+    if (requests === 1) return route.fulfill({ status: 503, json: { message: "AI service temporarily unavailable." } });
+    return route.fallback();
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/ai");
+  await page.getByLabel("Your request").fill("Retry this request");
+  await page.getByRole("button", { name: /Ask SMAJ AI/ }).click();
+  await expect(page.getByText("Retry this request", { exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("AI service temporarily unavailable.");
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByText("I can search current employer-backed jobs for you.")).toBeVisible();
+  await expect(page.getByText("Retry this request", { exact: true })).toBeVisible();
+  expect(requests).toBe(2);
+});
+
 test("workspace content and service cards fit narrow mobile viewports", async ({ page }) => {
   await page.goto("/ai");
   await expect(page.getByRole("heading", { name: "What can I help you do?" })).toBeVisible();

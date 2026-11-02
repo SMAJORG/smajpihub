@@ -287,3 +287,16 @@
   .embeddedAiServiceGrid button{font-size:8px}
 }
 @media(prefers-reduced-motion:reduce){.embeddedAiPromptInput>span{animation:none}}
+
+.embeddedAiTyping{display:flex;align-items:center;gap:10px;margin:14px 0 18px}
+.embeddedAiTyping>img{width:36px;height:36px;flex:none;object-fit:contain}
+.embeddedAiTypingDots{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:12px;background:#f5f1fc}
+.embeddedAiTypingDots i{width:6px;height:6px;border-radius:50%;background:#8759da;animation:embedded-ai-dot-bounce 1s infinite}
+.embeddedAiTypingDots i:nth-child(2){animation-delay:.15s}
+.embeddedAiTypingDots i:nth-child(3){animation-delay:.3s}
+@keyframes embedded-ai-dot-bounce{50%{opacity:.25;transform:translateY(-4px)}}
+.embeddedAiSendFailure{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 14px 47px;padding:10px 12px;border:1px solid #f0c5cc;border-radius:12px;background:#fff2f4;color:#9d3348;font-size:12px;line-height:1.45}
+.embeddedAiSendFailure button{min-height:34px;flex:none;padding:7px 12px;border:0;border-radius:9px;background:#7547d5;color:#fff;font-size:11px;font-weight:700}
+.embeddedAiSendFailure button:disabled{opacity:.6}
+@media(max-width:480px){.embeddedAiTyping{gap:8px}.embeddedAiTyping>img{width:32px;height:32px}.embeddedAiSendFailure{margin-left:40px}}
+@media(prefers-reduced-motion:reduce){.embeddedAiTypingDots i{animation:none}}
