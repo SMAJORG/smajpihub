@@ -54,6 +54,7 @@ type AiPlan = {
 };
 type AiTask = { id: string; task: string; plan: AiPlan; createdAt: string; conversationId?: string; requestKey?: string };
 type PendingMessage = { id: string; text: string; conversationId: string; persistedConversation: boolean; requestKey: string; status: "sending" | "failed"; error?: string };
+type StoredPendingRequest = { id: string; text: string; conversationId: string; persistedConversation: boolean; requestKey: string };
 type AiConnection = { serviceId: string; connected: boolean; available: boolean; adapterMode: string };
 type AiResponse<T> = T;
 type Section = "chat" | "tasks" | "apps" | "approvals" | "results" | "settings";
@@ -157,6 +158,32 @@ const dateGroup = (value: string) => {
   if (daysAgo >= 2 && daysAgo < 7) return "Previous 7 days";
   return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
 };
+const PENDING_REQUEST_STORAGE_KEY = "smaj-ai-pending-request";
+const mergeTask = (current: AiTask | undefined, incoming: AiTask): AiTask => {
+  if (!current) return incoming;
+  if (current.plan.generationStatus === "complete" && incoming.plan.generationStatus === "pending") return current;
+  const plan = { ...current.plan, ...incoming.plan };
+  if (!incoming.plan.summary && current.plan.summary) plan.summary = current.plan.summary;
+  if (!incoming.plan.discovery && current.plan.discovery) plan.discovery = current.plan.discovery;
+  if (!incoming.plan.execution && current.plan.execution) plan.execution = current.plan.execution;
+  return { ...current, ...incoming, plan };
+};
+const mergeTasks = (current: AiTask[], incoming: AiTask[]) => {
+  const byId = new Map(current.map(task => [task.id, task]));
+  for (const task of incoming) byId.set(task.id, mergeTask(byId.get(task.id), task));
+  return [...byId.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+};
+const readStoredPendingRequest = (): StoredPendingRequest | null => {
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_REQUEST_STORAGE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<StoredPendingRequest>;
+    if (typeof value.id !== "string" || typeof value.text !== "string" || typeof value.conversationId !== "string" || typeof value.requestKey !== "string") return null;
+    return { id: value.id, text: value.text, conversationId: value.conversationId, persistedConversation: value.persistedConversation === true, requestKey: value.requestKey };
+  } catch {
+    return null;
+  }
+};
 
 export default function EmbeddedAiWorkspace() {
   const { user } = useAuthContext();
@@ -167,12 +194,14 @@ export default function EmbeddedAiWorkspace() {
   const tasksRef = useRef<AiTask[]>([]);
   const [connections, setConnections] = useState<AiConnection[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingMessage|null>(null);
+  const [resolvingTaskId, setResolvingTaskId] = useState("");
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [connectionBusy, setConnectionBusy] = useState<string[]>([]);
   const pendingConnections = useRef(new Set<string>());
   const taskSubmissionPending = useRef(false);
+  const discoveryInFlight = useRef(new Set<string>());
   const promptInput = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState("");
   const [selectedService, setSelectedService] = useState("");
@@ -194,11 +223,11 @@ export default function EmbeddedAiWorkspace() {
     setError("");
     try {
       const [taskResponse, connectionResponse] = await Promise.all([
-        axiosClient.get<AiResponse<{ tasks: AiTask[] }>>("/ai/tasks", { smajSkipReadRetry: true }),
-        axiosClient.get<AiResponse<{ connections: AiConnection[] }>>("/ai/connections", { smajSkipReadRetry: true }),
+        axiosClient.get<AiResponse<{ tasks: AiTask[] }>>("/ai/tasks", { smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } }),
+        axiosClient.get<AiResponse<{ connections: AiConnection[] }>>("/ai/connections", { smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } }),
       ]);
       const loadedTasks = taskResponse.data.tasks || [];
-      setTasks(loadedTasks);
+      setTasks(current => mergeTasks(current, loadedTasks));
       const latestTask = loadedTasks[0];
       const unfinished = latestTask?.plan.generationStatus === "pending" || latestTask?.plan.generationStatus === "failed" ? latestTask : undefined;
       if (unfinished?.requestKey) {
@@ -208,7 +237,7 @@ export default function EmbeddedAiWorkspace() {
           conversationId: unfinished.conversationId || unfinished.id,
           persistedConversation: true,
           requestKey: unfinished.requestKey,
-          status: "failed",
+          status: unfinished.plan.generationStatus === "pending" ? "sending" : "failed",
           error: unfinished.plan.generationError || "Your message is saved. Retry to get the AI response.",
         });
       }
@@ -226,11 +255,11 @@ export default function EmbeddedAiWorkspace() {
   useEffect(() => {
     if (!active.legacyConversationId || loading) return;
     let activeRequest = true;
-    void axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(active.legacyConversationId)}`, { smajSkipReadRetry: true })
+    void axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(active.legacyConversationId)}`, { smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } })
       .then(({ data }) => {
         if (!activeRequest) return;
         const history = data.tasks || [];
-        setTasks(current => [...current.filter(item => !history.some(saved => saved.id === item.id)), ...history]);
+        setTasks(current => mergeTasks(current, history));
         const latest = history.at(-1);
         navigate(latest ? `/ai/results/${encodeURIComponent(latest.id)}` : "/ai/tasks", { replace: true });
       })
@@ -243,21 +272,24 @@ export default function EmbeddedAiWorkspace() {
     return () => { activeRequest = false; };
   }, [active.legacyConversationId, loading, navigate]);
   useEffect(() => {
-    if (!active.taskId || loading || active.section !== "results" || pendingMessage?.id === active.taskId) return;
+    if (!active.taskId || loading || active.section !== "results" || active.taskId.startsWith("pending-")) return;
     let activeRequest = true;
     void (async () => {
       try {
         let task = tasksRef.current.find(item => item.id === active.taskId);
         if (!task) {
-          const response = await axiosClient.get<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(active.taskId!)}`, { smajSkipReadRetry: true });
+          setResolvingTaskId(active.taskId!);
+          const response = await axiosClient.get<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(active.taskId!)}`, { smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } });
           task = response.data.task;
         }
+        if (!activeRequest || !task) return;
+        setTasks(current => mergeTasks(current, [task!]));
         const conversationId = task?.conversationId || task?.id;
         if (!conversationId) return;
-        const { data } = await axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(conversationId)}`, { smajSkipReadRetry: true });
+        const { data } = await axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(conversationId)}`, { smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } });
         if (!activeRequest) return;
         const history = data.tasks || [];
-        setTasks(current => [...current.filter(item => !history.some(saved => saved.id === item.id)), ...history]);
+        setTasks(current => mergeTasks(current, history));
         const latest = history.at(-1);
         const latestRequestKey = latest?.requestKey;
         if (latest && latestRequestKey && (latest.plan.generationStatus === "pending" || latest.plan.generationStatus === "failed")) {
@@ -267,16 +299,79 @@ export default function EmbeddedAiWorkspace() {
             conversationId: latest.conversationId || latest.id,
             persistedConversation: true,
             requestKey: latestRequestKey,
-            status: "failed",
+            status: latest.plan.generationStatus === "pending" ? "sending" : "failed",
             error: latest.plan.generationError || "Your message is saved. Retry to get the AI response.",
           });
         }
       } catch (failure) {
         if (activeRequest) setError(await responseMessage(failure));
+      } finally {
+        if (activeRequest) setResolvingTaskId(current => current === active.taskId ? "" : current);
       }
     })();
-    return () => { activeRequest = false; };
+    return () => { activeRequest = false; setResolvingTaskId(current => current === active.taskId ? "" : current); };
   }, [active.section, active.taskId, loading, pendingMessage?.id]);
+  useEffect(() => {
+    if (loading || !active.taskId?.startsWith("pending-")) return;
+    const stored = readStoredPendingRequest();
+    if (!stored || stored.id !== active.taskId) return;
+    let cancelled = false;
+    let timer = 0;
+    let attempts = 0;
+    setResolvingTaskId(active.taskId);
+    const restoreCanonicalTask = (task: AiTask) => {
+      if (cancelled) return;
+      setTasks(current => mergeTasks(current, [task]));
+      setPendingMessage(task.plan.generationStatus === "pending" || task.plan.generationStatus === "failed" ? {
+          id: task.id,
+          text: task.task,
+          conversationId: task.conversationId || task.id,
+          persistedConversation: true,
+          requestKey: task.requestKey || stored.requestKey,
+          status: task.plan.generationStatus === "pending" ? "sending" : "failed",
+          error: task.plan.generationError || "Your message is saved. Retry to get the AI response.",
+        } : null);
+      try { window.sessionStorage.removeItem(PENDING_REQUEST_STORAGE_KEY); } catch { /* Ignore unavailable session storage. */ }
+      setResolvingTaskId("");
+      navigate(`/ai/results/${encodeURIComponent(task.id)}`, { replace: true });
+    };
+    const findTask = async () => {
+      const localTask = tasksRef.current.find(task => task.requestKey === stored.requestKey);
+      if (localTask) {
+        restoreCanonicalTask(localTask);
+        return;
+      }
+      try {
+        const { data } = await axiosClient.get<AiResponse<{ tasks: AiTask[] }>>("/ai/tasks", { smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } });
+        if (cancelled) return;
+        const loadedTasks = data.tasks || [];
+        setTasks(current => mergeTasks(current, loadedTasks));
+        const task = loadedTasks.find(item => item.requestKey === stored.requestKey);
+        if (task) {
+          restoreCanonicalTask(task);
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+      }
+      attempts += 1;
+      if (attempts < 60 && !cancelled) timer = window.setTimeout(() => { void findTask(); }, 2500);
+      else if (!cancelled) {
+        setResolvingTaskId("");
+        setPendingMessage({
+          ...stored,
+          status: "failed",
+          error: "The saved task could not be located yet. Retry to safely check again.",
+        });
+      }
+    };
+    void findTask();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      setResolvingTaskId(current => current === active.taskId ? "" : current);
+    };
+  }, [active.taskId, loading, navigate]);
   useEffect(() => {
     if (active.legacyConversationList) navigate("/ai/tasks", { replace: true });
   }, [active.legacyConversationList, navigate]);
@@ -298,7 +393,43 @@ export default function EmbeddedAiWorkspace() {
     () => activeConversationId ? tasks.filter(task => (task.conversationId || task.id) === activeConversationId).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) : [],
     [activeConversationId, tasks],
   );
-  const updateTask = (task: AiTask) => setTasks(current => [task, ...current.filter(item => item.id !== task.id)]);
+  const updateTask = (task: AiTask) => setTasks(current => mergeTasks(current, [task]));
+  useEffect(() => {
+    const task = selectedTask;
+    if (active.section !== "results" || !task || task.plan.generationStatus !== "pending" || !task.requestKey) return;
+    const controller = new AbortController();
+    let attempts = 0;
+    const refresh = async () => {
+      attempts += 1;
+      try {
+        const { data } = await axiosClient.get<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(task.id)}`, {
+          signal: controller.signal,
+          smajSkipReadRetry: true,
+          headers: { "X-SMAJ-Silent": "true" },
+        });
+        if (controller.signal.aborted || !data.task) return;
+        updateTask(data.task);
+        if (data.task.plan.generationStatus === "complete") {
+          setPendingMessage(current => current?.id === task.id ? null : current);
+          const stored = readStoredPendingRequest();
+          if (stored?.requestKey === task.requestKey && !data.task.plan.services.some(id => ["jobs", "store", "stream"].includes(id))) {
+            try { window.sessionStorage.removeItem(PENDING_REQUEST_STORAGE_KEY); } catch { /* Ignore unavailable session storage. */ }
+          }
+        } else if (data.task.plan.generationStatus === "failed") {
+          setPendingMessage(current => current?.id === task.id ? { ...current, status: "failed", error: data.task.plan.generationError || "Your message is saved. Retry to get the AI response." } : current);
+        } else if (attempts >= 48) {
+          setPendingMessage(current => current?.id === task.id ? { ...current, status: "failed", error: "SMAJ AI is taking longer than expected. Retry to safely check the saved request." } : current);
+        }
+      } catch {
+        if (!controller.signal.aborted && attempts >= 48) {
+          setPendingMessage(current => current?.id === task.id ? { ...current, status: "failed", error: "The response status could not be refreshed. Your saved message is safe; retry to check again." } : current);
+        }
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { if (attempts < 48) void refresh(); }, 2500);
+    return () => { window.clearInterval(timer); controller.abort(); };
+  }, [active.section, selectedTask?.id, selectedTask?.plan.generationStatus]);
   useEffect(() => {
     const task = selectedTask;
     if (!task || !["queued", "running", "retrying", "verifying"].includes(task.plan.execution?.status || "")) return;
@@ -307,8 +438,9 @@ export default function EmbeddedAiWorkspace() {
       void axiosClient.get<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(task.id)}`, {
         signal: controller.signal,
         smajSkipReadRetry: true,
+        headers: { "X-SMAJ-Silent": "true" },
       }).then(({ data }) => {
-        if (data.task) setTasks(current => [data.task, ...current.filter(item => item.id !== data.task.id)]);
+        if (data.task) setTasks(current => mergeTasks(current, [data.task]));
         setError(current => current.startsWith("Task progress could not be refreshed") ? "" : current);
       }).catch(() => {
         if (!controller.signal.aborted) setError(current => current || "Task progress could not be refreshed. Your saved task is safe; try reopening it.");
@@ -316,6 +448,13 @@ export default function EmbeddedAiWorkspace() {
     }, 2500);
     return () => { window.clearInterval(timer); controller.abort(); };
   }, [selectedTask?.id, selectedTask?.plan.execution?.status]);
+  useEffect(() => {
+    const task = selectedTask;
+    if (active.section !== "results" || !task || task.plan.generationStatus !== "complete" || task.plan.discovery || task.plan.execution || !task.plan.services.some(id => ["jobs", "store", "stream"].includes(id))) return;
+    const stored = readStoredPendingRequest();
+    if (!stored || stored.requestKey !== task.requestKey) return;
+    void runDiscovery(task);
+  }, [active.section, selectedTask?.id, selectedTask?.plan.generationStatus, selectedTask?.plan.discovery, selectedTask?.plan.execution]);
   const openTask = (task: AiTask) => {
     setSelectedActions([]);
     navigate(`/ai/results/${encodeURIComponent(task.id)}`);
@@ -343,16 +482,33 @@ export default function EmbeddedAiWorkspace() {
     setBusy("create");
     setError("");
     setPendingMessage({ ...optimistic, status: "sending", error: undefined });
+    try {
+      window.sessionStorage.setItem(PENDING_REQUEST_STORAGE_KEY, JSON.stringify(optimistic));
+    } catch { /* The active request still works when browser storage is unavailable. */ }
     if (!conversationId) navigate(`/ai/results/${encodeURIComponent(optimistic.id)}`);
     try {
-      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 250000, headers: { "Idempotency-Key": optimistic.requestKey } });
+      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 250000, headers: { "Idempotency-Key": optimistic.requestKey, "X-SMAJ-Silent": "true" } });
       if (!data.task?.plan) throw new Error("SMAJ AI could not answer. Please try again.");
       updateTask(data.task);
       setDraft("");
-      setPendingMessage({ ...optimistic, id: data.task.id, conversationId: data.task.conversationId || data.task.id, persistedConversation: true, status: "sending", error: undefined });
+      setPendingMessage(data.task.plan.generationStatus === "pending" ? { ...optimistic, id: data.task.id, conversationId: data.task.conversationId || data.task.id, persistedConversation: true, status: "sending", error: undefined } : null);
       navigate(`/ai/results/${encodeURIComponent(data.task.id)}`);
-      if (data.task.plan.services.some(id => ["jobs", "store", "stream"].includes(id))) await runDiscovery(data.task);
-      setPendingMessage(null);
+      const needsDiscovery = data.task.plan.generationStatus !== "pending" && !data.task.plan.discovery && data.task.plan.services.some(id => ["jobs", "store", "stream"].includes(id));
+      try {
+        if (needsDiscovery) {
+          window.sessionStorage.setItem(PENDING_REQUEST_STORAGE_KEY, JSON.stringify({
+            ...optimistic,
+            id: data.task.id,
+            conversationId: data.task.conversationId || data.task.id,
+            persistedConversation: true,
+          }));
+        } else {
+          window.sessionStorage.removeItem(PENDING_REQUEST_STORAGE_KEY);
+        }
+      } catch { /* Ignore unavailable session storage. */ }
+      if (needsDiscovery) {
+        window.setTimeout(() => { void runDiscovery(data.task); }, 0);
+      }
       return true;
     } catch (createError) {
       const message = await responseMessage(createError);
@@ -370,14 +526,21 @@ export default function EmbeddedAiWorkspace() {
   };
 
   const runDiscovery = async (task: AiTask) => {
+    if (discoveryInFlight.current.has(task.id)) return;
+    discoveryInFlight.current.add(task.id);
     setBusy(`discover:${task.id}`);
     setError("");
     try {
-      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(task.id)}/discover`, {}, { timeout: 240000 });
+      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>(`/ai/tasks/${encodeURIComponent(task.id)}/discover`, {}, { timeout: 240000, headers: { "X-SMAJ-Silent": "true" } });
       updateTask(data.task);
     } catch (discoveryError) {
       setError(await responseMessage(discoveryError));
     } finally {
+      discoveryInFlight.current.delete(task.id);
+      const stored = readStoredPendingRequest();
+      if (stored?.requestKey === task.requestKey) {
+        try { window.sessionStorage.removeItem(PENDING_REQUEST_STORAGE_KEY); } catch { /* Ignore unavailable session storage. */ }
+      }
       setBusy("");
     }
   };
@@ -599,13 +762,14 @@ export default function EmbeddedAiWorkspace() {
                   <div className="embeddedAiSettings"><span>Pi account</span><strong>{user?.piUsername || user?.username || "Signed in with Pi"}</strong><span>Saved tasks</span><strong>{tasks.length}</strong><span>Connected apps</span><strong>{connections.filter(connection => connection.connected).length}</strong><button type="button" onClick={() => navigate("/settings")}>Open SMAJ PI HUB account settings</button></div>
                   <form className="embeddedAiPreferences" onSubmit={savePreferences}><h2>AI preferences</h2><p>Save up to 10 preferences to personalize recommendations. Avoid passwords, payment details, and sensitive personal information.</p><label htmlFor="embedded-ai-preferences">One preference per line</label><textarea id="embedded-ai-preferences" value={preferencesDraft} maxLength={1210} rows={5} onChange={event => setPreferencesDraft(event.target.value)} placeholder={"Remote work\nPrefer Pi-denominated prices"}/><small>{preferences.length}/10 saved</small><button type="submit" disabled={preferencesBusy}>{preferencesBusy ? "Saving…" : "Save preferences"}</button>{preferencesStatus&&<p role="status">{preferencesStatus}</p>}</form>
                 </section>
-                  : active.taskId && pendingMessage?.id === active.taskId ? <section className="embeddedAiPage embeddedAiConversation">
+                  : active.taskId?.startsWith("pending-") && pendingMessage?.id === active.taskId ? <section className="embeddedAiPage embeddedAiConversation">
                     <div className="embeddedAiConversationScroll"><div className="embeddedAiMessage user"><span>You</span><p>{pendingMessage.text}</p></div>
                       {pendingMessage.status === "sending" ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
                         : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={isBusy} onClick={retryPendingMessage}>Retry</button></div>}
                     </div><FollowUpComposer busy={isBusy} onSubmit={message => submitTask(message, pendingMessage.persistedConversation ? pendingMessage.conversationId : undefined)}/>
                   </section>
-                    : active.taskId ? selectedTask
+                    : active.taskId && resolvingTaskId === active.taskId ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Restoring your saved task…</div>
+                      : active.taskId ? selectedTask
                       ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === (selectedTask.conversationId || selectedTask.id) ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} runDiscovery={runDiscovery} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId || selectedTask.id)} />
                       : <div className="embeddedAiEmpty"><h2>Task not found</h2><p>This saved task may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate("/ai/tasks")}>Back to All Tasks</button></div>
                     : active.section === "approvals" ? <section className="embeddedAiPage"><h1>Approvals</h1><p className="embeddedAiIntro">Review actions that SMAJ AI prepared. Nothing is submitted until you approve it.</p><TaskList tasks={tasks.filter(task => task.plan.proposedActions?.length && !task.plan.execution)} openTask={task => openTask(task)} empty="No actions are waiting for approval." /></section>
