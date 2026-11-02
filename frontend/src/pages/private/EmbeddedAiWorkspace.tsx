@@ -218,6 +218,24 @@ export default function EmbeddedAiWorkspace() {
   const [taskQuery, setTaskQuery] = useState("");
   const [taskServiceFilter, setTaskServiceFilter] = useState("all");
   const [taskFilterOpen, setTaskFilterOpen] = useState(false);
+  const [navigationMenuOpen, setNavigationMenuOpen] = useState(false);
+  const navigationMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!navigationMenuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !navigationMenuRef.current?.contains(event.target)) setNavigationMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNavigationMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [navigationMenuOpen]);
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);
@@ -697,17 +715,31 @@ export default function EmbeddedAiWorkspace() {
       </button>
       <img src="/smaj-ai-logo.png" alt="" />
       <div><strong>SMAJ AI</strong><span>{sectionTitle}</span></div>
+      <div className="embeddedAiHeaderMenu" ref={navigationMenuRef}>
+        <button
+          type="button"
+          className="embeddedAiHeaderMenuTrigger"
+          aria-label="Open SMAJ AI navigation"
+          aria-haspopup="menu"
+          aria-expanded={navigationMenuOpen}
+          onClick={() => setNavigationMenuOpen(open => !open)}
+        >⋮</button>
+        {navigationMenuOpen && <nav className="embeddedAiHeaderMenuDropdown" aria-label="SMAJ AI navigation" role="menu">
+          {navigation.map(item => <button
+            key={item.section}
+            type="button"
+            role="menuitem"
+            aria-current={active.section === item.section ? "page" : undefined}
+            className={active.section === item.section ? "active" : ""}
+            onClick={() => {
+              setNavigationMenuOpen(false);
+              navigate(item.path);
+            }}
+          >{item.label}</button>)}
+        </nav>}
+      </div>
     </header>
     <div className="embeddedAiShell">
-      <nav className="embeddedAiNav" aria-label="SMAJ AI workspace">
-        {navigation.map(item => <button
-          key={item.section}
-          type="button"
-          className={active.section === item.section ? "active" : ""}
-          aria-current={active.section === item.section ? "page" : undefined}
-          onClick={() => navigate(item.path)}
-        >{item.label}</button>)}
-      </nav>
       <main className={`embeddedAiMain${active.taskId && active.section === "results" ? " embeddedAiMainChat" : ""}`} aria-busy={loading || isBusy}>
         {loading ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Loading your SMAJ AI workspace…</div>
           : initialLoadFailed ? <div className="embeddedAiEmpty"><h2>Workspace unavailable</h2><p>Your Pi session and saved work are unchanged. Check your connection or try again.</p><button type="button" onClick={() => void loadWorkspace()}>Try again</button></div>
