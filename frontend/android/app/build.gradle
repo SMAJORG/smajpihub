@@ -1,6 +1,9 @@
 apply plugin: 'com.android.application'
 
-def smajBuildNumber = System.getenv("SMAJ_ANDROID_VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER") ?: "2"
+def smajBuildNumber = System.getenv("SMAJ_ANDROID_VERSION_CODE") ?: "30000"
+if (!(smajBuildNumber ==~ /[0-9]+/) || smajBuildNumber.toLong() < 30000 || smajBuildNumber.toLong() > 2100000000L) {
+    throw new GradleException("Android versionCode must be between 30000 and 2100000000.")
+}
 
 def smajSigningStore = System.getenv("SMAJ_ANDROID_KEYSTORE_PATH")
 def smajSigningPassword = System.getenv("SMAJ_ANDROID_KEYSTORE_PASSWORD")
