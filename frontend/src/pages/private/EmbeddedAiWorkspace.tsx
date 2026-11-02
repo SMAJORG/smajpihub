@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { serviceCatalog } from "../../content/serviceCatalog";
@@ -796,7 +795,7 @@ export default function EmbeddedAiWorkspace() {
                   </section>
                     : active.taskId && resolvingTaskId === active.taskId ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Restoring your saved task…</div>
                       : active.taskId ? selectedTask
-                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === (selectedTask.conversationId || selectedTask.id) ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} deleteTask={deleteTask} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId || selectedTask.id)} />
+                      ? <TaskConversation task={selectedTask} section={active.section} busy={isBusy} pending={pendingMessage?.conversationId === (selectedTask.conversationId || selectedTask.id) ? pendingMessage : null} retryPending={retryPendingMessage} turns={conversationTasks.filter(item => item.id !== selectedTask.id)} selectedActions={selectedActions} setSelectedActions={setSelectedActions} approveActions={approveActions} retryTask={retryTask} downloadReceipt={downloadReceipt} onFollowUp={(message:string)=>submitTask(message,selectedTask.conversationId || selectedTask.id)} />
                       : <div className="embeddedAiEmpty"><h2>Task not found</h2><p>This saved task may have been deleted, or it is not available to your Pi account.</p><button type="button" onClick={() => navigate("/ai/tasks")}>Back to All Tasks</button></div>
                     : active.section === "approvals" ? <section className="embeddedAiPage"><h1>Approvals</h1><p className="embeddedAiIntro">Review actions that SMAJ AI prepared. Nothing is submitted until you approve it.</p><TaskList tasks={tasks.filter(task => task.plan.proposedActions?.length && !task.plan.execution)} openTask={task => openTask(task)} empty="No actions are waiting for approval." /></section>
                       : active.section === "results" ? <section className="embeddedAiPage"><h1>Results</h1><p className="embeddedAiIntro">Completed searches and verified task results.</p><TaskList tasks={tasks.filter(task => task.plan.discovery || task.plan.execution)} openTask={openTask} empty="Your results will appear here after a search." /></section>
@@ -865,7 +864,7 @@ function TaskList({ tasks, openTask, empty }: { tasks: AiTask[]; openTask: (task
 }
 
 function TaskConversation({
-  task, section, busy, pending, retryPending, turns, selectedActions, setSelectedActions, approveActions, retryTask, downloadReceipt, deleteTask, onFollowUp,
+  task, section, busy, pending, retryPending, turns, selectedActions, setSelectedActions, approveActions, retryTask, downloadReceipt, onFollowUp,
 }: {
   task: AiTask;
   section: Section;
@@ -878,65 +877,98 @@ function TaskConversation({
   approveActions: (task: AiTask) => void;
   retryTask: (task: AiTask) => void;
   downloadReceipt: (task: AiTask, format: "pdf" | "json") => void;
-  deleteTask: (task: AiTask) => void;
   onFollowUp: (message: string) => Promise<boolean>;
 }) {
   const plan = task.plan;
   const execution = plan.execution;
   const showResults = section === "results";
   const pendingIsCurrentTask = pending?.id === task.id;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const shouldFollowRef = useRef(true);
+  const entries = [...turns, task]
+    .filter((entry, index, all) => all.findIndex(candidate => candidate.id === entry.id) === index)
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  const latestEntryId = entries.at(-1)?.id;
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    const contentElement = contentRef.current;
+    if (!scrollElement || !contentElement) return;
+    const followLatest = () => {
+      if (shouldFollowRef.current) scrollElement.scrollTop = scrollElement.scrollHeight;
+    };
+    const observer = new ResizeObserver(followLatest);
+    observer.observe(contentElement);
+    followLatest();
+    return () => observer.disconnect();
+  }, []);
   return <section className="embeddedAiPage embeddedAiConversation">
-    <div className="embeddedAiConversationScroll">
-      <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
-      {turns.map(turn => <article className="embeddedAiThreadTurn" key={turn.id}>
-        <div className="embeddedAiMessage user"><span>You · {taskTime(turn.createdAt)}</span><p>{turn.task}</p></div>
-        <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt=""/><div><ProgressiveResponse text={turn.plan.generationStatus === "failed" ? turn.plan.generationError || "This response did not complete." : turn.plan.generationStatus === "pending" ? "SMAJ AI is preparing a response…" : turn.plan.summary || "Your request is ready for review."} />
-          {turn.plan.discovery?.results.map(result => <section className="embeddedAiCards" key={result.serviceId} aria-label={`${serviceName(result.serviceId)} results`}>
-            {result.records.map((item, index) => {
-              const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
-              return <article key={String(record.id || index)}><strong>{String(record.title || "SMAJ PI HUB listing")}</strong><span>{String(record.company || record.creatorName || record.sellerName || serviceName(result.serviceId))}</span>{record.salary != null && <span>{String(record.salary)}</span>}</article>;
-            })}
-          </section>)}
-        </div></div>
-      </article>)}
-      <div className="embeddedAiMessage user"><span>You</span><p>{task.task}</p></div>
-      {!pendingIsCurrentTask&&<div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><ProgressiveResponse text={plan.summary || "Your request is ready for review."}/>
-        {showResults&&plan.discovery&&<TaskResults plan={plan}/>}
-      </div></div>}
-      {pending&&<article className="embeddedAiThreadTurn">
-        {!pendingIsCurrentTask&&<div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>}
-        {pending.status === "sending"
-          ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-          : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
-      </article>}
+    <div className="embeddedAiConversationScroll" ref={scrollRef} onScroll={event => {
+      const element = event.currentTarget;
+      shouldFollowRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120;
+    }}>
+      <div ref={contentRef}>
+        <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
+        {entries.map(turn => <article className="embeddedAiThreadTurn" key={turn.id}>
+          <div className="embeddedAiMessage user"><span>You · {taskTime(turn.createdAt)}</span><p>{turn.task}</p></div>
+          {turn.id === pending?.id && pending.status === "failed"
+            ? <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>
+            : turn.plan.generationStatus === "pending" && !turn.plan.summary
+            ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
+            : <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt=""/><div>
+              <ProgressiveResponse
+                text={turn.plan.generationStatus === "failed" ? turn.plan.generationError || "This response did not complete." : turn.plan.summary || "Your request is ready for review."}
+                animate={turn.id === latestEntryId}
+              />
+              {showResults && turn.plan.discovery && <TaskResults plan={turn.plan}/>}
+            </div></div>}
+        </article>)}
+        {pending && !entries.some(entry => entry.id === pending.id) && <article className="embeddedAiThreadTurn">
+          {!pendingIsCurrentTask && <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>}
+          {pending.status === "sending"
+            ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
+            : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+        </article>}
+      </div>
       {!pendingIsCurrentTask&&!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.message && <small>Exact message to seller: “{action.message}”</small>}{action.storePreview?.product && <small>Verified product: {action.storePreview.product.title} · Seller: {action.storePreview.product.sellerName} · Seller ID: {action.storePreview.product.sellerId} · {action.storePreview.product.pricePi} Pi</small>}{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
       {!pendingIsCurrentTask&&execution && (execution.status === "failed" && execution.retryable || execution.receipt && execution.status === "verified") && <section className="embeddedAiExecution">{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><span>Verified · {execution.receipt.verifiedAt || "Complete"}</span><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download data</button></div>}</section>}
-      {!pendingIsCurrentTask&&<div className="embeddedAiConversationActions"><button type="button" disabled={busy} onClick={() => deleteTask(task)}><DeleteOutlineOutlinedIcon/> Delete task</button></div>}
     </div>
     <FollowUpComposer busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>
   </section>;
 }
 
-function ProgressiveResponse({ text }: { text: string }) {
-  const [visibleLength, setVisibleLength] = useState(0);
+function ProgressiveResponse({ text, animate }: { text: string; animate: boolean }) {
+  const animateRef = useRef(animate);
+  const renderedText = useRef(animate ? "" : text);
+  const [visibleText, setVisibleText] = useState(renderedText.current);
   useEffect(() => {
-    setVisibleLength(0);
     if (!text) return;
-    let position = 0;
+    const characters = Array.from(text);
+    const previousCharacters = Array.from(renderedText.current);
+    const continuesPrevious = previousCharacters.length <= characters.length
+      && characters.slice(0, previousCharacters.length).join("") === renderedText.current;
+    let position = continuesPrevious ? previousCharacters.length : 0;
+    if (!animateRef.current && position === 0) {
+      renderedText.current = text;
+      setVisibleText(text);
+      return;
+    }
+    if (!continuesPrevious) {
+      renderedText.current = "";
+      setVisibleText("");
+    }
+    if (position >= characters.length) return;
     let frame = 0;
-    let lastUpdate = 0;
-    const renderFrame = (now: number) => {
-      if (now - lastUpdate >= 18) {
-        position = Math.min(text.length, position + Math.max(1, Math.ceil(text.length / 500)));
-        setVisibleLength(position);
-        lastUpdate = now;
-      }
-      if (position < text.length) frame = requestAnimationFrame(renderFrame);
+    const renderFrame = () => {
+      renderedText.current += characters[position];
+      position += 1;
+      setVisibleText(renderedText.current);
+      if (position < characters.length) frame = requestAnimationFrame(renderFrame);
     };
     frame = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(frame);
   }, [text]);
-  return <p className="embeddedAiResponseText">{text.slice(0, visibleLength)}{visibleLength < text.length && <span className="embeddedAiTypingCursor" aria-hidden="true"/>}</p>;
+  return <p className="embeddedAiResponseText">{visibleText}{visibleText.length < text.length && <span className="embeddedAiTypingCursor" aria-hidden="true"/>}</p>;
 }
 
 function TaskResults({ plan }: { plan: AiPlan }) {
