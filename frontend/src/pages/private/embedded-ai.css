@@ -307,8 +307,8 @@
 .embeddedAiTypingDots i:nth-child(2){animation-delay:.15s}
 .embeddedAiTypingDots i:nth-child(3){animation-delay:.3s}
 @keyframes embedded-ai-dot-bounce{50%{opacity:.25;transform:translateY(-4px)}}
-.embeddedAiSendFailure{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 14px 47px;padding:10px 12px;border:1px solid #f0c5cc;border-radius:12px;background:#fff2f4;color:#9d3348;font-size:12px;line-height:1.45}
-.embeddedAiSendFailure button{min-height:34px;flex:none;padding:7px 12px;border:0;border-radius:9px;background:#7547d5;color:#fff;font-size:11px;font-weight:700}
-.embeddedAiSendFailure button:disabled{opacity:.6}
-@media(max-width:480px){.embeddedAiTyping{gap:8px}.embeddedAiTyping>img{width:32px;height:32px}.embeddedAiSendFailure{margin-left:40px}}
+.embeddedAiRetryPrompt{display:flex;align-items:center;gap:10px;margin:8px 0 12px 47px;color:#81798b;font-size:10px}
+.embeddedAiRetryPrompt button{min-height:30px;padding:5px 10px;border:1px solid #e6deef;border-radius:16px;background:#fff;color:#6941b6;font-size:10px;font-weight:700}
+.embeddedAiRetryPrompt button:disabled{opacity:.6}
+@media(max-width:480px){.embeddedAiTyping{gap:8px}.embeddedAiTyping>img{width:32px;height:32px}.embeddedAiRetryPrompt{margin-left:40px}}
 @media(prefers-reduced-motion:reduce){.embeddedAiTypingDots i{animation:none}}

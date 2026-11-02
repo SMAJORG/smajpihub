@@ -27,6 +27,8 @@ type AiAction = {
 type AiPlan = {
   summary: string;
   model?: string;
+  generationStatus?: "pending" | "failed" | "complete";
+  generationError?: string;
   services: string[];
   steps?: Array<{ serviceId: string; title: string; description: string; status: string; reason?: string }>;
   sources?: Array<{ title: string; file: string }>;
@@ -46,9 +48,9 @@ type AiPlan = {
     events?: Array<{ at: string; message: string }>;
   };
 };
-type AiTask = { id: string; task: string; plan: AiPlan; createdAt: string; conversationId?: string };
+type AiTask = { id: string; task: string; plan: AiPlan; createdAt: string; conversationId?: string; requestKey?: string };
 type AiConversation = { id: string; title: string; createdAt: string; updatedAt: string; taskCount: number; latestTaskId: string; lastMessage: string };
-type PendingMessage = { id: string; text: string; conversationId: string; persistedConversation: boolean; status: "sending" | "failed"; error?: string };
+type PendingMessage = { id: string; text: string; conversationId: string; persistedConversation: boolean; requestKey: string; status: "sending" | "failed"; error?: string };
 type AiConnection = { serviceId: string; connected: boolean; available: boolean; adapterMode: string };
 type AiResponse<T> = T;
 type Section = "chat" | "tasks" | "conversations" | "apps" | "approvals" | "results" | "settings";
@@ -196,7 +198,21 @@ export default function EmbeddedAiWorkspace() {
         axiosClient.get<AiResponse<{ connections: AiConnection[] }>>("/ai/connections", { smajSkipReadRetry: true }),
         axiosClient.get<AiResponse<{ conversations: AiConversation[] }>>("/ai/conversations", { smajSkipReadRetry: true }),
       ]);
-      setTasks(taskResponse.data.tasks || []);
+      const loadedTasks = taskResponse.data.tasks || [];
+      setTasks(loadedTasks);
+      const latestTask = loadedTasks[0];
+      const unfinished = latestTask?.plan.generationStatus === "pending" || latestTask?.plan.generationStatus === "failed" ? latestTask : undefined;
+      if (unfinished?.requestKey) {
+        setPendingMessage({
+          id: unfinished.id,
+          text: unfinished.task,
+          conversationId: unfinished.conversationId || unfinished.id,
+          persistedConversation: true,
+          requestKey: unfinished.requestKey,
+          status: "failed",
+          error: unfinished.plan.generationError || "Your message is saved. Retry to get the AI response.",
+        });
+      }
       setConnections(connectionResponse.data.connections || []);
       setConversations(conversationResponse.data.conversations || []);
     } catch (loadError) {
@@ -208,6 +224,32 @@ export default function EmbeddedAiWorkspace() {
   }, []);
 
   useEffect(() => { void loadWorkspace(); }, [loadWorkspace]);
+  useEffect(() => {
+    if (active.section !== "conversations" || !active.taskId || loading) return;
+    let activeRequest = true;
+    void axiosClient.get<AiResponse<{ tasks: AiTask[] }>>(`/ai/conversations/${encodeURIComponent(active.taskId)}`, { smajSkipReadRetry: true })
+      .then(({ data }) => {
+        if (!activeRequest) return;
+        const history = data.tasks || [];
+        setTasks(current => [...history, ...current.filter(task => !history.some(saved => saved.id === task.id))]);
+        const latest = history.at(-1);
+        if (latest?.requestKey && (latest.plan.generationStatus === "pending" || latest.plan.generationStatus === "failed")) {
+          setPendingMessage(current => current || {
+            id: latest.id,
+            text: latest.task,
+            conversationId: latest.conversationId || latest.id,
+            persistedConversation: true,
+            requestKey: latest.requestKey!,
+            status: "failed",
+            error: latest.plan.generationError || "Your message is saved. Retry to get the AI response.",
+          });
+        }
+      })
+      .catch(async failure => {
+        if (activeRequest) setError(await responseMessage(failure));
+      });
+    return () => { activeRequest = false; };
+  }, [active.section, active.taskId, loading]);
   useEffect(() => {
     if (error) showFeedback(error, "error");
   }, [error]);
@@ -225,7 +267,7 @@ export default function EmbeddedAiWorkspace() {
     ? tasks.find(task => task.id === active.taskId)?.conversationId || active.taskId
     : undefined;
   const conversationTasks = useMemo(
-    () => activeConversationId ? tasks.filter(task => (task.conversationId || task.id) === activeConversationId).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) : [],
+    () => activeConversationId ? tasks.filter(task => (task.conversationId || task.id) === activeConversationId && task.plan.generationStatus !== "pending" && task.plan.generationStatus !== "failed").sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) : [],
     [activeConversationId, tasks],
   );
   const activeConversationTask = active.section === "conversations" && active.taskId
@@ -289,6 +331,7 @@ export default function EmbeddedAiWorkspace() {
       text: request.trim(),
       conversationId: conversationId || crypto.randomUUID(),
       persistedConversation: Boolean(conversationId),
+      requestKey: crypto.randomUUID(),
       status: "sending" as const,
     };
     setBusy("create");
@@ -296,7 +339,7 @@ export default function EmbeddedAiWorkspace() {
     setPendingMessage({ ...optimistic, status: "sending", error: undefined });
     if (!conversationId) openConversation(optimistic.conversationId);
     try {
-      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 150000 });
+      const { data } = await axiosClient.post<AiResponse<{ task: AiTask }>>("/ai/tasks", { task: request.trim(), ...(conversationId ? { conversationId } : {}) }, { timeout: 150000, headers: { "Idempotency-Key": optimistic.requestKey } });
       if (!data.task?.plan) throw new Error("SMAJ AI could not answer. Please try again.");
       updateTask(data.task);
       updateConversationForTask(data.task);
@@ -749,7 +792,7 @@ function ConversationThread({ title, turns, latestTask, pending, retryPending, o
         <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
         {pending.status === "sending"
           ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-          : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+          : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
       </article>}
     </div>
     {latestTask&&<FollowUpComposer key={latestTask.conversationId || latestTask.id} busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>}
@@ -792,7 +835,7 @@ function TaskConversation({
         <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
         {pending.status === "sending"
           ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-          : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+          : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
       </article>}
       {!!plan.steps?.length && <section className="embeddedAiPlan"><h2>Plan</h2>{plan.steps.map(step => <article key={`${step.serviceId}:${step.title}`}><strong>{step.title}</strong><span>{serviceName(step.serviceId)} · {step.status.replaceAll("_", " ")}</span>{step.description && <p>{step.description}</p>}{step.reason && <small>{step.reason}</small>}</article>)}</section>}
       {!!plan.sources?.length && <details className="embeddedAiSources"><summary>Sources used</summary>{plan.sources.map(source => <p key={`${source.file}:${source.title}`}>{source.title} · {source.file}</p>)}</details>}
