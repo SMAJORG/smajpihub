@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
-import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { serviceCatalog } from "../../content/serviceCatalog";
 import { axiosClient } from "../../lib/axiosClient";
 import { showFeedback } from "../../lib/feedback";
-import EmbeddedServiceIcon from "./EmbeddedServiceIcon";
+import AuthenticatedAiChatHome from "./AuthenticatedAiChatHome";
 import "./embedded-ai.css";
 
 type AiAction = {
@@ -110,23 +109,6 @@ const statusLabel = (plan: AiPlan) => {
 };
 
 const serviceName = (id: string) => serviceCatalog.find(service => service.slug === id)?.name || id;
-const serviceExamples: Record<string, string> = {
-  store: "Find a product and ask its seller if it is available",
-  stream: "Build a weekend watchlist",
-  jobs: "Find matching jobs and prepare applications",
-  education: "Create a learning path for product design",
-  sports: "Plan which matches to follow this week",
-  food: "Plan affordable meals near me",
-  health: "Prepare questions for a doctor visit",
-  transport: "Plan transport for my appointments",
-  agro: "Create a crop-to-market checklist",
-  energy: "Create an energy-saving plan",
-  charity: "Help me assess causes before donating",
-  housing: "Prepare a safe rental search",
-  events: "Plan events for my weekend",
-  swap: "Explain the peer-to-peer exchange vision",
-  token: "Explain available reward pathways",
-};
 const responseMessage = async (error: unknown) => {
   const data = (error as { response?: { data?: unknown } })?.response?.data;
   if (data instanceof Blob) {
@@ -203,11 +185,8 @@ export default function EmbeddedAiWorkspace() {
   const taskSubmissionPending = useRef(false);
   const discoveryInFlight = useRef(new Set<string>());
   const automaticDiscoveryStarted = useRef(new Set<string>());
-  const promptInput = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState("");
   const [selectedService, setSelectedService] = useState("");
-  const [showAllServices, setShowAllServices] = useState(false);
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
   const [preferences, setPreferences] = useState<string[]>([]);
@@ -397,12 +376,6 @@ export default function EmbeddedAiWorkspace() {
   useEffect(() => {
     if (error) showFeedback(error, "error");
   }, [error]);
-  useEffect(() => {
-    if (draft) return;
-    const timer = window.setInterval(() => setPlaceholderIndex(index => (index + 1) % serviceCatalog.length), 3000);
-    return () => window.clearInterval(timer);
-  }, [draft]);
-
   const selectedTask = useMemo(
     () => active.taskId ? tasks.find(task => task.id === active.taskId) : undefined,
     [active.taskId, tasks],
@@ -689,18 +662,6 @@ export default function EmbeddedAiWorkspace() {
 
   const sectionTitle = sectionTitles[active.section];
   const isBusy = Boolean(busy);
-  const orderedServices = useMemo(() => {
-    const connectionById = new Map(connections.map(connection => [connection.serviceId, connection]));
-    const allServices = serviceCatalog.map(service => ({ service, connection: connectionById.get(service.slug) }));
-    const connected = allServices.filter(item => item.connection?.available && item.connection.connected);
-    const connectedIds = new Set(connected.map(item => item.service.slug));
-    return [...connected, ...allServices.filter(item => !connectedIds.has(item.service.slug))];
-  }, [connections]);
-  const visibleServices = showAllServices ? orderedServices : orderedServices.slice(0, 5);
-  const placeholderService = serviceCatalog[placeholderIndex % serviceCatalog.length];
-  const selectedServiceDefinition = serviceCatalog.find(service => service.slug === selectedService);
-  const selectedConnection = connections.find(connection => connection.serviceId === selectedService);
-  const selectedServiceState = !selectedConnection?.available ? "planned" : selectedConnection.connected ? "connected" : "disconnected";
   const filteredTasks = tasks.filter(task => {
     const services = [...new Set([...task.plan.services, ...(task.plan.steps || []).map(step => step.serviceId)])];
     const matchesService = taskServiceFilter === "all" || services.includes(taskServiceFilter);
@@ -739,41 +700,19 @@ export default function EmbeddedAiWorkspace() {
       </div>
     </header>
     <div className="embeddedAiShell">
-      <main className={`embeddedAiMain${active.taskId && active.section === "results" ? " embeddedAiMainChat" : ""}`} aria-busy={loading || isBusy}>
+      <main className={`embeddedAiMain${active.taskId && active.section === "results" ? " embeddedAiMainChat" : active.section === "chat" ? " embeddedAiMainHome" : ""}`} aria-busy={loading || isBusy}>
         {loading ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Loading your SMAJ AI workspace…</div>
           : initialLoadFailed ? <div className="embeddedAiEmpty"><h2>Workspace unavailable</h2><p>Your Pi session and saved work are unchanged. Check your connection or try again.</p><button type="button" onClick={() => void loadWorkspace()}>Try again</button></div>
-            : active.section === "chat" && !active.taskId ? <section className="embeddedAiChatHome launcherHome">
-              <p className="embeddedAiEyebrow">YOUR WORKSPACE</p>
-              <h1>What can I help you do?</h1>
-              <form className="embeddedAiComposer compactComposer" onSubmit={createTask} aria-label="Create an AI task" aria-busy={busy === "create"}>
-                <label className="embeddedAiSrOnly" htmlFor="embedded-ai-prompt">Your AI task</label>
-                <div className="embeddedAiPromptInput">
-                  <textarea ref={promptInput} id="embedded-ai-prompt" value={draft} maxLength={1900} rows={3} placeholder="" onChange={event => setDraft(event.target.value)} />
-                  {!draft && <span key={placeholderService.slug}>{serviceExamples[placeholderService.slug] || "Tell SMAJ AI what you need"}…</span>}
-                </div>
-                <div className="embeddedAiComposerToolbar">
-                  {selectedServiceDefinition && <button type="button" className="embeddedAiSelectedService" onClick={() => setSelectedService("")} aria-label={`Clear ${selectedServiceDefinition.name} context`}><EmbeddedServiceIcon service={selectedServiceDefinition}/><span>{selectedServiceDefinition.name.replace(/^SMAJ /, "")}</span><b className="embeddedAiSelectedClear" aria-hidden="true">×</b></button>}
-                  <button type="submit" className="embeddedAiAskButton" disabled={!draft.trim() || isBusy}>{busy === "create" ? <><span className="embeddedAiSpinner"/>Asking AI…</> : <>Ask SMAJ AI <span aria-hidden="true">↗</span></>}</button>
-                </div>
-              </form>
-              {selectedServiceDefinition && <div className="serviceContext" role="status"><span><strong>{selectedServiceDefinition.name}</strong> · {selectedServiceState === "planned" ? "Planned" : selectedServiceState === "connected" ? "Connected" : "Not connected"}{selectedServiceState === "planned" ? " — integration not available yet." : selectedServiceState === "disconnected" ? " — use Connect Apps to connect this app." : " — task context selected."}</span></div>}
-              <div className="embeddedAiSuggestions" aria-label="Suggested requests">{[
-                { label: "Find jobs", prompt: "Find software engineering jobs" },
-                { label: "Shop cars", prompt: "Find cars under $30,000" },
-                { label: "Explore courses", prompt: "Show available online courses" },
-                { label: "Health services", prompt: "Find nearby health services" },
-              ].map(suggestion => <button key={suggestion.label} type="button" onClick={() => {setSelectedService("");setDraft(suggestion.prompt);promptInput.current?.focus({preventScroll:true});}}>{suggestion.label}</button>)}</div>
-              <div className="embeddedAiServicesHeading"><div><h2>Connected services</h2></div></div>
-              <div className="launcherLegend" aria-label="Service status legend"><span><i className="statusDot connected"/>Connected</span><span><i className="statusDot disconnected"/>Not connected</span><span><i className="statusDot unavailable"/>Planned</span></div>
-              <div id="home-services-list" className="embeddedAiServiceGrid" aria-label="Choose a service">{visibleServices.map(({ connection, service }) => {
-                const state = !connection?.available ? "planned" : connection.connected ? "connected" : "disconnected";
-                return <button key={service.slug} type="button" aria-pressed={selectedService === service.slug} aria-label={`${service.name}, ${state === "planned" ? "Planned" : state === "connected" ? "Connected" : "Not connected"}`} onClick={() => {setSelectedService(service.slug);setDraft(serviceExamples[service.slug] || "");promptInput.current?.focus({preventScroll:true});}}>
-                  <span className="embeddedAiServiceArt"><EmbeddedServiceIcon service={service}/></span>
-                  <span>{service.name.replace(/^SMAJ /, "")}<i className={`statusDot ${state === "planned" ? "unavailable" : state}`}/></span>
-                </button>;
-              })}</div>
-              {orderedServices.length > 5 && <button type="button" className="embeddedAiShowAll" aria-expanded={showAllServices} aria-controls="home-services-list" onClick={() => setShowAllServices(value => !value)}>{showAllServices ? "Show fewer services" : "Show all services"}</button>}
-            </section>
+            : active.section === "chat" && !active.taskId ? <AuthenticatedAiChatHome
+              task={draft}
+              setTask={setDraft}
+              selectedService={selectedService}
+              selectService={setSelectedService}
+              routeTask={createTask}
+              busy={busy}
+              connectedIds={new Set(connections.filter(connection => connection.available && connection.connected).map(connection => connection.serviceId))}
+              availableIds={new Set(connections.filter(connection => connection.available).map(connection => connection.serviceId))}
+            />
               : active.section === "apps" ? <section className="embeddedAiPage">
                 <h1>Connect Apps</h1><p className="embeddedAiIntro">Choose which SMAJ services SMAJ AI may use for approved requests.</p>
                 <div className="embeddedAiConnections">{connections.map(connection => {
@@ -787,11 +726,15 @@ export default function EmbeddedAiWorkspace() {
                   <div className="embeddedAiSettings"><span>Pi account</span><strong>{user?.piUsername || user?.username || "Signed in with Pi"}</strong><span>Saved tasks</span><strong>{tasks.length}</strong><span>Connected apps</span><strong>{connections.filter(connection => connection.connected).length}</strong><button type="button" onClick={() => navigate("/settings")}>Open SMAJ PI HUB account settings</button></div>
                   <form className="embeddedAiPreferences" onSubmit={savePreferences}><h2>AI preferences</h2><p>Save up to 10 preferences to personalize recommendations. Avoid passwords, payment details, and sensitive personal information.</p><label htmlFor="embedded-ai-preferences">One preference per line</label><textarea id="embedded-ai-preferences" value={preferencesDraft} maxLength={1210} rows={5} onChange={event => setPreferencesDraft(event.target.value)} placeholder={"Remote work\nPrefer Pi-denominated prices"}/><small>{preferences.length}/10 saved</small><button type="submit" disabled={preferencesBusy}>{preferencesBusy ? "Saving…" : "Save preferences"}</button>{preferencesStatus&&<p role="status">{preferencesStatus}</p>}</form>
                 </section>
-                  : active.taskId?.startsWith("pending-") && pendingMessage?.id === active.taskId ? <section className="embeddedAiPage embeddedAiConversation">
-                    <div className="embeddedAiConversationScroll"><div className="embeddedAiMessage user"><span>You</span><p>{pendingMessage.text}</p></div>
-                      {pendingMessage.status === "sending" ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-                        : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={isBusy} onClick={retryPendingMessage}>Retry</button></div>}
-                    </div><FollowUpComposer busy={isBusy} onSubmit={message => submitTask(message, pendingMessage.persistedConversation ? pendingMessage.conversationId : undefined)}/>
+                  : active.taskId?.startsWith("pending-") && pendingMessage?.id === active.taskId ? <section className="tasksView compactResults hasChatComposer" data-results-design="approved-compact-v2">
+                    <p className="resultsEyebrow">AI TASK RESULTS</p>
+                    <div className="embeddedAiConversationScroll"><div className="chatThread" aria-label="Conversation messages">
+                      <article className="chatTurn"><div className="chatUserMessage">{pendingMessage.text}</div>
+                        {pendingMessage.status === "sending"
+                          ? <section className="chatAssistantMessage chatTyping" role="status" aria-label="SMAJ AI is responding"><img className="resultsAvatar resultsAvatarLogo" src="/smaj-ai-logo.png" alt=""/><span className="taskDots" aria-hidden="true"><i/><i/><i/></span></section>
+                          : <div className="chatFailure" role="alert"><span>{pendingMessage.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={isBusy} onClick={retryPendingMessage}>Retry</button></div>}
+                      </article>
+                    </div></div><ChatComposer busy={isBusy} onSubmit={message => submitTask(message, pendingMessage.persistedConversation ? pendingMessage.conversationId : undefined)}/>
                   </section>
                     : active.taskId && resolvingTaskId === active.taskId ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Restoring your saved task…</div>
                       : active.taskId ? selectedTask
@@ -902,38 +845,43 @@ function TaskConversation({
     followLatest();
     return () => observer.disconnect();
   }, []);
-  return <section className="embeddedAiPage embeddedAiConversation">
+  return <section className="tasksView compactResults hasChatComposer" data-results-design="approved-compact-v2">
+    <p className="resultsEyebrow">AI TASK RESULTS</p>
     <div className="embeddedAiConversationScroll" ref={scrollRef} onScroll={event => {
       const element = event.currentTarget;
       shouldFollowRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120;
     }}>
       <div ref={contentRef}>
-        <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
-        {entries.map(turn => <article className="embeddedAiThreadTurn" key={turn.id}>
-          <div className="embeddedAiMessage user"><span>You · {taskTime(turn.createdAt)}</span><p>{turn.task}</p></div>
+      <div className="chatThread" aria-label="Conversation messages">
+        {entries.map((turn, index) => <article className="chatTurn" key={turn.id}>
+          <div className="chatUserMessage">{turn.task}</div>
           {turn.id === pending?.id && pending.status === "failed"
-            ? <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>
-            : turn.plan.generationStatus === "pending" && !turn.plan.summary
-            ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-            : <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt=""/><div>
+            ? <div className="chatFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>
+            : <section className={`chatAssistantMessage${turn.id === pending?.id && !turn.plan.summary && pending.status === "sending" ? " chatTyping" : ""}`}>
+              <img className="resultsAvatar resultsAvatarLogo" src="/smaj-ai-logo.png" alt=""/>
+              {turn.id === pending?.id && !turn.plan.summary && pending.status === "sending"
+                ? <span className="taskDots" role="status" aria-label="SMAJ AI is responding"><i/><i/><i/></span>
+                : <div className="resultsContent">
               <ProgressiveResponse
                 text={turn.plan.generationStatus === "failed" ? turn.plan.generationError || "This response did not complete." : turn.plan.summary || "Your request is ready for review."}
-                animate={turn.id === latestEntryId}
+                animate={turn.id === latestEntryId || index === entries.length - 1}
               />
               {showResults && turn.plan.discovery && <TaskResults plan={turn.plan}/>}
-            </div></div>}
+              </div>}
+            </section>}
         </article>)}
-        {pending && !entries.some(entry => entry.id === pending.id) && <article className="embeddedAiThreadTurn">
-          {!pendingIsCurrentTask && <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>}
+        {pending && !entries.some(entry => entry.id === pending.id) && <article className="chatTurn">
+          {!pendingIsCurrentTask && <div className="chatUserMessage">{pending.text}</div>}
           {pending.status === "sending"
-            ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-            : <div className="embeddedAiRetryPrompt" role="status"><span>Message saved</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+            ? <section className="chatAssistantMessage chatTyping" role="status" aria-label="SMAJ AI is responding"><img className="resultsAvatar resultsAvatarLogo" src="/smaj-ai-logo.png" alt=""/><span className="taskDots" aria-hidden="true"><i/><i/><i/></span></section>
+            : <div className="chatFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
         </article>}
       </div>
-      {!pendingIsCurrentTask&&!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.message && <small>Exact message to seller: “{action.message}”</small>}{action.storePreview?.product && <small>Verified product: {action.storePreview.product.title} · Seller: {action.storePreview.product.sellerName} · Seller ID: {action.storePreview.product.sellerId} · {action.storePreview.product.pricePi} Pi</small>}{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
+      {!pendingIsCurrentTask&&!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.message && <small>Exact message to seller: “{action.message}”</small>}{action.storePreview?.product && <small>Verified product: {action.storePreview.product.title} · Seller: {action.storePreview.product.sellerName} · Seller ID: {action.storePreview.product.sellerId} · {action.storePreview.product.pricePi} Pi</small>}      {action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
       {!pendingIsCurrentTask&&execution && (execution.status === "failed" && execution.retryable || execution.receipt && execution.status === "verified") && <section className="embeddedAiExecution">{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><span>Verified · {execution.receipt.verifiedAt || "Complete"}</span><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download data</button></div>}</section>}
+      </div>
     </div>
-    <FollowUpComposer busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>
+    <ChatComposer busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>
   </section>;
 }
 
@@ -968,7 +916,7 @@ function ProgressiveResponse({ text, animate }: { text: string; animate: boolean
     frame = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(frame);
   }, [text]);
-  return <p className="embeddedAiResponseText">{visibleText}{visibleText.length < text.length && <span className="embeddedAiTypingCursor" aria-hidden="true"/>}</p>;
+  return <div className="taskAnswer"><span className="taskSrOnly">{text}</span><span aria-hidden="true" className={visibleText.length < text.length ? "taskCursor" : ""}>{visibleText}</span></div>;
 }
 
 function TaskResults({ plan }: { plan: AiPlan }) {
@@ -992,22 +940,14 @@ function TaskResults({ plan }: { plan: AiPlan }) {
   </div>;
 }
 
-function FollowUpComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string)=>Promise<boolean>}){
+function ChatComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string)=>Promise<boolean>}){
   const [message,setMessage]=useState("");
   const [sending,setSending]=useState(false);
   const sendingRef=useRef(false);
-  const inputRef=useRef<HTMLTextAreaElement>(null);
-  useEffect(()=>{
-    const input=inputRef.current;
-    if(!input)return;
-    input.style.height="auto";
-    input.style.height=`${Math.min(input.scrollHeight,160)}px`;
-    input.style.overflowY=input.scrollHeight>160?"auto":"hidden";
-  },[message]);
   const submit=async(event:FormEvent)=>{event.preventDefault();const submitted=message.trim();if(!submitted||busy||sendingRef.current)return;sendingRef.current=true;setMessage("");setSending(true);try{await onSubmit(submitted);}finally{sendingRef.current=false;setSending(false);}};
-  return <form className="embeddedAiFollowUp" onSubmit={submit}>
-    <label className="embeddedAiSrOnly" htmlFor="embedded-ai-follow-up">Message SMAJ AI</label>
-    <textarea ref={inputRef} id="embedded-ai-follow-up" value={message} maxLength={1900} rows={1} placeholder="Message SMAJ AI…" onChange={event=>setMessage(event.target.value)}/>
-    <button type="submit" aria-label={busy||sending?"Sending message":"Send message"} disabled={busy||sending||!message.trim()}><SendOutlinedIcon/></button>
+  return <form className="chatComposer" onSubmit={submit}>
+    <label className="taskSrOnly" htmlFor="embedded-ai-follow-up">Message SMAJ AI</label>
+    <textarea id="embedded-ai-follow-up" value={message} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit();}}} maxLength={2000} rows={1} placeholder="Message SMAJ AI"/>
+    <button className="primaryButton" type="submit" aria-label="Send message" disabled={busy||sending||!message.trim()}>{busy||sending?"…":"Send"}</button>
   </form>;
 }

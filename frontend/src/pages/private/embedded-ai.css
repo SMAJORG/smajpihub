@@ -1,4 +1,6 @@
-.embeddedAi{--ai-ink:#211b2c;--ai-muted:#827a90;--ai-purple:#7547d5;display:flex;width:100%;min-width:0;height:100dvh;min-height:0;flex-direction:column;overflow:hidden;background:#faf9fd;color:var(--ai-ink)}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.embeddedAi{--ai-ink:#211b2c;--ai-muted:#827a90;--ai-purple:#7547d5;display:flex;width:100%;min-width:0;height:100dvh;min-height:0;flex-direction:column;overflow:hidden;background:#faf9fd;color:var(--ai-ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
 .embeddedAiHeader{z-index:2;display:flex;min-height:60px;flex:none;align-items:center;gap:12px;padding:0 clamp(12px,3vw,28px);border-bottom:1px solid #eee9f3;background:#fff}
 .embeddedAiBack{display:grid;width:38px;height:38px;flex:none;place-items:center;border:0;border-radius:11px;background:transparent;color:#65429d}
 .embeddedAiBack:hover{background:#f4f0ff}.embeddedAiBack svg{width:18px;height:18px}
@@ -12,23 +14,13 @@
 .embeddedAiHeaderMenuDropdown button:hover,.embeddedAiHeaderMenuDropdown button.active{background:#f2edfc;color:#6138b0}
 .embeddedAiShell{display:flex;width:100%;min-width:0;min-height:0;flex:1;overflow:hidden}
 .embeddedAiMain{position:relative;min-width:0;min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}
-.embeddedAiChatHome,.embeddedAiPage{width:min(820px,100%);min-width:0;max-width:100%;min-height:100%;margin:0 auto;padding:clamp(22px,4vw,48px) clamp(16px,4vw,36px) 48px}
-.embeddedAiChatHome{max-width:780px}
+.embeddedAiMainHome{box-sizing:border-box;padding:68px 24px 90px;background:#fff}
+.embeddedAiPage{width:min(820px,100%);min-width:0;max-width:100%;min-height:100%;margin:0 auto;padding:clamp(22px,4vw,48px) clamp(16px,4vw,36px) 48px}
 .embeddedAiEyebrow{margin:0 0 8px;color:#8b76b4;font-size:10px;font-weight:750;letter-spacing:1.4px;text-transform:uppercase}
-.embeddedAiChatHome>h1{margin:0;color:#211b2c;font-size:clamp(25px,4vw,36px);letter-spacing:-1.1px}
 .embeddedAiIntro{max-width:620px;margin:9px 0 24px;color:var(--ai-muted);font-size:13px;line-height:1.6}
-.embeddedAiComposer{min-width:0;padding:16px;border:1px solid #e8e2ef;border-radius:20px;background:#fff;box-shadow:0 8px 26px #24143a08}
-.embeddedAiComposer:focus-within{border-color:#b9a2e8;box-shadow:0 10px 28px #7547d511}
-.embeddedAiComposer textarea{display:block;width:100%;min-width:0;max-width:100%;min-height:96px;resize:vertical;border:0;outline:0;background:transparent;color:var(--ai-ink);font:inherit;font-size:15px;line-height:1.55}
-.embeddedAiComposer textarea::placeholder{color:#aaa3b2}
-.embeddedAiComposer>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.embeddedAiComposer>div>span{min-width:0;flex:1;color:#958da0;font-size:10px}
-.embeddedAiComposer button,.embeddedAiApproval>button,.embeddedAiExecution button,.embeddedAiEmpty button{display:inline-flex;min-height:40px;align-items:center;justify-content:center;gap:7px;padding:9px 14px;border:0;border-radius:11px;background:var(--ai-purple);color:white;font-size:12px;font-weight:700}
-.embeddedAiComposer button:disabled,.embeddedAiApproval button:disabled,.embeddedAiExecution button:disabled{opacity:.55}
-.embeddedAiComposer button svg,.embeddedAiExecution button svg,.embeddedAiConversationActions button svg{width:16px;height:16px}
-.embeddedAiSuggestions{display:flex;flex-wrap:wrap;gap:8px;margin:13px 0 32px}
-.embeddedAiSuggestions button{min-height:34px;padding:7px 11px;border:1px solid #e8e2ef;border-radius:20px;background:#fff;color:#6b6179;font-size:11px}
-.embeddedAiSuggestions button:hover{border-color:#b9a2e8;color:#6138b0}
+.embeddedAiApproval>button,.embeddedAiExecution button,.embeddedAiEmpty button{display:inline-flex;min-height:40px;align-items:center;justify-content:center;gap:7px;padding:9px 14px;border:0;border-radius:11px;background:var(--ai-purple);color:white;font-size:12px;font-weight:700}
+.embeddedAiApproval button:disabled,.embeddedAiExecution button:disabled{opacity:.55}
+.embeddedAiExecution button svg{width:16px;height:16px}
 .embeddedAiTaskList{display:grid;gap:6px;margin-top:12px}
 .embeddedAiTaskList>button{display:flex;min-width:0;min-height:62px;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid #eeeaf2;border-radius:13px;background:#fff;color:inherit;text-align:left}
 .embeddedAiTaskList>button:hover{border-color:#c5b3e8}
@@ -86,23 +78,12 @@
 .embeddedAiSettings{display:grid;grid-template-columns:minmax(110px,.5fr) minmax(0,1fr);gap:14px;padding:18px;border:1px solid #ece7f1;border-radius:16px;background:#fff}
 .embeddedAiSettings>span{color:var(--ai-muted);font-size:12px}.embeddedAiSettings>strong{font-size:12px;overflow-wrap:anywhere}
 .embeddedAiSettings button{grid-column:1/-1;justify-self:start;min-height:38px;padding:8px 12px;border:1px solid #ded5ea;border-radius:10px;background:#fff;color:#614091;font-size:11px;font-weight:700}
-.embeddedAiPreferences,.embeddedAiFollowUp{display:grid;gap:8px;margin:18px 0;padding:14px;border:1px solid #ece7f1;border-radius:15px;background:#fff}
+.embeddedAiPreferences{display:grid;gap:8px;margin:18px 0;padding:14px;border:1px solid #ece7f1;border-radius:15px;background:#fff}
 .embeddedAiPreferences h2{margin:0;font-size:14px}.embeddedAiPreferences p{margin:0;color:var(--ai-muted);font-size:11px;line-height:1.5}
-.embeddedAiPreferences label,.embeddedAiPreferences small,.embeddedAiFollowUp label{color:#766d81;font-size:10px;font-weight:700}
-.embeddedAiPreferences textarea,.embeddedAiFollowUp textarea{width:100%;min-width:0;resize:vertical;padding:10px;border:1px solid #e6e1eb;border-radius:10px;background:#fff;color:var(--ai-ink);font:inherit;font-size:12px}
-.embeddedAiPreferences button,.embeddedAiFollowUp button{justify-self:end;display:inline-flex;min-height:38px;align-items:center;gap:7px;padding:8px 12px;border:0;border-radius:10px;background:var(--ai-purple);color:white;font-size:11px;font-weight:700}
-.embeddedAiPreferences button:disabled,.embeddedAiFollowUp button:disabled{opacity:.55}
-.embeddedAiFollowUp button svg{width:15px;height:15px}
-.embeddedAiConversation{max-width:850px}
-.embeddedAiMessage{display:flex;gap:11px;margin:18px 0;min-width:0}
-.embeddedAiMessage>span,.embeddedAiMessage>div>span{display:block;margin:0 0 6px;color:#8b76b4;font-size:10px;font-weight:750;letter-spacing:.3px}
-.embeddedAiMessage.user{justify-content:flex-end;flex-wrap:wrap}
-.embeddedAiMessage.user>span{width:100%;text-align:right}
-.embeddedAiMessage.user p{max-width:min(90%,650px);margin:0;padding:12px 15px;border-radius:16px 16px 4px 16px;background:#eee8fb;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
-.embeddedAiMessage.assistant{align-items:flex-start}
-.embeddedAiMessage.assistant>img{width:36px;height:36px;flex:none;object-fit:contain}
-.embeddedAiMessage.assistant>div{min-width:0;padding-top:3px}
-.embeddedAiMessage.assistant p{margin:0;color:#3b3445;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.embeddedAiPreferences label,.embeddedAiPreferences small{color:#766d81;font-size:10px;font-weight:700}
+.embeddedAiPreferences textarea{width:100%;min-width:0;resize:vertical;padding:10px;border:1px solid #e6e1eb;border-radius:10px;background:#fff;color:var(--ai-ink);font:inherit;font-size:12px}
+.embeddedAiPreferences button{justify-self:end;display:inline-flex;min-height:38px;align-items:center;gap:7px;padding:8px 12px;border:0;border-radius:10px;background:var(--ai-purple);color:white;font-size:11px;font-weight:700}
+.embeddedAiPreferences button:disabled{opacity:.55}
 .embeddedAiPlan{display:grid;gap:8px;margin:18px 0;padding:15px;border:1px solid #ece7f1;border-radius:15px;background:#fff}
 .embeddedAiPlan h2{margin:0 0 2px;font-size:14px}
 .embeddedAiPlan article{display:grid;gap:4px;padding:10px;border-radius:11px;background:#faf8fd}
@@ -123,9 +104,6 @@
 .embeddedAiCards{display:flex;gap:9px;min-width:0;overflow-x:auto;padding:2px 1px 9px;scroll-snap-type:x proximity}
 .embeddedAiCards article{display:grid;flex:0 0 min(78vw,230px);gap:5px;min-width:0;padding:11px;border:1px solid #f0edf3;border-radius:12px;background:#fff;scroll-snap-align:start}
 .embeddedAiCards strong{font-size:11px;line-height:1.45}.embeddedAiCards span,.embeddedAiCards b{color:#81798b;font-size:10px;line-height:1.4}.embeddedAiCards b{color:#7854a1}
-.embeddedAiResponseText{margin:0;color:#3b3445;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
-.embeddedAiTypingCursor{display:inline-block;width:2px;height:1em;margin-left:2px;background:var(--ai-purple);vertical-align:-.15em;animation:embedded-ai-cursor 1s steps(2,start) infinite}
-@keyframes embedded-ai-cursor{to{visibility:hidden}}
 .embeddedAiApproval label{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-top:1px solid #f0edf3}
 .embeddedAiApproval input{flex:none;margin-top:3px;accent-color:var(--ai-purple)}
 .embeddedAiApproval label>span{display:grid;min-width:0;gap:5px}
@@ -134,25 +112,13 @@
 .embeddedAiExecution>div>p{width:100%}
 .embeddedAiExecution>div>button{border:1px solid #e6deef;background:white;color:#614091}
 .embeddedAiInlineError{color:#a63d4d!important;font-size:11px;line-height:1.5}
-.embeddedAiConversationActions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0;color:#81798b;font-size:10px}
-.embeddedAiConversationActions button{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:0;border-radius:9px;background:transparent;color:#9d4652;font-size:10px}
-.embeddedAiConversationActions button:hover{background:#fff0f2}
 .embeddedAiSrOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:700px){
   .embeddedAiHeader{min-height:54px;padding:0 11px;gap:9px}
   .embeddedAiHeader>img{width:30px;height:30px}
   .embeddedAiShell{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
   .embeddedAiMain{min-height:0}
-  .embeddedAiChatHome,.embeddedAiPage{padding:24px 15px calc(24px + env(safe-area-inset-bottom,0px))}
-  .embeddedAiChatHome>h1{font-size:27px}
-  .embeddedAiComposer{padding:13px;border-radius:17px}
-  .embeddedAiComposer textarea{min-height:90px;font-size:14px}
-  .embeddedAiComposer>div{align-items:flex-end}
-  .embeddedAiComposer>div>span{max-width:46%;font-size:9px;line-height:1.4}
-  .embeddedAiComposer button{min-height:42px;flex:none;padding:9px 11px;font-size:10px}
-  .embeddedAiSuggestions{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
-  .embeddedAiSuggestions::-webkit-scrollbar{display:none}
-  .embeddedAiSuggestions button{flex:none}
+  .embeddedAiPage{padding:24px 15px calc(24px + env(safe-area-inset-bottom,0px))}
   .embeddedAiTaskList>button{gap:7px;padding:10px}
   .embeddedAiTaskList strong{max-width:calc(100vw - 160px)}
   .embeddedAiTaskList i{max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -164,67 +130,18 @@
   .embeddedAiRenameForm input{flex-basis:100%}
   .embeddedAiConnections{grid-template-columns:minmax(0,1fr)}
   .embeddedAiSettings{gap:12px}
-  .embeddedAiMessage.user p{max-width:95%}
   .embeddedAiResults,.embeddedAiApproval,.embeddedAiExecution{padding:13px}
 }
 @media(prefers-reduced-motion:reduce){.embeddedAiSpinner{animation:none}}
 
-.embeddedAiMainChat{display:flex;flex-direction:column;overflow:hidden}
-.embeddedAiMainChat>.embeddedAiConversation{display:flex;height:100%;min-height:0;flex:1;flex-direction:column;padding-bottom:0}
-.embeddedAiConversationScroll{min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;padding-bottom:12px;scrollbar-gutter:stable}
-.embeddedAiFollowUp{position:sticky;z-index:2;bottom:0;display:flex;width:100%;min-width:0;flex:none;align-items:flex-end;gap:8px;margin:0;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px));border:0;background:linear-gradient(180deg,#faf9fd00 0%,#faf9fd 18%);backdrop-filter:blur(12px)}
-.embeddedAiFollowUp textarea{display:block;min-height:42px;max-height:160px;flex:1;padding:10px 14px;border:1px solid #e8e2ef;border-radius:22px;background:#fff;box-shadow:0 3px 14px #24143a0d;font-size:16px;line-height:1.4;resize:none;overflow-y:hidden}
-.embeddedAiFollowUp textarea:focus{border-color:#b9a2e8;outline:2px solid #b9a2e833}
-.embeddedAiFollowUp button{display:grid;width:42px;height:42px;min-height:42px;flex:none;place-items:center;padding:0;border-radius:50%;background:#7951c7}
-.embeddedAiFollowUp button:disabled{background:#c9bddc;opacity:1}
-.embeddedAiFollowUp button svg{width:19px;height:19px}
-@media(max-width:700px){
-  .embeddedAiMainChat>.embeddedAiConversation{width:100%;padding-right:15px;padding-left:15px}
-  .embeddedAiFollowUp{padding-top:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
-}
-
-.embeddedAiChatHome.launcherHome{box-sizing:border-box;width:min(100%,568px);max-width:568px;padding:30px 24px 48px}
-.embeddedAiChatHome>.embeddedAiEyebrow{margin:0;color:#7951c7;font-size:12px;letter-spacing:2px;font-weight:700}
-.embeddedAiChatHome>h1{margin:14px 0 26px;color:#171327;text-align:left;font-size:clamp(25px,6.7vw,32px);font-weight:600;letter-spacing:-1px;line-height:1.25}
-.embeddedAiChatHome .embeddedAiComposer{min-width:0;padding:17px;border:1px solid #e9e3f1;border-radius:23px;background:#fff;box-shadow:0 8px 25px #3121520a}
-.embeddedAiChatHome .embeddedAiComposer:focus-within{border-color:#a98ce4;box-shadow:0 0 0 3px #7951c714}
-.embeddedAiPromptInput{position:relative;min-width:0}
-.embeddedAiChatHome .embeddedAiPromptInput textarea{display:block;width:100%;min-height:72px;height:72px;max-height:240px;padding:0;border:0;outline:0;resize:vertical;background:transparent;color:#201a2d;font:inherit;font-size:16px;line-height:1.5}
-.embeddedAiPromptInput textarea:focus{outline:0}
-.embeddedAiPromptInput>span{position:absolute;inset:0;overflow:hidden;color:#96919f;font-size:16px;line-height:1.5;pointer-events:none;animation:embedded-ai-placeholder-rise .45s cubic-bezier(.2,.7,.25,1) both}
-@keyframes embedded-ai-placeholder-rise{from{opacity:0;transform:translateY(65%)}to{opacity:1;transform:translateY(0)}}
-.embeddedAiComposerToolbar{display:flex;align-items:center;gap:8px;margin-top:8px}
-.embeddedAiSelectedService{display:flex;min-width:0;max-width:100%;height:42px;align-items:center;gap:6px;padding:0 12px;border:1px solid #eee9f4;border-radius:14px;background:#f7f3fc;color:#625a70;font-size:14px}
-.embeddedAiSelectedService>span:not(.serviceBadge){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.embeddedAiSelectedService .serviceBadge{width:22px;height:22px;flex:none;border-radius:6px}
-.embeddedAiSelectedService .embeddedAiSelectedClear{flex:none;font-size:16px;font-weight:500}
-.embeddedAiChatHome .embeddedAiAskButton{display:flex;min-width:0;min-height:44px;flex:0 1 auto;align-items:center;justify-content:center;gap:7px;margin-left:auto;padding:0 17px;border:0;border-radius:14px;background:#7951c7;color:#fff;font-size:14px;font-weight:750;white-space:nowrap;box-shadow:none}
-.embeddedAiChatHome .embeddedAiAskButton:hover:not(:disabled){background:#6840b6;box-shadow:0 3px 12px #7951c725}
-.embeddedAiChatHome .embeddedAiAskButton:disabled{opacity:.5;cursor:not-allowed}
 .serviceContext{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 3px 0;color:#776a84;font-size:11px;line-height:1.5}
 .serviceContext button{flex:none;padding:8px 0;border:0;background:transparent;color:#7951c7;font-weight:700}
-.embeddedAiSuggestions{display:flex;width:100%;min-width:0;max-width:100%;gap:8px;margin:0;overflow-x:auto;overscroll-behavior-x:contain;padding:17px 3px 5px;scrollbar-width:none}
-.embeddedAiSuggestions::-webkit-scrollbar{display:none}
-.embeddedAiSuggestions button{min-height:44px;flex:none;padding:10px 13px;border:1px solid #ece6f4;border-radius:100px;background:#fff;color:#625970;font-size:13px}
-.embeddedAiServicesHeading{display:flex;align-items:center;gap:12px;margin:30px 0 14px}
-.embeddedAiServicesHeading>div{display:flex;min-width:0;align-items:center;flex-wrap:wrap;gap:9px}
-.embeddedAiServicesHeading h2{margin:0;font-size:17px;letter-spacing:-.3px}
 .launcherLegend{display:flex;justify-content:flex-start;flex-wrap:wrap;gap:12px;margin:0 0 10px;color:#827989;font-size:10px}
 .launcherLegend>span{display:flex;align-items:center;gap:5px}
 .statusDot{display:block;width:7px;height:7px;flex:none;border-radius:50%}
 .statusDot.connected{background:#16865b}
 .statusDot.disconnected{background:#bd810f}
 .statusDot.unavailable{background:#aaa2b3}
-.embeddedAiServiceGrid{display:grid;width:100%;min-width:0;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px 2px}
-.embeddedAiServiceGrid button{display:flex;width:100%;min-width:0;min-height:72px;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:5px 2px;border:1px solid transparent;border-radius:12px;background:transparent;color:#302a38;font-size:10px;font-weight:700}
-.embeddedAiServiceGrid button:hover{border-color:#e8def5;background:#fcfaff}
-.embeddedAiServiceGrid button[aria-pressed=true]{border-color:#d7c8ee;background:#f7f3fc;color:#6840b6}
-.embeddedAiServiceArt .serviceBadge{display:block;width:34px;height:34px;margin:0;border-radius:10px}
-.embeddedAiServiceGrid button>span:last-child{display:flex;width:100%;min-width:0;flex-wrap:wrap;align-items:center;justify-content:center;gap:3px;overflow-wrap:anywhere;line-height:1.15}
-.embeddedAiServiceGrid button>span:last-child .statusDot{width:7px;height:7px;flex:none;border-radius:50%}
-.embeddedAiShowAll{display:block;min-height:38px;margin:10px auto 0;padding:8px 14px;border:1px solid #e9e3f1;border-radius:100px;background:#fff;color:#7951c7;font-size:12px;font-weight:700}
-.embeddedAiShowAll:hover{border-color:#cbb9e8;background:#fcfaff}
-.embeddedAiChatHome button:focus-visible{outline:3px solid #a98ce4;outline-offset:3px}
 
 .embeddedAiHistoryPage{width:min(100%,832px);max-width:832px;padding:28px 36px 48px}
 .embeddedAiHistoryPage>h1{margin:0 0 22px;color:#20192f;font-size:27px;line-height:1.15;letter-spacing:-1px}
@@ -283,14 +200,6 @@
 .embeddedAiRenameForm button:disabled{opacity:.55}
 
 @media(max-width:480px){
-  .embeddedAiChatHome{padding:24px 18px calc(24px + env(safe-area-inset-bottom,0px))}
-  .embeddedAiChatHome .embeddedAiComposer{padding:13px}
-  .embeddedAiComposerToolbar{gap:6px}
-  .embeddedAiChatHome .embeddedAiPromptInput textarea{height:76px;min-height:76px}
-  .embeddedAiChatHome .embeddedAiAskButton{min-height:42px;flex:none;gap:5px;padding:0 9px;font-size:11px}
-  .embeddedAiSelectedService{max-width:45%;padding:0 9px;font-size:12px}
-  .embeddedAiServicesHeading{margin-top:25px}
-  .embeddedAiServiceGrid button{font-size:9px}
   .embeddedAiHistoryPage{padding:24px 18px calc(24px + env(safe-area-inset-bottom,0px))}
   .embeddedAiHistoryFilters{gap:10px;margin-bottom:16px}
   .embeddedAiHistoryRow{grid-template-columns:minmax(0,1fr) 34px;gap:4px}
@@ -300,26 +209,45 @@
   .embeddedAiHistoryMenu>div{right:0}
   .embeddedAiRenameForm input{flex-basis:100%}
 }
-@media(max-width:360px){
-  .embeddedAiChatHome .embeddedAiComposer{padding:13px}
-  .embeddedAiChatHome .embeddedAiAskButton{padding:0 8px;font-size:10px}
-  .embeddedAiServiceGrid button{font-size:8px}
-}
-@media(prefers-reduced-motion:reduce){.embeddedAiPromptInput>span{animation:none}}
 
 .embeddedAi input:not([type=checkbox]),.embeddedAi textarea{background-color:#fff}
-.embeddedAi .embeddedAiComposer textarea,.embeddedAi .embeddedAiFollowUp textarea{background-color:#fff}
 .embeddedAi .embeddedAiHistorySearch input{background-color:#fff}
 
-.embeddedAiTyping{display:flex;align-items:center;gap:10px;margin:14px 0 18px}
-.embeddedAiTyping>img{width:36px;height:36px;flex:none;object-fit:contain}
-.embeddedAiTypingDots{display:inline-flex;align-items:center;gap:5px;height:32px}
-.embeddedAiTypingDots i{width:6px;height:6px;border-radius:50%;background:#8759da;animation:embedded-ai-dot-bounce 1s infinite}
-.embeddedAiTypingDots i:nth-child(2){animation-delay:.15s}
-.embeddedAiTypingDots i:nth-child(3){animation-delay:.3s}
-@keyframes embedded-ai-dot-bounce{50%{opacity:.25;transform:translateY(-4px)}}
-.embeddedAiRetryPrompt{display:flex;align-items:center;gap:10px;margin:8px 0 12px 47px;color:#81798b;font-size:10px}
-.embeddedAiRetryPrompt button{min-height:30px;padding:5px 10px;border:1px solid #e6deef;border-radius:16px;background:#fff;color:#6941b6;font-size:10px;font-weight:700}
-.embeddedAiRetryPrompt button:disabled{opacity:.6}
-@media(max-width:480px){.embeddedAiTyping{gap:8px}.embeddedAiTyping>img{width:32px;height:32px}.embeddedAiRetryPrompt{margin-left:40px}}
-@media(prefers-reduced-motion:reduce){.embeddedAiTypingDots i{animation:none}}
+.embeddedAiMainChat{display:flex;flex-direction:column;overflow:hidden;background:#fff}
+.embeddedAiMainHome{background:#fff}
+.embeddedAiMainChat .tasksView{box-sizing:border-box;display:flex;width:min(680px,100%);max-width:680px;min-height:0;flex:1;flex-direction:column;margin:0 auto;padding:24px 0 0;color:#20192f}
+.embeddedAiMainChat .resultsEyebrow{flex:none;margin:0 0 7px;color:#8a75b5;font-size:11px;font-weight:750;letter-spacing:1.6px}
+.embeddedAiConversationScroll{min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;padding-bottom:150px;scrollbar-gutter:stable}
+.chatThread{display:grid;min-width:0;gap:26px;padding-bottom:18px}
+.chatTurn{min-width:0;scroll-margin-bottom:130px}
+.chatUserMessage{width:fit-content;max-width:min(90%,560px);margin:0 0 0 auto;padding:12px 15px;border-radius:17px 17px 5px 17px;background:#eee8fb;color:#20192f;font-size:14px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.chatAssistantMessage{display:flex;align-items:flex-start;gap:10px;min-width:0;margin-top:18px}
+.chatAssistantMessage .resultsContent{min-width:0;flex:1}
+.chatAssistantMessage .taskAnswer{margin:0 0 10px}
+.chatAssistantMessage.chatTyping{align-items:center;min-height:36px;margin-top:16px}
+.chatAssistantMessage.chatTyping .taskDots{gap:4px;padding:0;background:transparent;border-radius:0}
+.chatAssistantMessage.chatTyping .taskDots i{width:6px;height:6px}
+.chatFailure{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 0 43px;padding:10px 12px;border:1px solid #f0c5cc;border-radius:12px;background:#fff2f4;color:#9d3348;font-size:12px;line-height:1.45}
+.chatFailure button{flex:none;padding:7px 12px;border:0;border-radius:9px;background:#7547d5;color:#fff;font-size:11px;font-weight:700}
+.chatFailure button:disabled{opacity:.6}
+.taskAnswer{min-height:38px;font-size:14px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.taskSrOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.taskCursor:after{content:"▍";color:#8657d8;animation:taskBlink .7s infinite}
+.taskDots{display:inline-flex;gap:5px;padding:13px;border-radius:13px;background:#f5f1fc}
+.taskDots i{width:7px;height:7px;border-radius:50%;background:#8759da;animation:taskBounce 1s infinite}
+.taskDots i:nth-child(2){animation-delay:.15s}
+.taskDots i:nth-child(3){animation-delay:.3s}
+.resultsAvatar{display:grid;width:33px;height:33px;flex:none;place-items:center;border-radius:12px;background:linear-gradient(135deg,#8657e5,#49349c);color:#fff;font-size:12px;font-weight:800}
+img.resultsAvatarLogo{display:block;width:33px;height:33px;margin:0;border-radius:10px;object-fit:cover;background:transparent}
+.chatComposer{position:fixed;z-index:19;right:0;bottom:0;left:0;display:flex;width:min(680px,100%);align-items:flex-end;gap:8px;margin:0 auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #ece7f3;background:#ffffffed;backdrop-filter:blur(14px)}
+.chatComposer textarea{width:100%;min-width:0;min-height:44px;max-height:120px;flex:1;resize:vertical;border:1px solid #e6e1eb;border-radius:14px;padding:12px;background:#fff;color:#20192f;font:inherit;font-size:14px;line-height:1.4}
+.chatComposer textarea:focus{outline:2px solid #8657d866;border-color:#8657d8}
+.chatComposer .primaryButton{display:flex;min-width:62px;min-height:44px;flex:none;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 20px;background:#4423a5;color:#fff;font-size:12px;font-weight:700}
+.chatComposer .primaryButton:disabled{opacity:.55;cursor:not-allowed}
+@keyframes taskBounce{50%{opacity:.25;transform:translateY(-4px)}}
+@keyframes taskBlink{50%{opacity:0}}
+@media(max-width:700px){.embeddedAiMainChat .tasksView{width:100%;padding-right:15px;padding-left:15px}}
+@media(max-width:760px){.embeddedAiMainHome{padding:56px 20px 80px}}
+@media(max-width:430px){.embeddedAiMainHome{padding-right:15px;padding-left:15px}}
+@media(max-width:480px){.chatThread{gap:20px}.chatUserMessage{max-width:94%;font-size:13px}.chatAssistantMessage{gap:8px}.chatComposer{padding-inline:10px}}
+@media(prefers-reduced-motion:reduce){.taskDots i,.taskCursor:after{animation:none}}
