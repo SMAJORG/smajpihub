@@ -815,7 +815,7 @@ const mountStreamEndpoints = (router: Router) => {
     if (search) query.$or = ["title", "description", "category", "creatorName"].map(field => ({ [field]: { $regex: search, $options: "i" } }));
     if (req.query.category) query.category = String(req.query.category).slice(0, 80);
     const videos = await req.app.locals.streamContentCollection.find(query).sort({ createdAt: -1 }).limit(60).toArray();
-    return res.json({ videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, description: video.description, creatorName: video.creatorName, category: video.category, thumbnailUrl: video.thumbnailUrl, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentSource: video.contentSource, createdAt: video.createdAt })) });
+    return res.json({ videos: videos.map((video: Record<string, unknown>) => ({ _id: String(video._id), title: video.title, description: video.description, creatorName: video.creatorName, category: video.category, posterUrl: video.posterUrl || video.thumbnailUrl || null, thumbnailUrl: video.thumbnailUrl || video.posterUrl || null, youtubeVideoId: video.youtubeVideoId, cloudflareUid: video.cloudflareUid, contentSource: video.contentSource, createdAt: video.createdAt })) });
   });
 
   router.get("/creators", async (req, res) => {

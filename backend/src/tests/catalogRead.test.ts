@@ -12,7 +12,8 @@ async function main() {
   const cursor = { sort() { return this; }, skip() { return this; }, limit() { return this; }, async toArray() { return documents; } };
   const collection = { find(q: any) { jobQuery = q; return cursor; }, async countDocuments() { return documents.length; }, insertMany() { throw new Error("Discovery must not seed"); }, updateOne() { throw new Error("Discovery must not update"); } };
   const emptyCursor = { sort() { return this; }, limit() { return this; }, async toArray() { return []; } };
-  const streamCollection = { find(q: any) { query = q; return emptyCursor; } };
+  const streamCursor = { sort() { return this; }, limit() { return this; }, async toArray() { return [{ _id: "video-1", title: "Catalog title", posterUrl: "https://image.tmdb.org/t/p/w500/poster.jpg" }, { _id: "video-2", title: "Thumbnail fallback", thumbnailUrl: "https://smajpihub.com/thumb.jpg" }]; } };
+  const streamCollection = { find(q: any) { query = q; return streamCursor; } };
   let payload: any;
   const jobCompanyCollection = {
     find() {
@@ -53,7 +54,10 @@ async function main() {
   await stream({ query: {}, app: { locals: {} } }, res); assert.equal(status, 503);
   status = 200;
   await stream({ query: {}, app: { locals: { streamContentCollection: streamCollection } } }, res);
-  assert.equal(status, 200); assert.deepEqual(payload.videos, []);
+  assert.equal(status, 200);
+  assert.equal(payload.videos[0].posterUrl, "https://image.tmdb.org/t/p/w500/poster.jpg");
+  assert.equal(payload.videos[0].thumbnailUrl, "https://image.tmdb.org/t/p/w500/poster.jpg");
+  assert.equal(payload.videos[1].posterUrl, "https://smajpihub.com/thumb.jpg");
   assert.deepEqual(query, { visibility: "public", moderationStatus: "approved", playbackAllowed: true });
   console.log("Catalog discovery skips seeding and enforces Stream public visibility/storage availability");
 }
