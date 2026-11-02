@@ -7,6 +7,11 @@ build_tools="$(find "${ANDROID_HOME:?Android SDK required}/build-tools" -mindept
 "$build_tools/zipalign" -c -P 16 4 "$apk"
 unzip -tq "$apk"
 badging="$("$build_tools/aapt" dump badging "$apk")"
+permissions="$("$build_tools/aapt" dump permissions "$apk")"
+if [[ "$permissions" == *android.permission.REQUEST_INSTALL_PACKAGES* ]]; then
+  echo 'Forbidden REQUEST_INSTALL_PACKAGES permission in final Android manifest'
+  exit 1
+fi
 package_line="$(printf '%s\n' "$badging" | head -n 1)"
 [[ "$package_line" == *"name='com.smajpihub.mobile'"* ]] || { echo 'Unexpected package name'; exit 1; }
 [[ "$package_line" == *"versionCode='$SMAJ_ANDROID_VERSION_CODE'"* ]] || { echo 'Unexpected version code'; exit 1; }
