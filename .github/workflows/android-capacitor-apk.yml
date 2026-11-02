@@ -1,4 +1,4 @@
-name: Build Capacitor Android APK
+name: Build Capacitor Android APK and Play AAB
 
 on:
   workflow_dispatch:
@@ -70,15 +70,30 @@ jobs:
           SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
           SMAJ_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SMAJ_ANDROID_KEYSTORE_PASSWORD }}
         run: npm run android:sync
-      - name: Build signed release APK
+      - name: Build signed release APK and Play bundle
         env:
           SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
           SMAJ_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SMAJ_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease bundleRelease
           mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/SMAJ-PI-HUB.apk
+          mv app/build/outputs/bundle/release/app-release.aab app/build/outputs/bundle/release/SMAJ-PI-HUB.aab
+      - name: Verify signed Play bundle
+        run: |
+          set -euo pipefail
+          bundle="android/app/build/outputs/bundle/release/SMAJ-PI-HUB.aab"
+          jarsigner -verify "$bundle" | tee "$RUNNER_TEMP/aab-verification.txt"
+          grep -q "jar verified" "$RUNNER_TEMP/aab-verification.txt"
+          unzip -l "$bundle" | grep 'base/manifest/AndroidManifest.xml'
+      - name: Upload Google Play AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: SMAJ-PI-HUB-Google-Play-AAB
+          path: frontend/android/app/build/outputs/bundle/release/SMAJ-PI-HUB.aab
+          if-no-files-found: error
+          retention-days: 90
       - name: Verify installable update
         env:
           GH_TOKEN: ${{ github.token }}
