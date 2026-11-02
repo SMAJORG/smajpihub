@@ -538,7 +538,7 @@ export default function EmbeddedAiWorkspace() {
           onClick={() => navigate(item.path)}
         >{item.label}</button>)}
       </nav>
-      <main className="embeddedAiMain" aria-busy={loading || isBusy}>
+      <main className={`embeddedAiMain${active.taskId && ["conversations", "results"].includes(active.section) ? " embeddedAiMainChat" : ""}`} aria-busy={loading || isBusy}>
         {loading ? <div className="embeddedAiLoading" role="status"><span className="embeddedAiSpinner"/>Loading your SMAJ AI workspace…</div>
           : initialLoadFailed ? <div className="embeddedAiEmpty"><h2>Workspace unavailable</h2><p>Your Pi session and saved work are unchanged. Check your connection or try again.</p><button type="button" onClick={() => void loadWorkspace()}>Try again</button></div>
             : active.section === "chat" && !active.taskId ? <section className="embeddedAiChatHome">
@@ -739,17 +739,19 @@ function ConversationThread({ title, turns, latestTask, pending, retryPending, o
   busy: boolean;
 }) {
   return <section className="embeddedAiPage embeddedAiConversation">
-    <h1>{title}</h1><p className="embeddedAiIntro">Saved conversation · {turns.length} {turns.length === 1 ? "message" : "messages"}</p>
-    {turns.map(task => <article className="embeddedAiThreadTurn" key={task.id}>
-      <div className="embeddedAiMessage user"><span>You · {taskTime(task.createdAt)}</span><p>{task.task}</p></div>
-      <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{task.plan.summary || "Your request is ready for review."}</p><small className="embeddedAiTurnStatus">{statusLabel(task.plan)}</small><button type="button" className="embeddedAiViewTask" onClick={() => openTask(task)}>View task details</button></div></div>
-    </article>)}
-    {pending&&<article className="embeddedAiThreadTurn" key={pending.id}>
-      <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
-      {pending.status === "sending"
-        ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-        : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
-    </article>}
+    <div className="embeddedAiConversationScroll">
+      <h1>{title}</h1><p className="embeddedAiIntro">Saved conversation · {turns.length} {turns.length === 1 ? "message" : "messages"}</p>
+      {turns.map(task => <article className="embeddedAiThreadTurn" key={task.id}>
+        <div className="embeddedAiMessage user"><span>You · {taskTime(task.createdAt)}</span><p>{task.task}</p></div>
+        <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{task.plan.summary || "Your request is ready for review."}</p><small className="embeddedAiTurnStatus">{statusLabel(task.plan)}</small><button type="button" className="embeddedAiViewTask" onClick={() => openTask(task)}>View task details</button></div></div>
+      </article>)}
+      {pending&&<article className="embeddedAiThreadTurn" key={pending.id}>
+        <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
+        {pending.status === "sending"
+          ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
+          : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+      </article>}
+    </div>
     {latestTask&&<FollowUpComposer key={latestTask.conversationId || latestTask.id} busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>}
   </section>;
 }
@@ -782,39 +784,49 @@ function TaskConversation({
   const execution = plan.execution;
   const showResults = section === "results" || section === "conversations";
   return <section className="embeddedAiPage embeddedAiConversation">
-    <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
-    <div className="embeddedAiMessage user"><span>You</span><p>{task.task}</p></div>
-    <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{plan.summary || "Your request is ready for review."}</p></div></div>
-    {pending&&<article className="embeddedAiThreadTurn">
-      <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
-      {pending.status === "sending"
-        ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
-        : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
-    </article>}
-    {!!plan.steps?.length && <section className="embeddedAiPlan"><h2>Plan</h2>{plan.steps.map(step => <article key={`${step.serviceId}:${step.title}`}><strong>{step.title}</strong><span>{serviceName(step.serviceId)} · {step.status.replaceAll("_", " ")}</span>{step.description && <p>{step.description}</p>}{step.reason && <small>{step.reason}</small>}</article>)}</section>}
-    {!!plan.sources?.length && <details className="embeddedAiSources"><summary>Sources used</summary>{plan.sources.map(source => <p key={`${source.file}:${source.title}`}>{source.title} · {source.file}</p>)}</details>}
-    {!!plan.warnings?.length && <div className="embeddedAiWarnings">{plan.warnings.map((warning, index) => <p key={`${index}:${warning}`}>{warning}</p>)}</div>}
-    {plan.summaryError && <p className="embeddedAiInlineError" role="alert">{plan.summaryError.message}</p>}
-    {showResults && plan.discovery && <section className="embeddedAiResults"><h2>Live results</h2>{plan.discovery.results.map(result => <section key={result.serviceId}><h3>{serviceName(result.serviceId)} · {result.status === "read" ? "Results" : "Unavailable"}</h3>{result.error && <p className="embeddedAiInlineError">{result.error}</p>}{result.status === "read" && !result.records.length && <p>No matching listings were found.</p>}<div className="embeddedAiCards">{result.records.map((item, index) => {
+    <div className="embeddedAiConversationScroll">
+      <p className="embeddedAiEyebrow">{section === "results" ? "TASK RESULTS" : "CONVERSATION"} · {taskTime(task.createdAt)}</p>
+      <div className="embeddedAiMessage user"><span>You</span><p>{task.task}</p></div>
+      <div className="embeddedAiMessage assistant"><img src="/smaj-ai-logo.png" alt="" /><div><p>{plan.summary || "Your request is ready for review."}</p></div></div>
+      {pending&&<article className="embeddedAiThreadTurn">
+        <div className="embeddedAiMessage user"><span>You</span><p>{pending.text}</p></div>
+        {pending.status === "sending"
+          ? <div className="embeddedAiTyping" role="status" aria-label="SMAJ AI is responding"><img src="/smaj-ai-logo.png" alt=""/><span className="embeddedAiTypingDots" aria-hidden="true"><i/><i/><i/></span></div>
+          : <div className="embeddedAiSendFailure" role="alert"><span>{pending.error || "SMAJ AI could not answer. Please try again."}</span><button type="button" disabled={busy} onClick={retryPending}>Retry</button></div>}
+      </article>}
+      {!!plan.steps?.length && <section className="embeddedAiPlan"><h2>Plan</h2>{plan.steps.map(step => <article key={`${step.serviceId}:${step.title}`}><strong>{step.title}</strong><span>{serviceName(step.serviceId)} · {step.status.replaceAll("_", " ")}</span>{step.description && <p>{step.description}</p>}{step.reason && <small>{step.reason}</small>}</article>)}</section>}
+      {!!plan.sources?.length && <details className="embeddedAiSources"><summary>Sources used</summary>{plan.sources.map(source => <p key={`${source.file}:${source.title}`}>{source.title} · {source.file}</p>)}</details>}
+      {!!plan.warnings?.length && <div className="embeddedAiWarnings">{plan.warnings.map((warning, index) => <p key={`${index}:${warning}`}>{warning}</p>)}</div>}
+      {plan.summaryError && <p className="embeddedAiInlineError" role="alert">{plan.summaryError.message}</p>}
+      {showResults && plan.discovery && <section className="embeddedAiResults"><h2>Live results</h2>{plan.discovery.results.map(result => <section key={result.serviceId}><h3>{serviceName(result.serviceId)} · {result.status === "read" ? "Results" : "Unavailable"}</h3>{result.error && <p className="embeddedAiInlineError">{result.error}</p>}{result.status === "read" && !result.records.length && <p>No matching listings were found.</p>}<div className="embeddedAiCards">{result.records.map((item, index) => {
       const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
       const sample = result.serviceId === "jobs" && record.listingProvenance !== "employer_backed";
       return <article key={String(record.id || index)}><strong>{String(record.title || "SMAJ PI HUB listing")}</strong><span>{String(record.company || record.creatorName || record.sellerName || serviceName(result.serviceId))}</span>{record.salary != null && <span>{String(record.salary)}</span>}{result.serviceId === "jobs" && <b>{sample ? "Sample listing · Not verified" : record.employerVerified === true ? "Verified employer" : "Employer not verified"}</b>}</article>;
     })}</div></section>)}</section>}
-    {!plan.discovery && plan.services?.some(id => ["jobs", "store", "stream"].includes(id)) && !execution && <div className="embeddedAiApproval"><strong>Public search is ready</strong><p>SMAJ AI reads published listings only. No purchase or application will be made.</p><button type="button" disabled={busy} onClick={() => runDiscovery(task)}>{busy ? "Searching…" : "Search public listings"}</button></div>}
-    {!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
-    {execution && <section className="embeddedAiExecution"><h2>Task status · {execution.status.replaceAll("_", " ")}</h2>{execution.error && <p className="embeddedAiInlineError" role="alert">{execution.error}</p>}{execution.events?.map((event, index) => <p key={`${event.at}:${index}`}>{event.message}</p>)}{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><p>Independently verified · {execution.receipt.verifiedAt || "Verified"}</p><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download PDF receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download verification data</button></div>}</section>}
+      {!plan.discovery && plan.services?.some(id => ["jobs", "store", "stream"].includes(id)) && !execution && <div className="embeddedAiApproval"><strong>Public search is ready</strong><p>SMAJ AI reads published listings only. No purchase or application will be made.</p><button type="button" disabled={busy} onClick={() => runDiscovery(task)}>{busy ? "Searching…" : "Search public listings"}</button></div>}
+      {!!plan.proposedActions?.length && !execution && <section className="embeddedAiApproval"><h2>Review actions</h2><p>Choose the exact actions you approve. Nothing is submitted until you confirm.</p>{plan.proposedActions.map(action => <label key={action.id}><input type="checkbox" checked={selectedActions.includes(action.id)} onChange={event => setSelectedActions(current => event.target.checked ? [...current, action.id] : current.filter(id => id !== action.id))}/><span><strong>{action.title}</strong><small>{serviceName(action.serviceId)} · {action.recordId}</small>{action.coverNote && <small>Application note: {action.coverNote}</small>}{action.applicationPreview && <small>Job: {action.applicationPreview.job.title} · {action.applicationPreview.job.company}<br/>Location: {action.applicationPreview.job.location} · {action.applicationPreview.job.type} · {action.applicationPreview.job.mode}<br/>Salary: {action.applicationPreview.job.salary} · {action.applicationPreview.job.category}<br/>Profile: {action.applicationPreview.profile.title} · {action.applicationPreview.profile.skills.join(", ") || "No listed skills"} · {action.applicationPreview.profile.location || "Location not specified"}<br/>Summary: {action.applicationPreview.profile.summary || "None"} · Portfolio: {action.applicationPreview.profile.portfolio || "None"}<br/>CV: {action.applicationPreview.cv.attached ? `${action.applicationPreview.cv.name || "Attached"} (${action.applicationPreview.cv.size || 0} bytes; ${action.applicationPreview.cv.visibility || "visibility not specified"})` : `Not attached${action.applicationPreview.cv.visibility ? ` · ${action.applicationPreview.cv.visibility}` : ""}`}</small>}</span></label>)}<button type="button" disabled={busy || !selectedActions.length || !plan.actionReviewHash} onClick={() => approveActions(task)}>Approve {selectedActions.length} selected actions</button></section>}
+      {execution && <section className="embeddedAiExecution"><h2>Task status · {execution.status.replaceAll("_", " ")}</h2>{execution.error && <p className="embeddedAiInlineError" role="alert">{execution.error}</p>}{execution.events?.map((event, index) => <p key={`${event.at}:${index}`}>{event.message}</p>)}{execution.status === "failed" && execution.retryable && <button type="button" disabled={busy} onClick={() => retryTask(task)}><RefreshOutlinedIcon/> Retry safely</button>}{execution.receipt && execution.status === "verified" && <div><p>Independently verified · {execution.receipt.verifiedAt || "Verified"}</p><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "pdf")}><DownloadOutlinedIcon/> Download PDF receipt</button><button type="button" disabled={busy} onClick={() => downloadReceipt(task, "json")}>Download verification data</button></div>}</section>}
+      <div className="embeddedAiConversationActions"><span>{statusLabel(plan)}</span><button type="button" disabled={busy} onClick={() => deleteTask(task)}><DeleteOutlineOutlinedIcon/> Delete task</button></div>
+    </div>
     <FollowUpComposer busy={busy||Boolean(pending)} onSubmit={onFollowUp}/>
-    <div className="embeddedAiConversationActions"><span>{statusLabel(plan)}</span><button type="button" disabled={busy} onClick={() => deleteTask(task)}><DeleteOutlineOutlinedIcon/> Delete task</button></div>
   </section>;
 }
 
 function FollowUpComposer({busy,onSubmit}:{busy:boolean;onSubmit:(message:string)=>Promise<boolean>}){
   const [message,setMessage]=useState("");
   const [sending,setSending]=useState(false);
+  const inputRef=useRef<HTMLTextAreaElement>(null);
+  useEffect(()=>{
+    const input=inputRef.current;
+    if(!input)return;
+    input.style.height="auto";
+    input.style.height=`${Math.min(input.scrollHeight,160)}px`;
+    input.style.overflowY=input.scrollHeight>160?"auto":"hidden";
+  },[message]);
   const submit=async(event:FormEvent)=>{event.preventDefault();if(!message.trim()||busy||sending)return;setSending(true);try{if(await onSubmit(message.trim()))setMessage("");}finally{setSending(false);}};
   return <form className="embeddedAiFollowUp" onSubmit={submit}>
-    <label htmlFor="embedded-ai-follow-up">Continue this conversation</label>
-    <textarea id="embedded-ai-follow-up" value={message} maxLength={1900} rows={2} placeholder="Ask a follow-up or refine your request" onChange={event=>setMessage(event.target.value)}/>
-    <button type="submit" disabled={busy||sending||!message.trim()}>{busy||sending?"Working…":"Send follow-up"} <SendOutlinedIcon/></button>
+    <label className="embeddedAiSrOnly" htmlFor="embedded-ai-follow-up">Message SMAJ AI</label>
+    <textarea ref={inputRef} id="embedded-ai-follow-up" value={message} maxLength={1900} rows={1} placeholder="Message SMAJ AI…" onChange={event=>setMessage(event.target.value)}/>
+    <button type="submit" aria-label={busy||sending?"Sending message":"Send message"} disabled={busy||sending||!message.trim()}><SendOutlinedIcon/></button>
   </form>;
 }
