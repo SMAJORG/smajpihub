@@ -73,6 +73,49 @@ const mergePairConversations = async (req: any, conversations: Array<Record<stri
   return { ...primary, pairKey, unreadBy, archivedBy };
 };
 
+export const ensureProductConversation = async (req: any, user: any, product: Record<string, any>) => {
+  const productId = String(product._id);
+  const pairKey = pairKeyFor(user.uid, product.sellerId);
+  const pairConversations = await req.app.locals.conversationCollection.find({
+    $or: [
+      { pairKey, contextType: { $ne: "jobs" } },
+      { buyerId: user.uid, sellerId: product.sellerId, contextType: { $ne: "jobs" } },
+      { buyerId: product.sellerId, sellerId: user.uid, contextType: { $ne: "jobs" } },
+    ],
+  }).sort({ updatedAt: -1 }).toArray();
+  let conversation: Record<string, any> | null = await mergePairConversations(req, pairConversations);
+  if (!conversation) {
+    const document = {
+      pairKey,
+      buyerId: user.uid,
+      buyerName: user.displayName || user.username,
+      sellerId: product.sellerId,
+      sellerName: product.sellerName,
+      productId,
+      productTitle: product.title,
+      productImage: product.image,
+      participants: [user.uid, product.sellerId],
+      lastMessage: "",
+      unreadBy: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    try {
+      const result = await req.app.locals.conversationCollection.insertOne(document);
+      conversation = { ...document, _id: result.insertedId };
+    } catch (error: any) {
+      if (error?.code !== 11000) throw error;
+      conversation = await req.app.locals.conversationCollection.findOne({ pairKey });
+      if (!conversation) throw error;
+    }
+  } else {
+    const productContext = { productId, productTitle: product.title, productImage: product.image, updatedAt: new Date() };
+    await req.app.locals.conversationCollection.updateOne({ _id: conversation._id }, { $set: productContext, $pull: { deletedBy: user.uid } });
+    conversation = { ...conversation, ...productContext };
+  }
+  return conversation;
+};
+
 const enrichConversations = async (req: any, currentUser: Record<string, any>, conversations: Array<Record<string, any>>) => {
   const otherUserIds = conversations
     .map((conversation) => conversation.buyerId === currentUser.uid ? conversation.sellerId : conversation.buyerId)
@@ -213,44 +256,7 @@ export default function mountMessageEndpoints(router: Router) {
     if (!ObjectId.isValid(productId)) return res.status(400).json({ error: "bad_request", message: "Invalid product id" });
     const product = await req.app.locals.productCollection.findOne({ _id: new ObjectId(productId) });
     if (!product || product.sellerId === user.uid) return res.status(400).json({ error: "bad_request", message: "Conversation cannot be created" });
-    const pairKey = pairKeyFor(user.uid, product.sellerId);
-    const pairConversations = await req.app.locals.conversationCollection.find({
-      $or: [
-        { pairKey, contextType: { $ne: "jobs" } },
-        { buyerId: user.uid, sellerId: product.sellerId, contextType: { $ne: "jobs" } },
-        { buyerId: product.sellerId, sellerId: user.uid, contextType: { $ne: "jobs" } },
-      ],
-    }).sort({ updatedAt: -1 }).toArray();
-    let conversation: Record<string, any> | null = await mergePairConversations(req, pairConversations);
-    if (!conversation) {
-      const document = {
-        pairKey,
-        buyerId: user.uid,
-        buyerName: user.displayName || user.username,
-        sellerId: product.sellerId,
-        sellerName: product.sellerName,
-        productId,
-        productTitle: product.title,
-        productImage: product.image,
-        participants: [user.uid, product.sellerId],
-        lastMessage: "",
-        unreadBy: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      try {
-        const result = await req.app.locals.conversationCollection.insertOne(document);
-        conversation = { ...document, _id: result.insertedId };
-      } catch (error: any) {
-        if (error?.code !== 11000) throw error;
-        conversation = await req.app.locals.conversationCollection.findOne({ pairKey });
-        if (!conversation) throw error;
-      }
-    } else {
-      const productContext = { productId, productTitle: product.title, productImage: product.image, updatedAt: new Date() };
-      await req.app.locals.conversationCollection.updateOne({ _id: conversation._id }, { $set: productContext, $pull: { deletedBy: user.uid } });
-      conversation = { ...conversation, ...productContext };
-    }
+    const conversation = await ensureProductConversation(req, user, product);
     return res.status(200).json({ conversation: serialize(conversation) });
   });
 

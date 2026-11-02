@@ -20,7 +20,7 @@
     "storage:report": "ts-node ./src/scripts/storageReport.ts",
     "storage:migrate-images": "ts-node ./src/scripts/migrateBase64ImagesToCloudinary.ts",
     "test:p0": "node --test tests/p0Integrity.test.cjs tests/p0MongoTransactions.test.cjs",
-    "test:ai": "ts-node src/tests/catalogRead.test.ts && ts-node src/tests/aiBridge.test.ts && ts-node src/tests/aiDelegation.test.ts && ts-node src/tests/publicSellerEvidence.test.ts && ts-node src/tests/sso.test.ts"
+    "test:ai": "ts-node src/tests/catalogRead.test.ts && ts-node src/tests/aiBridge.test.ts && ts-node src/tests/aiDelegation.test.ts && ts-node src/tests/aiStoreDelegation.test.ts && ts-node src/tests/publicSellerEvidence.test.ts && ts-node src/tests/sso.test.ts"
   },
   "dependencies": {
     "axios": "^1.7.9",

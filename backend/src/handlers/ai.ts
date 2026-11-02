@@ -8,13 +8,13 @@ export default function mountAiEndpoints(router: Router) {
   router.all("*", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const route = req.path;
-    const allowed = /^(?:\/tasks(?:\/[a-zA-Z0-9-]+(?:\/(?:discover|approve|retry|receipt(?:\/pdf)?))?)?|\/conversations(?:\/[a-zA-Z0-9-]+)?|\/connections|\/jobs|\/store|\/preferences)$/.test(route);
+    const allowed = /^(?:\/tasks(?:\/[a-zA-Z0-9-]+(?:\/(?:discover|approve|retry|updates|receipt(?:\/pdf)?))?)?|\/conversations(?:\/[a-zA-Z0-9-]+)?|\/connections|\/jobs|\/store|\/preferences)$/.test(route);
     const allowedMethod = route === "/preferences"
       ? ["GET", "PUT"].includes(req.method)
       : route === "/conversations"
         ? req.method === "GET"
         : route.startsWith("/conversations/")
-          ? ["PATCH", "DELETE"].includes(req.method)
+          ? ["GET", "PATCH", "DELETE"].includes(req.method)
           : ["GET", "POST", "DELETE"].includes(req.method);
     if (!allowed || !allowedMethod) return res.sendStatus(404);
     try {
