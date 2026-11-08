@@ -49,7 +49,12 @@ const waitForPiSdk = async (timeoutMs = 2500) => {
   return Boolean(window.Pi?.authenticate);
 };
 
-const toUser = (candidate: Partial<User> | null | undefined, fallback: User): User => ({
+const toUser = (candidate: Partial<User> | null | undefined, fallback: User): User => {
+  // Older APIs have no completion flag and may return a stale top-level
+  // language. A canonical value in settings is a persisted preference;
+  // "English" is the provisioned default, whereas an explicit Save uses "en".
+  const settingsLanguage = typeof candidate?.settings?.language === "string" && candidate.settings.language.trim() && candidate.settings.language !== "English" ? candidate.settings.language : undefined;
+  return ({
   uid: candidate?.uid || fallback.uid,
   username: candidate?.username || fallback.username,
   wallet_address: candidate?.wallet_address || fallback.wallet_address,
@@ -61,8 +66,8 @@ const toUser = (candidate: Partial<User> | null | undefined, fallback: User): Us
   avatar: candidate?.avatar ?? fallback.avatar ?? "",
   coverImage: candidate?.coverImage ?? fallback.coverImage ?? "",
   bio: candidate?.bio ?? fallback.bio ?? "",
-  languagePreferenceSaved: candidate?.languagePreferenceSaved ?? fallback.languagePreferenceSaved ?? false,
-  language: candidate?.language ?? fallback.language ?? candidate?.settings?.language ?? fallback.settings?.language ?? "English",
+  languagePreferenceSaved: candidate?.languagePreferenceSaved ?? (settingsLanguage ? true : fallback.languagePreferenceSaved ?? false),
+  language: settingsLanguage ?? candidate?.language ?? fallback.language ?? candidate?.settings?.language ?? fallback.settings?.language ?? "English",
   sellerActive: candidate?.sellerActive ?? fallback.sellerActive ?? candidate?.role === "seller",
   role: candidate?.role || fallback.role || "buyer",
   blocked: candidate?.blocked ?? fallback.blocked ?? false,
@@ -73,7 +78,8 @@ const toUser = (candidate: Partial<User> | null | undefined, fallback: User): Us
   verificationRequested: candidate?.verificationRequested ?? fallback.verificationRequested ?? false,
   verificationRequestType: candidate?.verificationRequestType ?? fallback.verificationRequestType,
   accessToken: fallback.accessToken,
-});
+  });
+};
 
 const getStoredPiUser = () => {
   try {
@@ -443,11 +449,26 @@ export const useAuth = () => {
   const updateLanguage = useCallback(async (language: string) => {
     const currentUser = user || getStoredPiUser();
     if (!currentUser?.uid) throw new Error("Sign in before saving your language.");
-    const response = await axiosClient.put<SignInResponse>("/user/language", { language });
-    if (getStoredPiUser()?.uid !== currentUser.uid || response.data.user?.uid !== currentUser.uid || !response.data.user.languagePreferenceSaved) {
+    const config = { headers: { "X-SMAJ-Silent": "true" } };
+    let confirmed: Partial<User> | null | undefined;
+    try {
+      confirmed = (await axiosClient.put<SignInResponse>("/user/language", { language }, config)).data.user;
+    } catch (error) {
+      // The live legacy API supports /settings but not /language. Never turn
+      // authentication, validation, or database failures into a local-only save.
+      if (!isAxiosError(error) || ![404, 405].includes(error.response?.status || 0)) throw error;
+      const fresh = (await axiosClient.get<SignInResponse>("/user", config)).data.user;
+      if (fresh?.uid !== currentUser.uid) throw new Error("Sign in again before saving your language.");
+      confirmed = (await axiosClient.put<SignInResponse>("/user/settings", {
+        theme: fresh.settings?.theme === "dark" ? "dark" : "light",
+        notifications: typeof fresh.settings?.notifications === "boolean" ? fresh.settings.notifications : true,
+        language,
+      }, config)).data.user;
+    }
+    if (getStoredPiUser()?.uid !== currentUser.uid || confirmed?.uid !== currentUser.uid || confirmed.settings?.language !== language) {
       throw new Error("Language was not confirmed by the server. Please try again.");
     }
-    const updated = storeUser(toUser(response.data.user, currentUser));
+    const updated = storeUser(toUser({ ...confirmed, language, languagePreferenceSaved: true }, currentUser));
     setUser(updated);
     return updated;
   }, [user]);

@@ -29,7 +29,7 @@ function fixture() {
     await routes.get(method)({ body: { language, uid: 'someone-else' }, app: { locals: { userCollection: collection, deviceSessionCollection: { findOne: async () => ({ refreshTokenHash: 'known' }) } } }, get: () => '', session: {} }, response);
     return response;
   };
-  return { call, user: () => user, signOut: () => { user = null; }, fail: () => { failure = true; }, writes: () => writes };
+  return { call, user: () => user, settings: value => { user.settings = value; }, signOut: () => { user = null; }, fail: () => { failure = true; }, writes: () => writes };
 }
 test('default English is not a saved preference; explicit Save including English survives a subsequent profile read', async () => {
   const f = fixture();
@@ -52,4 +52,34 @@ test('unsupported language, missing authentication and storage failure never con
   f.fail(); assert.equal((await f.call('ar')).code, 503);
   assert.equal(f.user().languagePreferenceSaved, undefined);
   f.signOut(); assert.equal((await f.call('fr')).code, 401);
+});
+
+test('every bundled language, including explicit English, survives a profile reload', async () => {
+  for (const language of ['en','fr','ar','ha','es','pt','zh','sw','hi','tr']) {
+    const f = fixture();
+    const saved = await f.call(language);
+    assert.equal(saved.code, 200, language);
+    const reloaded = (await f.call(null, 'get /')).body.user;
+    assert.equal(reloaded.language, language);
+    assert.equal(reloaded.settings.language, language);
+    assert.equal(reloaded.languagePreferenceSaved, true);
+  }
+});
+test('legacy null, missing, or scalar settings are repaired before updating the language', async () => {
+  for (const value of [null, undefined, 'English']) {
+    const f = fixture(); f.settings(value);
+    const saved = await f.call('fr');
+    assert.equal(saved.code, 200);
+    assert.equal(saved.body.user.languagePreferenceSaved, true);
+    assert.deepEqual(f.user().settings, { theme: 'light', notifications: true, language: 'fr' });
+  }
+});
+test('legacy settings-only language wins over stale top-level language and is recognized without a completion flag', async () => {
+  const f = fixture(); f.user().language = 'English';
+  for (const language of ['en','fr']) {
+    f.user().settings.language = language;
+    const response = await f.call(null, 'get /');
+    assert.equal(response.body.user.language, language);
+    assert.equal(response.body.user.languagePreferenceSaved, true);
+  }
 });

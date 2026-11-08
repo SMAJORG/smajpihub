@@ -52,8 +52,8 @@ const toClientUser = (user: any) => user ? ({
   avatar: user.avatar || "",
   coverImage: user.coverImage || "",
   bio: user.bio || "",
-  language: user.language || user.settings?.language || "English",
-  languagePreferenceSaved: Boolean(user.languagePreferenceSaved || user.language || (user.settings?.language && !["English", "en"].includes(user.settings.language))),
+  language: (typeof user.settings?.language === "string" && user.settings.language !== "English" ? user.settings.language : "") || user.language || "English",
+  languagePreferenceSaved: Boolean(user.languagePreferenceSaved || user.language || (user.settings?.language && user.settings.language !== "English")),
   sellerActive: Boolean(user.sellerActive || user.role === "seller"),
   role: user.role,
   roles: user.roles,
@@ -75,6 +75,12 @@ export const handleLanguagePreference = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "invalid_language", message: "Choose a supported language." });
     }
     const collection = req.app.locals.userCollection;
+    // MongoDB cannot set settings.language when a legacy settings field is
+    // null or a scalar. Repair only the value we just read, so a concurrent
+    // valid settings update is never overwritten by this initialization.
+    if (!user.settings || Object.prototype.toString.call(user.settings) !== "[object Object]") {
+      await collection.updateOne({ uid: user.uid, settings: user.settings ?? null }, { $set: { settings: { theme: "light", notifications: true } } });
+    }
     const saved = await collection.updateOne({ uid: user.uid }, { $set: { language, "settings.language": language, languagePreferenceSaved: true } });
     if (!saved.matchedCount) return res.status(409).json({ error: "profile_unavailable", message: "Your profile could not be saved. Please retry." });
     const updated = await collection.findOne({ uid: user.uid });
