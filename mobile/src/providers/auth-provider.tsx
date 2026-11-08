@@ -1,3 +1,5 @@
+import { AppState } from "react-native";
+import { SmajApiError } from "@smaj/api-client";
 import type { PiAuthResult, SmajUser } from "@smaj/shared-types";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
@@ -35,22 +37,28 @@ export function AuthProvider({ children }: PropsWithChildren) {
     try {
       const token = await authStorage.getAccessToken();
       if (!token) return;
+      await api.refreshSession();
       const response = await api.currentUser();
       setUser(response.user);
       if (!response.user) await authStorage.clear();
-    } catch {
-      await authStorage.clear();
-      setUser(null);
+    } catch (error) {
+      if (error instanceof SmajApiError && [401, 403].includes(error.status)) { await authStorage.clear(); setUser(null); }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void restore(); }, [restore]);
+  useEffect(() => {
+    void restore();
+    const subscription = AppState.addEventListener("change", state => { if (state === "active") void restore(); });
+    const timer = setInterval(() => { if (AppState.currentState === "active") void restore(); }, 20 * 60 * 1000);
+    return () => { subscription.remove(); clearInterval(timer); };
+  }, [restore]);
 
   const signInWithPiAuthResult = useCallback(async (result: PiAuthResult) => {
     const response = await api.signInWithPi(result);
-    await authStorage.setAccessToken(result.accessToken);
+    await authStorage.setAccessToken(response.session?.accessToken || result.accessToken);
+    if (response.session) await authStorage.setRefreshToken(response.session.refreshToken);
     setUser(response.user);
   }, []);
 
@@ -102,9 +110,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [completePiSignIn]);
 
   const signOut = useCallback(async () => {
-    await authStorage.clear();
-    setUser(null);
-    setAuthError(null);
+    try { await api.request("/user/signout", { method: "POST" }); }
+    finally { await authStorage.clear(); setUser(null); setAuthError(null); }
   }, []);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);

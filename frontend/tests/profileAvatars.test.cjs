@@ -83,10 +83,12 @@ test('Stream photo events and other-tab changes update the shared account state'
     axios: { isAxiosError: () => false },
     '../lib/capacitorPiAuth': { isCapacitorNative: () => false },
     '../lib/axiosClient': { getBaseURL: () => '', axiosClient: {} },
+    '../lib/sessionCredentials': { SESSION_CHANGED: 'smaj:session-changed', SESSION_ENDED: 'smaj:session-ended' },
   }, { window: {
     localStorage: { getItem: () => JSON.stringify(stored), setItem: (_, value) => { stored = JSON.parse(value); } },
+    setInterval: () => 1, clearInterval() {},
     addEventListener: (type, handler) => listeners.set(type, handler), removeEventListener: type => listeners.delete(type),
-  } });
+  }, document: { addEventListener() {}, removeEventListener() {} } });
   api.useAuth();
   const cleanups = effects.map(effect => effect());
   listeners.get('smaj:profile-avatar-updated')({ detail: { avatar: 'new.jpg' } });

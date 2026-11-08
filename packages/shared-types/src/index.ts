@@ -63,3 +63,9 @@ export type HealthResponse = {
 };
 
 export type ApiErrorBody = { error?: string; message?: string };
+export type HubSession = {
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: string;
+  expiresAt: string;
+};

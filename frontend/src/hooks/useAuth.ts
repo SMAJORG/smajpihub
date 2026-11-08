@@ -1,3 +1,4 @@
+import { refreshHubSession, saveSessionCredentials, clearSessionCredentials, SESSION_CHANGED, SESSION_ENDED, type HubSession } from "../lib/sessionCredentials";
 import { ensurePiInitialized, isPiSandboxMode } from "../lib/piSdk";
 import { AxiosError, isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,7 +11,7 @@ import { authenticateWithSoloHostPi } from "../lib/soloHostPiAuth";
 
 type AuthFeedback = { type: "success" | "error"; message: string };
 type BackendErrorBody = { error?: string; message?: string };
-type SignInResponse = { user?: Partial<User> | null };
+type SignInResponse = { user?: Partial<User> | null; session?: HubSession };
 type ProfileUpdate = {
   displayName: string;
   country: string;
@@ -194,32 +195,24 @@ export const useAuth = () => {
       if (stored && mounted) setUser(stored);
       if (!getBaseURL()) { if (mounted) setIsLoading(false); return; }
       try {
-        const response = await axiosClient.get<{ user?: Partial<User> | null }>("/user", AUTH_REQUEST_CONFIG);
+        await refreshHubSession(getBaseURL());
+        const response = await axiosClient.get<SignInResponse>("/user", AUTH_REQUEST_CONFIG);
+        if (response.data.session && response.data.user) await saveSessionCredentials(response.data.session, response.data.user);
         console.log("[auth] /user session success", {
           status: response.status,
           hasUser: Boolean(response.data.user?.uid),
           username: response.data.user?.username,
         });
         if (response.data.user?.uid && response.data.user.username && mounted) {
-          setUser(storeUser(toUser(response.data.user, stored || response.data.user as User)));
+          setUser(storeUser(toUser(response.data.user, getStoredPiUser() || stored || response.data.user as User)));
         } else if (mounted) {
-          if (stored?.uid) {
-            console.log("[auth] /user returned no server user; keeping local Pi auth state for Pi Browser session continuity.");
-            setUser(stored);
-          } else {
-            window.localStorage.removeItem(PI_USER_STORAGE_KEY);
-            setUser(null);
-          }
+          await clearSessionCredentials();
+          setUser(null);
         }
       } catch (err) {
-        if (isAxiosError(err) && err.response?.status === 401) {
-          if (stored?.uid) {
-            console.log("[auth] /user session expired; keeping local Pi auth state so private refresh stays on the same page.");
-            if (mounted) setUser(stored);
-          } else {
-            window.localStorage.removeItem(PI_USER_STORAGE_KEY);
-            if (mounted) setUser(null);
-          }
+        if (isAxiosError(err) && [401, 403].includes(err.response?.status || 0)) {
+          await clearSessionCredentials();
+          if (mounted) setUser(null);
         }
       } finally {
         const remaining = MIN_SESSION_LOADING_MS - (Date.now() - startedAt);
@@ -229,6 +222,26 @@ export const useAuth = () => {
     };
     void checkSession();
     return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    const changed = (event: Event) => setUser((event as CustomEvent<User>).detail);
+    const ended = () => setUser(null);
+    const renew = () => {
+      if (!document.hidden && getStoredPiUser()?.uid) void refreshHubSession(getBaseURL()).catch(() => undefined);
+    };
+    const timer = window.setInterval(renew, 20 * 60 * 1000);
+    window.addEventListener(SESSION_CHANGED, changed);
+    window.addEventListener(SESSION_ENDED, ended);
+    window.addEventListener("focus", renew);
+    document.addEventListener("visibilitychange", renew);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(SESSION_CHANGED, changed);
+      window.removeEventListener(SESSION_ENDED, ended);
+      window.removeEventListener("focus", renew);
+      document.removeEventListener("visibilitychange", renew);
+    };
   }, []);
 
   useEffect(() => {
@@ -260,7 +273,8 @@ export const useAuth = () => {
           hasUser: Boolean(response.data.user?.uid),
           username: response.data.user?.username || fallback.username,
         });
-        signedInUser = toUser(response.data.user, fallback);
+        signedInUser = toUser(response.data.user, { ...fallback, accessToken: response.data.session?.accessToken || fallback.accessToken });
+        if (response.data.session && response.data.user) await saveSessionCredentials(response.data.session, response.data.user);
       } catch (err) {
         if (import.meta.env.DEV && isAxiosError(err) && !err.response) {
           console.warn("Backend sign-in unavailable; using local Pi session fallback.");
@@ -322,6 +336,7 @@ export const useAuth = () => {
       if (import.meta.env.DEV && getBaseURL()) {
         try {
           const response = await axiosClient.post<SignInResponse>("/user/dev-signin", undefined, AUTH_REQUEST_CONFIG);
+          if (response.data.session && response.data.user) await saveSessionCredentials(response.data.session, response.data.user);
           const devFallback: User = {
             uid: response.data.user?.uid || "local-dev-user",
             username: response.data.user?.username || "localdev",
@@ -341,7 +356,7 @@ export const useAuth = () => {
             verificationStatus: response.data.user?.verificationStatus || "approved",
             verificationRequested: false,
             settings: response.data.user?.settings || { theme: "light", language: "English", notifications: true },
-            accessToken: "dev-token",
+            accessToken: response.data.session?.accessToken || "dev-token",
           };
           setUser(storeUser(toUser(response.data.user, devFallback)));
           setShowSignIn(false);
@@ -410,16 +425,9 @@ export const useAuth = () => {
   }, [signInUser]);
 
   const refreshPiSession = useCallback(async () => {
-    if (!window.Pi) return false;
-    try {
-      const authResult = await authenticateWithTimeout(PI_AUTH_SCOPES);
-      await signInUser(authResult);
-      return true;
-    } catch (err) {
-      console.error("Pi session refresh failed:", err);
-      return false;
-    }
-  }, [signInUser]);
+    try { return Boolean(await refreshHubSession(getBaseURL())); }
+    catch { return false; }
+  }, []);
 
   const updateProfile = useCallback(async (profile: ProfileUpdate) => {
     const currentUser = user || getStoredPiUser();
@@ -458,13 +466,13 @@ export const useAuth = () => {
       const { supportsNativePushNotifications, unregisterNativePushOnLogout } = await import("../lib/nativePushNotifications");
       if (supportsNativePushNotifications()) await unregisterNativePushOnLogout();
       if (getBaseURL()) await axiosClient.post("/user/signout", undefined, AUTH_REQUEST_CONFIG);
-      window.localStorage.removeItem(PI_USER_STORAGE_KEY);
+      await clearSessionCredentials();
       if (isCapacitorNative()) void import("../lib/nativeAppLock").then(({ clearAppLockSettings, clearNativeSessionToken }) => Promise.all([clearAppLockSettings(), clearNativeSessionToken()])).catch(() => undefined);
       setUser(null);
       setAuthFeedback({ type: "success", message: "Signed out successfully." });
     } catch (err) {
       console.error("Sign-out failed:", err);
-      window.localStorage.removeItem(PI_USER_STORAGE_KEY);
+      await clearSessionCredentials();
       if (isCapacitorNative()) void import("../lib/nativeAppLock").then(({ clearAppLockSettings, clearNativeSessionToken }) => Promise.all([clearAppLockSettings(), clearNativeSessionToken()])).catch(() => undefined);
       setUser(null);
       setAuthFeedback({ type: "error", message: "Failed to sign out." });

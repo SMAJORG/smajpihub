@@ -1,3 +1,5 @@
+import { SESSION_TTL_SECONDS } from "./services/sessionPolicy";
+import { isHubAccessToken } from "./services/persistentSessions";
 import mountSsoEndpoints from "./handlers/sso";
 import mountAiEndpoints from "./handlers/ai";
 import mountAiDelegationEndpoints from "./handlers/aiDelegation";
@@ -80,7 +82,7 @@ const serviceStartedAt = new Date();
 app.locals.piNetwork = env.pi_network;
 const isProduction = env.is_production;
 const crossSiteSession = isProduction && !env.is_solohost;
-const sessionTtlSeconds = 60 * 60 * 24 * 7;
+const sessionTtlSeconds = SESSION_TTL_SECONDS;
 const configuredHttps = () => env.frontend_url.split(",").every(origin => origin.trim().startsWith("https://"));
 const sessionCookieOptions = {
   httpOnly: true,
@@ -195,6 +197,7 @@ app.use(
   session({
     secret: env.session_secret,
     resave: false,
+    rolling: true,
     saveUninitialized: false,
     cookie: sessionCookieOptions,
     ...(env.use_memory_db
@@ -212,6 +215,8 @@ app.use(
 );
 
 app.use(async (req, res, next) => {
+  const bearer = (req.get("authorization") || "").replace(/^Bearer\s+/i, "") || req.get("x-smaj-access-token") || "";
+  if (isHubAccessToken(bearer) || ["/user/signin", "/signin", "/user/dev-signin", "/user/refresh", "/user/signout"].includes(req.path)) return next();
   const uid = req.session.user?.uid;
   if (!uid || !req.session.deviceSessionId || !app.locals.deviceSessionCollection) return next();
   try {
@@ -576,6 +581,7 @@ const start = async () => {
         app.locals.nativePushTokenCollection.createIndex({ token: 1 }, { unique: true }),
         app.locals.nativePushTokenCollection.createIndex({ userId: 1 }),
         app.locals.deviceSessionCollection.createIndex({ sessionKey: 1 }, { unique: true }),
+        app.locals.deviceSessionCollection.createIndex({ refreshTokenHash: 1 }, { unique: true, sparse: true }),
         app.locals.deviceSessionCollection.createIndex({ userId: 1, active: 1, lastActiveAt: -1 }),
         app.locals.deviceSessionCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
         app.locals.heroBannerCollection.createIndex({

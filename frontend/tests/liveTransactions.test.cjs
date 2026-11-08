@@ -153,7 +153,8 @@ test("mobile layout keeps a compact table and inline badge", () => {
   const css = fs.readFileSync(require("node:path").join(__dirname, "../src/components/LiveTransactions.css"), "utf8");
   assert(css.includes("max-width: 600px"));
   assert(css.includes("overflow-wrap: anywhere"));
-  assert(css.includes("table-layout: fixed"));
+  assert(css.includes("table-layout: auto"));
+  assert(css.includes("overflow-x: auto"));
   assert(css.includes("flex-shrink: 0"));
   assert(!css.includes("attr(data-label)"));
 });

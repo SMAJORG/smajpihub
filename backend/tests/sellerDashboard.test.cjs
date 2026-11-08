@@ -282,6 +282,8 @@ test("dashboard endpoint requires authentication and ignores a supplied seller i
                   return { products: [] };
                 },
               }
+            : name.endsWith("/publicSellerEvidence")
+              ? { withSellerEvidence: async (_req, items) => items }
             : name.endsWith("/profileAvatars")
               ? { enrichProfileAvatars: async (_req, items) => items }
               : name.endsWith("/environments")

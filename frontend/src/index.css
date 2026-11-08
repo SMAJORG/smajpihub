@@ -5463,7 +5463,6 @@ html[data-private-theme="dark"] .confirm-modal { color: #fff; background: #11182
 .full-screen-page .private-header,
 .full-screen-page .private-sidebar,
 .full-screen-page .mobile-bottom-nav,
-.full-screen-page .live-activity-float,
 .full-screen-page .profile-verify-reminder,
 .full-screen-page .CommunityFollowPrompt,
 .full-screen-page .WelcomeTour {
@@ -5741,7 +5740,6 @@ html[data-private-theme="dark"] .environment-badge { color: #ffefb8; background:
 /* Private mobile super-app shell. Desktop components remain the default above. */
 .mobile-private-header-content,
 .mobile-bottom-nav,
-.mobile-ai-fab,
 .mobile-account-menu,
 .mobile-account-overlay,
 .mobile-super-home {
@@ -6040,25 +6038,7 @@ html[data-private-theme="dark"] .environment-badge { color: #ffefb8; background:
     border-radius: 999px;
   }
 
-  .mobile-ai-fab {
-    position: fixed;
-    right: 17px;
-    bottom: calc(79px + env(safe-area-inset-bottom));
-    z-index: 1140;
-    width: 48px;
-    height: 48px;
-    display: grid;
-    place-items: center;
-    color: #fff;
-    background: linear-gradient(135deg, var(--smaj-accent), #a855f7);
-    border: 4px solid var(--smaj-card);
-    border-radius: 50%;
-    box-shadow: 0 12px 28px rgba(124, 58, 237, .34);
-  }
 
-  .mobile-ai-fab svg {
-    font-size: 22px;
-  }
 
   .desktop-private-home {
     display: none;
@@ -7776,13 +7756,6 @@ html[data-private-theme="dark"] .environment-badge { color: #ffefb8; background:
     padding: 18px 10px 14px;
   }
 
-  .mobile-home-shell .mobile-ai-fab {
-    right: 15px;
-    bottom: calc(82px + env(safe-area-inset-bottom));
-    width: 45px;
-    height: 45px;
-    border-width: 3px;
-  }
 }
 
 @media (max-width: 380px) {
@@ -8022,9 +7995,6 @@ html[data-private-theme="dark"] .environment-badge { color: #ffefb8; background:
     margin: 0;
   }
 
-  .mobile-home-shell .mobile-ai-fab {
-    bottom: calc(94px + env(safe-area-inset-bottom));
-  }
 }
 
 @media (max-width: 380px) {
@@ -8533,9 +8503,6 @@ html[data-private-theme="dark"] .environment-badge { color: #ffefb8; background:
     cursor: pointer;
   }
 
-.private-shell:has(.messages-page.conversation-selected) .mobile-ai-fab {
-    display: none;
-  }
 }
 
 /* Desktop home feed */
@@ -14455,113 +14422,6 @@ html[data-private-theme="dark"] .storefront-mobile-actions a:not(.storefront-ava
 html[data-private-theme="dark"] .storefront-page .storefront-product-card .storefront-seller-name .seller-name-text,
 html[data-private-theme="dark"] .storefront-product-card .storefront-seller-name .seller-name-text {
   color: var(--smaj-text) !important;
-}
-
-/* Global mobile live activity inbox. */
-.live-activity-float {
-  display: none;
-}
-
-@media (max-width: 1023px) {
-  .live-activity-float {
-    position: fixed;
-    right: 16px;
-    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-    z-index: 82;
-    display: grid;
-    justify-items: end;
-    gap: 10px;
-  }
-
-  .live-activity-trigger {
-    position: relative;
-    width: 36px;
-    height: 36px;
-    display: grid;
-    place-items: center;
-    color: #ffffff;
-    background: linear-gradient(135deg, #7c3aed, #5b21b6);
-    border: 1px solid rgba(255,255,255,.22);
-    border-radius: 50%;
-    box-shadow: 0 8px 18px rgba(91,33,182,.36);
-    cursor: pointer;
-  }
-
-  /* Use the official SMAJ AI artwork without altering the source asset. */
-  .smaj-ai-trigger { text-decoration: none; background: transparent; border: 0; box-shadow: none; }
-  .smaj-ai-trigger:focus-visible { outline: 3px solid var(--smaj-text); outline-offset: 3px; }
-  .smaj-ai-mark { width: 27px; height: 27px; object-fit: contain; }
-
-  .live-activity-trigger svg { font-size: 18px !important; }
-  .live-activity-trigger b {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    min-width: 17px;
-    height: 17px;
-    padding: 0 4px;
-    display: grid;
-    place-items: center;
-    color: #ffffff;
-    background: #e11d48;
-    border: 2px solid var(--smaj-bg);
-    border-radius: 999px;
-    font-size: 9px;
-    font-weight: 900;
-    animation: live-activity-badge 1.7s ease-in-out infinite;
-  }
-
-  .live-activity-status {
-    position: absolute;
-    right: 3px;
-    bottom: 4px;
-    width: 7px;
-    height: 7px;
-    background: #22c55e;
-    border: 2px solid #6d28d9;
-    border-radius: 50%;
-  }
-
-  .live-activity-panel {
-    width: min(320px, calc(100vw - 32px));
-    max-height: min(420px, calc(100vh - 150px));
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    color: var(--smaj-text);
-    background: var(--smaj-card);
-    border: 1px solid var(--smaj-border);
-    border-radius: 18px;
-    box-shadow: 0 18px 42px rgba(2,6,23,.28);
-    animation: live-activity-panel-in .18s ease-out;
-  }
-
-  .live-activity-panel header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .live-activity-panel header > span { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 850; }
-  .live-activity-panel header i { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 0 4px rgba(34,197,94,.15); animation: live-activity-dot 1.5s ease-in-out infinite; }
-  .live-activity-panel header button { width: 32px; height: 32px; display: grid; place-items: center; color: var(--smaj-text-secondary); background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
-  .live-activity-panel header button svg { font-size: 19px !important; }
-  .live-activity-panel > p { margin: 4px 0 10px; color: var(--smaj-text-secondary); font-size: 11px; }
-  .live-activity-items { min-height: 0; max-height: 240px; display: grid; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
-  .live-activity-items > button { width: 100%; min-height: 52px; min-width: 0; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 8px; color: var(--smaj-text); background: var(--smaj-bg-secondary); border: 1px solid var(--smaj-border); border-radius: 11px; text-align: left; cursor: pointer; }
-  .live-activity-message-icon { width: 34px; height: 34px; display: grid; place-items: center; color: #ffffff; background: var(--smaj-primary); border-radius: 10px; }
-  .live-activity-message-icon svg { font-size: 18px !important; }
-  .live-activity-items strong,.live-activity-items small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .live-activity-items strong { font-size: 12px; }
-  .live-activity-items small { margin-top: 2px; color: var(--smaj-text-secondary); font-size: 10px; }
-  .live-activity-items b { min-width: 19px; height: 19px; display: grid; place-items: center; color: #ffffff; background: #e11d48; border-radius: 999px; font-size: 10px; }
-  .live-activity-empty { padding: 16px 8px; color: var(--smaj-text-secondary); font-size: 12px; text-align: center; }
-  .live-activity-inbox { width: 100%; min-height: 38px; margin-top: 10px; color: #ffffff; background: var(--smaj-primary); border: 0; border-radius: 10px; font-size: 12px; font-weight: 850; cursor: pointer; }
-
-  @keyframes live-activity-badge { 50% { transform: scale(1.12); } }
-  @keyframes live-activity-dot { 50% { opacity: .42; transform: scale(.8); } }
-  @keyframes live-activity-panel-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .live-activity-trigger b,
-  .live-activity-panel header i,
-  .live-activity-panel { animation: none !important; }
 }
 
 /* Real article content inside the private Help Center accordion. */

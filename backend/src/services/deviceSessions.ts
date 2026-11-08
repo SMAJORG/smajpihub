@@ -1,3 +1,4 @@
+import { SESSION_TTL_MS } from "./sessionPolicy";
 import crypto from "crypto";
 import type { Request } from "express";
 
@@ -73,7 +74,7 @@ export const ensureDeviceSession = async (req: Request, userId: string, metadata
         lastActiveAt: now,
         active: true,
         revokedAt: null,
-        expiresAt: req.session.cookie.expires || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: req.session.cookie.expires || new Date(now.getTime() + SESSION_TTL_MS),
       },
       $setOnInsert: { createdAt: now },
     },
@@ -86,11 +87,7 @@ export const validateAndTouchDeviceSession = async (req: Request, userId: string
   if (!req.session.deviceSessionId || !req.app.locals.deviceSessionCollection) return true;
   const sessionKey = deviceSessionKey(req.session.deviceSessionId);
   const record = await req.app.locals.deviceSessionCollection.findOne({ sessionKey, userId });
-  if (record?.revokedAt || record?.active === false) return false;
-  if (!record) {
-    await ensureDeviceSession(req, userId);
-    return true;
-  }
+  if (!record || record.revokedAt || record.active === false || new Date(record.expiresAt).getTime() <= Date.now()) return false;
   const lastActive = new Date(record.lastActiveAt || 0).getTime();
   if (Date.now() - lastActive >= ACTIVITY_INTERVAL_MS) {
     await req.app.locals.deviceSessionCollection.updateOne(

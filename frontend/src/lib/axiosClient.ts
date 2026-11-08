@@ -1,3 +1,4 @@
+import { refreshHubSession, clearSessionCredentials, getHubRefreshToken } from "./sessionCredentials";
 import { Capacitor } from "@capacitor/core";
 import axios, { type AxiosRequestConfig } from "axios";
 import { showFeedback } from "./feedback";
@@ -14,6 +15,7 @@ declare module "axios" { interface AxiosRequestConfig { smajSkipReadRetry?: bool
 
 type RetryableRequestConfig = AxiosRequestConfig & {
   __smajRetryCount?: number;
+  __smajAuthRetried?: boolean;
 };
 const API_CREDENTIALS_CONFIG: Pick<AxiosRequestConfig, "withCredentials"> = {
   withCredentials: true,
@@ -64,6 +66,10 @@ axiosClient.interceptors.request.use(async config => {
     showFeedback("You're offline. This action needs an internet connection.", "info");
     return Promise.reject(new Error("SMAJ_OFFLINE_MUTATION_BLOCKED"));
   }
+  if (/\/user\/signout$/.test(config.url || "")) {
+    const refreshToken = await getHubRefreshToken();
+    if (refreshToken) config.headers.set("X-SMAJ-Refresh-Token", refreshToken);
+  }
   const accessToken = getStoredAccessToken() || (Capacitor.isNativePlatform()
     ? await import("./nativeAppLock").then(({ getNativeSessionToken }) => getNativeSessionToken()).catch(() => "")
     : "");
@@ -95,10 +101,15 @@ axiosClient.interceptors.response.use(
     if (axios.isCancel(error) || config?.signal?.aborted) return Promise.reject(error);
     const method = String(config?.method || "get").toLowerCase();
     const status = Number(error?.response?.status || 0);
-    if (status === 401 && error?.response?.data?.error === "session_revoked" && typeof window !== "undefined") {
-      window.localStorage.removeItem(PI_USER_STORAGE_KEY);
-      window.location.assign("/");
+    if (status === 401 && error?.response?.data?.error === "session_revoked") {
+      await clearSessionCredentials();
       return Promise.reject(error);
+    }
+    if (status === 401 && config && !config.__smajAuthRetried && !/\/user\/(signin|dev-signin|refresh)$/.test(config.url || "")) {
+      config.__smajAuthRetried = true;
+      try {
+        if (await refreshHubSession(getBaseURL())) return axiosClient.request(config);
+      } catch (renewalError) { return Promise.reject(renewalError); }
     }
     const isReadRequest = method === "get" || method === "head";
     const isTemporaryFailure = error?.code === "ECONNABORTED" || !error?.response || [502, 503, 504].includes(status);
@@ -157,11 +168,31 @@ const resolveFetchInput = (input: RequestInfo | URL) => {
   return `${getBaseURL().replace(/\/+$/, "")}${input}`;
 };
 
-export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+export const apiFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const method = String(init.method || "GET").toUpperCase();
   if (typeof navigator !== "undefined" && !navigator.onLine && !["GET", "HEAD", "OPTIONS"].includes(method)) {
     showFeedback("You're offline. This action needs an internet connection.", "info");
     return Promise.reject(new Error("SMAJ_OFFLINE_MUTATION_BLOCKED"));
   }
-  return fetch(resolveFetchInput(input), { ...init, credentials: "include" });
+  const target = resolveFetchInput(input);
+  const location = window.location.href;
+  const url = new URL(target instanceof Request ? target.url : String(target), location);
+  const backend = new URL(getBaseURL(), location);
+  if (url.origin !== backend.origin || !url.pathname.startsWith(backend.pathname.replace(/\/$/, "") + "/")) {
+    return fetch(target, { ...init, credentials: "include" });
+  }
+  const send = async () => {
+    const headers = new Headers(init.headers || (target instanceof Request ? target.headers : undefined));
+    const token = Capacitor.isNativePlatform()
+      ? await import("./nativeAppLock").then(storage => storage.getNativeSessionToken())
+      : getStoredAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(target instanceof Request ? target.clone() : target, { ...init, headers, credentials: "include" });
+  };
+  const response = await send();
+  if (response.status === 401 && !/\/user\/(signin|dev-signin|refresh|signout)$/.test(url.pathname)) {
+    const renewed = await refreshHubSession(getBaseURL());
+    if (renewed) return send();
+  }
+  return response;
 };

@@ -18,8 +18,6 @@ import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArro
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
-import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
-import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
@@ -41,16 +39,6 @@ import ServiceLaunchGate from "../components/ServiceLaunchGate";
 import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 
 type PrivateLayoutProps = { children: ReactNode; fullScreen?: boolean };
-type LiveConversation = {
-  _id: string;
-  participantName?: string;
-  sellerName?: string;
-  buyerName?: string;
-  sellerId?: string;
-  lastMessage?: string;
-  productTitle?: string;
-  unreadBy?: string[];
-};
 const SIDEBAR_STORAGE_KEY = "smaj_private_sidebar_collapsed";
 const LAST_PRIVATE_ROUTE_KEY = "smaj_last_private_route";
 const PROFILE_VERIFY_REMINDER_KEY = "smaj_profile_verify_reminder_completed";
@@ -150,8 +138,6 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
   const [unreadCount, setUnreadCount] = useState(0);
   const [streamDownloadCount, setStreamDownloadCount] = useState(0);
-  const [liveFeedOpen, setLiveFeedOpen] = useState(false);
-  const [liveConversations, setLiveConversations] = useState<LiveConversation[]>([]);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<"light" | "dark">(() => window.localStorage.getItem("smaj_private_theme_mode") === "dark" ? "dark" : "light");
   const [showSignOut, setShowSignOut] = useState(false);
@@ -231,11 +217,6 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     axiosClient.get("/notifications").then(({ data }) => setUnreadCount(data.unreadCount || 0)).catch(() => undefined);
   }, []);
 
-  const loadLiveConversations = useCallback(() => {
-    axiosClient.get<{ conversations?: LiveConversation[] }>("/messages")
-      .then(({ data }) => setLiveConversations(data.conversations || []))
-      .catch(() => setLiveConversations([]));
-  }, []);
 
   useEffect(() => {
     loadUnreadCount();
@@ -261,24 +242,6 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     };
   }, [loadUnreadCount]);
 
-  useEffect(() => {
-    loadLiveConversations();
-    let resumeTimer = 0;
-    const refreshWhenVisible = () => {
-      if (!document.hidden) loadLiveConversations();
-    };
-    const onVisibilityChange = () => {
-      window.clearTimeout(resumeTimer);
-      if (!document.hidden) resumeTimer = window.setTimeout(loadLiveConversations, 900);
-    };
-    const timer = window.setInterval(refreshWhenVisible, 15000);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearInterval(timer);
-      window.clearTimeout(resumeTimer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [loadLiveConversations]);
   useEffect(() => { document.body.style.overflow = mobileSidebarOpen ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [mobileSidebarOpen]);
   const toggleSidebar = () => {
     setSidebarCollapsed((collapsed) => {
@@ -354,7 +317,6 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     setShowProfileReminder(false);
     navigate("/profile?edit=1");
   };
-  const unreadLiveConversations = liveConversations.filter((conversation) => Boolean(user?.uid && conversation.unreadBy?.includes(user.uid)));
   const isStreamShell = location.pathname.startsWith("/app/services/stream");
   const isStreamImmersive = location.pathname === "/app/services/stream/search" || /^\/app\/services\/stream\/(?:title|series|watch|live)\/[^/]+$/.test(location.pathname);
   const streamDownloadBadgeLabel = streamDownloadCount > 99 ? "99+" : streamDownloadCount;
@@ -377,14 +339,6 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       window.removeEventListener(STREAM_DOWNLOADS_CHANGED_EVENT, loadDownloadCount);
     };
   }, [isStreamShell]);
-  const liveMessageCount = unreadLiveConversations.length;
-  const liveBadgeLabel = liveMessageCount > 99 ? "99+" : liveMessageCount;
-  const liveActivityItems = (unreadLiveConversations.length ? unreadLiveConversations : liveConversations).slice(0, 3);
-  const liveConversationName = (conversation: LiveConversation) => conversation.participantName || (conversation.sellerId === user?.uid ? conversation.buyerName : conversation.sellerName) || "SMAJ user";
-  const openLiveConversation = (conversationId: string) => {
-    setLiveFeedOpen(false);
-    navigate(`/messages?conversation=${encodeURIComponent(conversationId)}`);
-  };
 
   return (
     <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${fullScreen ? "full-screen-page" : ""}`}>
@@ -499,39 +453,6 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
         ))}
       </nav> : null}
       {!fullScreen && !isStreamImmersive ? <CommunityFollowPrompt /> : null}
-      {!fullScreen && !isStreamShell && !isStreamImmersive && location.pathname !== "/messages" && location.pathname !== "/add-product" ? (
-        <aside className={`live-activity-float ${liveFeedOpen ? "open" : ""}`} aria-label={location.pathname === "/dashboard" ? "SMAJ AI" : "Live activity"}>
-          {location.pathname === "/dashboard" ? (
-            <Link className="live-activity-trigger smaj-ai-trigger" to="/ai" aria-label="Open SMAJ AI" title="SMAJ AI">
-              <img className="smaj-ai-mark" src="/smaj-ai-logo.png" alt="" />
-            </Link>
-          ) : <>
-          {liveFeedOpen ? (
-            <section className="live-activity-panel" aria-live="polite">
-              <header>
-                <span><i />Live activity</span>
-                <button type="button" onClick={() => setLiveFeedOpen(false)} aria-label="Close live activity"><CloseOutlinedIcon /></button>
-              </header>
-              <p>New messages and marketplace updates.</p>
-              <div className="live-activity-items">
-                {liveActivityItems.length ? liveActivityItems.map((conversation) => (
-                  <button type="button" key={conversation._id} onClick={() => openLiveConversation(conversation._id)}>
-                    <span className="live-activity-message-icon"><ChatOutlinedIcon /></span>
-                    <span><strong>{liveConversationName(conversation)}</strong><small>{conversation.lastMessage || `Message about ${conversation.productTitle || "your listing"}`}</small></span>
-                    {user?.uid && conversation.unreadBy?.includes(user.uid) ? <b>1</b> : null}
-                  </button>
-                )) : <div className="live-activity-empty">You are all caught up.</div>}
-              </div>
-              <button className="live-activity-inbox" type="button" onClick={() => { setLiveFeedOpen(false); navigate("/messages"); }}>Open Messages</button>
-            </section>
-          ) : null}
-          <button className="live-activity-trigger" type="button" onClick={() => setLiveFeedOpen((open) => !open)} aria-expanded={liveFeedOpen} aria-label="Open live activity">
-            <ForumOutlinedIcon />
-            {liveMessageCount ? <b>{liveBadgeLabel}</b> : <i className="live-activity-status" />}
-          </button>
-          </>}
-        </aside>
-      ) : null}
       {showProfileReminder && !isStreamImmersive && !fullScreen ? (
         <aside className="profile-verify-reminder" role="alert" aria-live="polite">
           <span><VerifiedUserOutlinedIcon /></span>

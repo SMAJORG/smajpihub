@@ -1,3 +1,5 @@
+import { resolveHubAccessUser } from "./persistentSessions";
+import { validateAndTouchDeviceSession } from "./deviceSessions";
 import { getUserPlatformAPIClient } from "./platformAPIClient";
 import { Request } from "express";
 import { ObjectId } from "mongodb";
@@ -13,9 +15,13 @@ const resolveUser = async (req: Request): Promise<UserData | null> => {
   const userCollection = req.app.locals.userCollection;
   if (!userCollection) return null;
 
+  const suppliedToken = getBearerToken(req.get("authorization")) || req.get("x-smaj-access-token") || "";
+  if (suppliedToken.startsWith("hub_access.")) return resolveHubAccessUser(req, suppliedToken);
+
   if (req.session.user?.userId && ObjectId.isValid(req.session.user.userId)) {
     const sessionUser = await userCollection.findOne({ _id: new ObjectId(req.session.user.userId) });
     if (!sessionUser || sessionUser.blocked) return null;
+    if (req.session.deviceSessionId && !await validateAndTouchDeviceSession(req, sessionUser.uid)) return null;
     return sessionUser;
   }
 

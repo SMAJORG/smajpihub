@@ -1,3 +1,5 @@
+import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
+import { issuePersistentSession, refreshPersistentSession, setRefreshCookie } from "../services/persistentSessions";
 import { presenceUpdate } from "../services/userPresence";
 import { synchronizeAvatarSnapshots } from "../services/profileAvatars";
 import { Router, Request, Response } from "express";
@@ -20,7 +22,7 @@ const sessionCookieOptions = {
   httpOnly: true,
   sameSite: crossSiteSession ? "none" as const : "lax" as const,
   secure: env.is_production && (!env.is_solohost || env.frontend_url.split(",").every(origin => origin.trim().startsWith("https://"))),
-  maxAge: 1000 * 60 * 60 * 24 * 7,
+  maxAge: SESSION_TTL_MS,
 };
 const normalizePiUsername = (username: string) => username.trim().replace(/^@+/, "").toLowerCase();
 const isConfiguredAdminUser = (user: any) => {
@@ -73,9 +75,15 @@ const regenerateSession = (req: Request) => new Promise<void>((resolve, reject) 
 
 const establishAuthSession = async (req: Request, currentUser: any, device: DeviceMetadata = {}) => {
   const nextUser = minimalSessionUser(currentUser);
-  if (req.session.user?.userId !== nextUser.userId) {
-    await regenerateSession(req);
+  req.session.cookie.maxAge = SESSION_TTL_MS;
+  const previousDevice = currentDeviceSessionKey(req);
+  if (previousDevice) {
+    await req.app.locals.deviceSessionCollection?.updateOne(
+      { sessionKey: previousDevice }, { $set: { active: false, revokedAt: new Date() } },
+    );
   }
+  await regenerateSession(req);
+  req.session.cookie.maxAge = SESSION_TTL_MS;
   delete (req.session as any).currentUser;
   delete (req.session as any).accessToken;
   delete (req.session as any).piUser;
@@ -115,7 +123,8 @@ const refreshExistingAuthSession = async (req: Request, currentUser: any) => {
 };
 
 const destroySession = async (req: Request, res: Response) => {
-  const currentUser = await resolveCurrentUser(req).catch(() => null);
+  const currentUser = await resolveCurrentUser(req).catch(() => null)
+    || (await refreshPersistentSession(req).catch(() => null))?.user;
   if (currentUser) {
     await req.app.locals.userCollection.updateOne({ _id: currentUser._id }, { $unset: { accessToken: "" } });
     await req.app.locals.userCollection.updateOne({ _id: currentUser._id }, { $set: { accessTokenRevokedAt: new Date() }, $unset: { accessToken: "" } });
@@ -140,6 +149,7 @@ const destroySession = async (req: Request, res: Response) => {
     }
 
     res.clearCookie("connect.sid", sessionCookieOptions);
+    res.clearCookie(REFRESH_COOKIE, { ...sessionCookieOptions, path: "/user" });
     return res.status(200).json({ message: "User signed out" });
   });
 };
@@ -252,7 +262,10 @@ export const handleSignIn = async (req: Request, res: Response) => {
         relatedId: "settings",
       });
     }
-    return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser) });
+    const session = await issuePersistentSession(req, currentUser);
+    await saveSession(req);
+    setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
+    return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session });
   } catch (err) {
     console.error("Error during signin:", err);
     return res.status(500).json({ error: "internal_error", message: "Failed to sign in" });
@@ -260,6 +273,17 @@ export const handleSignIn = async (req: Request, res: Response) => {
 };
 
 export default function mountUserEndpoints(router: Router) {
+  router.post("/refresh", async (req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      const result = await refreshPersistentSession(req);
+      if (!result) return res.status(401).json({ error: "session_revoked", message: "Please sign in again to establish a new session." });
+      await saveSession(req);
+      setRefreshCookie(res, result.session.refreshToken, sessionCookieOptions);
+      return res.json({ user: toClientUser(result.user), session: result.session });
+    } catch { return res.status(503).json({ error: "authentication_unavailable", message: "Session renewal is temporarily unavailable. Please retry." }); }
+  });
+
   router.post("/presence", async (req, res) => {
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Sign in to update presence." });
@@ -315,7 +339,10 @@ export default function mountUserEndpoints(router: Router) {
         relatedId: "settings",
       });
     }
-    return res.status(200).json({ message: "Development user signed in", user: toClientUser(currentUser) });
+    const session = await issuePersistentSession(req, currentUser);
+    await saveSession(req);
+    setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
+    return res.status(200).json({ message: "Development user signed in", user: toClientUser(currentUser), session });
   });
 
   // POST /user/signin
@@ -332,9 +359,21 @@ export default function mountUserEndpoints(router: Router) {
       currentUser = await req.app.locals.userCollection.findOne({ uid: currentUser.uid });
       if (currentUser) await refreshExistingAuthSession(req, currentUser);
     }
-    return res.status(200).json({
-      user: toClientUser(currentUser),
-    });
+    if (!currentUser && (req.get("authorization") || req.get("x-smaj-access-token") || "").includes("hub_access.")) {
+      return res.status(401).json({ error: "session_expired" });
+    }
+    let session;
+    if (currentUser) {
+      const key = currentDeviceSessionKey(req);
+      const record = key && await req.app.locals.deviceSessionCollection?.findOne({ sessionKey: key, userId: currentUser.uid });
+      if (!record || !record.refreshTokenHash) {
+        req.session.user = minimalSessionUser(currentUser);
+        session = await issuePersistentSession(req, currentUser);
+        await saveSession(req);
+        setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
+      }
+    }
+    return res.status(200).json({ user: toClientUser(currentUser), ...(session ? { session } : {}) });
   });
 
   router.put("/profile", async (req: Request, res: Response) => {

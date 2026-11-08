@@ -1,4 +1,4 @@
-﻿import { AndroidBiometryStrength, BiometricAuth } from "@aparajita/capacitor-biometric-auth";
+import { AndroidBiometryStrength, BiometricAuth } from "@aparajita/capacitor-biometric-auth";
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 import { Capacitor } from "@capacitor/core";
 
@@ -35,3 +35,12 @@ export const getNativeSessionToken = async (): Promise<string> => {
   const token = await SecureStorage.get(SESSION_TOKEN_KEY);
   return typeof token === "string" ? token : "";
 };
+
+const REFRESH_TOKEN_KEY = "smaj_hub_refresh_token";
+export const storeNativeRefreshToken = async (token: string) => { if (supportsNativeAppLock()) await SecureStorage.set(REFRESH_TOKEN_KEY, token); };
+export const getNativeRefreshToken = async (): Promise<string> => {
+  if (!supportsNativeAppLock()) return "";
+  const token = await SecureStorage.get(REFRESH_TOKEN_KEY);
+  return typeof token === "string" ? token : "";
+};
+export const clearNativeRefreshToken = async () => { if (supportsNativeAppLock()) await SecureStorage.remove(REFRESH_TOKEN_KEY); };
