@@ -15,6 +15,7 @@ export interface UserData {
   coverImage?: string,
   bio?: string,
   language?: string,
+  languagePreferenceSaved?: boolean,
   sellerActive?: boolean,
   blocked?: boolean,
   verificationLevel?: "basic" | "pi_verified" | "seller_verified" | "trusted_seller",

@@ -53,6 +53,7 @@ const toClientUser = (user: any) => user ? ({
   coverImage: user.coverImage || "",
   bio: user.bio || "",
   language: user.language || user.settings?.language || "English",
+  languagePreferenceSaved: Boolean(user.languagePreferenceSaved || user.language || (user.settings?.language && !["English", "en"].includes(user.settings.language))),
   sellerActive: Boolean(user.sellerActive || user.role === "seller"),
   role: user.role,
   roles: user.roles,
@@ -64,6 +65,26 @@ const toClientUser = (user: any) => user ? ({
   settings: user.settings || { theme: "light", language: "English", notifications: true },
   createdAt: user.createdAt,
 }) : null;
+
+export const handleLanguagePreference = async (req: Request, res: Response) => {
+  try {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized", message: "Sign in before saving your language." });
+    const language = req.body?.language;
+    if (typeof language !== "string" || !["en", "fr", "ar", "ha", "es", "pt", "zh", "sw", "hi", "tr"].includes(language)) {
+      return res.status(400).json({ error: "invalid_language", message: "Choose a supported language." });
+    }
+    const collection = req.app.locals.userCollection;
+    const saved = await collection.updateOne({ uid: user.uid }, { $set: { language, "settings.language": language, languagePreferenceSaved: true } });
+    if (!saved.matchedCount) return res.status(409).json({ error: "profile_unavailable", message: "Your profile could not be saved. Please retry." });
+    const updated = await collection.findOne({ uid: user.uid });
+    if (!updated) return res.status(503).json({ error: "profile_unavailable" });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ user: toClientUser(updated) });
+  } catch {
+    return res.status(503).json({ error: "language_save_unavailable", message: "Language could not be saved. Please try again." });
+  }
+};
 
 const saveSession = (req: Request) => new Promise<void>((resolve, reject) => {
   req.session.save((err) => (err ? reject(err) : resolve()));
@@ -578,6 +599,7 @@ export default function mountUserEndpoints(router: Router) {
     await req.app.locals.nativePushTokenCollection?.deleteMany?.({ userId: currentUser.uid, sessionKey: { $ne: currentKey } });
     return res.json({ removed: true });
   });
+  router.put("/language", handleLanguagePreference);
   router.put("/settings", async (req: Request, res: Response) => {
     const currentUser = await resolveCurrentUser(req);
     if (!currentUser) {

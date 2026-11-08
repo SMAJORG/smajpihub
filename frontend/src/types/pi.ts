@@ -14,6 +14,7 @@ export type AuthResult = {
     coverImage?: string;
     bio?: string;
     language?: string;
+    languagePreferenceSaved?: boolean;
     sellerActive?: boolean;
     blocked?: boolean;
     settings?: {

@@ -16,3 +16,9 @@ export const readLanguage = () => {
 export const persistLanguage = (code: string) => {
   try { window.localStorage.setItem('smaj_language', normalizeLanguage(code)); } catch { /* Keep in-memory selection. */ }
 };
+
+// Profiles created by older versions stored language names rather than codes.
+export const profileLanguageCode = (value: string) => {
+  const names: Record<string, LanguageCode> = { english: 'en', french: 'fr', arabic: 'ar', hausa: 'ha', spanish: 'es', portuguese: 'pt', chinese: 'zh', swahili: 'sw', hindi: 'hi', turkish: 'tr' };
+  return languages.find(language => language.label.toLowerCase() === value.toLowerCase())?.code || names[value.toLowerCase()] || normalizeLanguage(value);
+};

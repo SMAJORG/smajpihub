@@ -61,6 +61,7 @@ const toUser = (candidate: Partial<User> | null | undefined, fallback: User): Us
   avatar: candidate?.avatar ?? fallback.avatar ?? "",
   coverImage: candidate?.coverImage ?? fallback.coverImage ?? "",
   bio: candidate?.bio ?? fallback.bio ?? "",
+  languagePreferenceSaved: candidate?.languagePreferenceSaved ?? fallback.languagePreferenceSaved ?? false,
   language: candidate?.language ?? fallback.language ?? candidate?.settings?.language ?? fallback.settings?.language ?? "English",
   sellerActive: candidate?.sellerActive ?? fallback.sellerActive ?? candidate?.role === "seller",
   role: candidate?.role || fallback.role || "buyer",
@@ -439,6 +440,18 @@ export const useAuth = () => {
     return updatedUser;
   }, [user]);
 
+  const updateLanguage = useCallback(async (language: string) => {
+    const currentUser = user || getStoredPiUser();
+    if (!currentUser?.uid) throw new Error("Sign in before saving your language.");
+    const response = await axiosClient.put<SignInResponse>("/user/language", { language });
+    if (getStoredPiUser()?.uid !== currentUser.uid || response.data.user?.uid !== currentUser.uid || !response.data.user.languagePreferenceSaved) {
+      throw new Error("Language was not confirmed by the server. Please try again.");
+    }
+    const updated = storeUser(toUser(response.data.user, currentUser));
+    setUser(updated);
+    return updated;
+  }, [user]);
+
   const updateSettings = useCallback(async (settings: { theme: "dark" | "light"; language: string; notifications: boolean }) => {
     const currentUser = user || getStoredPiUser();
     const applyLocalSettingsUpdate = () => {
@@ -491,6 +504,7 @@ export const useAuth = () => {
     signOut,
     updateProfile,
     updateSettings,
+    updateLanguage,
     closeSignIn: () => setShowSignIn(false),
     requireAuth: () => setShowSignIn(true),
     isLoading,

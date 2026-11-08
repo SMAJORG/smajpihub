@@ -14424,14 +14424,13 @@ html[data-private-theme="dark"] .storefront-product-card .storefront-seller-name
   color: var(--smaj-text) !important;
 }
 
-/* Original mobile SMAJ AI launcher; independent of the removed message widget. */
+/* Dashboard SMAJ AI assistant, independent of the removed message widget. */
 .smaj-ai-float { display: none; }
-
 @media (max-width: 1023px) {
   .smaj-ai-float {
     position: fixed;
-    right: 16px;
-    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    bottom: clamp(16px, calc(104px + env(safe-area-inset-bottom, 0px)), calc(100dvh - 88px - env(safe-area-inset-top, 0px)));
     z-index: 82;
     display: grid;
     justify-items: end;
@@ -14439,20 +14438,31 @@ html[data-private-theme="dark"] .storefront-product-card .storefront-seller-name
   }
   .smaj-ai-trigger {
     position: relative;
-    width: 36px;
-    height: 36px;
+    width: 72px;
+    height: 72px;
     display: grid;
     place-items: center;
     color: #ffffff;
     border-radius: 50%;
     cursor: pointer;
     text-decoration: none;
-    background: transparent;
+    background: radial-gradient(circle, #a78bfa26, #7c3aed12 68%, transparent 72%);
     border: 0;
-    box-shadow: none;
+    box-shadow: 0 0 0 1px #a78bfa33, 0 0 22px #7c3aed55, 0 8px 24px #5b21b62b;
   }
-  .smaj-ai-trigger:focus-visible { outline: 3px solid var(--smaj-text); outline-offset: 3px; }
-  .smaj-ai-mark { width: 27px; height: 27px; object-fit: contain; }
+  .smaj-ai-trigger:focus-visible { outline: 3px solid var(--smaj-text); outline-offset: 4px; }
+  .smaj-ai-mark { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 0 6px #a78bfa77); animation: smaj-ai-breathe 6s ease-in-out infinite; }
+  .smaj-ai-trigger::before, .smaj-ai-trigger::after { content: "✦"; position: absolute; z-index: 1; pointer-events: none; color: #c4a3ff; opacity: 0; animation: smaj-ai-sparkle 14s ease-in-out infinite; }
+  .smaj-ai-trigger::before { right: 4px; top: 2px; font-size: 15px; }
+  .smaj-ai-trigger::after { left: 3px; bottom: 8px; font-size: 10px; animation-delay: 1s; }
+  .smaj-ai-invitation { position: absolute; right: 84px; bottom: 12px; display: flex; align-items: center; gap: 5px; width: max-content; max-width: min(190px, calc(100vw - 120px - env(safe-area-inset-right, 0px) - env(safe-area-inset-left, 0px))); padding: 10px 11px; color: var(--smaj-text); background: var(--smaj-card); border: 1px solid #a78bfa55; border-radius: 16px 16px 4px 16px; box-shadow: 0 6px 24px #5b21b61c; font-size: 12px; line-height: 1.4; }
+  .smaj-ai-invitation button { flex: none; width: 24px; height: 28px; padding: 0; color: inherit; background: transparent; border: 0; border-radius: 6px; font-size: 18px; cursor: pointer; }
+  .smaj-ai-invitation button:focus-visible { outline: 2px solid #8b5cf6; }
+}
+@keyframes smaj-ai-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+@keyframes smaj-ai-sparkle { 0%, 87%, 100% { opacity: 0; transform: scale(.5); } 92% { opacity: .85; transform: scale(1); } 96% { opacity: 0; transform: scale(.6); } }
+@media (prefers-reduced-motion: reduce) {
+  .smaj-ai-mark, .smaj-ai-trigger::before, .smaj-ai-trigger::after { animation: none; }
 }
 
 /* Real article content inside the private Help Center accordion. */
@@ -22777,3 +22787,6 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
     text-align: right;
   }
 }
+
+.language-choice-dialog .language-choice-error { color: #b91c1c; }
+.language-choice-save:disabled { opacity: .6; cursor: wait; }

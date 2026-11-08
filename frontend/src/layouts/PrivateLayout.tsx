@@ -454,7 +454,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
         ))}
       </nav> : null}
       {!fullScreen && !isStreamImmersive ? <CommunityFollowPrompt /> : null}
-      {!fullScreen && user?.uid && location.pathname === "/dashboard" ? <SmajAiFloatingAssistant /> : null}
+      {!fullScreen && user?.uid && location.pathname === "/dashboard" ? <SmajAiFloatingAssistant userId={user.uid} /> : null}
       {showProfileReminder && !isStreamImmersive && !fullScreen ? (
         <aside className="profile-verify-reminder" role="alert" aria-live="polite">
           <span><VerifiedUserOutlinedIcon /></span>

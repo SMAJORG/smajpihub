@@ -16,7 +16,7 @@ test(
       output = fs.mkdtempSync(path.join(os.tmpdir(), "smaj-settings-review-")),
       apiPath = path.join(root, "src/lib/axiosClient").replace(/\\/g, "/");
     const modules = {
-      auth: `import {axiosClient} from '${apiPath}';export function useAuthContext(){return {user:window.fixture.user,updateSettings:async value=>{window.fixture.settingsCalls.push(value);return (await axiosClient.post('/fixture/settings',value)).data;},updateProfile:async value=>{window.fixture.profileCalls.push(value);const {data}=await axiosClient.post('/fixture/profile',value);window.fixture.user={...window.fixture.user,...data.user};return window.fixture.user;},signOut:async()=>{window.fixture.signouts++;}}}`,
+      auth: `import {axiosClient} from '${apiPath}';export function useAuthContext(){return {user:window.fixture.user,updateLanguage:async language=>{const {data}=await axiosClient.post('/fixture/language',{language});window.fixture.user={...window.fixture.user,...data.user};return window.fixture.user;},updateSettings:async value=>{window.fixture.settingsCalls.push(value);return (await axiosClient.post('/fixture/settings',value)).data;},updateProfile:async value=>{window.fixture.profileCalls.push(value);const {data}=await axiosClient.post('/fixture/profile',value);window.fixture.user={...window.fixture.user,...data.user};return window.fixture.user;},signOut:async()=>{window.fixture.signouts++;}}}`,
       updates: `export const APP_VERSION='1.0.test';export const checkAppUpdate=async native=>{window.fixture.checks.push(native);return {available:window.fixture.native,native,version:'1.0.test',details:'Verified test update'};};export const installAppUpdate=async(info,progress)=>{window.fixture.installs++;progress({stage:'installing'});};`,
       push: `export const getPushState=async()=>({supported:true,subscribed:window.fixture.webPush});export const enablePushNotifications=async()=>{window.fixture.webPush=true;window.fixture.pushCalls.push('web-enable');};export const disablePushNotifications=async()=>{window.fixture.webPush=false;window.fixture.pushCalls.push('web-disable');};`,
       nativePush: `export const supportsNativePushNotifications=()=>window.fixture.native;export const getNativePushState=async()=>({supported:true,subscribed:window.fixture.nativePush});export const enableNativePushNotifications=async()=>{window.fixture.nativePush=true;window.fixture.pushCalls.push('native-enable');};export const disableNativePushNotifications=async()=>{window.fixture.nativePush=false;window.fixture.pushCalls.push('native-disable');};`,
@@ -25,7 +25,7 @@ test(
     };
     await require("esbuild").build({
       stdin: {
-        contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {createBrowserRouter,RouterProvider} from 'react-router-dom';import Settings from './src/pages/private/SettingsPage';import './src/index.css';const Shell=()=> <div className="private-shell full-screen-page"><div className="full-screen-tab-page"><Settings/></div><nav id="fixture-nav" style={{position:'fixed',bottom:0,height:62,width:'100%',background:'var(--smaj-card)',zIndex:45}}>Navigation</nav></div>;const router=createBrowserRouter([{path:'/settings/preferences',element:<Shell/>},{path:'*',element:<h1>Destination</h1>}]);createRoot(document.getElementById('root')).render(<React.StrictMode><RouterProvider router={router}/></React.StrictMode>);`,
+        contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {createBrowserRouter,RouterProvider} from 'react-router-dom';import Settings from './src/pages/private/SettingsPage';import './src/i18n';import './src/index.css';const Shell=()=> <div className="private-shell full-screen-page"><div className="full-screen-tab-page"><Settings/></div><nav id="fixture-nav" style={{position:'fixed',bottom:0,height:62,width:'100%',background:'var(--smaj-card)',zIndex:45}}>Navigation</nav></div>;const router=createBrowserRouter([{path:'/settings/preferences',element:<Shell/>},{path:'*',element:<h1>Destination</h1>}]);createRoot(document.getElementById('root')).render(<React.StrictMode><RouterProvider router={router}/></React.StrictMode>);`,
         resolveDir: root,
         loader: "tsx",
       },
@@ -65,6 +65,7 @@ test(
     let failSave = false,
       failDelete = false,
       delay = 0;
+    let savedLanguage = "";
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url, "http://localhost"),
         json = (data, status = 200) => {
@@ -74,7 +75,7 @@ test(
       if (url.pathname === "/settings/preferences") {
         res.setHeader("Content-Type", "text/html");
         return res.end(
-          `<meta name="viewport" content="width=device-width,initial-scale=1"><style>@media(min-width:1024px){#fixture-nav{display:none}}</style><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script>window.__ENV={apiBaseURL:location.origin};window.fixture={native:${url.searchParams.has("native")},user:{uid:'alice',username:'AlicePi',piUsername:'AlicePi',displayName:'Alice Example',role:'buyer',country:'Nigeria',contactPhone:'test-contact',avatar:'/avatar.svg',bio:'Real profile',language:'English',verificationLevel:'basic',verificationStatus:'none',settings:{notifications:true}},settingsCalls:[],profileCalls:[],pushCalls:[],checks:[],installs:0,signouts:0,adPrivacy:0,webPush:false,nativePush:false,consent:{allowed:false,canRequestAds:false,privacyRequired:true}};localStorage.setItem('smaj_pi_user',JSON.stringify({accessToken:'fixture-token'}));localStorage.setItem('smaj_language_explicit','true');window.fixture.welcomes=0;window.addEventListener('smaj:welcome-tour-open',()=>window.fixture.welcomes++);</script><script src="/fixture.js"></script>`
+          `<meta name="viewport" content="width=device-width,initial-scale=1"><style>@media(min-width:1024px){#fixture-nav{display:none}}</style><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script>window.__ENV={apiBaseURL:location.origin};window.fixture={native:${url.searchParams.has("native")},user:{uid:'alice',username:'AlicePi',piUsername:'AlicePi',displayName:'Alice Example',role:'buyer',country:'Nigeria',contactPhone:'test-contact',avatar:'/avatar.svg',bio:'Real profile',language:${JSON.stringify(savedLanguage || 'English')},languagePreferenceSaved:${Boolean(savedLanguage)},verificationLevel:'basic',verificationStatus:'none',settings:{notifications:true}},settingsCalls:[],profileCalls:[],pushCalls:[],checks:[],installs:0,signouts:0,adPrivacy:0,webPush:false,nativePush:false,consent:{allowed:false,canRequestAds:false,privacyRequired:true}};localStorage.setItem('smaj_pi_user',JSON.stringify({accessToken:'fixture-token'}));localStorage.setItem('smaj_language_explicit','true');window.fixture.welcomes=0;window.addEventListener('smaj:welcome-tour-open',()=>window.fixture.welcomes++);</script><script src="/fixture.js"></script>`
         );
       }
       if (["/fixture.js", "/fixture.css"].includes(url.pathname)) {
@@ -94,6 +95,11 @@ test(
       const body = text ? JSON.parse(text) : {};
       requests.push({ path: url.pathname, body });
       if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+      if (url.pathname === "/fixture/language") {
+        if (failSave) return json({ message: "Save failed" }, 503);
+        savedLanguage = body.language;
+        return json({ user: { uid: "alice", language: savedLanguage, languagePreferenceSaved: true } });
+      }
       if (url.pathname === "/fixture/settings" || url.pathname === "/fixture/profile")
         return json(url.pathname.endsWith("profile") ? { user: body } : { ok: true }, failSave ? 500 : 200);
       if (url.pathname === "/support") return json({ ok: !failDelete }, failDelete ? 500 : 200);
@@ -214,6 +220,7 @@ test(
       const language = page.locator(".language-choice-dialog");
       await language.getByLabel(/^Language/).selectOption("fr");
       await language.getByRole("button", { name: "Save", exact: true }).click();
+      await language.waitFor({ state: "detached" });
       assert.equal(await page.evaluate(() => localStorage.getItem("smaj_language")), "fr");
       assert.equal(await save().count(), 0);
       await page.reload();
