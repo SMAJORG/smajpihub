@@ -7,12 +7,15 @@ import android.content.pm.Signature;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
+import androidx.appcompat.app.AlertDialog;
+import androidx.activity.result.ActivityResult;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.ActivityCallback;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -30,7 +33,6 @@ import java.util.concurrent.Executors;
 public class SmajUpdaterPlugin extends Plugin {
     private final ExecutorService downloads = Executors.newSingleThreadExecutor();
     private final AtomicBoolean busy = new AtomicBoolean(false);
-    private PluginCall pendingPermission;
     private static final long MAX_APK_BYTES = 300L * 1024 * 1024;
 
     @PluginMethod public void getInfo(PluginCall call) {
@@ -51,21 +53,48 @@ public class SmajUpdaterPlugin extends Plugin {
         if (!hash.matches("[a-fA-F0-9]{64}") || size == null || size <= 0 || size > MAX_APK_BYTES || code == null || code <= 0 || !url.startsWith("https://github.com/SMAJORG/smajpihub/releases/download/")) {
             busy.set(false); call.reject("Verified update information is missing. Check for updates again.", "INVALID_UPDATE"); return;
         }
-        if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
+        getBridge().executeOnMainThread(() -> {
+            if (canInstallUpdates()) { download(call); return; }
             progress("permission", 0, size);
-            pendingPermission = call;
-            try { getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()))); }
-            catch (Exception error) { pendingPermission = null; busy.set(false); call.reject("Allow SMAJ PI HUB to install updates in Android settings.", "INSTALL_PERMISSION"); }
-            return;
-        }
-        download(call);
+            new AlertDialog.Builder(getActivity())
+                .setTitle("Allow app updates")
+                .setMessage("Allow SMAJ PI HUB to install verified updates in Android settings. You can continue using the app without this access.")
+                .setNegativeButton("TRY LATER", (dialog, which) -> permissionDeclined(call))
+                .setPositiveButton("ENABLE PERMISSION", (dialog, which) -> openInstallSettings(call))
+                .setOnCancelListener(dialog -> permissionDeclined(call))
+                .show();
+        });
     }
-    @Override protected void handleOnResume() {
-        super.handleOnResume();
-        if (pendingPermission == null) return;
-        PluginCall call = pendingPermission; pendingPermission = null;
-        if (Build.VERSION.SDK_INT < 26 || getContext().getPackageManager().canRequestPackageInstalls()) download(call);
-        else { busy.set(false); call.reject("Allow SMAJ PI HUB to install updates, then try again.", "INSTALL_PERMISSION"); }
+    private boolean canInstallUpdates() {
+        return Build.VERSION.SDK_INT < 26 || getContext().getPackageManager().canRequestPackageInstalls();
+    }
+    private void permissionDeclined(PluginCall call) {
+        busy.set(false);
+        call.reject("Update postponed. You can keep using SMAJ PI HUB and try again from Settings.", "INSTALL_PERMISSION");
+    }
+    private void openInstallSettings(PluginCall call) {
+        // Special access is not a runtime permission. Open this package's
+        // Android settings and wait for its activity result, not any resume.
+        Uri packageUri = Uri.parse("package:" + getContext().getPackageName());
+        Intent[] destinations = {
+            new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, packageUri),
+            new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES),
+            new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
+        };
+        for (Intent intent : destinations) {
+            try { startActivityForResult(call, intent, "installPermissionResult"); return; }
+            catch (android.content.ActivityNotFoundException | SecurityException unavailable) { /* Try the next supported settings page. */ }
+        }
+        busy.set(false);
+        call.reject("Open Android Settings > Apps > Special app access > Install unknown apps > SMAJ PI HUB to allow updates. The app remains available.", "INSTALL_PERMISSION");
+    }
+    @ActivityCallback
+    private void installPermissionResult(PluginCall call, ActivityResult result) {
+        if (call == null) { busy.set(false); return; }
+        // Settings may report RESULT_CANCELED even when access was granted.
+        // The operating system is the source of truth, including revocation.
+        if (canInstallUpdates()) download(call);
+        else permissionDeclined(call);
     }
     @Override protected void handleOnDestroy() {
         downloads.shutdownNow();

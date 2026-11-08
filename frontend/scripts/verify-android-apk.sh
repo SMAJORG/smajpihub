@@ -8,8 +8,8 @@ build_tools="$(find "${ANDROID_HOME:?Android SDK required}/build-tools" -mindept
 unzip -tq "$apk"
 badging="$("$build_tools/aapt" dump badging "$apk")"
 permissions="$("$build_tools/aapt" dump permissions "$apk")"
-if [[ "$permissions" == *android.permission.REQUEST_INSTALL_PACKAGES* ]]; then
-  echo 'Forbidden REQUEST_INSTALL_PACKAGES permission in final Android manifest'
+if [[ "$permissions" != *android.permission.REQUEST_INSTALL_PACKAGES* ]]; then
+  echo 'Missing REQUEST_INSTALL_PACKAGES permission: users cannot authorize verified APK updates'
   exit 1
 fi
 package_line="$(printf '%s\n' "$badging" | head -n 1)"
