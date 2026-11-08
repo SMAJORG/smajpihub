@@ -14,9 +14,11 @@ function compile(path,modules,extra={}) {
 const cache=compile('frontend/src/lib/chatCache.ts',{});
 const viewport=compile('frontend/src/hooks/useChatViewport.ts',{react:React,'../lib/chatCache':cache});
 const history=compile('frontend/src/lib/chatHistory.ts',{});
+const chatLinks=compile('frontend/src/lib/chatLinks.ts',{'@capacitor/core':{Capacitor:{isNativePlatform:()=>false}}},{URL});
+const chatText=compile('frontend/src/components/ChatMessageText.tsx',{'react/jsx-runtime':require('react/jsx-runtime'),'../lib/chatLinks':chatLinks,'./ChatMessageText.css':{}});
 function render(query,uid='alice') {
  let requests=0;
- const modules={'../../hooks/useChatViewport':viewport,react:React,'react/jsx-runtime':require('react/jsx-runtime'),'react-dom':{createPortal:children=>children},'react-router-dom':{useSearchParams:()=>[new URLSearchParams(query),()=>{}],Link:({children,...props})=>React.createElement('a',props,children)},axios:{isAxiosError:()=>false},'../../contexts/AuthContext':{useAuthContext:()=>({user:{uid}})},'../../lib/chatCache':cache,'../../lib/axiosClient':{axiosClient:{get:()=>{requests++;return new Promise(()=>{});}}}};
+ const modules={'../../components/ChatMessageText':chatText,'../../hooks/useChatViewport':viewport,react:React,'react/jsx-runtime':require('react/jsx-runtime'),'react-dom':{createPortal:children=>children},'react-router-dom':{useSearchParams:()=>[new URLSearchParams(query),()=>{}],Link:({children,...props})=>React.createElement('a',props,children)},axios:{isAxiosError:()=>false},'../../contexts/AuthContext':{useAuthContext:()=>({user:{uid}})},'../../lib/chatCache':cache,'../../lib/axiosClient':{axiosClient:{get:()=>{requests++;return new Promise(()=>{});}}}};
  const empty=()=>null;
  const page=compile('frontend/src/pages/private/MessagesPage.tsx',new Proxy(modules,{get:(items,key)=>key in items?items[key]:{default:empty}}));
  const html=renderToString(React.createElement(page.default));return{html,requests};
@@ -66,3 +68,15 @@ test('pending sends show a clock, failures offer retry, and only confirmed messa
 
 test('latest messages are delivered before a slow older-history gap finishes',async()=>{let release,ready,latest,calls=0,finished=false;const gate=new Promise(resolve=>release=resolve),firstPage=new Promise(resolve=>ready=resolve);const result=history.fetchChatHistory(async()=>{calls++;return calls===1?{messages:[{_id:'300'}],nextCursor:'older'}:await gate;},'100',()=>true,page=>{latest=[...page.messages];ready();}).then(value=>{finished=true;return value;});await firstPage;assert.equal(latest[0]._id,'300');assert.equal(finished,false);release({messages:[{_id:'100'}],nextCursor:null});assert.equal((await result).messages.length,2);});
 test('presence and typing updates do not trigger message-history invalidation',()=>{const base={lastMessageId:'a',lastMessage:'Hello',updatedAt:'one',readUpdatedAt:'zero'};const key=history.conversationHistoryVersion(base);assert.equal(history.conversationHistoryVersion({...base,online:true,typing:true,lastSeenAt:'new'}),key);assert.notEqual(history.conversationHistoryVersion({...base,lastMessageId:'b'}),key);assert.notEqual(history.conversationHistoryVersion({...base,readUpdatedAt:'two'}),key);});
+
+test('cached incoming and outgoing messages render clickable links when a conversation is restored',()=>{
+ cache.writeChatCache('alice','conversation:thread',{_id:'thread',buyerId:'alice',sellerId:'bob',participantName:'Bob',updatedAt:'',productId:'',productTitle:''});
+ cache.writeChatCache('alice','thread',[
+  {_id:'incoming',conversationId:'thread',senderId:'bob',message:'https://x.com/Devsmaj/status/2117556322388349196',createdAt:new Date().toISOString()},
+  {_id:'outgoing',conversationId:'thread',senderId:'alice',message:'https://youtu.be/video?t=12',createdAt:new Date().toISOString()},
+ ]);
+ const {html}=render('conversation=thread');
+ assert.match(html,/href="https:\/\/x.com\/Devsmaj\/status\/2117556322388349196"/);
+ assert.match(html,/href="https:\/\/youtu.be\/video\?t=12"/);
+ assert.match(html,/rel="noopener noreferrer"/);
+});

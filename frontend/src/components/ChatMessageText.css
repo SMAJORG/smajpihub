@@ -1,0 +1,10 @@
+.chat-message-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.chat-message-link:hover { text-decoration-thickness: 2px; }
+.chat-message-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 2px; }

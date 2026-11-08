@@ -1,3 +1,4 @@
+import ChatMessageText from "./ChatMessageText";
 import "./ChatMessageMedia.css";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -161,7 +162,7 @@ export default function ChatMessageAttachment({
         </a>
       ) : null}
       <figcaption>
-        {message.message || message.attachmentName || "Attachment"}
+        <ChatMessageText text={message.message || message.attachmentName || "Attachment"} />
       </figcaption>
       {error ? <small role="status">{error}</small> : null}
     </figure>

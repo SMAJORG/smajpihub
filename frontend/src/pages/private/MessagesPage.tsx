@@ -1,3 +1,4 @@
+import ChatMessageText from "../../components/ChatMessageText";
 import MessageDeliveryStatus from "../../components/MessageDeliveryStatus";
 import { useChatViewport } from "../../hooks/useChatViewport";
 import VoiceMessagePlayer from "../../components/VoiceMessagePlayer";
@@ -1351,7 +1352,7 @@ const MessagesPageContent = () => {
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
                             <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
-                            <p>{item.message || "Message"}</p>
+                            <p><ChatMessageText text={item.message || "Message"} /></p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
@@ -1474,7 +1475,7 @@ const MessagesPageContent = () => {
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
                             <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
-                            <p>{item.message || "Message"}</p>
+                            <p><ChatMessageText text={item.message || "Message"} /></p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
@@ -1528,7 +1529,7 @@ const MessagesPageContent = () => {
           </div>
         )}
       </section>
-      {imagePreview ? createPortal(<div className={`chat-image-viewer${imagePreviewFullscreen ? " chat-image-viewer-fullscreen" : ""}`} role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }}><div className="chat-image-viewer-actions" onClick={(event) => event.stopPropagation()}><button type="button" className="chat-image-viewer-back" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }} aria-label="Back to chat"><ArrowBackOutlinedIcon /></button><button type="button" className="chat-image-viewer-delete" onClick={() => { setDeleteTarget(imagePreview.message); setImagePreview(null); setImagePreviewFullscreen(false); }}>Delete</button><button type="button" onClick={() => setImagePreviewFullscreen((open) => !open)} aria-label={imagePreviewFullscreen ? "Exit fullscreen" : "Fullscreen"}><FullscreenOutlinedIcon /></button></div><img src={imagePreview.src} alt={imagePreview.caption || "Shared photo"} onClick={(event) => event.stopPropagation()} />{imagePreview.caption && imagePreview.caption !== "Photo" ? <p>{imagePreview.caption}</p> : null}</div>, document.body) : null}
+      {imagePreview ? createPortal(<div className={`chat-image-viewer${imagePreviewFullscreen ? " chat-image-viewer-fullscreen" : ""}`} role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }}><div className="chat-image-viewer-actions" onClick={(event) => event.stopPropagation()}><button type="button" className="chat-image-viewer-back" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }} aria-label="Back to chat"><ArrowBackOutlinedIcon /></button><button type="button" className="chat-image-viewer-delete" onClick={() => { setDeleteTarget(imagePreview.message); setImagePreview(null); setImagePreviewFullscreen(false); }}>Delete</button><button type="button" onClick={() => setImagePreviewFullscreen((open) => !open)} aria-label={imagePreviewFullscreen ? "Exit fullscreen" : "Fullscreen"}><FullscreenOutlinedIcon /></button></div><img src={imagePreview.src} alt={imagePreview.caption || "Shared photo"} onClick={(event) => event.stopPropagation()} />{imagePreview.caption && imagePreview.caption !== "Photo" ? <p><ChatMessageText text={imagePreview.caption} /></p> : null}</div>, document.body) : null}
     </main>
   );
 };
