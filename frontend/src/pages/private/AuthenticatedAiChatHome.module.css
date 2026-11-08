@@ -12,7 +12,7 @@
 .root.root .composer { min-width: 0; padding: 17px; border: 1px solid #e9e3f1; border-radius: 23px; background: #fff; box-shadow: 0 8px 25px #3121520a; }
 .root.root .composer:focus-within { border-color: #a98ce4; box-shadow: 0 0 0 3px #7951c714; }
 .root.root .promptInput { position: relative; min-width: 0; }
-.root.root .composer textarea { display: block; width: 100%; min-height: 72px; height: 72px; max-height: 240px; padding: 0; border: 0; outline: 0; resize: vertical; background: transparent; color: #201a2d; font: inherit; font-size: 16px; line-height: 1.5; }
+.root.root .composer textarea { display: block; width: 100%; min-height: 72px; height: 72px; max-height: 240px; padding: 0; border: 0; outline: 0; resize: vertical; background: #fff !important; color: #201a2d; font: inherit; font-size: 16px; line-height: 1.5; }
 .root.root .composer textarea::placeholder { color: #96919f; }
 .rotatingPlaceholder { position: absolute; inset: 0; overflow: hidden; color: #96919f; font-size: 16px; line-height: 1.5; pointer-events: none; }
 .rotatingPlaceholder > span { display: block; animation: placeholderRise .45s cubic-bezier(.2,.7,.25,1) both; }
@@ -40,7 +40,7 @@
 .root.root .service { display: flex; width: 100%; box-sizing: border-box; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 72px; border: 1px solid transparent; background: transparent; border-radius: 12px; padding: 5px 2px; color: #302a38; font-size: 10px; font-weight: 700; }
 .root.root .service:hover { border-color: #e8def5; background: #fcfaff; }
 .root.root .service[aria-pressed=true] { border-color: #d7c8ee; background: #f7f3fc; color: #6840b6; }
-.root.root .art :global(.serviceBadge) { width: 34px; height: 34px; margin: 0; border-radius: 10px; }
+.root.root .art :global(.serviceBadge) { display: block; width: 34px; height: 34px; margin: 0; border-radius: 10px; }
 .serviceLabel { display: flex; width: 100%; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px; max-width: 100%; overflow-wrap: anywhere; line-height: 1.15; }
 .showAll { display: block; min-height: 38px; margin: 10px auto 0; padding: 8px 14px; border: 1px solid #e9e3f1; border-radius: 100px; background: #fff; color: #7951c7; font-size: 12px; font-weight: 700; }
 .showAll:hover { border-color: #cbb9e8; background: #fcfaff; }
