@@ -14424,6 +14424,37 @@ html[data-private-theme="dark"] .storefront-product-card .storefront-seller-name
   color: var(--smaj-text) !important;
 }
 
+/* Original mobile SMAJ AI launcher; independent of the removed message widget. */
+.smaj-ai-float { display: none; }
+
+@media (max-width: 1023px) {
+  .smaj-ai-float {
+    position: fixed;
+    right: 16px;
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    z-index: 82;
+    display: grid;
+    justify-items: end;
+    gap: 10px;
+  }
+  .smaj-ai-trigger {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    color: #ffffff;
+    border-radius: 50%;
+    cursor: pointer;
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  .smaj-ai-trigger:focus-visible { outline: 3px solid var(--smaj-text); outline-offset: 3px; }
+  .smaj-ai-mark { width: 27px; height: 27px; object-fit: contain; }
+}
+
 /* Real article content inside the private Help Center accordion. */
 .help-article-content {
   padding: 0 0 14px;

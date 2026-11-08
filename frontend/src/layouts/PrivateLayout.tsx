@@ -27,6 +27,7 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
 import NativeAdSlot from "../components/NativeAdSlot";
+import SmajAiFloatingAssistant from "../components/SmajAiFloatingAssistant";
 import { axiosClient } from "../lib/axiosClient";
 import ConfirmSignOutModal from "../components/ConfirmSignOutModal";
 import WelcomeTour from "../components/WelcomeTour";
@@ -453,6 +454,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
         ))}
       </nav> : null}
       {!fullScreen && !isStreamImmersive ? <CommunityFollowPrompt /> : null}
+      {!fullScreen && user?.uid && location.pathname === "/dashboard" ? <SmajAiFloatingAssistant /> : null}
       {showProfileReminder && !isStreamImmersive && !fullScreen ? (
         <aside className="profile-verify-reminder" role="alert" aria-live="polite">
           <span><VerifiedUserOutlinedIcon /></span>

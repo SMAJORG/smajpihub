@@ -64,7 +64,7 @@ export default function NativeAdSlot() {
       const nav = document.querySelector(".mobile-bottom-nav")?.getBoundingClientRect();
       const bottom = nav && nav.height > 0 ? nav.top : window.innerHeight;
       const blockers = [
-        ...document.querySelectorAll(".private-header, .private-profile-menu"),
+        ...document.querySelectorAll(".private-header, .smaj-ai-float, .private-profile-menu"),
       ]
         .filter(element => ["fixed", "sticky"].includes(getComputedStyle(element).position))
         .map(element => element.getBoundingClientRect());
