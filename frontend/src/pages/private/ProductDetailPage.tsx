@@ -25,7 +25,7 @@ import { setBuyNowItem } from "../../lib/storeCart";
 import { useAddToCartToast } from "../../hooks/useAddToCartToast";
 import type { Product, SellerSummary } from "../../types/marketplace";
 
-const supportEmail = "info@smajpihub.com";
+const supportEmail = "contact@smajpihub.com";
 
 const ProductDetailPage = () => {
   const { id } = useParams();

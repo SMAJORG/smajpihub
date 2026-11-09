@@ -11,7 +11,7 @@ import ArrowUpwardOutlinedIcon from "@mui/icons-material/ArrowUpwardOutlined";
 import styles from "./Footer.module.css";
 import { useTranslation } from "react-i18next";
 
-const companyEmail = "info@smajpihub.com";
+const companyEmail = "contact@smajpihub.com";
 const quickSupportEmail = "smajpihub@gmail.com";
 
 const Footer = () => {

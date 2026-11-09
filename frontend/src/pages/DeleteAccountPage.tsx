@@ -32,7 +32,7 @@ const DeleteAccountPage = () => {
       formElement.reset();
       setSubmitted(true);
     } catch {
-      setError("We couldn't submit your request. Please try again or email info@smajpihub.com.");
+      setError("We couldn't submit your request. Please try again or email contact@smajpihub.com.");
     } finally {
       setSubmitting(false);
     }
@@ -139,7 +139,7 @@ const DeleteAccountPage = () => {
             </p>
             <p>
               See our <a href="/privacy">Privacy Policy</a> for more information. Questions can also be sent to{" "}
-              <a href="mailto:info@smajpihub.com">info@smajpihub.com</a>.
+              <a href="mailto:contact@smajpihub.com">contact@smajpihub.com</a>.
             </p>
           </section>
         </div>

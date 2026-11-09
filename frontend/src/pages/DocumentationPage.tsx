@@ -269,7 +269,7 @@ const articles: DocArticle[] = [
     title: "Contact and support",
     summary: "Know what information to provide and where to ask for help.",
     paragraphs: [
-      "Use info@smajpihub.com for company enquiries and smajpihub@gmail.com for quick support. Include enough detail to reproduce the issue without sending sensitive credentials.",
+      "Use contact@smajpihub.com for company enquiries and smajpihub@gmail.com for quick support. Include enough detail to reproduce the issue without sending sensitive credentials.",
       "For account-specific help, provide your Pi username, service name, approximate time, device/app version, and a screenshot with private information hidden.",
     ],
     links: [

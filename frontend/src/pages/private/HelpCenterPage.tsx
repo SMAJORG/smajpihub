@@ -103,7 +103,7 @@ const HelpCenterPage = () => {
         </div>
         <form onSubmit={(event) => void submit(event)}>
           <label>Topic<select value={topic} onChange={(event) => setTopic(event.target.value)}><option>Account support</option><option>Marketplace</option><option>Wallet and payment</option><option>Safety report</option><option>Feedback</option></select></label>
-          <label>Reply email optional<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="info@smajpihub.com" /></label>
+          <label>Reply email optional<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@smajpihub.com" /></label>
           <label>Message<textarea required maxLength={1500} rows={6} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Describe what happened, what page you were on, and what you expected." /><small className="form-help">{message.length}/1500 characters</small></label>
           {submitted ? <div className="private-alert success">Support request submitted.</div> : null}
           {error ? <div className="private-alert error">{error}</div> : null}

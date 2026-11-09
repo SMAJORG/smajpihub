@@ -7,7 +7,7 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import { axiosClient } from "../lib/axiosClient";
 import { formatPiRate } from "../lib/piPricing";
 
-const legalEmail = "info@smajpihub.com";
+const legalEmail = "contact@smajpihub.com";
 
 const LegalShell = ({
   kicker,
@@ -114,7 +114,7 @@ export const PrivacyPage = () => (
           "SMAJ PI HUB uses access controls, verification signals, and safety workflows to reduce abuse.",
           "Sensitive service flows are designed around user awareness, transaction confirmation, and support review.",
           "We do not sell personal data as a business model.",
-          "Questions about privacy can be sent to info@smajpihub.com.",
+          "Questions about privacy can be sent to contact@smajpihub.com.",
         ]}
       />
     </section>
@@ -794,7 +794,7 @@ export const ReportAbusePage = () => {
       event.currentTarget.reset();
       setSubmitted(true);
     } catch {
-      setError("Could not submit this report. Please email info@smajpihub.com.");
+      setError("Could not submit this report. Please email contact@smajpihub.com.");
     }
   };
 

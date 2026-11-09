@@ -8,7 +8,7 @@ import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
 import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 
-const companyEmail = "info@smajpihub.com";
+const companyEmail = "contact@smajpihub.com";
 const quickSupportEmail = "smajpihub@gmail.com";
 
 const contactRoutes = [

@@ -75,7 +75,7 @@ const faqItems: FaqItem[] = [
     id: "support",
     question: "How do I get support?",
     answer:
-      "Use the contact page or email info@smajpihub.com for support, partnerships, provider onboarding, or company inquiries.",
+      "Use the contact page or email contact@smajpihub.com for support, partnerships, provider onboarding, or company inquiries.",
     linkToContact: true,
   },
 ];
