@@ -23,7 +23,7 @@
     flex: 0 0 auto;
     gap: clamp(2px, .6vw, 12px);
   }
-  .smaj-desktop-group { display: flex; align-items: center; }
+  .smaj-desktop-group { position: relative; display: flex; align-items: center; }
   .smaj-desktop-trigger {
     display: inline-flex;
     align-items: center;
@@ -68,56 +68,36 @@
   .smaj-mega-menu {
     position: absolute;
     inset-block-start: calc(100% + 8px);
-    inset-inline-start: 76px;
-    width: min(560px, calc(100vw - 48px));
-    padding: 20px;
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: 0 18px 54px rgba(15, 23, 42, .18), 0 3px 10px rgba(15, 23, 42, .05);
+    inset-inline-start: 0;
+    width: 240px;
+    padding: 6px;
+    background: #ffffff;
+    color: #172033;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .10), 0 2px 6px rgba(15, 23, 42, .04);
     max-height: calc(100dvh - 110px);
     overflow-y: auto;
     text-align: start;
     z-index: 50;
   }
   .smaj-mega-menu[hidden] { display: none; }
-  .smaj-mega-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 2px 8px 16px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-    font-weight: 750;
-    font-size: 16px;
-  }
-  .smaj-mega-heading > span:last-child { color: var(--primary); font-size: 11px; letter-spacing: .08em; }
-  .smaj-mega-menu ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .smaj-mega-menu ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
   .smaj-mega-menu li { min-width: 0; }
   .smaj-mega-menu a {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 66px;
-    height: 100%;
-    padding: 14px;
-    color: var(--text);
-    background: var(--soft-bg);
-    border: 1px solid transparent;
-    border-radius: 12px;
+    display: block;
+    padding: 9px 12px;
+    color: #172033;
+    background: transparent;
+    border-radius: 6px;
     font-size: 14px;
-    font-weight: 600;
-    line-height: 1.5;
+    font-weight: 500;
+    line-height: 1.45;
     text-decoration: none;
     overflow-wrap: anywhere;
   }
   .smaj-mega-menu a:hover,
-  .smaj-mega-menu a[aria-current="page"] { color: var(--primary); background: var(--primary-soft); border-color: var(--border); }
-  .smaj-mega-arrow { flex-shrink: 0; color: var(--primary); font-size: 18px; }
-  html[dir="rtl"] .smaj-mega-arrow { transform: scaleX(-1); }
+  .smaj-mega-menu a[aria-current="page"] { color: #6b3fe6; background: #f3eeff; }
 }
 
 @media (min-width: 1024px) and (max-width: 1199px) {

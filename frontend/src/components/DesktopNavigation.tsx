@@ -85,11 +85,10 @@ export default function DesktopNavigation() {
           </button>
           <div className="smaj-mega-menu" id={`${id}-${group.id}-panel`} data-panel={group.id}
             aria-labelledby={`${id}-${group.id}-trigger`} hidden={open !== group.id}>
-            <div className="smaj-mega-heading"><span>{labels[group.label]}</span><span aria-hidden="true">SMAJ PI HUB</span></div>
             <ul>
               {group.links.map(([label, to]) => <li key={to}>
                 <NavLink to={to} onClick={() => setOpen(null)}>
-                  <span>{labels[label]}</span><span className="smaj-mega-arrow" aria-hidden="true">↗</span>
+                  {labels[label]}
                 </NavLink>
               </li>)}
             </ul>

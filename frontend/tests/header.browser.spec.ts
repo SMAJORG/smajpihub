@@ -52,7 +52,29 @@ for (const width of [1024, 1280, 1440, 1920]) {
         await page.locator(`[data-trigger="${group}"]`).click();
         const panel = page.locator(`[data-panel="${group}"]`);
         await expect(panel).toBeVisible();
-        expect(await panel.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })).toBe(true);
+        const panelMetrics = await panel.evaluate(el => {
+          const box = el.getBoundingClientRect();
+          const trigger = el.parentElement!.querySelector('button')!.getBoundingClientRect();
+          const links = Array.from(el.querySelectorAll('a')).map(link => link.getBoundingClientRect());
+          return {
+            fits: box.left >= 0 && box.right <= innerWidth,
+            width: box.width,
+            height: box.height,
+            aligned: Math.abs(document.dir === 'rtl' ? box.right - trigger.right : box.left - trigger.left) < 1,
+            gap: box.top - trigger.bottom,
+            vertical: links.every((link, i) => i === 0 || link.top >= links[i - 1].bottom),
+            background: getComputedStyle(el).backgroundColor,
+          };
+        });
+        expect(panelMetrics.fits).toBe(true);
+        expect(panelMetrics.width).toBeGreaterThanOrEqual(220);
+        expect(panelMetrics.width).toBeLessThanOrEqual(260);
+        expect(panelMetrics.height).toBeLessThanOrEqual(260);
+        expect(panelMetrics.aligned).toBe(true);
+        expect(panelMetrics.gap).toBeGreaterThanOrEqual(6);
+        expect(panelMetrics.gap).toBeLessThanOrEqual(10);
+        expect(panelMetrics.vertical).toBe(true);
+        expect(panelMetrics.background).toBe('rgb(255, 255, 255)');
         expect(await page.locator('#header-test-content').evaluate(el => el.getBoundingClientRect().top)).toBe(contentTop);
         await page.keyboard.press('Escape');
         await expect(panel).toBeHidden();
