@@ -34,6 +34,8 @@ jobs:
       - run: npm run build:android-web
       - run: npx playwright install --with-deps chromium
       - run: npm run test:i18n:browser
+      - name: Public header layout and navigation regression
+        run: npm run test:header:browser
       - name: Existing jobs UI source contract
         run: npm run test:jobs
   backend:

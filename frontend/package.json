@@ -16,6 +16,7 @@
     "android:open": "cap open android",
     "lint": "eslint .",
     "test:jobs": "node tests/jobsUi.test.mjs",
+    "test:header:browser": "playwright test --config tests/header.playwright.config.ts",
     "test:ai-workspace:browser": "node node_modules/@playwright/test/cli.js test --config tests/embedded-ai.playwright.config.mjs",
     "test:ai-redirect": "node --test tests/standaloneAiRedirect.test.mjs",
     "test:careroute": "node --test tests/carerouteState.test.cjs",

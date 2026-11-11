@@ -15,6 +15,7 @@ import LoginWithPiButton from "./LoginWithPiButton";
 import logoImage from "/logo.png";
 import { languages, persistLanguage } from "../localization/languages";
 import "./Header.css";
+import DesktopNavigation from "./DesktopNavigation";
 
 const navItems = [
   { to: "/white-paper", label: "White Paper" },
@@ -268,7 +269,8 @@ const Header = () => {
             {isMobileMenuOpen ? <CloseIcon fontSize="small" /> : <MenuIcon fontSize="small" />}
           </span>
         </button>
-        <nav className={`smaj-nav ${isMobileMenuOpen ? "smaj-nav-open" : ""}`} aria-label="Primary">
+        <DesktopNavigation />
+        <nav className={`smaj-nav ${isMobileMenuOpen ? "smaj-nav-open" : ""}`} aria-label="Mobile primary">
           <button
             type="button"
             className="smaj-drawer-close"

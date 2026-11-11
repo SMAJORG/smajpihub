@@ -1,90 +1,132 @@
-/* Standard and public builds share the same two-row desktop header. */
+/* Floating disclosure navigation; the existing drawer is used below desktop. */
+.smaj-desktop-navigation { display: none; }
+
 @media (min-width: 1024px) {
   .smaj-header .smaj-header-inner {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 24px;
-    padding: 10px 24px 0;
+    flex-wrap: nowrap;
+    min-height: 72px;
+    gap: clamp(12px, 1.5vw, 28px);
+    padding: 10px clamp(16px, 2vw, 32px);
   }
 
-  .smaj-header .smaj-logo-link {
-    order: 0;
-    flex: 0 0 auto;
-    margin: 0;
-  }
-
-  .smaj-header .smaj-auth-section {
-    order: 1;
-    display: flex;
-    flex: 0 1 auto;
-    min-width: 0;
-    align-items: center;
-    gap: 12px;
-    margin: 0;
-    margin-inline-start: auto;
-  }
-
-  .smaj-header .smaj-nav {
-    order: 2;
-    position: relative;
-    inset: auto;
-    display: flex;
-    flex: 0 0 100%;
-    width: 100%;
-    min-width: 0;
-    height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 12px 18px;
-    margin: 0;
-    padding: 12px 0;
-    border: 0;
-    border-top: 1px solid var(--border);
-    overflow: visible;
-  }
-
-  .smaj-header .smaj-nav > a,
-  .smaj-header .smaj-services-trigger {
-    font-size: 14px;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    max-width: 100%;
-  }
-
-  .smaj-header .smaj-nav > a { min-width: 0; }
-  .smaj-header .smaj-services-menu { max-width: 100%; }
-  .smaj-header .smaj-search-panel-anchor { position: absolute; top: 100%; }
-
-  .smaj-header .smaj-auth-search-btn {
-    flex-shrink: 0;
-    width: 32px;
-    margin: 0;
-  }
-
-  .smaj-header .smaj-utility-icons {
-    flex-shrink: 0;
-    margin: 0;
-  }
-
-  .smaj-header .smaj-language-picker > svg { display: none; }
-  .smaj-header .smaj-language-picker select { width: 100px; max-width: 100px; }
-
-  .smaj-header .smaj-login-btn {
-    min-width: 0;
-    min-height: 38px;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    text-decoration: none;
-  }
-
+  .smaj-header .smaj-logo-link { flex: 0 0 auto; margin: 0; }
+  .smaj-header .smaj-logo { width: 44px; height: 44px; }
+  .smaj-header .smaj-nav,
   .smaj-header .smaj-menu-toggle,
   .smaj-header .smaj-public-search-mobile-toggle,
-  .smaj-header .smaj-drawer-close,
-  .smaj-header .smaj-mobile-auth-sheet,
-  .smaj-header .smaj-nav-overlay {
-    display: none;
+  .smaj-header .smaj-nav-overlay { display: none; }
+
+  .smaj-header .smaj-desktop-navigation {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: clamp(2px, .6vw, 12px);
   }
+  .smaj-desktop-group { display: flex; align-items: center; }
+  .smaj-desktop-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 12px 8px;
+    border: 0;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.4;
+    color: var(--text);
+    background: transparent;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .smaj-desktop-trigger > svg { width: 17px; height: 17px; transition: transform .15s ease; }
+  .smaj-desktop-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+  .smaj-desktop-trigger:hover,
+  .smaj-desktop-trigger[aria-expanded="true"] { color: var(--primary); background: var(--primary-soft); }
+  .smaj-desktop-trigger:focus-visible,
+  .smaj-mega-menu a:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
+  .smaj-header .smaj-auth-section {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    margin-inline-start: auto;
+    white-space: nowrap;
+  }
+  .smaj-header .smaj-auth-search-btn { flex-shrink: 0; width: 30px; margin: 0; }
+  .smaj-header .smaj-login-btn { min-height: 40px; font-size: 13px; white-space: nowrap; text-decoration: none; }
+  .smaj-header .smaj-utility-icons { flex-shrink: 0; gap: 6px; margin: 0; }
+  .smaj-header .smaj-language-picker { color: var(--text); gap: 4px; }
+  .smaj-header .smaj-language-picker select { width: 108px; max-width: 108px; font-size: 13px; }
+  .smaj-header .smaj-utility-icon-btn { width: 34px; }
+  .smaj-header .smaj-search-panel-anchor { position: absolute; top: calc(100% + 8px); }
+
+  .smaj-mega-menu {
+    position: absolute;
+    inset-block-start: calc(100% + 8px);
+    inset-inline-start: 76px;
+    width: min(560px, calc(100vw - 48px));
+    padding: 20px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 18px 54px rgba(15, 23, 42, .18), 0 3px 10px rgba(15, 23, 42, .05);
+    max-height: calc(100dvh - 110px);
+    overflow-y: auto;
+    text-align: start;
+    z-index: 50;
+  }
+  .smaj-mega-menu[hidden] { display: none; }
+  .smaj-mega-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 8px 16px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 750;
+    font-size: 16px;
+  }
+  .smaj-mega-heading > span:last-child { color: var(--primary); font-size: 11px; letter-spacing: .08em; }
+  .smaj-mega-menu ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .smaj-mega-menu li { min-width: 0; }
+  .smaj-mega-menu a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 66px;
+    height: 100%;
+    padding: 14px;
+    color: var(--text);
+    background: var(--soft-bg);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+  .smaj-mega-menu a:hover,
+  .smaj-mega-menu a[aria-current="page"] { color: var(--primary); background: var(--primary-soft); border-color: var(--border); }
+  .smaj-mega-arrow { flex-shrink: 0; color: var(--primary); font-size: 18px; }
+  html[dir="rtl"] .smaj-mega-arrow { transform: scaleX(-1); }
+}
+
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .smaj-header .smaj-header-inner { gap: 12px; padding-inline: 16px; }
+  .smaj-desktop-trigger { padding-inline: 6px; font-size: 13px; }
+  .smaj-header .smaj-auth-section { gap: 6px; }
+  .smaj-header .smaj-login-btn { padding-inline: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smaj-desktop-trigger > svg { transition: none; }
 }
