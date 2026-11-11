@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
@@ -112,7 +112,7 @@ const Header = () => {
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchPanelRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLElement | null>(null);
+
   const selectTheme = (theme: "light" | "dark") => {
     setMobileThemeMode(theme);
     document.documentElement.dataset.theme = theme;
@@ -152,49 +152,13 @@ const Header = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isMobileMenuOpen]);
 
-  useLayoutEffect(() => {
-    const header = headerRef.current;
-    const inner = header?.querySelector<HTMLElement>(".smaj-header-inner");
-    if (!header || !inner) return;
-
-    const measure = () => {
-      // Measure the full row before applying the drawer so it can expand again.
-      // This runs synchronously before paint; translated labels are never clipped.
-      header.classList.remove("smaj-header-compact");
-      const style = window.getComputedStyle(inner);
-      const rowItems = Array.from(inner.children).filter((item) =>
-        item.matches(".smaj-logo-link, .smaj-nav, .smaj-auth-section"));
-      const requiredWidth = rowItems.reduce((width, item) => {
-        const itemStyle = window.getComputedStyle(item);
-        // Auto margins only consume spare room; don't count them as required space.
-        const margin = (value: string) => Number.parseFloat(value) || 0;
-        return width + item.getBoundingClientRect().width +
-          (item.matches(".smaj-logo-link") ? margin(itemStyle.marginLeft) + margin(itemStyle.marginRight) : 0);
-      }, 0) + (Number.parseFloat(style.columnGap) || 0) * (rowItems.length - 1) +
-        (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
-      const compact = window.innerWidth >= 1024 &&
-        (window.innerWidth < 1280 || requiredWidth > inner.clientWidth);
-      header.classList.toggle("smaj-header-compact", compact);
-      if (!compact && window.innerWidth >= 1280) setIsMobileMenuOpen(false);
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 1024) setIsMobileMenuOpen(false);
     };
-
-    measure();
-    const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(header);
-    // Also catch text translated after React renders and browser font loading.
-    const textObserver = new MutationObserver(measure);
-    textObserver.observe(inner, { childList: true, characterData: true, subtree: true });
-    let active = true;
-    void document.fonts.ready.then(() => { if (active) measure(); });
-    window.addEventListener("resize", measure);
-    return () => {
-      active = false;
-      resizeObserver.disconnect();
-      textObserver.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [language, isAuthenticated, isPiLoginPending]);
-
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   useEffect(() => {
     document.body.style.overflow = isMobileMenuOpen ? "hidden" : "";
     return () => {
@@ -280,7 +244,7 @@ const Header = () => {
   );
 
   return (
-    <header ref={headerRef} className="smaj-header">
+    <header className="smaj-header">
       <div className="smaj-header-inner">
         <NavLink to="/home" className="smaj-logo-link" aria-label="SMAJ PI HUB Home">
           <img src={logoImage} alt="SMAJ PI HUB Logo" className="smaj-logo" />
