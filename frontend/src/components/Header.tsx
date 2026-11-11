@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import LoginWithPiButton from "./LoginWithPiButton";
 import logoImage from "/logo.png";
 import { languages, persistLanguage } from "../localization/languages";
+import "./Header.css";
 
 const navItems = [
   { to: "/white-paper", label: "White Paper" },
@@ -152,7 +153,7 @@ const Header = () => {
 
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth >= 1024) {
+      if (window.innerWidth >= 1280) {
         setIsMobileMenuOpen(false);
       }
     };
@@ -393,14 +394,14 @@ const Header = () => {
                 </span>
                 <span className="smaj-login-text">{isPiLoginPending ? t("nav.signingIn") : t("nav.login")}</span>
               </LoginWithPiButton>
-              <UtilityIcons
-                theme={mobileThemeMode}
-                language={language}
-                onLanguageChange={selectLanguage}
-                onToggleTheme={() => selectTheme(mobileThemeMode === "dark" ? "light" : "dark")}
-              />
             </>
           )}
+          <UtilityIcons
+            theme={mobileThemeMode}
+            language={language}
+            onLanguageChange={selectLanguage}
+            onToggleTheme={() => selectTheme(mobileThemeMode === "dark" ? "light" : "dark")}
+          />
         </div>
       </div>
       {isSearchModalOpen ? (
