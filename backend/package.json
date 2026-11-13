@@ -10,6 +10,8 @@
     "build": "tsc",
     "lint": "tsc --noEmit",
     "start": "ts-node-dev ./src/index.ts",
+    "test:pi-identity": "npm run build && node --test tests/piAccountIdentity.test.cjs",
+    "accounts:audit-pi": "node build/scripts/auditPiAccounts.js",
     "test:testnet-a2u": "npm run build && node --test tests/testnetA2U.test.cjs",
     "test:transactions": "node --test tests/liveTransactions.test.cjs",
     "test:i18n": "node --test tests/translations.test.cjs",

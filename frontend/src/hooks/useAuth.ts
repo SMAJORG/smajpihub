@@ -177,6 +177,7 @@ const toErrorMessage = (err: unknown) => {
 
 export const useAuth = () => {
   const initialUserRef = useRef<User | null>(getStoredPiUser());
+  const accountContinuityRef = useRef<string | undefined>(initialUserRef.current?.uid);
   const [user, setUser] = useState<User | null>(initialUserRef.current);
   const [showSignIn, setShowSignIn] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialUserRef.current);
@@ -270,27 +271,13 @@ export const useAuth = () => {
 
   const signInUser = useCallback(async (authResult: AuthResult) => {
     const fallback = authResultUser(authResult);
-    let signedInUser = fallback;
-    if (getBaseURL()) {
-      try {
-        const device = await getLoginDeviceMetadata();
-        const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult, sandbox: isPiSandboxMode(), device }, AUTH_REQUEST_CONFIG);
-        console.log("[auth] /user/signin success", {
-          status: response.status,
-          hasUser: Boolean(response.data.user?.uid),
-          username: response.data.user?.username || fallback.username,
-        });
-        signedInUser = toUser(response.data.user, { ...fallback, accessToken: response.data.session?.accessToken || fallback.accessToken });
-        if (response.data.session && response.data.user) await saveSessionCredentials(response.data.session, response.data.user);
-      } catch (err) {
-        if (import.meta.env.DEV && isAxiosError(err) && !err.response) {
-          console.warn("Backend sign-in unavailable; using local Pi session fallback.");
-          signedInUser = fallback;
-        } else {
-          throw err;
-        }
-      }
-    }
+    if (!getBaseURL()) throw new Error("The account server is not configured. Your original profile has not been replaced.");
+    const device = await getLoginDeviceMetadata();
+    const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult, sandbox: isPiSandboxMode(), device, expectedAccountUid: accountContinuityRef.current, loginContext: { clientId: window.__ENV?.piOAuthClientId || null } }, AUTH_REQUEST_CONFIG);
+    if (!response.data.user?.uid || !response.data.user.username) throw new Error("The server did not confirm your saved account. Your previous profile has not been replaced.");
+    const signedInUser = toUser(response.data.user, { ...fallback, accessToken: response.data.session?.accessToken || fallback.accessToken });
+    if (response.data.session) await saveSessionCredentials(response.data.session, response.data.user);
+    accountContinuityRef.current = signedInUser.uid;
     setUser(storeUser(signedInUser));
     setShowSignIn(false);
     setAuthFeedback({ type: "success", message: `Signed in as ${signedInUser.username || "Pi user"}.` });
@@ -313,7 +300,7 @@ export const useAuth = () => {
         await redirectToDashboard();
         return true;
       } catch (err) {
-        setAuthFeedback({ type: "error", message: (err as Error)?.message || "Pi login failed." });
+        setAuthFeedback({ type: "error", message: isAxiosError(err) ? toErrorMessage(err) : (err as Error)?.message || "Pi login failed." });
         return false;
       } finally {
         loginInProgressRef.current = false;
@@ -330,7 +317,7 @@ export const useAuth = () => {
         await redirectToDashboard();
         return true;
       } catch (err) {
-        setAuthFeedback({ type: "error", message: (err as Error)?.message || "Pi Sign-In failed." });
+        setAuthFeedback({ type: "error", message: isAxiosError(err) ? toErrorMessage(err) : (err as Error)?.message || "Pi Sign-In failed." });
         return false;
       } finally {
         loginInProgressRef.current = false;
@@ -412,10 +399,11 @@ export const useAuth = () => {
       await redirectToDashboard();
       return true;
     } catch (err) {
-      console.error("Pi login failed:", err);
+      console.error("[auth] Pi login failed", { status: isAxiosError(err) ? err.response?.status : undefined });
       const sdkMessage = (err as Error)?.message || "";
       const message = isAxiosError<BackendErrorBody>(err)
         ? toErrorMessage(err)
+        : /^(The server did not confirm|The account server)/.test(sdkMessage) ? sdkMessage
         : sdkMessage === "PI_AUTH_TIMEOUT"
           ? "Pi login timed out. Reopen Pi Browser, confirm your sandbox account is signed in, and try again."
           : /cancel|denied|reject/i.test(sdkMessage)
@@ -495,6 +483,7 @@ export const useAuth = () => {
   }, [user]);
 
   const signOut = useCallback(async () => {
+    accountContinuityRef.current = undefined; // Explicit sign-out allows intentional account switching.
     setIsLoading(true);
     try {
       const { supportsNativePushNotifications, unregisterNativePushOnLogout } = await import("../lib/nativePushNotifications");

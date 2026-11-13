@@ -1,3 +1,4 @@
+import { resolvePiAccount, PiAccountIdentityError, piLoginContext } from "../services/piAccountIdentity";
 import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
 import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
 import { issuePersistentSession, refreshPersistentSession, setRefreshCookie } from "../services/persistentSessions";
@@ -17,6 +18,7 @@ type VerifiedPiUser = {
   uid?: string;
   username?: string;
   wallet_address?: string;
+  credentials?: { scopes?: string[] };
 };
 
 const crossSiteSession = env.is_production && !env.is_solohost;
@@ -218,46 +220,31 @@ export const handleSignIn = async (req: Request, res: Response) => {
   }
 
   const normalizedUser = {
-    uid: verifiedUser.uid || auth.user.uid,
-    username: verifiedUser.username || auth.user.username,
-    roles: Array.isArray(auth.user.roles) ? auth.user.roles : [],
+    uid: verifiedUser.uid,
+    username: verifiedUser.username,
   };
   const isConfiguredAdmin = env.admin_pi_usernames.includes(normalizePiUsername(String(normalizedUser.username || "")));
 
   try {
-    let currentUser = await userCollection.findOne({ uid: normalizedUser.uid });
+    const resolution = await resolvePiAccount(userCollection, req.app.locals.piIdentityLinkCollection, { uid: verifiedUser.uid, username: verifiedUser.username }, typeof req.body?.expectedAccountUid === "string" ? req.body.expectedAccountUid.slice(0, 200) : undefined);
+    let currentUser = resolution.account;
+    const loginContext = piLoginContext(req.body, { ...verifiedUser, uid: verifiedUser.uid });
 
     if (currentUser) {
-      const role = isConfiguredAdmin ? "admin" : ["buyer", "seller", "admin"].includes(currentUser.role) ? currentUser.role : "buyer";
-      if (currentUser.blocked) {
-        return res.status(403).json({ error: "blocked", message: "This SMAJ account has been blocked" });
+      if (currentUser.blocked) return res.status(403).json({ error: "blocked", message: "This SMAJ account has been blocked" });
+      const updates: Record<string, any> = { lastSeenAt: new Date(), lastPiLogin: loginContext };
+      if (!resolution.linked) {
+        // Never provision/reset profile, verification, seller flags or settings on login.
+        Object.assign(updates, { username: normalizedUser.username, piUsername: normalizedUser.username,
+          ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }), accessToken: auth.accessToken, accessTokenRevokedAt: null });
+        if (isConfiguredAdmin && currentUser.role !== "admin") {
+          updates.role = "admin";
+          updates.roles = [...new Set([...(Array.isArray(currentUser.roles) ? currentUser.roles : []), "admin"])];
+        }
       }
-      await userCollection.updateOne(
-        {
-          _id: currentUser._id,
-        },
-        {
-          $set: {
-            username: normalizedUser.username,
-            piUsername: normalizedUser.username,
-            displayName: currentUser.displayName || normalizedUser.username,
-            country: currentUser.country || "",
-            contactPhone: currentUser.contactPhone || "",
-            role,
-            roles: [role],
-            blocked: false,
-            verificationLevel: currentUser.verificationLevel === "verified" ? "pi_verified" : currentUser.verificationLevel || "basic",
-            verificationStatus: currentUser.verificationStatus || "none",
-            verificationRequested: Boolean(currentUser.verificationRequested),
-            settings: currentUser.settings || { theme: "light", language: "English", notifications: true },
-            createdAt: currentUser.createdAt || new Date(),
-            lastSeenAt: new Date(),
-            ...verifiedPiIdentityFields({ uid: verifiedUser.uid!, wallet_address: verifiedUser.wallet_address }),
-            accessToken: auth.accessToken,
-            accessTokenRevokedAt: null,
-          },
-        },
-      );
+      // Linked app tokens/UIDs must not replace the original Testnet identity or
+      // canonical UID used by orders, seller tools, sessions and payout history.
+      await userCollection.updateOne({ _id: currentUser._id }, { $set: updates });
 
       currentUser = await userCollection.findOne({ _id: currentUser._id });
     } else {
@@ -278,6 +265,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
         settings: { theme: "light", language: "English", notifications: true },
         createdAt: new Date(),
         lastSeenAt: new Date(),
+        lastPiLogin: loginContext,
         ...verifiedPiIdentityFields({ uid: verifiedUser.uid!, wallet_address: verifiedUser.wallet_address }),
         accessToken: auth.accessToken,
       });
@@ -300,6 +288,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
     return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session });
   } catch (err) {
+    if (err instanceof PiAccountIdentityError) return res.status(409).json({ error: err.code, message: err.message });
     console.error("[pi-signin] session persistence failed", { code: (err as any)?.code });
     return res.status(500).json({ error: "internal_error", message: "Failed to sign in" });
   }

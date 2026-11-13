@@ -432,6 +432,8 @@ const start = async () => {
       app.locals.orderDisputeCollection = db.collection("order_disputes");
       app.locals.productCollection = db.collection("products");
       app.locals.userCollection = db.collection("users");
+      // Read only during login; bindings require separately reviewed ownership proof.
+      app.locals.piIdentityLinkCollection = db.collection("pi_account_identity_links");
       app.locals.ssoCodeCollection = db.collection("sso_codes");
       await app.locals.ssoCodeCollection.createIndex({expiresAt:1},{expireAfterSeconds:0});
       app.locals.reportCollection = db.collection("reports");
