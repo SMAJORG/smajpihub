@@ -10,6 +10,7 @@
     "build": "tsc",
     "lint": "tsc --noEmit",
     "start": "ts-node-dev ./src/index.ts",
+    "test:testnet-a2u": "npm run build && node --test tests/testnetA2U.test.cjs",
     "test:transactions": "node --test tests/liveTransactions.test.cjs",
     "test:i18n": "node --test tests/translations.test.cjs",
     "test:validation": "ts-node ./src/tests/storageValidation.test.ts",
@@ -33,6 +34,7 @@
     "firebase-admin": "^13.10.0",
     "mongodb": "^6.12.0",
     "morgan": "^1.10.0",
+    "pi-backend": "0.1.3",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

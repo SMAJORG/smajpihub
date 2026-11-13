@@ -464,6 +464,7 @@ const start = async () => {
       app.locals.jobPaymentCollection = db.collection("job_payments");
       app.locals.jobDisputeCollection = db.collection("job_disputes");
       app.locals.sessionCollection = db.collection("user_sessions");
+      app.locals.testnetA2UCollection = db.collection("testnet_a2u_payments", { writeConcern: { w: "majority", j: true } });
       app.locals.transportBookingCollection =
         db.collection("transport_bookings");
       app.locals.transportDriverCollection = db.collection("transport_drivers");

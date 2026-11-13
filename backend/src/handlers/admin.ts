@@ -1,3 +1,4 @@
+import { testnetA2UHandler } from "./testnetA2U";
 import { parseSiteContent } from "../services/siteContent";
 import { recordMerchantSettlement } from "../services/merchantSettlement";
 import { verifyOutboundPayment, bindPayment, financialTransaction } from "../services/financialIntegrity";
@@ -104,6 +105,8 @@ export default function mountAdminEndpoints(router: Router) {
     next();
   });
   router.use(async (req, res, next) => { if (await requireAdmin(req, res)) next(); });
+
+  router.post("/testnet/a2u", testnetA2UHandler);
 
   router.get("/site-content", async (req,res) => {
     if (!req.app.locals.siteContentCollection) return res.status(503).json({message:"Home content storage is starting."});
