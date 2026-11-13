@@ -212,12 +212,16 @@ export const useAuth = () => {
           username: response.data.user?.username,
         });
         if (response.data.user?.uid && response.data.user.username && mounted) {
+          accountContinuityRef.current = response.data.user.uid;
           setUser(storeUser(toUser(response.data.user, getStoredPiUser() || stored || response.data.user as User)));
         } else if (mounted) {
           await clearSessionCredentials();
           setUser(null);
         }
       } catch (err) {
+        if (isAxiosError<BackendErrorBody>(err) && err.response?.status === 409) {
+          if (mounted) { setUser(null); setAuthFeedback({ type: "error", message: err.response.data?.message || "Verified account recovery is required. Your original data has not been changed." }); }
+        }
         if (isAxiosError(err) && [401, 403].includes(err.response?.status || 0)) {
           await clearSessionCredentials();
           if (mounted) setUser(null);
@@ -233,7 +237,7 @@ export const useAuth = () => {
   }, []);
 
   useEffect(() => {
-    const changed = (event: Event) => setUser((event as CustomEvent<User>).detail);
+    const changed = (event: Event) => { const confirmed = (event as CustomEvent<User>).detail; accountContinuityRef.current = confirmed?.uid; setUser(confirmed); };
     const ended = () => setUser(null);
     const renew = () => {
       if (!document.hidden && getStoredPiUser()?.uid) void refreshHubSession(getBaseURL()).catch(() => undefined);

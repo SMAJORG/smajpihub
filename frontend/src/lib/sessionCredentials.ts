@@ -63,7 +63,10 @@ export function refreshHubSession(baseUrl: string) {
       });
       if (started !== generation) return null;
       const current = JSON.parse(localStorage.getItem(USER_KEY) || "null");
-      if (current?.uid && current.uid !== data.user?.uid) return null;
+      if (current?.uid && current.uid !== data.user?.uid) {
+        const recovery = data.identityRecovery;
+        if (!recovery?.bindingId || recovery.fromUid !== current.uid || recovery.canonicalUid !== data.user?.uid) return null;
+      }
       await saveSessionCredentials(data.session, data.user, started);
       if (started !== generation) return null;
       return data as { user: Record<string, any>; session: HubSession };

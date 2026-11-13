@@ -17,7 +17,7 @@ export async function resolvePiAccount(users: any, links: any, verified: { uid: 
   if (binding) {
     if (binding.status !== "approved" || typeof binding.approvedBy !== "string" || !binding.approvedBy.trim() || !Number.isFinite(new Date(binding.approvedAt || "").getTime()) || typeof binding.proofReference !== "string" || !binding.proofReference.trim() || typeof binding.originalAppId !== "string" || !binding.originalAppId.trim() || typeof binding.incomingAppId !== "string" || !binding.incomingAppId.trim() || typeof binding.canonicalUserId !== "string" || !ObjectId.isValid(binding.canonicalUserId)) throw recovery();
     const account = await users.findOne({ _id: new ObjectId(binding.canonicalUserId) });
-    if (!account || account.uid !== binding.canonicalUid || (expectedAccountUid && expectedAccountUid !== account.uid)) throw recovery();
+    if (!account || account.uid !== binding.canonicalUid) throw recovery();
     const canonicalPeers = await users.find({ uid: account.uid }).limit(2).toArray();
     if (canonicalPeers.length !== 1 || String(canonicalPeers[0]._id) !== String(account._id)) throw new PiAccountIdentityError("pi_duplicate_uid", "The original canonical UID is not unique. A database review is required before issuing a session; no account was changed.");
     const duplicates = matches.filter((user: any) => String(user._id) !== String(account._id));
@@ -28,8 +28,21 @@ export async function resolvePiAccount(users: any, links: any, verified: { uid: 
   }
   if (matches.length > 1) throw new PiAccountIdentityError("pi_duplicate_uid", "Multiple saved accounts use this Pi UID. Sign-in is stopped for a safe account review; no profile was selected or changed.");
   const account = matches[0] || null;
+  if (account) {
+    const hasSavedProfile = Boolean(account.country || account.contactPhone || account.avatar || account.bio || account.sellerActive || account.verificationStatus === "approved");
+    if (!hasSavedProfile) {
+      const candidateName = normalize(verified.username || account.piUsername || account.username || "");
+      if (candidateName) {
+        const sameName = new RegExp("^@*" + escaped(candidateName) + "$", "i");
+        const otherIdentity = await users.find({ uid: { $ne: verified.uid }, $or: [{ username: sameName }, { piUsername: sameName }] }).limit(1).project({ _id: 1 }).toArray();
+        // Name similarity can refuse an incomplete duplicate, never select its owner.
+        if (otherIdentity.length) throw recovery();
+      }
+    }
+    // A verified existing identity or approved binding outranks a stale browser hint.
+    return { account, linked: false, bindingId: null };
+  }
   if (expectedAccountUid && expectedAccountUid !== verified.uid) throw recovery();
-  if (account) return { account, linked: false, bindingId: null };
   if (expectedAccountUid) throw new PiAccountIdentityError("pi_account_record_missing", "Your previously signed-in account was not found in this backend database. No replacement profile was created. Ask support to verify the database and original Pi app identity.");
   const name = new RegExp("^" + escaped(normalize(verified.username)) + "$", "i");
   const collision = await users.find({ $or: [{ username: name }, { piUsername: name }] }).limit(1).project({ _id: 1 }).toArray();
@@ -47,3 +60,6 @@ export const piLoginContext = (body: any, verified: { uid: string; credentials?:
   scopes: Array.isArray(verified.credentials?.scopes) ? verified.credentials!.scopes.filter((scope: unknown) => typeof scope === "string").slice(0, 20) : [],
   at: new Date(),
 });
+
+// Call only after validating a Hub signature/device or a refresh-token hash.
+export const resolvePiSessionAccount = (users: any, links: any, uid: string) => resolvePiAccount(users, links, { uid, username: "" });

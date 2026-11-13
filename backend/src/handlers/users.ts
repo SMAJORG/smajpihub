@@ -302,8 +302,11 @@ export default function mountUserEndpoints(router: Router) {
       if (!result) return res.status(401).json({ error: "session_revoked", message: "Please sign in again to establish a new session." });
       await saveSession(req);
       setRefreshCookie(res, result.session.refreshToken, sessionCookieOptions);
-      return res.json({ user: toClientUser(result.user), session: result.session });
-    } catch { return res.status(503).json({ error: "authentication_unavailable", message: "Session renewal is temporarily unavailable. Please retry." }); }
+      return res.json({ user: toClientUser(result.user), session: result.session, ...(result.identityRecovery ? { identityRecovery: result.identityRecovery } : {}) });
+    } catch (error) {
+      if (error instanceof PiAccountIdentityError) return res.status(409).json({ error: error.code, message: error.message });
+      return res.status(503).json({ error: "authentication_unavailable", message: "Session renewal is temporarily unavailable. Please retry." });
+    }
   });
 
   router.post("/presence", async (req, res) => {

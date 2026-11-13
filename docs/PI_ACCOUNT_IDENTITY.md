@@ -13,7 +13,7 @@ Configuration inspection found `.env.public` and the Pages workflow using Sandbo
 - The incoming UID and username must be verified by Pi's server. Browser roles, usernames, wallet addresses and app/environment hints cannot select another account.
 - A unique existing UID returns the same canonical account. Login updates authentication metadata, not saved profiles, verification, seller flags, settings or roles. Existing additional roles are preserved; the existing configured-admin promotion remains supported.
 - A new UID colliding with a saved username stops with `pi_account_recovery_required`. The username is only a reason to stop signup, never a reason to link or merge.
-- A remembered account UID is a refusal-only continuity hint. It cannot grant access. A missing remembered account stops instead of provisioning a replacement; check the database and app identity. Explicit sign-out clears the browser hint for intentional account switching.
+- A remembered account UID is a refusal-only continuity hint. It cannot grant access or override a verified existing UID or approved binding. A missing remembered account stops instead of provisioning a replacement; check the database and app identity. Explicit sign-out clears the browser hint for intentional account switching.
 - Duplicate UID records stop rather than selecting an arbitrary profile. A canonical target must itself have a unique UID before a new session can be issued.
 - New users without conflicts can still register. The frontend never fabricates a local buyer profile after backend failure or an unconfirmed response.
 
@@ -56,3 +56,18 @@ Compare the report with controlled Pi logins in the original and paired app, Dev
 Tests cover existing/new identities, both app environments, profile/role/history preservation, mismatched identities, approved binding, duplicate review, read-only audit, explicit environment selection, and browser preservation during recovery/outages. Database/Pi responses in the integration tests are local fixtures, not production ownership verification.
 
 Official references: https://developers.minepi.com/docs/use-native-features/PiSignIn and https://developers.minepi.com/docs/api-reference/PlatformAPI.
+
+## Persistent-session recovery follow-up
+
+Previously, Hub access/refresh and cookie authentication looked up the incoming UID directly, bypassing approved recovery bindings. The browser also rejected a canonical UID returned by renewal, and a stale continuity hint could veto an approved binding at sign-in. These paths now use the same identity resolver. A validated refresh credential can reconnect its device session through an approved, duplicate-reviewed binding; the original account UID, profile, roles, verification and history remain unchanged. The device document records the prior UID and binding reference. Old alias access tokens require renewal. The browser accepts a UID transition only with matching server-issued recovery metadata.
+
+An incomplete existing UID with a conflicting username stops for identity review instead of silently opening the incomplete profile. This collision is only a refusal signal and never grants access to another account.
+
+For the reported users, gather candidates using the read-only audit in the production backend environment:
+
+```
+node build/scripts/auditPiAccounts.js --username alisha314159
+node build/scripts/auditPiAccounts.js --username socialswithkime
+```
+
+Neither username is an identity binding. Production ownership, UID pairs and bindings for these users have not been verified from this workspace. Their recovery still requires the ownership evidence and privileged binding review described above. No production accounts were merged, deleted, reset or claimed restored. No additional test runs were performed for this follow-up at the user's request.
