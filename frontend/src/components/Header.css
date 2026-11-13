@@ -67,7 +67,8 @@
     max-width: 108px;
     padding-inline-end: 20px;
     font-size: 13px;
-    background: transparent;
+    /* Override the global select theme background, which uses !important. */
+    background: transparent !important;
     appearance: none;
   }
   .smaj-header .smaj-language-picker::after {

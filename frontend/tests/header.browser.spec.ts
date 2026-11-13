@@ -27,6 +27,7 @@ for (const width of [1024, 1280, 1440, 1920]) {
     await openFixture(page);
     for (const code of codes) {
       await page.locator('.smaj-language-picker select').selectOption(code);
+      await expect(page.locator('.smaj-language-picker select')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(page.locator('html')).toHaveAttribute('dir', code === 'ar' ? 'rtl' : 'ltr');
       await expect(page.locator('.smaj-menu-toggle')).toBeHidden();
       const metrics = await page.locator('.smaj-header').evaluate(header => {
