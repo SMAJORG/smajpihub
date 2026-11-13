@@ -1,3 +1,4 @@
+import AdminTestnetPayoutsPage from "./pages/admin/AdminTestnetPayoutsPage";
 import AiSignInPage from "./pages/AiSignInPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
@@ -1300,6 +1301,10 @@ export const router = createBrowserRouter([
         </AdminLayout>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/admin/testnet-payouts",
+    element: <ProtectedRoute><AdminLayout><AdminTestnetPayoutsPage /></AdminLayout></ProtectedRoute>,
   },
   {
     path: "/admin/home-content",

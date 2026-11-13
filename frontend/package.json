@@ -15,6 +15,7 @@
     "android:sync": "npm run build:android-web && cap sync android",
     "android:open": "cap open android",
     "lint": "eslint .",
+    "test:testnet-payouts": "playwright test --config tests/payouts.playwright.config.ts",
     "test:jobs": "node tests/jobsUi.test.mjs",
     "test:header:browser": "playwright test --config tests/header.playwright.config.ts",
     "test:ai-workspace:browser": "node node_modules/@playwright/test/cli.js test --config tests/embedded-ai.playwright.config.mjs",
