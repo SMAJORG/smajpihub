@@ -19,7 +19,7 @@ Configuration inspection found `.env.public` and the Pages workflow using Sandbo
 
 ## Approved cross-app bindings
 
-Login reads `pi_account_identity_links`; no public endpoint writes it. No bindings were applied in production. A privileged operator must verify ownership of both identities and obtain explicit migration/reconnection approval first. Matching usernames, matching wallets, client Sandbox flags and client IDs alone are insufficient.
+Login reads `pi_account_identity_links`. The admin recovery endpoint can insert a binding only after record inspection, separate Pi verification of both UIDs and explicit admin approval. No bindings were applied in production from this workspace. A privileged operator must verify ownership of both identities and obtain explicit migration/reconnection approval first. Matching usernames, matching wallets, client Sandbox flags and client IDs alone are insufficient.
 
 An approved binding has this schema, using real IDs only in the private database after review:
 
@@ -71,3 +71,22 @@ node build/scripts/auditPiAccounts.js --username socialswithkime
 ```
 
 Neither username is an identity binding. Production ownership, UID pairs and bindings for these users have not been verified from this workspace. Their recovery still requires the ownership evidence and privileged binding review described above. No production accounts were merged, deleted, reset or claimed restored. No additional test runs were performed for this follow-up at the user's request.
+
+## Admin-assisted recovery
+
+Open **Admin Dashboard → Users & Identity → Account Recovery** (`/admin/account-recovery`). Existing admin authentication applies; no access-token copying is required.
+
+1. Inspect the affected username, including `alisha314159` and `socialswithkime`. This reads the deployed backend's current MongoDB database, saved UIDs, original/new account IDs, profile flags, roles, verification and order/product/message/session counts. Names only find candidates. Confirm this is the original production database; the workspace has no production MongoDB access.
+2. Select the original account from verified historical evidence. Enter the incoming UID and both Developer Portal app IDs. Inspect **both UIDs together**, review every newer record, and confirm the records checkbox. Opening a request adds a recovery case only. The server checks the inspection fingerprint and original UID uniqueness.
+3. Privately give the owner the expiring recovery code/link. They open `/account-recovery` through the **original Pi app**, verify the original identity, then repeat through the **incoming Pi app** with the same code. Both registrations must remain accessible and serve the recovery page. On Sandbox, navigate within the correct app preview. Use the Sandbox checkbox only for a confirmed Sandbox registration; Testnet alone is not Sandbox. No global Pi/payment configuration is changed.
+4. Each proof requires owner consent and a server `/v2/me` verification of the exact expected UID. The random code is stored as a hash, expires after 24 hours and permits 30 verification attempts. Pi access tokens remain in request memory; only credential hashes, consent timestamps, UIDs and verification timestamps are retained. Proof never grants access. Pi `/me` does not attest app IDs or prove both identities belong to the same person: the admin independently verifies the registrations, owner and historical account evidence.
+5. Refresh requests, select **Review**, inspect current records, record a private evidence reference and explicitly confirm ownership/app verification. **Approve identity reconnection** asks for confirmation. Approval inserts an immutable incoming-UID → original-account binding with reviewed duplicate IDs, proofs, reviewer and timestamps. Existing bindings cannot be overwritten. If records changed, open a new reviewed request. No profile, account, order or duplicate records are copied, updated, deleted or merged by these endpoints.
+6. The owner signs in again. The original UID/profile, saved roles, verification, seller status and account history are used. Existing refresh sessions can reconnect through the approved binding. Newer records remain intact; moving their content requires a separate approval.
+
+Blocked users can access the recovery page/proof endpoint without a Hub login. Inspection, case creation and approval remain admin-only. Sandbox CORS extends only to proof submission, which does not consume cookies or issue sessions. A recovery code authorizes proof submission only, never account access.
+
+Collisions now say **"We found an existing account. Please complete account recovery to continue."** Authentication requests suppress duplicate global error notifications. The native welcome screen remains the sole native sign-in error display. Unaffected exact-UID logins keep their existing flow.
+
+Deployment and production recovery remain unverified here. Production inspection, ownership checks, app-registration review and each final binding approval must be performed by an authorized administrator. No additional test suites were run at the user's request; static compilation/theme checks do not verify runtime behavior or production ownership.
+
+Official Pi token verification/app-specific UID contract: https://developers.minepi.com/docs/api-reference/PlatformAPI .

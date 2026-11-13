@@ -3,7 +3,8 @@ import { ObjectId } from "mongodb";
 export class PiAccountIdentityError extends Error {
   constructor(public code: string, message: string) { super(message); }
 }
-const recovery = () => new PiAccountIdentityError("pi_account_recovery_required", "This Pi app identity differs from an existing SMAJ account. Your original profile has not been changed. Sign in through the original Pi app or request identity recovery; do not create another profile.");
+export const PI_ACCOUNT_RECOVERY_MESSAGE = "We found an existing account. Please complete account recovery to continue.";
+const recovery = () => new PiAccountIdentityError("pi_account_recovery_required", PI_ACCOUNT_RECOVERY_MESSAGE);
 const normalize = (value: string) => value.trim().replace(/^@+/, "").toLowerCase();
 const escaped = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

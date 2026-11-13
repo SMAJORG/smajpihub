@@ -1,3 +1,4 @@
+import { mountAdminPiRecovery } from "./piAccountRecovery";
 import { testnetA2UHandler, testnetA2UPreflightHandler, testnetDashboardHandler, testnetRecipientsHandler } from "./testnetA2U";
 import { parseSiteContent } from "../services/siteContent";
 import { recordMerchantSettlement } from "../services/merchantSettlement";
@@ -111,6 +112,7 @@ export default function mountAdminEndpoints(router: Router) {
   router.get("/testnet/a2u/recipients", testnetRecipientsHandler);
 
   router.use(async (req, res, next) => { if (await requireAdmin(req, res)) next(); });
+  mountAdminPiRecovery(router);
 
 
   router.get("/site-content", async (req,res) => {

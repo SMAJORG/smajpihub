@@ -28,7 +28,7 @@ const PI_AUTH_TIMEOUT_MS = 20000;
 const MIN_SESSION_LOADING_MS = 450;
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
 const piAuthScopes = () => isPiSandboxMode() ? ["username", "wallet_address"] : ["username"];
-const AUTH_REQUEST_CONFIG = { withCredentials: true };
+const AUTH_REQUEST_CONFIG = { withCredentials: true, headers: { "X-SMAJ-Silent": "true" } };
 
 
 const onIncompletePaymentFound = () => {
@@ -171,6 +171,7 @@ const getLoginDeviceMetadata = async () => {
 const toErrorMessage = (err: unknown) => {
   const axiosErr = err as AxiosError<BackendErrorBody>;
   if (!axiosErr.response) return "Backend connection unavailable. Please try again.";
+  if (axiosErr.response.status === 409 && axiosErr.response.data?.error?.startsWith("pi_")) return "We found an existing account. Please complete account recovery to continue.";
   if ([400, 401].includes(axiosErr.response.status)) return "Pi login failed. Please login again through Pi Browser.";
   return axiosErr.response.data?.message ? `Login failed: ${axiosErr.response.data.message}` : `Login failed with status ${axiosErr.response.status}.`;
 };
@@ -220,7 +221,7 @@ export const useAuth = () => {
         }
       } catch (err) {
         if (isAxiosError<BackendErrorBody>(err) && err.response?.status === 409) {
-          if (mounted) { setUser(null); setAuthFeedback({ type: "error", message: err.response.data?.message || "Verified account recovery is required. Your original data has not been changed." }); }
+          if (mounted) { setUser(null); setAuthFeedback({ type: "error", message: err.response.data?.message || "We found an existing account. Please complete account recovery to continue." }); }
         }
         if (isAxiosError(err) && [401, 403].includes(err.response?.status || 0)) {
           await clearSessionCredentials();

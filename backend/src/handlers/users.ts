@@ -1,4 +1,4 @@
-import { resolvePiAccount, PiAccountIdentityError, piLoginContext } from "../services/piAccountIdentity";
+import { resolvePiAccount, PiAccountIdentityError, PI_ACCOUNT_RECOVERY_MESSAGE, piLoginContext } from "../services/piAccountIdentity";
 import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
 import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
 import { issuePersistentSession, refreshPersistentSession, setRefreshCookie } from "../services/persistentSessions";
@@ -288,7 +288,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
     return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session });
   } catch (err) {
-    if (err instanceof PiAccountIdentityError) return res.status(409).json({ error: err.code, message: err.message });
+    if (err instanceof PiAccountIdentityError) return res.status(409).json({ error: err.code, message: PI_ACCOUNT_RECOVERY_MESSAGE });
     console.error("[pi-signin] session persistence failed", { code: (err as any)?.code });
     return res.status(500).json({ error: "internal_error", message: "Failed to sign in" });
   }
@@ -304,7 +304,7 @@ export default function mountUserEndpoints(router: Router) {
       setRefreshCookie(res, result.session.refreshToken, sessionCookieOptions);
       return res.json({ user: toClientUser(result.user), session: result.session, ...(result.identityRecovery ? { identityRecovery: result.identityRecovery } : {}) });
     } catch (error) {
-      if (error instanceof PiAccountIdentityError) return res.status(409).json({ error: error.code, message: error.message });
+      if (error instanceof PiAccountIdentityError) return res.status(409).json({ error: error.code, message: PI_ACCOUNT_RECOVERY_MESSAGE });
       return res.status(503).json({ error: "authentication_unavailable", message: "Session renewal is temporarily unavailable. Please retry." });
     }
   });

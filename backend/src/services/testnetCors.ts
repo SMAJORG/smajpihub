@@ -3,7 +3,7 @@ import { resolveHubAccessUser } from "./persistentSessions";
 const identityPaths = new Set(["/user", "/user/signin", "/user/refresh", "/user/signout", "/user/presence"]);
 const normalized = (path: string) => path.replace(/\/+$/, "");
 // No new CORS access to Mainnet payments, profile editing or unrelated services.
-export const allowsTestnetSandboxOrigin = (path: string, origin: string | undefined, testnetConfigured: boolean) => Boolean(testnetConfigured && origin === "https://sandbox.minepi.com" && (/^\/admin\/testnet(?:\/|$)/.test(path) || identityPaths.has(normalized(path))));
+export const allowsTestnetSandboxOrigin = (path: string, origin: string | undefined, testnetConfigured: boolean) => Boolean(testnetConfigured && origin === "https://sandbox.minepi.com" && (/^\/admin\/testnet(?:\/|$)/.test(path) || identityPaths.has(normalized(path)) || normalized(path) === "/user/recovery/prove"));
 
 // Never let a Sandbox page exchange another site's cookies for Hub credentials.
 // Signin verifies its own Pi token; refresh requires its own explicit secret;

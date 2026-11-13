@@ -1,3 +1,4 @@
+import { provePiRecovery } from "./handlers/piAccountRecovery";
 import { allowsTestnetSandboxOrigin, guardTestnetSandboxIdentity } from "./services/testnetCors";
 import { SESSION_TTL_SECONDS } from "./services/sessionPolicy";
 import { isHubAccessToken } from "./services/persistentSessions";
@@ -272,6 +273,7 @@ app.use("/transactions", transactionsRouter); // /api-stripping reverse proxies
 
 // User endpoints (e.g signin, signout) under /user:
 const userRouter = express.Router();
+userRouter.post("/recovery/prove", provePiRecovery);
 mountUserEndpoints(userRouter);
 app.use("/user", userRouter);
 
@@ -432,8 +434,9 @@ const start = async () => {
       app.locals.orderDisputeCollection = db.collection("order_disputes");
       app.locals.productCollection = db.collection("products");
       app.locals.userCollection = db.collection("users");
-      // Read only during login; bindings require separately reviewed ownership proof.
+      // Login reads bindings; the admin recovery workflow writes only after dual Pi proof and record review.
       app.locals.piIdentityLinkCollection = db.collection("pi_account_identity_links");
+      app.locals.piRecoveryDatabase = db;
       app.locals.ssoCodeCollection = db.collection("sso_codes");
       await app.locals.ssoCodeCollection.createIndex({expiresAt:1},{expireAfterSeconds:0});
       app.locals.reportCollection = db.collection("reports");

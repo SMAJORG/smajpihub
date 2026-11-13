@@ -70,7 +70,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
     return () => window.clearInterval(timer);
   }, [isAuthenticated, isLoading]);
 
-  if (!isCapacitorNative() || isAuthenticated) return <>{children}</>;
+  if (!isCapacitorNative() || isAuthenticated || /\/account-recovery\/?$/.test(window.location.pathname)) return <>{children}</>;
 
   const slide = slides[activeSlide];
   const changeSlide = (direction: number) => {
@@ -141,7 +141,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
             ) : "Continue with Pi"}
           </button>
           {authFeedback?.type === "error" ? (
-            <p className="native-welcome__error" role="alert">{authFeedback.message}</p>
+            <p className="native-welcome__error" role="alert">{authFeedback.message}{authFeedback.message === "We found an existing account. Please complete account recovery to continue." && <a href="/account-recovery"> Recover account</a>}</p>
           ) : null}
           {needsPiBrowser ? (
             <button type="button" className="native-welcome__button native-welcome__install" onClick={() => void openPiBrowserInstall()}>
