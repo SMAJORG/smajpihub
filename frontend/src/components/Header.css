@@ -40,8 +40,9 @@
     background: transparent;
     white-space: nowrap;
     cursor: pointer;
+    transition: color .2s ease, background-color .2s ease;
   }
-  .smaj-desktop-trigger > svg { width: 17px; height: 17px; transition: transform .15s ease; }
+  .smaj-desktop-trigger > svg { width: 17px; height: 17px; transition: transform .28s cubic-bezier(.22, 1, .36, 1); }
   .smaj-desktop-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
   .smaj-desktop-trigger:hover,
   .smaj-desktop-trigger[aria-expanded="true"] { color: var(--primary); background: var(--primary-soft); }
@@ -60,8 +61,28 @@
   .smaj-header .smaj-auth-search-btn { flex-shrink: 0; width: 30px; margin: 0; }
   .smaj-header .smaj-login-btn { min-height: 40px; font-size: 13px; white-space: nowrap; text-decoration: none; }
   .smaj-header .smaj-utility-icons { flex-shrink: 0; gap: 6px; margin: 0; }
-  .smaj-header .smaj-language-picker { color: var(--text); gap: 4px; }
-  .smaj-header .smaj-language-picker select { width: 108px; max-width: 108px; font-size: 13px; }
+  .smaj-header .smaj-language-picker { position: relative; color: var(--text); gap: 4px; background: transparent; }
+  .smaj-header .smaj-language-picker select {
+    width: 108px;
+    max-width: 108px;
+    padding-inline-end: 20px;
+    font-size: 13px;
+    background: transparent;
+    appearance: none;
+  }
+  .smaj-header .smaj-language-picker::after {
+    content: "";
+    position: absolute;
+    inset-inline-end: 5px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-75%) rotate(45deg);
+    pointer-events: none;
+  }
+  .smaj-header .smaj-language-picker select:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
   .smaj-header .smaj-utility-icon-btn { width: 34px; }
   .smaj-header .smaj-search-panel-anchor { position: absolute; top: calc(100% + 8px); }
 
@@ -80,7 +101,10 @@
     overflow-y: auto;
     text-align: start;
     z-index: 50;
+    transform-origin: top left;
+    animation: smaj-desktop-panel-enter .28s cubic-bezier(.22, 1, .36, 1) both;
   }
+  [dir="rtl"] .smaj-mega-menu { transform-origin: top right; }
   .smaj-mega-menu[hidden] { display: none; }
   .smaj-mega-menu ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
   .smaj-mega-menu li { min-width: 0; }
@@ -100,6 +124,11 @@
   .smaj-mega-menu a[aria-current="page"] { color: #6b3fe6; background: #f3eeff; }
 }
 
+@keyframes smaj-desktop-panel-enter {
+  from { opacity: 0; transform: translateY(-8px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (min-width: 1024px) and (max-width: 1199px) {
   .smaj-header .smaj-header-inner { gap: 12px; padding-inline: 16px; }
   .smaj-desktop-trigger { padding-inline: 6px; font-size: 13px; }
@@ -108,5 +137,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .smaj-desktop-trigger,
   .smaj-desktop-trigger > svg { transition: none; }
+  .smaj-mega-menu { animation: none; }
 }

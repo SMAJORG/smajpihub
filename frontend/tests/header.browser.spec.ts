@@ -52,6 +52,7 @@ for (const width of [1024, 1280, 1440, 1920]) {
         await page.locator(`[data-trigger="${group}"]`).click();
         const panel = page.locator(`[data-panel="${group}"]`);
         await expect(panel).toBeVisible();
+        await panel.evaluate(el => el.getAnimations().forEach(animation => animation.finish()));
         const panelMetrics = await panel.evaluate(el => {
           const box = el.getBoundingClientRect();
           const trigger = el.parentElement!.querySelector('button')!.getBoundingClientRect();
