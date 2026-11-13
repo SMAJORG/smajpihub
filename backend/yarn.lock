@@ -2229,7 +2229,7 @@ stellar-base@^8.2.2:
   optionalDependencies:
     sodium-native "^3.3.0"
 
-stellar-sdk@^10.4.1:
+stellar-sdk@^10.4.1, stellar-sdk@10.4.1:
   version "10.4.1"
   resolved "https://registry.npmjs.org/stellar-sdk/-/stellar-sdk-10.4.1.tgz"
   integrity sha512-Wdm2UoLuN9SNrSEHO0R/I+iZuRwUkfny1xg4akhGCpO8LQZw8QzuMTJvbEoMT3sHT4/eWYiteVLp7ND21xZf5A==

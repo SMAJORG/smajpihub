@@ -27,7 +27,7 @@ type ProfileUpdate = {
 const PI_AUTH_TIMEOUT_MS = 20000;
 const MIN_SESSION_LOADING_MS = 450;
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
-const PI_AUTH_SCOPES = ["username"];
+const piAuthScopes = () => isPiSandboxMode() ? ["username", "wallet_address"] : ["username"];
 const AUTH_REQUEST_CONFIG = { withCredentials: true };
 
 
@@ -402,7 +402,7 @@ export const useAuth = () => {
     }
     try {
       await ensurePiInitialized();
-      const authResult = await authenticateWithTimeout(PI_AUTH_SCOPES);
+      const authResult = await authenticateWithTimeout(piAuthScopes());
       console.log("[auth] Pi authenticate success", {
         uid: authResult.user.uid,
         username: authResult.user.username,
