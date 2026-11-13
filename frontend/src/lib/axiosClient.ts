@@ -1,4 +1,4 @@
-import { refreshHubSession, clearSessionCredentials, getHubRefreshToken } from "./sessionCredentials";
+import { refreshHubSession, clearSessionCredentials, getHubRefreshToken, getHubAccessToken } from "./sessionCredentials";
 import { Capacitor } from "@capacitor/core";
 import axios, { type AxiosRequestConfig } from "axios";
 import { showFeedback } from "./feedback";
@@ -70,7 +70,8 @@ axiosClient.interceptors.request.use(async config => {
     const refreshToken = await getHubRefreshToken();
     if (refreshToken) config.headers.set("X-SMAJ-Refresh-Token", refreshToken);
   }
-  const accessToken = getStoredAccessToken() || (Capacitor.isNativePlatform()
+  const payoutToken = /\/admin\/testnet\/a2u(?:\/|$)/.test(config.url || "") ? await getHubAccessToken() : "";
+  const accessToken = payoutToken || getStoredAccessToken() || (Capacitor.isNativePlatform()
     ? await import("./nativeAppLock").then(({ getNativeSessionToken }) => getNativeSessionToken()).catch(() => "")
     : "");
   if (accessToken) {

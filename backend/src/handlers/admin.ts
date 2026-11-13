@@ -104,12 +104,14 @@ export default function mountAdminEndpoints(router: Router) {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
-  router.use(async (req, res, next) => { if (await requireAdmin(req, res)) next(); });
-
+  // Testnet handlers validate their Hub bearer and admin role themselves.
   router.post("/testnet/a2u", testnetA2UHandler);
   router.get("/testnet/a2u/preflight", testnetA2UPreflightHandler);
   router.get("/testnet/a2u/dashboard", testnetDashboardHandler);
   router.get("/testnet/a2u/recipients", testnetRecipientsHandler);
+
+  router.use(async (req, res, next) => { if (await requireAdmin(req, res)) next(); });
+
 
   router.get("/site-content", async (req,res) => {
     if (!req.app.locals.siteContentCollection) return res.status(503).json({message:"Home content storage is starting."});

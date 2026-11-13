@@ -1,3 +1,4 @@
+import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
 import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
 import { issuePersistentSession, refreshPersistentSession, setRefreshCookie } from "../services/persistentSessions";
 import { presenceUpdate } from "../services/userPresence";
@@ -15,6 +16,7 @@ import { currentDeviceSessionKey, ensureDeviceSession, type DeviceMetadata } fro
 type VerifiedPiUser = {
   uid?: string;
   username?: string;
+  wallet_address?: string;
 };
 
 const crossSiteSession = env.is_production && !env.is_solohost;
@@ -201,9 +203,11 @@ export const handleSignIn = async (req: Request, res: Response) => {
     });
     verifiedUser = meResponse.data ?? {};
   } catch (err) {
-    console.error("Error verifying access token:", err);
+    console.error("[pi-signin] identity verification failed", { status: (err as any)?.response?.status });
     return res.status(401).json({ error: "invalid_token", message: "Pi login failed. Please login again through Pi Browser." });
   }
+
+  if (!verifiedUser.uid || !verifiedUser.username) return res.status(401).json({ error: "invalid_pi_identity", message: "Pi did not verify your UID and username. Please sign in through Pi Browser again." });
 
   if (verifiedUser.uid && verifiedUser.uid !== auth.user.uid) {
     return res.status(401).json({ error: "invalid_token", message: "Pi login failed. Please login again through Pi Browser." });
@@ -248,6 +252,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
             settings: currentUser.settings || { theme: "light", language: "English", notifications: true },
             createdAt: currentUser.createdAt || new Date(),
             lastSeenAt: new Date(),
+            ...verifiedPiIdentityFields({ uid: verifiedUser.uid!, wallet_address: verifiedUser.wallet_address }),
             accessToken: auth.accessToken,
             accessTokenRevokedAt: null,
           },
@@ -273,6 +278,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
         settings: { theme: "light", language: "English", notifications: true },
         createdAt: new Date(),
         lastSeenAt: new Date(),
+        ...verifiedPiIdentityFields({ uid: verifiedUser.uid!, wallet_address: verifiedUser.wallet_address }),
         accessToken: auth.accessToken,
       });
 
@@ -294,7 +300,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
     return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session });
   } catch (err) {
-    console.error("Error during signin:", err);
+    console.error("[pi-signin] session persistence failed", { code: (err as any)?.code });
     return res.status(500).json({ error: "internal_error", message: "Failed to sign in" });
   }
 };

@@ -1,3 +1,4 @@
+import { allowsTestnetSandboxOrigin, guardTestnetSandboxIdentity } from "./services/testnetCors";
 import { SESSION_TTL_SECONDS } from "./services/sessionPolicy";
 import { isHubAccessToken } from "./services/persistentSessions";
 import mountSsoEndpoints from "./handlers/sso";
@@ -151,8 +152,7 @@ console.info("[cors-config]", {
   allowedOrigins: [...allowedOrigins],
 });
 
-app.use(
-  cors({
+const standardCors = cors({
     origin: (origin, callback) => {
       // Allow non-browser or same-origin server requests.
       if (!origin) {
@@ -177,14 +177,16 @@ app.use(
       callback(new Error(`CORS blocked origin: ${origin}`));
     },
     credentials: true,
-  }),
-);
+  });
+const testnetSandboxCors = cors({ origin: "https://sandbox.minepi.com", credentials: true });
+const isTestnetSandboxRequest = (req: express.Request) => allowsTestnetSandboxOrigin(req.path, req.get("origin"), Boolean(process.env.PI_TESTNET_API_KEY));
+app.use((req, res, next) => isTestnetSandboxRequest(req) ? testnetSandboxCors(req, res, next) : standardCors(req, res, next));
 
 // Reject browser mutations from untrusted or missing cross-site origins.
 app.use((req, res, next) => {
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const origin = req.get("origin");
-    if ((origin && !allowedOrigins.has(origin.replace(/\/+$/, "")) && !(!isProduction && origin.endsWith(".app.github.dev")))
+    if ((origin && !isTestnetSandboxRequest(req) && !allowedOrigins.has(origin.replace(/\/+$/, "")) && !(!isProduction && origin.endsWith(".app.github.dev")))
         || (!origin && req.get("sec-fetch-site") === "cross-site")) return res.status(403).json({ error: "untrusted_origin" });
   }
   next();
@@ -213,6 +215,8 @@ app.use(
         }),
   }) as unknown as express.RequestHandler,
 );
+
+app.use(guardTestnetSandboxIdentity);
 
 app.use(async (req, res, next) => {
   const bearer = (req.get("authorization") || "").replace(/^Bearer\s+/i, "") || req.get("x-smaj-access-token") || "";

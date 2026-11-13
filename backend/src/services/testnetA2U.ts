@@ -1,9 +1,9 @@
 import PiNetwork from "pi-backend";
-import axios from "axios";
+import { reviewPiRecipient, persistPiRecipientReview } from "./piRecipientIdentity";
 import { Collection } from "mongodb";
 
 export class PayoutError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public code = "testnet_payout_error") { super(message); }
 }
 export type PayoutSdk = Pick<PiNetwork, "createPayment" | "getPayment" | "submitPayment" | "completePayment">;
 export const makeTestnetSdk = (): PayoutSdk => {
@@ -13,17 +13,12 @@ export const makeTestnetSdk = (): PayoutSdk => {
   try { return new PiNetwork(key, seed); }
   catch { throw new PayoutError(503, "Testnet wallet seed must be a valid Stellar secret seed (S..., 56 characters)."); }
 };
-export const getVerifiedTestnetRecipient = async (user: any) => {
-  if (!user || user.blocked || !user.accessToken || user.accessTokenRevokedAt) return null;
-  try {
-    const { data } = await axios.get("https://api.minepi.com/v2/me", {
-      headers: { Authorization: `Bearer ${user.accessToken}` }, timeout: 6000,
-    });
-    if (data.uid !== user.uid || (data.credentials?.valid_until?.timestamp && data.credentials.valid_until.timestamp * 1000 <= Date.now())) return null;
-    return { uid: data.uid as string, walletAddress: typeof data.wallet_address === "string" ? data.wallet_address : "" };
-  } catch { return null; }
+export const getVerifiedTestnetRecipient = async (user: any, collection?: any) => {
+  const review = await reviewPiRecipient(user);
+  await persistPiRecipientReview(collection, user, review);
+  return review.recipient;
 };
-export const verifyTestnetRecipient = async (user: any) => Boolean(await getVerifiedTestnetRecipient(user));
+export const verifyTestnetRecipient = async (user: any, collection?: any) => Boolean(await getVerifiedTestnetRecipient(user, collection));
 const validatePayment = (payment: any, uid: string, paymentId: string) => {
   if (payment.identifier !== paymentId || payment.network !== "Pi Testnet" || payment.direction !== "app_to_user"
       || payment.user_uid !== uid || payment.amount !== 0.01 || !/^G[A-Z2-7]{55}$/.test(payment.to_address)

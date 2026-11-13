@@ -8,16 +8,22 @@ import { makeTestnetSdk, PayoutError, sendTestnetPayout, verifyTestnetRecipient 
 async function requirePayoutAdmin(req: Request, res: Response) {
   res.setHeader("Cache-Control", "no-store");
   const token = req.get("authorization")?.match(/^Bearer (hub_access\.[^\s]+)$/i)?.[1];
-  if (!token) { res.status(401).json({ message: "A valid admin Hub bearer token is required; cookies are not sufficient." }); return null; }
+  if (!token) { res.status(401).json({ code: "admin_session_required", message: "Your admin session needs renewal. Sign out and sign in again; no token copying is needed." }); return null; }
   // Validate this credential directly, independently of the shared cookie/session cache.
   const admin = await resolveHubAccessUser(req, token);
-  if (!admin) { res.status(401).json({ message: "Admin bearer token is invalid, expired or revoked." }); return null; }
+  if (!admin) { res.status(401).json({ code: "admin_session_expired", message: "Your admin session expired or was revoked. Sign in again." }); return null; }
   const configuredAdmin = [admin.username, admin.piUsername].some(value => env.admin_pi_usernames.includes(String(value || "").trim().replace(/^@+/, "").toLowerCase()));
-  if (admin.role !== "admin" && !configuredAdmin) { res.status(403).json({ message: "Admin access required." }); return null; }
+  if (admin.role !== "admin" && !configuredAdmin) { res.status(403).json({ code: "admin_required", message: "This signed-in account is not an authorized SMAJ administrator." }); return null; }
   return admin;
 }
 const validUid = (uid: unknown): uid is string => typeof uid === "string" && /^[a-zA-Z0-9_-]{1,200}$/.test(uid);
-const fail = (res: Response, error: unknown) => res.status(error instanceof PayoutError ? error.status : 503).json({ message: error instanceof PayoutError ? error.message : "Testnet payout unavailable." });
+const fail = (res: Response, error: unknown) => {
+  const status = error instanceof PayoutError ? error.status : 503;
+  const code = error instanceof PayoutError ? error.code : "payout_storage_unavailable";
+  // Never log Axios errors or headers: they can include API keys and Pi tokens.
+  console.warn("[testnet-a2u] request failed", { status, code });
+  return res.status(status).json({ code, message: error instanceof PayoutError ? error.message : "The Testnet payout database or service is unavailable. Check backend logs for [testnet-a2u]; no payment was confirmed." });
+};
 
 export async function testnetA2UPreflightHandler(req: Request, res: Response) {
   try {
@@ -41,7 +47,7 @@ export async function testnetA2UHandler(req: Request, res: Response) {
     if (!collection) return res.status(503).json({ message: "Payout database unavailable." });
     // Preserve idempotent completed responses, but verify current recipient identity first.
     const recipient = await req.app.locals.userCollection.findOne({ uid });
-    if (!await verifyTestnetRecipient(recipient)) return res.status(422).json({ message: "Recipient must have a currently verified Pi login." });
+    if (!await verifyTestnetRecipient(recipient, req.app.locals.userCollection)) return res.status(422).json({ message: "Recipient must have a currently verified Pi login." });
     const existing = await collection.findOne({ _id: `recipient:${uid}` });
     if (existing?.status !== "completed") {
       const preflight = await testnetA2UPreflight(req.app.locals, uid);

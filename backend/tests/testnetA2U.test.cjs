@@ -123,3 +123,60 @@ test('eligible list freshly verifies UID and wallet consent and never returns to
 test('changed wallet after confirmation cannot be submitted',async()=>{
  const db=new Store(),pi=sdk();await assert.rejects(sendTestnetPayout(db,'user','admin',pi,{recipientWalletAddress:'G'+'B'.repeat(55)}));assert.deepEqual(pi.calls,['create']);
 });
+test('saved server-verified identity survives OAuth expiry, but spoofed or revoked consent does not',async()=>{
+ const {reviewPiRecipient,verifiedPiIdentityFields}=require('../build/services/piRecipientIdentity');const axios=require('axios'),old=axios.get;
+ const wallet='G'+'A'.repeat(55),saved={uid:'user',accessToken:'expired-test-token',...verifiedPiIdentityFields({uid:'user',wallet_address:wallet})};
+ axios.get=async()=>{throw Object.assign(new Error('expired'),{isAxiosError:true,response:{status:401}});};
+ try{assert.equal((await reviewPiRecipient(saved)).recipient.walletAddress,wallet);assert.equal((await reviewPiRecipient({uid:'user',accessToken:'expired-test-token',wallet_address:wallet})).reason,'pi_login_expired');
+ axios.get=async()=>({data:{uid:'user'}});assert.equal((await reviewPiRecipient(saved)).reason,'wallet_consent_required');
+ axios.get=async()=>{throw Object.assign(new Error('denied'),{isAxiosError:true,response:{status:403}});};assert.equal((await reviewPiRecipient(saved)).recipient,null);
+ }finally{axios.get=old;}
+});
+test('Sandbox CORS allowance is scoped to Testnet/admin identity routes and requires configuration',()=>{
+ const {allowsTestnetSandboxOrigin:allow}=require('../build/services/testnetCors');
+ assert(allow('/admin/testnet/a2u/dashboard','https://sandbox.minepi.com',true));assert(allow('/user/signin','https://sandbox.minepi.com',true));
+ assert(!allow('/user/profile','https://sandbox.minepi.com',true));assert(!allow('/payments/complete','https://sandbox.minepi.com',true));assert(!allow('/admin/orders','https://sandbox.minepi.com',true));assert(!allow('/admin/testnet/a2u','https://evil.example',true));assert(!allow('/admin/testnet/a2u','https://sandbox.minepi.com',false));
+});
+test('real HTTP login → admin Hub session → @username/UID/wallet search → readiness; no payment endpoints called',async()=>{
+ const express=require('express'),session=require('express-session'),axios=require('axios'),{Keypair}=require('stellar-sdk');
+ const env=require('../build/environments').default,{createMemoryCollections}=require('../build/services/memoryDatabase');
+ const mountAdmin=require('../build/handlers/admin').default,{handleSignIn}=require('../build/handlers/users');
+ const oldAdapter=axios.defaults.adapter,oldAdmins=env.admin_pi_usernames,oldKey=process.env.PI_TESTNET_API_KEY,oldSeed=process.env.PI_TESTNET_WALLET_SEED;
+ const sender=Keypair.random(),recipient=Keypair.random().publicKey();let recipientStatus=200,externalPosts=0;
+ process.env.PI_TESTNET_API_KEY='integration-app-key';process.env.PI_TESTNET_WALLET_SEED=sender.secret();env.admin_pi_usernames=['integration-admin'];
+ axios.defaults.adapter=async config=>{
+  if(String(config.method).toLowerCase()!=='get'){externalPosts++;throw new Error('Test forbids external mutations');}
+  const path=String(config.url);
+  let data;
+  if(path.endsWith('/v2/me')){const admin=String(config.headers.Authorization).includes('admin-pi-token');if(!admin&&recipientStatus!==200)throw Object.assign(new Error('Pi identity unavailable'),{isAxiosError:true,response:{status:recipientStatus},config});data=admin?{uid:'admin-uid',username:'integration-admin',wallet_address:sender.publicKey()}:{uid:'alice-uid',username:'alice.name',wallet_address:recipient};}
+  else if(path.endsWith('/incomplete_server_payments'))data={incomplete_server_payments:[]};
+  else if(path.includes('/ledgers?'))data={_embedded:{records:[{base_reserve_in_stroops:4900000,base_fee_in_stroops:100000}]}};
+  else if(path.includes('/accounts/'))data={balances:[{asset_type:'native',balance:'5'}],subentry_count:0};else throw new Error('Unexpected read');
+  return {status:200,statusText:'OK',data,headers:{},config};
+ };
+ const tables=createMemoryCollections(),payouts=createMemoryCollections().userCollection;payouts.distinct=async()=>[];
+ const app=express();app.use(express.json());app.use(session({secret:'integration-session-only',resave:false,saveUninitialized:true}));app.locals.userCollection=tables.userCollection;app.locals.deviceSessionCollection=tables.deviceSessionCollection;app.locals.testnetA2UCollection=payouts;
+ app.post('/user/signin',handleSignIn);const router=express.Router();mountAdmin(router);app.use('/admin',router);
+ const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`;
+ try{
+  const login=async(uid,username,token)=>{const r=await fetch(base+'/user/signin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({authResult:{accessToken:token,user:{uid,username,wallet_address:'client-spoofed-address'}}})});assert.equal(r.status,200);return r.json();};
+  const admin=await login('admin-uid','integration-admin','admin-pi-token'),user=await login('alice-uid','alice.name','recipient-pi-token');
+  assert.equal(admin.user.role,'admin');const stored=await tables.userCollection.findOne({uid:'alice-uid'});assert.equal(stored.piWalletAddress,recipient);assert.equal(stored.piVerifiedUid,'alice-uid');
+  const headers={Authorization:'Bearer '+admin.session.accessToken};
+  for(const search of ['@alice.name','alice-uid',recipient]){const r=await fetch(base+'/admin/testnet/a2u/recipients?search='+encodeURIComponent(search),{headers});assert.equal(r.status,200);const body=await r.json();assert.equal(body.recipients[0].uid,'alice-uid');assert(!JSON.stringify(body).includes('recipient-pi-token'));}
+  const dashboard=await fetch(base+'/admin/testnet/a2u/dashboard',{headers});assert.equal(dashboard.status,200);const snapshot=await dashboard.json();assert.equal(snapshot.wallet.ready,true);assert.equal(snapshot.wallet.apiStatus,200);
+  const preflight=await fetch(base+'/admin/testnet/a2u/preflight?uid=alice-uid',{headers});assert.equal(preflight.status,200);assert.equal((await preflight.json()).checksPassed,true);
+  const denied=await fetch(base+'/admin/testnet/a2u/dashboard',{headers:{Authorization:'Bearer '+user.session.accessToken}});assert.equal(denied.status,403);assert.equal((await denied.json()).code,'admin_required');
+  recipientStatus=401;const expired=await fetch(base+'/admin/testnet/a2u/recipients?search=alice-uid',{headers});assert.equal((await expired.json()).recipients[0].uid,'alice-uid');
+  recipientStatus=403;const revoked=await fetch(base+'/admin/testnet/a2u/recipients?search=alice-uid',{headers});const revokedBody=await revoked.json();assert.equal(revokedBody.recipients.length,0);assert.equal(revokedBody.diagnostics.pi_permission_denied,1);assert.equal((await tables.userCollection.findOne({uid:'alice-uid'})).piWalletVerifiedAt,null);
+  assert.equal(externalPosts,0);
+ }finally{
+  await new Promise(r=>server.close(r));axios.defaults.adapter=oldAdapter;env.admin_pi_usernames=oldAdmins;
+  for(const [name,value]of[['PI_TESTNET_API_KEY',oldKey],['PI_TESTNET_WALLET_SEED',oldSeed]]){if(value===undefined)delete process.env[name];else process.env[name]=value;}
+ }
+});
+
+test('Sandbox identity cannot exchange cookie-only sessions for credentials',async()=>{
+ const {guardTestnetSandboxIdentity:guard}=require('../build/services/testnetCors');const old=process.env.PI_TESTNET_API_KEY;process.env.PI_TESTNET_API_KEY='test-only';
+ try{for(const path of ['/user','/user/refresh','/user/signout']){let status=0,passed=false;const req={path,method:path==='/user'?'GET':'POST',get:name=>name==='origin'?'https://sandbox.minepi.com':undefined,session:{user:{role:'admin'}}};const res={status(code){status=code;return this;},json(){}};await guard(req,res,()=>{passed=true;});assert.equal(status,401);assert.equal(passed,false);}}finally{if(old===undefined)delete process.env.PI_TESTNET_API_KEY;else process.env.PI_TESTNET_API_KEY=old;}
+});

@@ -78,3 +78,12 @@ export function refreshHubSession(baseUrl: string) {
   })().finally(() => { pending = null; });
   return pending;
 }
+
+// Payouts require the canonical Hub credential, not a possibly stale Pi/profile token.
+export async function getHubAccessToken() {
+  if (Capacitor.isNativePlatform()) return import("./nativeAppLock").then(storage => storage.getNativeSessionToken());
+  try {
+    const token = JSON.parse(localStorage.getItem(KEY) || "null")?.accessToken;
+    return typeof token === "string" && token.startsWith("hub_access.") ? token : "";
+  } catch { return ""; }
+}
