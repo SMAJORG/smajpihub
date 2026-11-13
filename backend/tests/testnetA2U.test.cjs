@@ -43,22 +43,22 @@ test('credentials missing fails closed',()=>{
  try {assert.throws(makeTestnetSdk,/not configured/);}finally{if(old)process.env.PI_TESTNET_API_KEY=old;}
 });
 test('endpoint validates bearer independently of admin cookies and rejects non-admin Hub tokens',async()=>{
- const express=require('express'),{ObjectId}=require('mongodb');const {testnetA2UHandler,testnetA2UPreflightHandler}=require('../build/handlers/testnetA2U');
+ const express=require('express'),{ObjectId}=require('mongodb');const {testnetA2UHandler,testnetA2UPreflightHandler,testnetDashboardHandler,testnetRecipientsHandler}=require('../build/handlers/testnetA2U');
  const {createHmac}=require('crypto'),env=require('../build/environments').default;
  const body=Buffer.from(JSON.stringify({uid:'buyer',deviceId:'a'.repeat(64),exp:Math.floor(Date.now()/1000)+120})).toString('base64url');
  const signed='hub_access.'+body+'.'+createHmac('sha256',env.session_secret).update('hub-access:'+body).digest('base64url');
  let role='admin';
  const app=express();app.use(express.json());app.use((req,res,next)=>{req.session={user:{userId:new ObjectId().toString()}};next();});
  app.locals.userCollection={findOne:async()=>({_id:new ObjectId(),uid:'buyer',role})};app.locals.deviceSessionCollection={findOne:async()=>({active:true})};
- app.post('/payout',testnetA2UHandler);app.get('/preflight',testnetA2UPreflightHandler);
+ app.post('/payout',testnetA2UHandler);app.get('/preflight',testnetA2UPreflightHandler);app.get('/dashboard',testnetDashboardHandler);app.get('/recipients',testnetRecipientsHandler);
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}`;
  try {
   for(const token of ['', 'invalid', 'hub_access.invalid.signature']) {
    const headers=token?{Authorization:'Bearer '+token}:{};
    assert.equal((await fetch(url+'/payout',{method:'POST',headers})).status,401);
-   assert.equal((await fetch(url+'/preflight',{headers})).status,401);
+   for(const path of ['/preflight','/dashboard','/recipients']) assert.equal((await fetch(url+path,{headers})).status,401);
   }
-  role='buyer';assert.equal((await fetch(url+'/payout',{method:'POST',headers:{Authorization:'Bearer '+signed}})).status,403);
+  role='buyer';assert.equal((await fetch(url+'/payout',{method:'POST',headers:{Authorization:'Bearer '+signed}})).status,403);for(const path of ['/dashboard','/recipients','/preflight']) assert.equal((await fetch(url+path,{headers:{Authorization:'Bearer '+signed}})).status,403);
   role='admin';assert.equal((await fetch(url+'/payout',{method:'POST',headers:{Authorization:'Bearer '+signed}})).status,400);
   app.locals.deviceSessionCollection.findOne=async()=>null;
   assert.equal((await fetch(url+'/preflight',{headers:{Authorization:'Bearer '+signed}})).status,401);
@@ -100,4 +100,26 @@ test('read-only preflight verifies credentials, funding, consent and UID without
  } finally {
   axios.get=oldGet;for(const [name,value] of [['PI_TESTNET_API_KEY',oldKey],['PI_TESTNET_WALLET_SEED',oldSeed]]){if(value===undefined)delete process.env[name];else process.env[name]=value;}
  }
+});
+test('same wallet cannot receive again through a different UID',async()=>{
+ const db=new Store(),first=sdk();await sendTestnetPayout(db,'user','admin',first);
+ const second=sdk();second.payment.user_uid='second-user';await assert.rejects(sendTestnetPayout(db,'second-user','admin',second));
+ assert.deepEqual(second.calls,['create']);assert.equal(db.rows.get('recipient:second-user').status,'reconciliation_required');
+});
+test('dashboard reports verified unique-wallet progress and restricts payment fields',async()=>{
+ const {testnetDashboard}=require('../build/services/testnetA2UDashboard');const old=process.env.PI_TESTNET_API_KEY;delete process.env.PI_TESTNET_API_KEY;let projection;
+ const cursor={project(fields){projection=fields;return this;},sort(){return this;},skip(){return this;},limit(){return this;},toArray:async()=>[]};
+ const collection={find:()=>cursor,countDocuments:async()=>0,findOne:async()=>null,distinct:async(field,filter)=>{assert.equal(field,'recipientWalletAddress');assert.equal(filter.status,'completed');assert.equal(filter['piStatus.transaction_verified'],true);assert.equal(filter['piStatus.developer_completed'],true);assert.equal(filter.network,'Pi Testnet');return ['wallet1','wallet2'];}};
+ try{const result=await testnetDashboard({testnetA2UCollection:collection},1);assert.equal(result.successfulUniqueWallets,2);assert.equal(result.target,5);assert.equal(result.wallet.ready,false);assert(!('accessToken' in projection));assert(!('adminUid' in projection));assert.equal(projection.txid,1);}finally{if(old)process.env.PI_TESTNET_API_KEY=old;}
+});
+test('eligible list freshly verifies UID and wallet consent and never returns tokens',async()=>{
+ const {testnetRecipients}=require('../build/services/testnetA2UDashboard');const axios=require('axios'),old=axios.get;
+ const users=[{uid:'eligible',username:'alice',accessToken:'secret-alice'},{uid:'no-consent',username:'bob',accessToken:'secret-bob'},{uid:'paid',username:'carol',accessToken:'secret-carol'},{uid:'forged',username:'eve',accessToken:'secret-eve'}];
+ const cursor={project(){return this;},sort(){return this;},skip(){return this;},limit(){return this;},toArray:async()=>users};
+ const locals={userCollection:{find:()=>cursor},testnetA2UCollection:{findOne:async q=>q._id==='recipient:paid'?{status:'completed'}:null}};
+ axios.get=async(_url,config)=>{const user=users.find(u=>config.headers.Authorization.endsWith(u.accessToken));return {data:{uid:user.uid==='forged'?'mismatch':user.uid,wallet_address:user.uid==='no-consent'?'':'G'+'A'.repeat(55)}};};
+ try{const result=await testnetRecipients(locals,1,'');assert.deepEqual(result.recipients.map(r=>r.uid),['eligible','paid']);assert.equal(result.recipients[0].canReceive,true);assert.equal(result.recipients[1].canReceive,false);assert(!JSON.stringify(result).includes('secret-'));assert(!JSON.stringify(result).includes('accessToken'));}finally{axios.get=old;}
+});
+test('changed wallet after confirmation cannot be submitted',async()=>{
+ const db=new Store(),pi=sdk();await assert.rejects(sendTestnetPayout(db,'user','admin',pi,{recipientWalletAddress:'G'+'B'.repeat(55)}));assert.deepEqual(pi.calls,['create']);
 });

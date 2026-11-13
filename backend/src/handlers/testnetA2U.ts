@@ -1,3 +1,4 @@
+import { payoutPage, testnetDashboard, testnetRecipients } from "../services/testnetA2UDashboard";
 import { Request, Response } from "express";
 import env from "../environments";
 import { resolveHubAccessUser } from "../services/persistentSessions";
@@ -32,8 +33,9 @@ export async function testnetA2UHandler(req: Request, res: Response) {
     const admin = await requirePayoutAdmin(req, res);
     if (!admin) return;
     const uid = req.body?.uid;
-    if (!validUid(uid) || Object.keys(req.body).some(key => key !== "uid")) {
-      return res.status(400).json({ message: "Supply only a verified Pi user uid; amount is fixed at 0.01 Test-Pi." });
+    const confirmed = { recipientWalletAddress: req.body?.recipientWalletAddress, senderWalletAddress: req.body?.senderWalletAddress };
+    if (!validUid(uid) || Object.keys(req.body).some(key => !["uid", "recipientWalletAddress", "senderWalletAddress"].includes(key)) || Object.values(confirmed).some(address => address !== undefined && (typeof address !== "string" || !/^G[A-Z2-7]{55}$/.test(address)))) {
+      return res.status(400).json({ message: "Supply a verified Pi user uid and optional confirmed wallet addresses; amount is fixed at 0.01 Test-Pi." });
     }
     const collection = req.app.locals.testnetA2UCollection;
     if (!collection) return res.status(503).json({ message: "Payout database unavailable." });
@@ -41,8 +43,28 @@ export async function testnetA2UHandler(req: Request, res: Response) {
     const recipient = await req.app.locals.userCollection.findOne({ uid });
     if (!await verifyTestnetRecipient(recipient)) return res.status(422).json({ message: "Recipient must have a currently verified Pi login." });
     const existing = await collection.findOne({ _id: `recipient:${uid}` });
-    if (existing?.status !== "completed") await testnetA2UPreflight(req.app.locals, uid);
-    const payout = await sendTestnetPayout(collection, uid, admin.uid, makeTestnetSdk());
+    if (existing?.status !== "completed") {
+      const preflight = await testnetA2UPreflight(req.app.locals, uid);
+      if ((confirmed.recipientWalletAddress && confirmed.recipientWalletAddress !== preflight.recipientWalletAddress) || (confirmed.senderWalletAddress && confirmed.senderWalletAddress !== preflight.senderWalletAddress)) {
+        return res.status(409).json({ message: "A wallet address changed. Refresh and select the recipient again before confirming." });
+      }
+      confirmed.recipientWalletAddress = preflight.recipientWalletAddress;
+      confirmed.senderWalletAddress = preflight.senderWalletAddress;
+    }
+    const payout = await sendTestnetPayout(collection, uid, admin.uid, makeTestnetSdk(), confirmed);
     return res.status(200).json({ payout });
+  } catch (error) { return fail(res, error); }
+}
+
+export async function testnetDashboardHandler(req: Request, res: Response) {
+  try {
+    if (!await requirePayoutAdmin(req, res)) return;
+    return res.json(await testnetDashboard(req.app.locals, payoutPage(req.query.page)));
+  } catch (error) { return fail(res, error); }
+}
+export async function testnetRecipientsHandler(req: Request, res: Response) {
+  try {
+    if (!await requirePayoutAdmin(req, res)) return;
+    return res.json(await testnetRecipients(req.app.locals, payoutPage(req.query.page), String(req.query.search || "").trim().slice(0, 80)));
   } catch (error) { return fail(res, error); }
 }

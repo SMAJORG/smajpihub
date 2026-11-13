@@ -34,7 +34,7 @@ const validatePayment = (payment: any, uid: string, paymentId: string) => {
 
 // One test payout per UID. The fixed wallet lock serializes SDK calls across replicas.
 // Neither lock nor payout reservations expire: ambiguous transfers must never be resent.
-export async function sendTestnetPayout(collection: Collection<any>, uid: string, adminUid: string, sdk: PayoutSdk) {
+export async function sendTestnetPayout(collection: Collection<any>, uid: string, adminUid: string, sdk: PayoutSdk, expected: { recipientWalletAddress?: string; senderWalletAddress?: string } = {}) {
   const id = `recipient:${uid}`;
   const existing = await collection.findOne({ _id: id });
   if (existing) {
@@ -59,7 +59,13 @@ export async function sendTestnetPayout(collection: Collection<any>, uid: string
     await save({ paymentId, status: "created" });
     const payment = await sdk.getPayment(paymentId);
     validatePayment(payment, uid, paymentId);
+    if ((expected.recipientWalletAddress && payment.to_address !== expected.recipientWalletAddress) || (expected.senderWalletAddress && payment.from_address !== expected.senderWalletAddress)) throw new Error("Confirmed wallet changed");
     if (payment.transaction) throw new Error("Unexpected existing transaction");
+    const walletId = `wallet:${payment.to_address}`;
+    if (await collection.findOne({ _id: walletId }) || await collection.findOne({ recipientWalletAddress: payment.to_address, status: { $in: ["completed", "submitting", "submitted", "reconciliation_required"] } })) {
+      throw new Error("Recipient wallet already reserved or paid");
+    }
+    await collection.insertOne({ _id: walletId, recipientUid: uid, createdAt: new Date(), type: "wallet_reservation" });
     await save({ recipientWalletAddress: payment.to_address, status: "submitting" });
     const txid = await sdk.submitPayment(paymentId);
     if (!txid) throw new Error("Missing transaction ID");

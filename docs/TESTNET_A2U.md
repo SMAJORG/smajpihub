@@ -43,3 +43,24 @@ Normal Pi Browser login now requests `wallet_address` alongside `username` only 
 6. Expect `status: completed`, amount `0.01`, network `Pi Testnet`, paymentId, txid, and recipientWalletAddress; confirm receipt in Pi Wallet's Testnet view. On timeout/409, stop and reconcile. Never clear a lock to try again.
 
 The helper uses only Python's standard library, never saves credentials, and defaults to a read-only check. Render access and an authenticated admin session are required to verify private runtime prerequisites; a public health response cannot verify the secret values or wallet connection.
+
+
+## Admin website dashboard
+
+Open **Admin Dashboard → Pi Payments → Testnet Payouts**, or `/admin/testnet-payouts`. Existing admin authentication is attached automatically by the shared API client; there is no token-entry flow. The page never reads, renders, or persists credentials itself. All payout APIs remain restricted to a valid admin Hub session, with credentials excluded from response projections and caching disabled.
+
+The dashboard shows the configured Testnet wallet address, balance, available balance after reserve, API readiness, and any unresolved wallet lock. A read-only API cannot establish the Developer Portal app-to-wallet mapping: compare the displayed address with the connected Testnet app wallet before confirming a payout. Wallet seeds and API keys remain on the backend.
+
+The recipient directory freshly verifies Pi `/me` identity and wallet sharing on the server, in batches of four across pages of twenty recent logged-in accounts. Search names, usernames or UID to find older accounts. Only users with verified identity and wallet consent are listed; previously reserved/paid users or wallets are disabled. No stored user token is returned. An empty page may require signing in again, granting wallet consent, searching, or moving to the next page.
+
+Selecting a user runs preflight. **Send 0.01 Test-Pi** opens a native confirmation dialog showing recipient and sender addresses. Confirm the Developer Portal mapping and explicitly confirm the transfer. Cancellation sends no payment. New sends repeat server preflight and use the existing SDK flow. The page disables repeated clicks and does not retry uncertain transfers; a failed/unknown result requires checking the persisted history and reconciliation.
+
+Each UID and wallet address can receive only once. `_id: wallet:<address>` reservations are acquired inside the existing serialized wallet operation before submission and retained after completion or uncertainty. Legacy completed/submitted records are also checked, so an alternate UID sharing an already paid wallet cannot bypass the protection. Never delete these reservations to force a resend.
+
+The five-wallet progress indicator counts distinct recipient addresses only from Testnet records with completed status, a txid, and both Pi verification/completion flags. Reserved, pending, failed, cancelled or duplicate-wallet records do not count. History displays persisted IDs and addresses for all Testnet payout attempts, with pagination.
+
+New read-only APIs: `GET /admin/testnet/a2u/dashboard?page=1` and `GET /admin/testnet/a2u/recipients?page=1&search=...`. Neither creates or submits a payment. Run backend checks with `npm run test:testnet-a2u --prefix backend` and mocked mobile/desktop browser checks with `npm run test:testnet-payouts --prefix frontend` (or append `-- --browser firefox`). The three browser checks passed in Firefox at 390px and 1280px, including cancel, confirm, history/progress, and uncertain-result behavior. Chromium could not launch in this execution environment. No real payment or production admin credential is used in these tests.
+
+Deployment: both the GitHub Pages frontend and Render backend must serve this commit. A healthy `/health` on an older revision is not a completed backend deployment. Render must contain `PI_TESTNET_API_KEY` and `PI_TESTNET_WALLET_SEED`; the admin must have authorized access; recipient and sender wallets must be activated and funded appropriately. Mainnet and other service endpoints/configuration are unchanged.
+
+Dashboard confirmations bind both displayed wallet addresses to the POST request. If either address changes, the server rejects before creation; the SDK payment addresses are checked against preflight again before submission. The optional `recipientWalletAddress` and `senderWalletAddress` fields are accepted for this purpose; existing UID-only clients remain compatible.
