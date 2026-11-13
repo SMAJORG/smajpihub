@@ -137,6 +137,23 @@ test('click, outside click, focus, keyboard, navigation, search and theme', asyn
   await expect(page.locator('[data-trigger="services"]')).toBeFocused();
 });
 
+test('desktop panels follow light and dark themes', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await openFixture(page);
+  for (const theme of ['dark', 'light']) {
+    await page.locator('.smaj-utility-icon-btn').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    for (const group of ['platform', 'services', 'resources', 'company']) {
+      await page.locator(`[data-trigger="${group}"]`).click();
+      const panel = page.locator(`[data-panel="${group}"]`);
+      await expect(panel).toBeVisible();
+      await expect(panel).toHaveCSS('background-color', theme === 'dark' ? 'rgb(16, 28, 46)' : 'rgb(255, 255, 255)');
+      await expect(panel.locator('a').first()).toHaveCSS('color', theme === 'dark' ? 'rgb(255, 255, 255)' : 'rgb(15, 23, 42)');
+      await page.keyboard.press('Escape');
+    }
+  }
+});
+
 test('mobile and tablet retain the original drawer and preferences', async ({ page }) => {
   await openFixture(page);
   for (const width of [390, 768, 1023]) {
