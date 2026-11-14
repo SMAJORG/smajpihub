@@ -141,7 +141,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
             ) : "Continue with Pi"}
           </button>
           {authFeedback?.type === "error" ? (
-            <p className="native-welcome__error" role="alert">{authFeedback.message}{authFeedback.message === "We found an existing account. Please complete account recovery to continue." && <a href="/account-recovery"> Recover account</a>}</p>
+            <p className="native-welcome__error" role="alert">{authFeedback.message}</p>
           ) : null}
           {needsPiBrowser ? (
             <button type="button" className="native-welcome__button native-welcome__install" onClick={() => void openPiBrowserInstall()}>

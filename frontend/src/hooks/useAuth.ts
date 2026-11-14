@@ -171,7 +171,7 @@ const getLoginDeviceMetadata = async () => {
 const toErrorMessage = (err: unknown) => {
   const axiosErr = err as AxiosError<BackendErrorBody>;
   if (!axiosErr.response) return "Backend connection unavailable. Please try again.";
-  if (axiosErr.response.status === 409 && axiosErr.response.data?.error?.startsWith("pi_")) return "We found an existing account. Please complete account recovery to continue.";
+  if (axiosErr.response.status === 409 && axiosErr.response.data?.error?.startsWith("pi_")) return axiosErr.response.data.message || "Please sign in through the Pi app you previously used for SMAJ PI HUB.";
   if ([400, 401].includes(axiosErr.response.status)) return "Pi login failed. Please login again through Pi Browser.";
   return axiosErr.response.data?.message ? `Login failed: ${axiosErr.response.data.message}` : `Login failed with status ${axiosErr.response.status}.`;
 };
@@ -221,7 +221,7 @@ export const useAuth = () => {
         }
       } catch (err) {
         if (isAxiosError<BackendErrorBody>(err) && err.response?.status === 409) {
-          if (mounted) { setUser(null); setAuthFeedback({ type: "error", message: err.response.data?.message || "We found an existing account. Please complete account recovery to continue." }); }
+          if (mounted) { setUser(null); setAuthFeedback({ type: "error", message: err.response.data?.message || "Please sign in again through Pi Browser." }); }
         }
         if (isAxiosError(err) && [401, 403].includes(err.response?.status || 0)) {
           await clearSessionCredentials();

@@ -23,7 +23,7 @@ test('returning verified UID preserves original profile, roles, seller tools, se
  assert.equal((await users.find({}).toArray()).length,1);assert.equal((await tables.marketplaceOrderCollection.find({buyerId:result.body.user.uid}).toArray()).length,1);
 }));
 test('changed app UID + same verified username stops rather than creating or merging an account',()=>fixture(async({users,login,setVerified})=>{
- await users.insertOne(original());setVerified({uid:'paired-mainnet-uid',username:'pioneer'});const before=await users.find({}).toArray();const result=await login({sandbox:false});assert.equal(result.status,409);assert.equal(result.body.error,'pi_account_recovery_required');assert.deepEqual(await users.find({}).toArray(),before);
+ await users.insertOne(original());setVerified({uid:'paired-mainnet-uid',username:'pioneer'});const before=await users.find({}).toArray();const result=await login({sandbox:false});assert.equal(result.status,409);assert.equal(result.body.error,'pi_app_identity_unrecognized');assert.deepEqual(await users.find({}).toArray(),before);
 }));
 test('client continuity hint stops an unfamiliar UID even when the username changed; hint cannot grant access',()=>fixture(async({users,login,setVerified})=>{
  await users.insertOne(original());setVerified({uid:'new-app-uid',username:'different-name'});const result=await login({expectedAccountUid:'original-testnet-uid',sandbox:false});assert.equal(result.status,409);assert.equal((await users.find({}).toArray()).length,1);
@@ -41,8 +41,8 @@ test('explicitly approved identity binding reconnects original account without r
 }));
 test('existing duplicate must be explicitly reviewed; approved reconnection preserves both records and their data',()=>fixture(async({users,links,login,setVerified})=>{
  await users.insertOne(original());await users.insertOne({uid:'paired-mainnet-uid',username:'pioneer',displayName:'Duplicate with its own data',role:'buyer'});const target=await users.findOne({uid:'original-testnet-uid'}),duplicate=await users.findOne({uid:'paired-mainnet-uid'});await links.insertOne(approval(target));setVerified({uid:'paired-mainnet-uid',username:'pioneer'});
- let result=await login();assert.equal(result.status,409);assert.equal(result.body.error,'pi_duplicate_account_review_required');assert.equal((await users.find({}).toArray()).length,2);
- await links.updateOne({_id:'paired-mainnet-uid'},{$set:{duplicatesReviewed:true,reviewedDuplicateAccountIds:[String(duplicate._id)]}});result=await login();assert.equal(result.status,200);assert.equal(result.body.user.uid,target.uid);assert.deepEqual(await users.findOne({_id:duplicate._id}),duplicate);assert.equal((await users.find({}).toArray()).length,2);
+ let result=await login();assert.equal(result.status,200);assert.equal(result.body.user.uid,duplicate.uid);assert.equal((await users.find({}).toArray()).length,2);const ownedDuplicate=await users.findOne({_id:duplicate._id});
+ await links.updateOne({_id:'paired-mainnet-uid'},{$set:{duplicatesReviewed:true,reviewedDuplicateAccountIds:[String(duplicate._id)]}});result=await login();assert.equal(result.status,200);assert.equal(result.body.user.uid,target.uid);assert.deepEqual(await users.findOne({_id:duplicate._id}),ownedDuplicate);assert.equal((await users.find({}).toArray()).length,2);
 }));
 test('missing proof, blocked originals, duplicate UID records and username-only claims never select another account',()=>fixture(async({users,links,login,setVerified})=>{
  await users.insertOne(original());const target=await users.findOne({uid:'original-testnet-uid'});await links.insertOne(approval(target,{proofReference:''}));setVerified({uid:'paired-mainnet-uid',username:'pioneer'});assert.equal((await login()).status,409);
@@ -61,4 +61,21 @@ test('a known returning UID missing from the configured database cannot be provi
 
 test('an approved link cannot issue an ambiguous UID-based session for duplicate canonical records',()=>fixture(async({users,links,login,setVerified})=>{
  await users.insertOne(original());const target=await users.findOne({uid:'original-testnet-uid'});await users.insertOne({...original(),displayName:'Second historical record'});await links.insertOne(approval(target));setVerified({uid:'paired-mainnet-uid',username:'pioneer'});const result=await login();assert.equal(result.status,409);assert.equal(result.body.error,'pi_duplicate_uid');assert.equal((await users.find({}).toArray()).length,2);
+}));
+
+for (const role of ['buyer','admin']) {
+ test(`existing incomplete ${role} can sign in despite username collisions and a stale browser hint`,()=>fixture(async({users,login})=>{
+  await users.insertOne({uid:'original-testnet-uid',username:'pioneer',displayName:'Saved profile',role,roles:[role,'moderator'],settings:{theme:'dark'}});
+  await users.insertOne({uid:'other-app-uid',username:'pioneer',country:'NG',role:'seller'});
+  const result=await login({expectedAccountUid:'stale-browser-uid'});
+  assert.equal(result.status,200);assert.equal(result.body.user.uid,'original-testnet-uid');assert.equal(result.body.user.role,role);assert.deepEqual(result.body.user.roles,[role,'moderator']);assert.equal((await users.find({}).toArray()).length,2);
+ }));
+}
+test('pending, malformed and unavailable optional recovery mappings do not veto an existing verified UID',()=>fixture(async({users,links,login})=>{
+ await users.insertOne(original());
+ await links.insertOne({_id:'original-testnet-uid',status:'pending'});assert.equal((await login()).status,200);
+ await links.updateOne({_id:'original-testnet-uid'},{$set:{status:'approved',proofReference:''}});assert.equal((await login()).status,200);
+ const result=await resolvePiAccount(users,{findOne:async()=>{throw new Error('optional recovery unavailable');}},{uid:'original-testnet-uid',username:'pioneer'});
+ assert.equal(result.account.uid,'original-testnet-uid');assert.equal(result.linked,false);assert.equal((await users.find({}).toArray()).length,1);
+ await users.updateOne({uid:'original-testnet-uid'},{$set:{blocked:true}});assert.equal((await login()).status,403);
 }));
