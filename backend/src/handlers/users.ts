@@ -1,5 +1,3 @@
-import { recordVerifiedPiLogin } from "../services/piRecoveryOptions";
-import { resolvePiAccount, PiAccountIdentityError, piLoginContext } from "../services/piAccountIdentity";
 import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
 import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
 import { issuePersistentSession, refreshPersistentSession, setRefreshCookie } from "../services/persistentSessions";
@@ -227,32 +225,29 @@ export const handleSignIn = async (req: Request, res: Response) => {
   const isConfiguredAdmin = env.admin_pi_usernames.includes(normalizePiUsername(String(normalizedUser.username || "")));
 
   try {
-    const loginContext = piLoginContext(req.body, { ...verifiedUser, uid: verifiedUser.uid });
-    // Capture verified incoming identities even when account continuity stops login.
-    // Failure to record diagnostics must not break an otherwise valid login.
-    try { await recordVerifiedPiLogin(req.app.locals.verifiedPiLoginCollection, { uid: verifiedUser.uid, username: verifiedUser.username }, loginContext); }
-    catch { console.warn("[pi-signin] verified login history could not be recorded"); }
-    const resolution = await resolvePiAccount(userCollection, req.app.locals.piIdentityLinkCollection, { uid: verifiedUser.uid, username: verifiedUser.username }, typeof req.body?.expectedAccountUid === "string" ? req.body.expectedAccountUid.slice(0, 200) : undefined);
-    let currentUser = resolution.account;
-
+    // Original Pi sign-in: use only the identity verified by Pi's /me endpoint.
+    let currentUser = await userCollection.findOne({ uid: normalizedUser.uid });
     if (currentUser) {
       if (currentUser.blocked) return res.status(403).json({ error: "blocked", message: "This SMAJ account has been blocked" });
-      const updates: Record<string, any> = { lastSeenAt: new Date(), lastPiLogin: loginContext };
-      if (!resolution.linked) {
-        // Never provision/reset profile, verification, seller flags or settings on login.
-        Object.assign(updates, { username: normalizedUser.username, piUsername: normalizedUser.username,
-          ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }, currentUser), accessToken: auth.accessToken, accessTokenRevokedAt: null });
-        if (isConfiguredAdmin && currentUser.role !== "admin") {
-          updates.role = "admin";
-          updates.roles = [...new Set([...(Array.isArray(currentUser.roles) ? currentUser.roles : []), "admin"])];
-        }
+      const updates: Record<string, any> = {
+        lastSeenAt: new Date(), username: normalizedUser.username, piUsername: normalizedUser.username,
+        ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }, currentUser),
+        accessToken: auth.accessToken, accessTokenRevokedAt: null,
+      };
+      // Keep saved profile, verification, seller state and additional roles intact.
+      if (isConfiguredAdmin && currentUser.role !== "admin") {
+        updates.role = "admin";
+        updates.roles = [...new Set([...(Array.isArray(currentUser.roles) ? currentUser.roles : []), "admin"])];
       }
-      // Linked app tokens/UIDs must not replace the original Testnet identity or
-      // canonical UID used by orders, seller tools, sessions and payout history.
       await userCollection.updateOne({ _id: currentUser._id }, { $set: updates });
 
       currentUser = await userCollection.findOne({ _id: currentUser._id });
     } else {
+      // Never create a second account for a saved Pi username, and never use a
+      // username to authorize access to a differently identified MongoDB record.
+      const name = new RegExp("^@*" + normalizedUser.username.replace(/^@+/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i");
+      const existing = await userCollection.findOne({ $or: [{ username: name }, { piUsername: name }] });
+      if (existing) return res.status(401).json({ error: "invalid_token", message: "Pi login failed. Please login again through Pi Browser." });
       const role = isConfiguredAdmin ? "admin" : "buyer";
       const insertResult = await userCollection.insertOne({
         username: normalizedUser.username,
@@ -270,7 +265,6 @@ export const handleSignIn = async (req: Request, res: Response) => {
         settings: { theme: "light", language: "English", notifications: true },
         createdAt: new Date(),
         lastSeenAt: new Date(),
-        lastPiLogin: loginContext,
         ...verifiedPiIdentityFields({ uid: verifiedUser.uid!, wallet_address: verifiedUser.wallet_address }),
         accessToken: auth.accessToken,
       });
@@ -285,7 +279,6 @@ export const handleSignIn = async (req: Request, res: Response) => {
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
     return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session });
   } catch (err) {
-    if (err instanceof PiAccountIdentityError) return res.status(409).json({ error: err.code, message: err.message });
     console.error("[pi-signin] session persistence failed", { code: (err as any)?.code });
     return res.status(500).json({ error: "internal_error", message: "Failed to sign in" });
   }
@@ -299,9 +292,8 @@ export default function mountUserEndpoints(router: Router) {
       if (!result) return res.status(401).json({ error: "session_revoked", message: "Please sign in again to establish a new session." });
       await saveSession(req);
       setRefreshCookie(res, result.session.refreshToken, sessionCookieOptions);
-      return res.json({ user: toClientUser(result.user), session: result.session, ...(result.identityRecovery ? { identityRecovery: result.identityRecovery } : {}) });
+      return res.json({ user: toClientUser(result.user), session: result.session });
     } catch (error) {
-      if (error instanceof PiAccountIdentityError) return res.status(409).json({ error: error.code, message: error.message });
       return res.status(503).json({ error: "authentication_unavailable", message: "Session renewal is temporarily unavailable. Please retry." });
     }
   });

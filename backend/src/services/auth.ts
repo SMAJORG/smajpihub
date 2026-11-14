@@ -1,4 +1,3 @@
-import { resolvePiSessionAccount, PiAccountIdentityError } from "./piAccountIdentity";
 import { resolveHubAccessUser } from "./persistentSessions";
 import { validateAndTouchDeviceSession } from "./deviceSessions";
 import { getUserPlatformAPIClient } from "./platformAPIClient";
@@ -22,10 +21,6 @@ const resolveUser = async (req: Request): Promise<UserData | null> => {
   if (req.session.user?.userId && ObjectId.isValid(req.session.user.userId)) {
     const sessionUser = await userCollection.findOne({ _id: new ObjectId(req.session.user.userId) });
     if (!sessionUser || sessionUser.blocked) return null;
-    try {
-      const canonical = (await resolvePiSessionAccount(req.app.locals.userCollection, req.app.locals.piIdentityLinkCollection, sessionUser.uid)).account;
-      if (!canonical || String(canonical._id) !== String(sessionUser._id)) return null;
-    } catch (error) { if (error instanceof PiAccountIdentityError) return null; throw error; }
     if (req.session.deviceSessionId && !await validateAndTouchDeviceSession(req, sessionUser.uid)) return null;
     return sessionUser;
   }
@@ -41,10 +36,7 @@ const resolveUser = async (req: Request): Promise<UserData | null> => {
     if (verified?.uid !== currentUser.uid) return null;
     if (verified.credentials?.valid_until?.timestamp && verified.credentials.valid_until.timestamp * 1000 <= Date.now()) return null;
   } catch { return null; }
-  try {
-    const canonical = (await resolvePiSessionAccount(req.app.locals.userCollection, req.app.locals.piIdentityLinkCollection, currentUser.uid)).account;
-    return canonical && !canonical.blocked ? canonical : null;
-  } catch (error) { if (error instanceof PiAccountIdentityError) return null; throw error; }
+  return currentUser;
 };
 
 // Share verification only within the same HTTP request; never reuse authentication across requests.

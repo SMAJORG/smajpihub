@@ -70,7 +70,7 @@ const NativeWelcomeGate = ({ children }: { children: ReactNode }) => {
     return () => window.clearInterval(timer);
   }, [isAuthenticated, isLoading]);
 
-  if (!isCapacitorNative() || isAuthenticated || /\/account-recovery\/?$/.test(window.location.pathname)) return <>{children}</>;
+  if (!isCapacitorNative() || isAuthenticated) return <>{children}</>;
 
   const slide = slides[activeSlide];
   const changeSlide = (direction: number) => {

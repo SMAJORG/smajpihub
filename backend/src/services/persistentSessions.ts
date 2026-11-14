@@ -1,4 +1,3 @@
-import { resolvePiSessionAccount, PiAccountIdentityError } from "./piAccountIdentity";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { Request, Response } from "express";
 import env from "../environments";
@@ -29,11 +28,8 @@ export const resolveHubAccessUser = async (req: Request, token: string) => {
   } catch { return null; }
   const record = await req.app.locals.deviceSessionCollection?.findOne({ sessionKey: digest(claims.deviceId), userId: claims.uid, active: true, expiresAt: { $gt: new Date() } });
   if (!record || record.revokedAt) return null;
-  let user: any;
-  try { user = (await resolvePiSessionAccount(req.app.locals.userCollection, req.app.locals.piIdentityLinkCollection, claims.uid)).account; }
-  catch (error) { if (error instanceof PiAccountIdentityError) return null; throw error; }
-  // An old alias token must renew into a canonical token, not open the duplicate.
-  if (!user || user.blocked || user.uid !== claims.uid) return null;
+  const user = await req.app.locals.userCollection.findOne({ uid: claims.uid });
+  if (!user || user.blocked) return null;
   req.session.deviceSessionId = claims.deviceId;
   req.session.user = { userId: String(user._id), uid: user.uid, piUsername: user.piUsername || user.username, role: user.role };
   return user;
@@ -60,29 +56,19 @@ export const refreshPersistentSession = async (req: Request) => {
   const query = { refreshTokenHash: digest(token), active: true, expiresAt: { $gt: new Date() } };
   const record = await collection?.findOne(query);
   if (!record || record.revokedAt) return null;
+  const user = await req.app.locals.userCollection.findOne({ uid: record.userId });
+  if (!user || user.blocked) return null;
+  // Keep the random refresh credential stable across concurrent tabs and lost
+  // responses. Only its hash is stored; revocation is checked on every use.
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const updated = await collection.updateOne({ ...query, sessionKey: record.sessionKey }, { $set: { expiresAt, lastActiveAt: new Date() } });
+  if (!updated.matchedCount) return null;
   const id = parsed[1];
   if (digest(id) !== record.sessionKey) return null;
-  const resolution = await resolvePiSessionAccount(req.app.locals.userCollection, req.app.locals.piIdentityLinkCollection, record.userId);
-  const user = resolution.account;
-  if (!user || user.blocked) return null;
-  const migrating = user.uid !== record.userId;
-  const identityRecovery = migrating
-    ? { fromUid: record.userId, canonicalUid: user.uid, bindingId: String(resolution.bindingId) }
-    : record.identityRecovery?.canonicalUid === user.uid ? record.identityRecovery : undefined;
-  // Preserve the device document and its history. Only a verified approved binding
-  // may move this authenticated device to the original canonical account.
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-  const updated = await collection.updateOne({ ...query, sessionKey: record.sessionKey, userId: record.userId }, { $set: {
-    expiresAt, lastActiveAt: new Date(), ...(migrating ? { userId: user.uid, identityRecovery, identityRecoveredAt: new Date() } : {}),
-  } });
-  if (!updated.matchedCount) {
-    const concurrent = await collection.findOne({ ...query, sessionKey: record.sessionKey, userId: user.uid });
-    if (!concurrent || concurrent.revokedAt) return null;
-  }
   req.session.deviceSessionId = id;
   req.session.cookie.maxAge = SESSION_TTL_MS;
   req.session.user = { userId: String(user._id), uid: user.uid, piUsername: user.piUsername || user.username, role: user.role };
-  return { user, identityRecovery, session: { ...accessToken(user, id), refreshToken: token, expiresAt: expiresAt.toISOString() } };
+  return { user, session: { ...accessToken(user, id), refreshToken: token, expiresAt: expiresAt.toISOString() } };
 };
 
 export const setRefreshCookie = (res: Response, token: string, options: any) => {

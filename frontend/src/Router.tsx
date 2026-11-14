@@ -1,6 +1,4 @@
 import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
-import AccountRecoveryPage from "./pages/AccountRecoveryPage";
-import AdminAccountRecoveryPage from "./pages/admin/AdminAccountRecoveryPage";
 import AdminTestnetPayoutsPage from "./pages/admin/AdminTestnetPayoutsPage";
 import AiSignInPage from "./pages/AiSignInPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
@@ -311,10 +309,6 @@ export const router = createBrowserRouter([
   {
     path: "/contact",
     element: <ContactPage />,
-  },
-  {
-    path: "/account-recovery",
-    element: <AccountRecoveryPage />,
   },
   {
     path: "/delete-account",
@@ -1312,10 +1306,6 @@ export const router = createBrowserRouter([
         </AdminLayout>
       </ProtectedRoute>
     ),
-  },
-  {
-    path: "/admin/account-recovery",
-    element: <ProtectedRoute><AdminLayout><AdminAccountRecoveryPage /></AdminLayout></ProtectedRoute>,
   },
   {
     path: "/admin/testnet-payouts",

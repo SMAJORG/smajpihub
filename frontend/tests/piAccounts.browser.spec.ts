@@ -15,13 +15,13 @@ async function setup(page:import('@playwright/test').Page,sandbox:boolean){
 }
 for(const sandbox of [true,false])test(`different ${sandbox?'Testnet':'Mainnet'} app identity cannot replace the original profile`,async({page})=>{
  await setup(page,sandbox);
- await page.route('**/user/signin',async route=>{const body=route.request().postDataJSON();expect(body.expectedAccountUid).toBe(original.uid);expect(body.sandbox).toBe(sandbox);await route.fulfill({status:409,json:{error:'pi_account_recovery_required',message:'Your original profile has not been changed. Sign in through the original Pi app or request identity recovery.'}});});
- await page.goto('/tests/piAccounts.html');await expect(page.getByTestId('profile')).toContainText('Completed seller');await page.getByTestId('login').click();await expect(page.getByTestId('feedback')).toContainText('original profile has not been changed');await expect(page.getByTestId('profile')).toContainText(original.uid);await expect(page.getByTestId('profile')).toContainText('approved');
+ await page.route('**/user/signin',async route=>{const body=route.request().postDataJSON();expect(body.expectedAccountUid).toBeUndefined();expect(body.sandbox).toBe(sandbox);await route.fulfill({status:401,json:{error:'invalid_token',message:'Pi login failed. Please login again through Pi Browser.'}});});
+ await page.goto('/tests/piAccounts.html');await expect(page.getByTestId('profile')).toContainText('Completed seller');await page.getByTestId('login').click();await expect(page.getByTestId('feedback')).toContainText('Pi login failed');await expect(page.getByTestId('profile')).toContainText(original.uid);await expect(page.getByTestId('profile')).toContainText('approved');
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('smaj_pi_user')||'{}').uid)).toBe(original.uid);
 });
 test('a backend outage cannot fabricate a new local buyer profile',async({page})=>{
  await setup(page,true);await page.route('**/user/signin',route=>route.abort('failed'));await page.goto('/tests/piAccounts.html');await expect(page.getByTestId('profile')).toContainText('Completed seller');await page.getByTestId('login').click();await expect(page.getByTestId('feedback')).toContainText('connection unavailable');await expect(page.getByTestId('profile')).toContainText('seller');expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('smaj_pi_user')||'{}').uid)).toBe(original.uid);
 });
-test('approved server-side identity resolution returns the canonical profile to the browser',async({page})=>{
+test('confirmed server login returns the saved profile to the browser',async({page})=>{
  await setup(page,false);await page.route('**/user/signin',route=>route.fulfill({json:{user:original,session}}));await page.goto('/tests/piAccounts.html');await page.getByTestId('login').click();await expect(page.getByTestId('feedback')).toContainText('Signed in as pioneer');await expect(page.getByTestId('profile')).toContainText(original.uid);await expect(page.getByTestId('profile')).toContainText('Completed seller');expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('smaj_pi_user')||'{}').role)).toBe('seller');
 });

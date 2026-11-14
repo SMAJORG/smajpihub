@@ -4,8 +4,6 @@ const express=require('express'),session=require('express-session'),axios=requir
 const {ObjectId}=require('mongodb');
 const {createMemoryCollections}=require('../build/services/memoryDatabase');
 const {handleSignIn}=require('../build/handlers/users');
-const {resolvePiAccount}=require('../build/services/piAccountIdentity');
-const {auditPiAccounts}=require('../build/scripts/auditPiAccounts');
 const original=()=>({uid:'original-testnet-uid',username:'pioneer',piUsername:'pioneer',displayName:'Completed seller',country:'NG',contactPhone:'saved-phone',bio:'saved biography',avatar:'saved-image',role:'seller',roles:['seller','moderator'],sellerActive:true,verificationStatus:'approved',verificationLevel:'seller_verified',verificationRequested:true,settings:{theme:'dark',language:'fr',notifications:false},language:'fr',createdAt:new Date('2025-01-01'),accessToken:'original-testnet-token',piVerifiedUid:'original-testnet-uid',piWalletAddress:'G'+'A'.repeat(55),piWalletVerifiedAt:new Date('2025-01-01')});
 async function fixture(run){
  const tables=createMemoryCollections(),users=tables.userCollection,links=createMemoryCollections().userCollection;
@@ -22,60 +20,26 @@ test('returning verified UID preserves original profile, roles, seller tools, se
  const after=await users.findOne({uid:profile.uid});for(const key of ['_id','uid','displayName','country','contactPhone','bio','avatar','role','roles','sellerActive','verificationStatus','verificationLevel','verificationRequested','settings','language','createdAt'])assert.deepEqual(after[key],before[key],key);
  assert.equal((await users.find({}).toArray()).length,1);assert.equal((await tables.marketplaceOrderCollection.find({buyerId:result.body.user.uid}).toArray()).length,1);
 }));
-test('changed app UID + same verified username stops rather than creating or merging an account',()=>fixture(async({users,login,setVerified})=>{
- await users.insertOne(original());setVerified({uid:'paired-mainnet-uid',username:'pioneer'});const before=await users.find({}).toArray();const result=await login({sandbox:false});assert.equal(result.status,409);assert.equal(result.body.error,'pi_app_identity_unrecognized');assert.deepEqual(await users.find({}).toArray(),before);
-}));
-test('client continuity hint stops an unfamiliar UID even when the username changed; hint cannot grant access',()=>fixture(async({users,login,setVerified})=>{
- await users.insertOne(original());setVerified({uid:'new-app-uid',username:'different-name'});const result=await login({expectedAccountUid:'original-testnet-uid',sandbox:false});assert.equal(result.status,409);assert.equal((await users.find({}).toArray()).length,1);
-}));
-for(const [sandbox,uid,name] of [[true,'genuine-testnet-new','new-test-user'],[false,'genuine-mainnet-new','new-main-user']]){
- test(`genuinely new ${sandbox?'Testnet':'Mainnet'} identity creates only its own profile and records diagnostic context`,()=>fixture(async({users,login,setVerified})=>{
-  setVerified({uid,username:name,credentials:{scopes:['username']}});const result=await login({sandbox,loginContext:{clientId:'public-client-context'}});assert.equal(result.status,200);assert.equal(result.body.user.uid,uid);const saved=await users.findOne({uid});assert.equal(saved.role,'buyer');assert.equal(saved.lastPiLogin.verifiedUid,uid);assert.equal(saved.lastPiLogin.clientSandboxHint,sandbox);assert.equal((await users.find({}).toArray()).length,1);
- }));
-}
-function approval(account,overrides={}){return{_id:'paired-mainnet-uid',status:'approved',canonicalUserId:String(account._id),canonicalUid:account.uid,originalAppId:'reviewed-testnet-app',incomingAppId:'reviewed-mainnet-app',approvedBy:'reviewed-operator',approvedAt:new Date(),proofReference:'dual-identity-proof-record',...overrides};}
-test('explicitly approved identity binding reconnects original account without replacing its UID or Testnet credentials',()=>fixture(async({users,links,login,setVerified})=>{
- await users.insertOne(original());const before=await users.findOne({uid:'original-testnet-uid'});await links.insertOne(approval(before));setVerified({uid:'paired-mainnet-uid',username:'pioneer-new-name',wallet_address:'G'+'B'.repeat(55)});
- const result=await login({sandbox:false,expectedAccountUid:before.uid});assert.equal(result.status,200);assert.equal(result.body.user.uid,before.uid);const after=await users.findOne({_id:before._id});
- for(const key of ['uid','username','piUsername','accessToken','piVerifiedUid','piWalletAddress','piWalletVerifiedAt','role','roles','settings','verificationStatus','sellerActive'])assert.deepEqual(after[key],before[key],key);assert.equal(after.lastPiLogin.verifiedUid,'paired-mainnet-uid');assert.equal((await users.find({}).toArray()).length,1);
-}));
-test('existing duplicate must be explicitly reviewed; approved reconnection preserves both records and their data',()=>fixture(async({users,links,login,setVerified})=>{
- await users.insertOne(original());await users.insertOne({uid:'paired-mainnet-uid',username:'pioneer',displayName:'Duplicate with its own data',role:'buyer'});const target=await users.findOne({uid:'original-testnet-uid'}),duplicate=await users.findOne({uid:'paired-mainnet-uid'});await links.insertOne(approval(target));setVerified({uid:'paired-mainnet-uid',username:'pioneer'});
- let result=await login();assert.equal(result.status,200);assert.equal(result.body.user.uid,duplicate.uid);assert.equal((await users.find({}).toArray()).length,2);const ownedDuplicate=await users.findOne({_id:duplicate._id});
- await links.updateOne({_id:'paired-mainnet-uid'},{$set:{duplicatesReviewed:true,reviewedDuplicateAccountIds:[String(duplicate._id)]}});result=await login();assert.equal(result.status,200);assert.equal(result.body.user.uid,target.uid);assert.deepEqual(await users.findOne({_id:duplicate._id}),ownedDuplicate);assert.equal((await users.find({}).toArray()).length,2);
-}));
-test('missing proof, blocked originals, duplicate UID records and username-only claims never select another account',()=>fixture(async({users,links,login,setVerified})=>{
- await users.insertOne(original());const target=await users.findOne({uid:'original-testnet-uid'});await links.insertOne(approval(target,{proofReference:''}));setVerified({uid:'paired-mainnet-uid',username:'pioneer'});assert.equal((await login()).status,409);
- await links.updateOne({_id:'paired-mainnet-uid'},{$set:{proofReference:'reviewed-proof'}});await users.updateOne({_id:target._id},{$set:{blocked:true}});assert.equal((await login()).status,403);
- const isolated=createMemoryCollections().userCollection;await isolated.insertOne({uid:'duplicated',username:'one'});await isolated.insertOne({uid:'duplicated',username:'two'});await assert.rejects(resolvePiAccount(isolated,null,{uid:'duplicated',username:'one'}),error=>error.code==='pi_duplicate_uid');
-}));
-test('read-only audit reports ownership reference counts and profile presence without credentials or profile contents',async()=>{
- const tables=createMemoryCollections();await tables.userCollection.insertOne(original());await tables.marketplaceOrderCollection.insertOne({buyerId:'original-testnet-uid'});
- const lookup={users:tables.userCollection,orders:tables.marketplaceOrderCollection,products:tables.productCollection,messages:tables.messageCollection,device_sessions:tables.deviceSessionCollection,pi_account_identity_links:createMemoryCollections().userCollection};
- const report=await auditPiAccounts({databaseName:'regression',collection:name=>lookup[name]},['original-testnet-uid'],'pioneer');assert.equal(report.readOnly,true);assert.equal(report.accounts[0].referenceCounts.buyerOrders,1);const encoded=JSON.stringify(report);for(const secret of ['original-testnet-token','saved-phone','saved biography','saved-image'])assert(!encoded.includes(secret));assert.equal((await tables.userCollection.find({}).toArray()).length,1);
-});
 
-test('a known returning UID missing from the configured database cannot be provisioned as a replacement profile',()=>fixture(async({users,login})=>{
- const result=await login({expectedAccountUid:'original-testnet-uid'});assert.equal(result.status,409);assert.equal(result.body.error,'pi_account_record_missing');assert.equal((await users.find({}).toArray()).length,0);
+test('unknown UID cannot create a duplicate or select an account by username',()=>fixture(async({users,login,setVerified})=>{
+ await users.insertOne(original());setVerified({uid:'other-app-uid',username:'pioneer'});
+ const before=await users.find({}).toArray(),result=await login();
+ assert.equal(result.status,401);assert.equal(result.body.message,'Pi login failed. Please login again through Pi Browser.');assert.deepEqual(await users.find({}).toArray(),before);
 }));
-
-test('an approved link cannot issue an ambiguous UID-based session for duplicate canonical records',()=>fixture(async({users,links,login,setVerified})=>{
- await users.insertOne(original());const target=await users.findOne({uid:'original-testnet-uid'});await users.insertOne({...original(),displayName:'Second historical record'});await links.insertOne(approval(target));setVerified({uid:'paired-mainnet-uid',username:'pioneer'});const result=await login();assert.equal(result.status,409);assert.equal(result.body.error,'pi_duplicate_uid');assert.equal((await users.find({}).toArray()).length,2);
+for(const role of ['buyer','admin'])test(`original exact-UID login works for incomplete ${role} despite stale hints or recovery records`,()=>fixture(async({users,links,login})=>{
+ await users.insertOne({uid:'original-testnet-uid',username:'pioneer',displayName:'Existing profile',role,roles:[role,'moderator'],settings:{theme:'dark'}});
+ await users.insertOne({uid:'other-uid',username:'pioneer',country:'NG'});
+ await links.insertOne({_id:'original-testnet-uid',status:'pending'});
+ const result=await login({expectedAccountUid:'stale-uid',loginContext:{clientId:'ignored'}});
+ assert.equal(result.status,200);assert.equal(result.body.user.uid,'original-testnet-uid');assert.equal(result.body.user.role,role);assert.deepEqual(result.body.user.roles,[role,'moderator']);assert.equal((await users.find({}).toArray()).length,2);
 }));
-
-for (const role of ['buyer','admin']) {
- test(`existing incomplete ${role} can sign in despite username collisions and a stale browser hint`,()=>fixture(async({users,login})=>{
-  await users.insertOne({uid:'original-testnet-uid',username:'pioneer',displayName:'Saved profile',role,roles:[role,'moderator'],settings:{theme:'dark'}});
-  await users.insertOne({uid:'other-app-uid',username:'pioneer',country:'NG',role:'seller'});
-  const result=await login({expectedAccountUid:'stale-browser-uid'});
-  assert.equal(result.status,200);assert.equal(result.body.user.uid,'original-testnet-uid');assert.equal(result.body.user.role,role);assert.deepEqual(result.body.user.roles,[role,'moderator']);assert.equal((await users.find({}).toArray()).length,2);
- }));
-}
-test('pending, malformed and unavailable optional recovery mappings do not veto an existing verified UID',()=>fixture(async({users,links,login})=>{
- await users.insertOne(original());
- await links.insertOne({_id:'original-testnet-uid',status:'pending'});assert.equal((await login()).status,200);
- await links.updateOne({_id:'original-testnet-uid'},{$set:{status:'approved',proofReference:''}});assert.equal((await login()).status,200);
- const result=await resolvePiAccount(users,{findOne:async()=>{throw new Error('optional recovery unavailable');}},{uid:'original-testnet-uid',username:'pioneer'});
- assert.equal(result.account.uid,'original-testnet-uid');assert.equal(result.linked,false);assert.equal((await users.find({}).toArray()).length,1);
+test('normal new-user login remains available without continuity requirements',()=>fixture(async({users,login,setVerified})=>{
+ setVerified({uid:'genuine-new-user',username:'new-pioneer'});const result=await login({expectedAccountUid:'stale-browser-value'});
+ assert.equal(result.status,200);assert.equal(result.body.user.uid,'genuine-new-user');assert.equal((await users.find({}).toArray()).length,1);
+}));
+test('approved recovery metadata does not alter the restored direct-UID login',()=>fixture(async({users,links,login})=>{
+ await users.insertOne(original());await users.insertOne({uid:'other-uid',username:'other-user',role:'buyer'});
+ await links.insertOne({_id:'original-testnet-uid',status:'approved',canonicalUid:'other-uid'});
+ assert.equal((await login()).body.user.uid,'original-testnet-uid');
  await users.updateOne({uid:'original-testnet-uid'},{$set:{blocked:true}});assert.equal((await login()).status,403);
 }));

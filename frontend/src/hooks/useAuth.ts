@@ -171,14 +171,12 @@ const getLoginDeviceMetadata = async () => {
 const toErrorMessage = (err: unknown) => {
   const axiosErr = err as AxiosError<BackendErrorBody>;
   if (!axiosErr.response) return "Backend connection unavailable. Please try again.";
-  if (axiosErr.response.status === 409 && axiosErr.response.data?.error?.startsWith("pi_")) return axiosErr.response.data.message || "Please sign in through the Pi app you previously used for SMAJ PI HUB.";
   if ([400, 401].includes(axiosErr.response.status)) return "Pi login failed. Please login again through Pi Browser.";
   return axiosErr.response.data?.message ? `Login failed: ${axiosErr.response.data.message}` : `Login failed with status ${axiosErr.response.status}.`;
 };
 
 export const useAuth = () => {
   const initialUserRef = useRef<User | null>(getStoredPiUser());
-  const accountContinuityRef = useRef<string | undefined>(initialUserRef.current?.uid);
   const [user, setUser] = useState<User | null>(initialUserRef.current);
   const [showSignIn, setShowSignIn] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialUserRef.current);
@@ -213,16 +211,12 @@ export const useAuth = () => {
           username: response.data.user?.username,
         });
         if (response.data.user?.uid && response.data.user.username && mounted) {
-          accountContinuityRef.current = response.data.user.uid;
           setUser(storeUser(toUser(response.data.user, getStoredPiUser() || stored || response.data.user as User)));
         } else if (mounted) {
           await clearSessionCredentials();
           setUser(null);
         }
       } catch (err) {
-        if (isAxiosError<BackendErrorBody>(err) && err.response?.status === 409) {
-          if (mounted) { setUser(null); setAuthFeedback({ type: "error", message: err.response.data?.message || "Please sign in again through Pi Browser." }); }
-        }
         if (isAxiosError(err) && [401, 403].includes(err.response?.status || 0)) {
           await clearSessionCredentials();
           if (mounted) setUser(null);
@@ -238,7 +232,7 @@ export const useAuth = () => {
   }, []);
 
   useEffect(() => {
-    const changed = (event: Event) => { const confirmed = (event as CustomEvent<User>).detail; accountContinuityRef.current = confirmed?.uid; setUser(confirmed); };
+    const changed = (event: Event) => setUser((event as CustomEvent<User>).detail);
     const ended = () => setUser(null);
     const renew = () => {
       if (!document.hidden && getStoredPiUser()?.uid) void refreshHubSession(getBaseURL()).catch(() => undefined);
@@ -276,13 +270,12 @@ export const useAuth = () => {
 
   const signInUser = useCallback(async (authResult: AuthResult) => {
     const fallback = authResultUser(authResult);
-    if (!getBaseURL()) throw new Error("The account server is not configured. Your original profile has not been replaced.");
+    if (!getBaseURL()) throw new Error("Pi login failed. Please login again through Pi Browser.");
     const device = await getLoginDeviceMetadata();
-    const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult, sandbox: isPiSandboxMode(), device, expectedAccountUid: accountContinuityRef.current, loginContext: { clientId: window.__ENV?.piOAuthClientId || null } }, AUTH_REQUEST_CONFIG);
-    if (!response.data.user?.uid || !response.data.user.username) throw new Error("The server did not confirm your saved account. Your previous profile has not been replaced.");
+    const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult, sandbox: isPiSandboxMode(), device }, AUTH_REQUEST_CONFIG);
+    if (!response.data.user?.uid || !response.data.user.username) throw new Error("Pi login failed. Please login again through Pi Browser.");
     const signedInUser = toUser(response.data.user, { ...fallback, accessToken: response.data.session?.accessToken || fallback.accessToken });
     if (response.data.session) await saveSessionCredentials(response.data.session, response.data.user);
-    accountContinuityRef.current = signedInUser.uid;
     setUser(storeUser(signedInUser));
     setShowSignIn(false);
     setAuthFeedback({ type: "success", message: `Signed in as ${signedInUser.username || "Pi user"}.` });
@@ -408,7 +401,6 @@ export const useAuth = () => {
       const sdkMessage = (err as Error)?.message || "";
       const message = isAxiosError<BackendErrorBody>(err)
         ? toErrorMessage(err)
-        : /^(The server did not confirm|The account server)/.test(sdkMessage) ? sdkMessage
         : sdkMessage === "PI_AUTH_TIMEOUT"
           ? "Pi login timed out. Reopen Pi Browser, confirm your sandbox account is signed in, and try again."
           : /cancel|denied|reject/i.test(sdkMessage)
@@ -488,7 +480,6 @@ export const useAuth = () => {
   }, [user]);
 
   const signOut = useCallback(async () => {
-    accountContinuityRef.current = undefined; // Explicit sign-out allows intentional account switching.
     setIsLoading(true);
     try {
       const { supportsNativePushNotifications, unregisterNativePushOnLogout } = await import("../lib/nativePushNotifications");
