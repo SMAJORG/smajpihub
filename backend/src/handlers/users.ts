@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
 import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
 import { issuePersistentSession, refreshPersistentSession, setRefreshCookie } from "../services/persistentSessions";
@@ -17,7 +18,7 @@ type VerifiedPiUser = {
   uid?: string;
   username?: string;
   wallet_address?: string;
-  credentials?: { scopes?: string[] };
+  credentials?: { scopes?: string[]; valid_until?: { timestamp?: number } };
 };
 
 const crossSiteSession = env.is_production && !env.is_solohost;
@@ -188,47 +189,51 @@ export const handleSignIn = async (req: Request, res: Response) => {
   const auth = req.body?.authResult;
   const userCollection = req.app.locals.userCollection;
 
-  if (!auth?.accessToken || !auth?.user?.uid || !auth?.user?.username) {
-    return res.status(400).json({ error: "bad_request", message: "Pi login failed. Please login again through Pi Browser." });
+  const requestId = randomUUID();
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-SMAJ-Request-Id", requestId);
+  let stage = "request";
+  const failure = (status: number, error: string, message: string, upstreamStatus?: number) => {
+    // Do not log credentials, Axios errors, user identities or MongoDB URLs.
+    console.warn("[pi-signin]", { requestId, stage, status, error, upstreamStatus, revision: process.env.RENDER_GIT_COMMIT || null });
+    return res.status(status).json({ error, message, requestId, stage });
+  };
+  if (typeof auth?.accessToken !== "string" || !auth.accessToken.trim() || auth.accessToken.length > 8192) {
+    return failure(400, "pi_token_missing", "Pi sign-in did not provide an access token. Please retry sign-in.");
   }
-
-  if (!userCollection) {
-    return res.status(503).json({ error: "service_unavailable", message: "Database not ready" });
-  }
+  if (!userCollection) return failure(503, "signin_database_unavailable", "The account server database is not ready. Please retry shortly.");
 
   let verifiedUser: VerifiedPiUser;
-
+  stage = "pi_verification";
   try {
     const meResponse = await getUserPlatformAPIClient().get<VerifiedPiUser>("/v2/me", {
-      headers: { Authorization: `Bearer ${auth.accessToken}` },
+      headers: { Authorization: `Bearer ${auth.accessToken}` }, timeout: 20000,
     });
     verifiedUser = meResponse.data ?? {};
-  } catch (err) {
-    console.error("[pi-signin] identity verification failed", { status: (err as any)?.response?.status });
-    return res.status(401).json({ error: "invalid_token", message: "Pi login failed. Please login again through Pi Browser." });
+  } catch (err: any) {
+    const upstream = err.response?.status;
+    if (upstream === 401) return failure(401, "pi_token_rejected", "Pi rejected or expired this sign-in token. Please authenticate with Pi again.", upstream);
+    if (upstream === 403) return failure(403, "pi_permissions_denied", "Pi denied this app's sign-in permissions. Review the app permissions in Pi.", upstream);
+    if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT") return failure(504, "pi_verification_timeout", "The account server timed out while contacting Pi. Please retry shortly.", upstream);
+    if (upstream === 404 || upstream === 400) return failure(503, "pi_api_configuration_error", "The account server could not reach the configured Pi identity endpoint. The administrator must check PLATFORM_API_URL.", upstream);
+    return failure(503, upstream === 429 ? "pi_verification_rate_limited" : "pi_verification_unavailable", upstream === 429 ? "Pi is limiting sign-in verification requests. Please wait and retry." : "The account server could not verify this sign-in with Pi. Please retry shortly.", upstream);
   }
+  if (typeof verifiedUser.uid !== "string" || !verifiedUser.uid.trim()) return failure(502, "pi_identity_invalid", "Pi returned an incomplete identity to the account server. Please retry shortly.");
+  if (verifiedUser.credentials?.valid_until?.timestamp && verifiedUser.credentials.valid_until.timestamp * 1000 <= Date.now()) return failure(401, "pi_token_expired", "This Pi sign-in token expired. Please authenticate with Pi again.");
 
-  if (!verifiedUser.uid || !verifiedUser.username) return res.status(401).json({ error: "invalid_pi_identity", message: "Pi did not verify your UID and username. Please sign in through Pi Browser again." });
-
-  if (verifiedUser.uid && verifiedUser.uid !== auth.user.uid) {
-    return res.status(401).json({ error: "invalid_token", message: "Pi login failed. Please login again through Pi Browser." });
-  }
-
-  if (verifiedUser.username && verifiedUser.username !== auth.user.username) {
-    return res.status(401).json({ error: "invalid_token", message: "Pi login failed. Please login again through Pi Browser." });
-  }
-
-  const normalizedUser = {
-    uid: verifiedUser.uid,
-    username: verifiedUser.username,
-  };
-  const isConfiguredAdmin = env.admin_pi_usernames.includes(normalizePiUsername(String(normalizedUser.username || "")));
+  // SDK user fields are presentation data, not authentication assertions. Only
+  // the token-verified identity selects the account, even if names changed.
+  const normalizedUser = { uid: verifiedUser.uid, username: typeof verifiedUser.username === "string" ? verifiedUser.username.trim() : "" };
+  const isConfiguredAdmin = normalizedUser.username ? env.admin_pi_usernames.includes(normalizePiUsername(normalizedUser.username)) : false;
 
   try {
     // Original Pi sign-in: use only the identity verified by Pi's /me endpoint.
+    stage = "account_lookup";
     let currentUser = await userCollection.findOne({ uid: normalizedUser.uid });
     if (currentUser) {
-      if (currentUser.blocked) return res.status(403).json({ error: "blocked", message: "This SMAJ account has been blocked" });
+      if (currentUser.blocked) return failure(403, "blocked", "This SMAJ account has been blocked.");
+      normalizedUser.username ||= currentUser.piUsername || currentUser.username || "";
+      stage = "account_write";
       const updates: Record<string, any> = {
         lastSeenAt: new Date(), username: normalizedUser.username, piUsername: normalizedUser.username,
         ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }, currentUser),
@@ -243,11 +248,13 @@ export const handleSignIn = async (req: Request, res: Response) => {
 
       currentUser = await userCollection.findOne({ _id: currentUser._id });
     } else {
+      if (!normalizedUser.username) return failure(403, "pi_username_permission_required", "Pi did not share a username for registration. Approve the username permission and retry.");
       // Never create a second account for a saved Pi username, and never use a
       // username to authorize access to a differently identified MongoDB record.
       const name = new RegExp("^@*" + normalizedUser.username.replace(/^@+/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i");
       const existing = await userCollection.findOne({ $or: [{ username: name }, { piUsername: name }] });
-      if (existing) return res.status(401).json({ error: "invalid_token", message: "Pi login failed. Please login again through Pi Browser." });
+      if (existing) return failure(409, "signin_account_identity_conflict", "Pi authentication succeeded, but the account server could not match this identity to the saved account. No account was created or changed.");
+      stage = "account_write";
       const role = isConfiguredAdmin ? "admin" : "buyer";
       const insertResult = await userCollection.insertOne({
         username: normalizedUser.username,
@@ -272,15 +279,17 @@ export const handleSignIn = async (req: Request, res: Response) => {
       currentUser = await userCollection.findOne({ _id: insertResult.insertedId });
     }
 
+    if (!currentUser) return failure(503, "signin_account_unavailable", "The account server could not load your saved profile. Please retry shortly.");
+    stage = "session_create";
     await establishAuthSession(req, currentUser, req.body?.device || {});
     // The client shows one login confirmation; do not duplicate it with push/inbox alerts.
+    stage = "session_issue";
     const session = await issuePersistentSession(req, currentUser);
     await saveSession(req);
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
-    return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session });
+    return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session, requestId });
   } catch (err) {
-    console.error("[pi-signin] session persistence failed", { code: (err as any)?.code });
-    return res.status(500).json({ error: "internal_error", message: "Failed to sign in" });
+    return failure(503, stage.startsWith("session_") ? "signin_session_unavailable" : "signin_storage_unavailable", stage.startsWith("session_") ? "The account server verified Pi but could not save your login session. Please retry shortly." : "The account server could not read or save your account. Please retry shortly.");
   }
 };
 

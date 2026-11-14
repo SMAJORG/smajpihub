@@ -15,9 +15,12 @@ const platformAPIClient = axios.create({
   timeout: 20000,
 });
 
+// User identity requests already include /v2. Accept a configured API root or
+// /v2 base without accidentally requesting /v2/v2/me. Payment clients are unchanged.
+export const userPlatformAPIBase = (value: string) => value.trim().replace(/\/+$/, "").replace(/\/v2$/i, "");
 export const getUserPlatformAPIClient = () =>
   axios.create({
-    baseURL: env.platform_api_url,
+    baseURL: userPlatformAPIBase(env.platform_api_url),
     timeout: 20000,
   });
 

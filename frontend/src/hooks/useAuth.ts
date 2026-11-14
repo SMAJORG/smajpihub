@@ -1,6 +1,7 @@
+import { piSignInErrorMessage, PiSignInResponseError } from "../lib/piSignInErrors";
 import { refreshHubSession, saveSessionCredentials, clearSessionCredentials, SESSION_CHANGED, SESSION_ENDED, type HubSession } from "../lib/sessionCredentials";
 import { ensurePiInitialized, isPiSandboxMode } from "../lib/piSdk";
-import { AxiosError, isAxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient, getBaseURL } from "../lib/axiosClient";
 import type { AuthResult, User } from "../types/pi";
@@ -28,7 +29,7 @@ const PI_AUTH_TIMEOUT_MS = 20000;
 const MIN_SESSION_LOADING_MS = 450;
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
 const piAuthScopes = () => isPiSandboxMode() ? ["username", "wallet_address"] : ["username"];
-const AUTH_REQUEST_CONFIG = { withCredentials: true, headers: { "X-SMAJ-Silent": "true" } };
+const AUTH_REQUEST_CONFIG = { withCredentials: true, timeout: 45000, headers: { "X-SMAJ-Silent": "true" } };
 
 
 const onIncompletePaymentFound = () => {
@@ -168,12 +169,7 @@ const getLoginDeviceMetadata = async () => {
     return { platform: "android", name: "SMAJ PI HUB Android" };
   }
 };
-const toErrorMessage = (err: unknown) => {
-  const axiosErr = err as AxiosError<BackendErrorBody>;
-  if (!axiosErr.response) return "Backend connection unavailable. Please try again.";
-  if ([400, 401].includes(axiosErr.response.status)) return "Pi login failed. Please login again through Pi Browser.";
-  return axiosErr.response.data?.message ? `Login failed: ${axiosErr.response.data.message}` : `Login failed with status ${axiosErr.response.status}.`;
-};
+const toErrorMessage = piSignInErrorMessage;
 
 export const useAuth = () => {
   const initialUserRef = useRef<User | null>(getStoredPiUser());
@@ -269,11 +265,11 @@ export const useAuth = () => {
   }, []);
 
   const signInUser = useCallback(async (authResult: AuthResult) => {
-    const fallback = authResultUser(authResult);
-    if (!getBaseURL()) throw new Error("Pi login failed. Please login again through Pi Browser.");
+    if (!getBaseURL()) throw new PiSignInResponseError("The account server address is not configured. Contact the administrator.");
     const device = await getLoginDeviceMetadata();
-    const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult, sandbox: isPiSandboxMode(), device }, AUTH_REQUEST_CONFIG);
-    if (!response.data.user?.uid || !response.data.user.username) throw new Error("Pi login failed. Please login again through Pi Browser.");
+    const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult: { accessToken: authResult.accessToken }, sandbox: isPiSandboxMode(), device }, AUTH_REQUEST_CONFIG);
+    if (!response.data.user?.uid || !response.data.user.username) throw new PiSignInResponseError("The account server did not return a confirmed account. Please retry shortly.");
+    const fallback = authResultUser({ accessToken: authResult.accessToken, user: { uid: response.data.user.uid, username: response.data.user.username } });
     const signedInUser = toUser(response.data.user, { ...fallback, accessToken: response.data.session?.accessToken || fallback.accessToken });
     if (response.data.session) await saveSessionCredentials(response.data.session, response.data.user);
     setUser(storeUser(signedInUser));
@@ -389,8 +385,6 @@ export const useAuth = () => {
       await ensurePiInitialized();
       const authResult = await authenticateWithTimeout(piAuthScopes());
       console.log("[auth] Pi authenticate success", {
-        uid: authResult.user.uid,
-        username: authResult.user.username,
         hasAccessToken: Boolean(authResult.accessToken),
       });
       await signInUser(authResult);
@@ -399,7 +393,7 @@ export const useAuth = () => {
     } catch (err) {
       console.error("[auth] Pi login failed", { status: isAxiosError(err) ? err.response?.status : undefined });
       const sdkMessage = (err as Error)?.message || "";
-      const message = isAxiosError<BackendErrorBody>(err)
+      const message = isAxiosError<BackendErrorBody>(err) || err instanceof PiSignInResponseError
         ? toErrorMessage(err)
         : sdkMessage === "PI_AUTH_TIMEOUT"
           ? "Pi login timed out. Reopen Pi Browser, confirm your sandbox account is signed in, and try again."
