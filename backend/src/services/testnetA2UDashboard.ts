@@ -21,8 +21,8 @@ export async function testnetDashboard(locals: any, page: number) {
 }
 export async function testnetRecipients(locals: any, page: number, search: string) {
   const collection = collectionFor(locals);
-  const query: any = { blocked: { $ne: true }, accessTokenRevokedAt: null,
-    $or: [{ accessToken: { $type: "string" } }, { piWalletVerifiedAt: { $type: "date" } }] };
+  const query: any = { blocked: { $ne: true },
+    $or: [{ accessToken: { $type: "string" } }, { piWalletVerifiedAt: { $type: "date" } }, { piVerifiedUid: { $type: "string" } }, { "lastPiLogin.verifiedUid": { $type: "string" } }] };
   const normalized = search.trim().replace(/^@+/, "");
   const walletSearch = piWalletPattern.test(normalized.toUpperCase()) ? normalized.toUpperCase() : "";
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -38,7 +38,10 @@ export async function testnetRecipients(locals: any, page: number, search: strin
       const review = await reviewPiRecipient(user);
       await persistPiRecipientReview(locals.userCollection, user, review);
       const verified = review.recipient;
-      if (!verified) { diagnostics[review.reason] = (diagnostics[review.reason] || 0) + 1; return null; }
+      if (!verified) {
+        diagnostics[review.reason] = (diagnostics[review.reason] || 0) + 1;
+        return walletSearch ? null : { uid: user.uid, username: user.username || "", displayName: user.displayName || user.username || "Pi user", walletAddress: "", canReceive: false, status: review.reason };
+      }
       if (walletSearch && verified.walletAddress !== walletSearch) return null;
       const [uidRecord, walletRecord, previous] = await Promise.all([
         collection.findOne({ _id: `recipient:${user.uid}` }), collection.findOne({ _id: `wallet:${verified.walletAddress}` }),

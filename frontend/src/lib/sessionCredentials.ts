@@ -58,7 +58,7 @@ export function refreshHubSession(baseUrl: string) {
     const token = await getHubRefreshToken();
     try {
       const { data } = await axios.post(`${baseUrl.replace(/\/$/, "")}/user/refresh`, {}, {
-        withCredentials: true, timeout: 15000,
+        withCredentials: !token, timeout: 15000,
         headers: token ? { "X-SMAJ-Refresh-Token": token } : {},
       });
       if (started !== generation) return null;

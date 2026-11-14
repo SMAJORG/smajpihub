@@ -21,7 +21,10 @@ export async function testnetA2UPreflight(locals: any, uid: string) {
   if (!wallet.ready) throw new PayoutError(wallet.incompletePayments ? 409 : 422, wallet.message);
   const address = wallet.address;
   try { await testnetGet(`/accounts/${recipient.walletAddress}`); }
-  catch { throw new PayoutError(422, "Recipient Testnet wallet is not activated or Testnet API is unavailable."); }
+  catch (error: any) {
+    const status = error.response?.status;
+    throw new PayoutError(status === 404 ? 422 : 503, status === 404 ? "Recipient Testnet wallet is not activated." : `Testnet wallet lookup is unavailable${status ? ` (HTTP ${status})` : ""}. No payment was created.`, status === 404 ? "testnet_wallet_unactivated" : "testnet_api_unavailable");
+  }
   const [record, lock, walletReservation, previousWalletPayment] = await Promise.all([
     locals.testnetA2UCollection.findOne({ _id: `recipient:${uid}` }),
     locals.testnetA2UCollection.findOne({ _id: "wallet-lock" }),

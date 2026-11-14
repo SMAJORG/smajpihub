@@ -49,7 +49,7 @@ test('endpoint validates bearer independently of admin cookies and rejects non-a
  const signed='hub_access.'+body+'.'+createHmac('sha256',env.session_secret).update('hub-access:'+body).digest('base64url');
  let role='admin';
  const app=express();app.use(express.json());app.use((req,res,next)=>{req.session={user:{userId:new ObjectId().toString()}};next();});
- app.locals.userCollection={findOne:async()=>({_id:new ObjectId(),uid:'buyer',role})};app.locals.deviceSessionCollection={findOne:async()=>({active:true})};
+ app.locals.userCollection={findOne:async()=>({_id:new ObjectId(),uid:'buyer',role}),find(){return {limit(){return this;},toArray:async()=>[{_id:new ObjectId(),uid:'buyer',role}]};}};app.locals.deviceSessionCollection={findOne:async()=>({active:true})};
  app.post('/payout',testnetA2UHandler);app.get('/preflight',testnetA2UPreflightHandler);app.get('/dashboard',testnetDashboardHandler);app.get('/recipients',testnetRecipientsHandler);
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}`;
  try {
@@ -118,7 +118,7 @@ test('eligible list freshly verifies UID and wallet consent and never returns to
  const cursor={project(){return this;},sort(){return this;},skip(){return this;},limit(){return this;},toArray:async()=>users};
  const locals={userCollection:{find:()=>cursor},testnetA2UCollection:{findOne:async q=>q._id==='recipient:paid'?{status:'completed'}:null}};
  axios.get=async(_url,config)=>{const user=users.find(u=>config.headers.Authorization.endsWith(u.accessToken));return {data:{uid:user.uid==='forged'?'mismatch':user.uid,wallet_address:user.uid==='no-consent'?'':'G'+'A'.repeat(55)}};};
- try{const result=await testnetRecipients(locals,1,'');assert.deepEqual(result.recipients.map(r=>r.uid),['eligible','paid']);assert.equal(result.recipients[0].canReceive,true);assert.equal(result.recipients[1].canReceive,false);assert(!JSON.stringify(result).includes('secret-'));assert(!JSON.stringify(result).includes('accessToken'));}finally{axios.get=old;}
+ try{const result=await testnetRecipients(locals,1,'');assert.deepEqual(result.recipients.map(r=>r.uid),['eligible','no-consent','paid','forged']);assert.equal(result.recipients[0].canReceive,true);assert.equal(result.recipients[1].canReceive,false);assert.equal(result.recipients[1].status,'wallet_consent_required');assert(!JSON.stringify(result).includes('secret-'));assert(!JSON.stringify(result).includes('accessToken'));}finally{axios.get=old;}
 });
 test('changed wallet after confirmation cannot be submitted',async()=>{
  const db=new Store(),pi=sdk();await assert.rejects(sendTestnetPayout(db,'user','admin',pi,{recipientWalletAddress:'G'+'B'.repeat(55)}));assert.deepEqual(pi.calls,['create']);
@@ -128,14 +128,14 @@ test('saved server-verified identity survives OAuth expiry, but spoofed or revok
  const wallet='G'+'A'.repeat(55),saved={uid:'user',accessToken:'expired-test-token',...verifiedPiIdentityFields({uid:'user',wallet_address:wallet})};
  axios.get=async()=>{throw Object.assign(new Error('expired'),{isAxiosError:true,response:{status:401}});};
  try{assert.equal((await reviewPiRecipient(saved)).recipient.walletAddress,wallet);assert.equal((await reviewPiRecipient({uid:'user',accessToken:'expired-test-token',wallet_address:wallet})).reason,'pi_login_expired');
- axios.get=async()=>({data:{uid:'user'}});assert.equal((await reviewPiRecipient(saved)).reason,'wallet_consent_required');
+ axios.get=async()=>({data:{uid:'user'}});assert.equal((await reviewPiRecipient(saved)).recipient.walletAddress,wallet);axios.get=async()=>({data:{uid:'user',wallet_address:''}});assert.equal((await reviewPiRecipient(saved)).reason,'wallet_consent_required');
  axios.get=async()=>{throw Object.assign(new Error('denied'),{isAxiosError:true,response:{status:403}});};assert.equal((await reviewPiRecipient(saved)).recipient,null);
  }finally{axios.get=old;}
 });
-test('Sandbox CORS allowance is scoped to Testnet/admin identity routes and requires configuration',()=>{
+test('Sandbox CORS is scoped to Testnet and guarded identity routes even with missing credentials',()=>{
  const {allowsTestnetSandboxOrigin:allow}=require('../build/services/testnetCors');
  assert(allow('/admin/testnet/a2u/dashboard','https://sandbox.minepi.com',true));assert(allow('/user/signin','https://sandbox.minepi.com',true));
- assert(!allow('/user/profile','https://sandbox.minepi.com',true));assert(!allow('/payments/complete','https://sandbox.minepi.com',true));assert(!allow('/admin/orders','https://sandbox.minepi.com',true));assert(!allow('/admin/testnet/a2u','https://evil.example',true));assert(!allow('/admin/testnet/a2u','https://sandbox.minepi.com',false));
+ assert(!allow('/user/profile','https://sandbox.minepi.com',true));assert(!allow('/payments/complete','https://sandbox.minepi.com',true));assert(!allow('/admin/orders','https://sandbox.minepi.com',true));assert(!allow('/admin/testnet/a2u','https://evil.example',true));assert(allow('/admin/testnet/a2u','https://sandbox.minepi.com',false));assert(allow('/user/testnet/wallet-consent','https://sandbox.minepi.com',false));
 });
 test('real HTTP login → admin Hub session → @username/UID/wallet search → readiness; no payment endpoints called',async()=>{
  const express=require('express'),session=require('express-session'),axios=require('axios'),{Keypair}=require('stellar-sdk');
@@ -156,7 +156,7 @@ test('real HTTP login → admin Hub session → @username/UID/wallet search → 
  };
  const tables=createMemoryCollections(),payouts=createMemoryCollections().userCollection;payouts.distinct=async()=>[];
  const app=express();app.use(express.json());app.use(session({secret:'integration-session-only',resave:false,saveUninitialized:true}));app.locals.userCollection=tables.userCollection;app.locals.deviceSessionCollection=tables.deviceSessionCollection;app.locals.testnetA2UCollection=payouts;
- app.post('/user/signin',handleSignIn);const router=express.Router();mountAdmin(router);app.use('/admin',router);
+ app.post('/user/signin',handleSignIn);app.post('/user/testnet/wallet-consent',require('../build/handlers/testnetWalletConsent').saveTestnetWalletConsent);const router=express.Router();mountAdmin(router);app.use('/admin',router);
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`;
  try{
   const login=async(uid,username,token)=>{const r=await fetch(base+'/user/signin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({authResult:{accessToken:token,user:{uid,username,wallet_address:'client-spoofed-address'}}})});assert.equal(r.status,200);return r.json();};
@@ -168,7 +168,13 @@ test('real HTTP login → admin Hub session → @username/UID/wallet search → 
   const preflight=await fetch(base+'/admin/testnet/a2u/preflight?uid=alice-uid',{headers});assert.equal(preflight.status,200);assert.equal((await preflight.json()).checksPassed,true);
   const denied=await fetch(base+'/admin/testnet/a2u/dashboard',{headers:{Authorization:'Bearer '+user.session.accessToken}});assert.equal(denied.status,403);assert.equal((await denied.json()).code,'admin_required');
   recipientStatus=401;const expired=await fetch(base+'/admin/testnet/a2u/recipients?search=alice-uid',{headers});assert.equal((await expired.json()).recipients[0].uid,'alice-uid');
-  recipientStatus=403;const revoked=await fetch(base+'/admin/testnet/a2u/recipients?search=alice-uid',{headers});const revokedBody=await revoked.json();assert.equal(revokedBody.recipients.length,0);assert.equal(revokedBody.diagnostics.pi_permission_denied,1);assert.equal((await tables.userCollection.findOne({uid:'alice-uid'})).piWalletVerifiedAt,null);
+  recipientStatus=403;const revoked=await fetch(base+'/admin/testnet/a2u/recipients?search=alice-uid',{headers});const revokedBody=await revoked.json();assert.equal(revokedBody.recipients.length,1);assert.equal(revokedBody.recipients[0].canReceive,false);assert.equal(revokedBody.recipients[0].status,'pi_permission_denied');assert.equal(revokedBody.diagnostics.pi_permission_denied,1);assert.equal((await tables.userCollection.findOne({uid:'alice-uid'})).piWalletVerifiedAt,null);
+  recipientStatus=200;
+  const consent=await fetch(base+'/user/testnet/wallet-consent',{method:'POST',headers:{Authorization:'Bearer '+user.session.accessToken,'Content-Type':'application/json'},body:JSON.stringify({accessToken:'fresh-recipient-token',walletAddress:'client-forgery'})});assert.equal(consent.status,200);const consentBody=await consent.json();assert.equal(consentBody.walletAddress,recipient);assert.equal(consentBody.paymentSent,false);assert(!JSON.stringify(consentBody).includes('fresh-recipient-token'));
+  const wrongIdentity=await fetch(base+'/user/testnet/wallet-consent',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({accessToken:'fresh-recipient-token'})});assert.equal(wrongIdentity.status,422);
+  const noHub=await fetch(base+'/user/testnet/wallet-consent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken:'fresh-recipient-token'})});assert.equal(noHub.status,401);
+  recipientStatus=403;const deniedConsent=await fetch(base+'/user/testnet/wallet-consent',{method:'POST',headers:{Authorization:'Bearer '+user.session.accessToken,'Content-Type':'application/json'},body:JSON.stringify({accessToken:'denied-recipient-token'})});assert.equal(deniedConsent.status,422);assert.equal((await tables.userCollection.findOne({uid:'alice-uid'})).piWalletVerifiedAt,null);
+  recipientStatus=401;const expiredConsent=await fetch(base+'/user/testnet/wallet-consent',{method:'POST',headers:{Authorization:'Bearer '+user.session.accessToken,'Content-Type':'application/json'},body:JSON.stringify({accessToken:'expired-recipient-token'})});assert.equal(expiredConsent.status,422);assert.equal((await expiredConsent.json()).code,'pi_login_expired');
   assert.equal(externalPosts,0);
  }finally{
   await new Promise(r=>server.close(r));axios.defaults.adapter=oldAdapter;env.admin_pi_usernames=oldAdmins;
@@ -179,4 +185,13 @@ test('real HTTP login → admin Hub session → @username/UID/wallet search → 
 test('Sandbox identity cannot exchange cookie-only sessions for credentials',async()=>{
  const {guardTestnetSandboxIdentity:guard}=require('../build/services/testnetCors');const old=process.env.PI_TESTNET_API_KEY;process.env.PI_TESTNET_API_KEY='test-only';
  try{for(const path of ['/user','/user/refresh','/user/signout']){let status=0,passed=false;const req={path,method:path==='/user'?'GET':'POST',get:name=>name==='origin'?'https://sandbox.minepi.com':undefined,session:{user:{role:'admin'}}};const res={status(code){status=code;return this;},json(){}};await guard(req,res,()=>{passed=true;});assert.equal(status,401);assert.equal(passed,false);}}finally{if(old===undefined)delete process.env.PI_TESTNET_API_KEY;else process.env.PI_TESTNET_API_KEY=old;}
+});
+
+test('username-only login preserves prior exact-UID consent; logout is not Pi consent revocation',async()=>{
+ const {reviewPiRecipient,verifiedPiIdentityFields}=require('../build/services/piRecipientIdentity');
+ const wallet='G'+'A'.repeat(55),previous={uid:'user',...verifiedPiIdentityFields({uid:'user',wallet_address:wallet})};
+ const current={...previous,...verifiedPiIdentityFields({uid:'user'},previous),accessTokenRevokedAt:new Date()};
+ assert.equal(current.piWalletAddress,wallet);assert.equal((await reviewPiRecipient(current)).recipient.walletAddress,wallet);
+ assert.equal(verifiedPiIdentityFields({uid:'different'},previous).piWalletVerifiedAt,null);
+ assert.equal(verifiedPiIdentityFields({uid:'user',wallet_address:''},previous).piWalletVerifiedAt,null);
 });

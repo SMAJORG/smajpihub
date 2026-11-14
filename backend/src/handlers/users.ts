@@ -241,7 +241,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
       if (!resolution.linked) {
         // Never provision/reset profile, verification, seller flags or settings on login.
         Object.assign(updates, { username: normalizedUser.username, piUsername: normalizedUser.username,
-          ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }), accessToken: auth.accessToken, accessTokenRevokedAt: null });
+          ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }, currentUser), accessToken: auth.accessToken, accessTokenRevokedAt: null });
         if (isConfiguredAdmin && currentUser.role !== "admin") {
           updates.role = "admin";
           updates.roles = [...new Set([...(Array.isArray(currentUser.roles) ? currentUser.roles : []), "admin"])];

@@ -1,3 +1,4 @@
+import { saveTestnetWalletConsent } from "./handlers/testnetWalletConsent";
 import { provePiRecovery } from "./handlers/piAccountRecovery";
 import { allowsTestnetSandboxOrigin, guardTestnetSandboxIdentity } from "./services/testnetCors";
 import { SESSION_TTL_SECONDS } from "./services/sessionPolicy";
@@ -274,6 +275,7 @@ app.use("/transactions", transactionsRouter); // /api-stripping reverse proxies
 // User endpoints (e.g signin, signout) under /user:
 const userRouter = express.Router();
 userRouter.post("/recovery/prove", provePiRecovery);
+userRouter.post("/testnet/wallet-consent", saveTestnetWalletConsent);
 mountUserEndpoints(userRouter);
 app.use("/user", userRouter);
 

@@ -1,3 +1,4 @@
+import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
 import AccountRecoveryPage from "./pages/AccountRecoveryPage";
 import AdminAccountRecoveryPage from "./pages/admin/AdminAccountRecoveryPage";
 import AdminTestnetPayoutsPage from "./pages/admin/AdminTestnetPayoutsPage";
@@ -610,6 +611,10 @@ export const router = createBrowserRouter([
         </PrivateLayout>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/testnet-wallet",
+    element: <ProtectedRoute><PrivateLayout><TestnetWalletConsentPage /></PrivateLayout></ProtectedRoute>,
   },
   {
     path: "/wallet",

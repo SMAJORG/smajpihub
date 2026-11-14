@@ -60,7 +60,9 @@ const getStoredAccessToken = () => {
 };
 
 axiosClient.interceptors.request.use(async config => {
-  config.withCredentials = true;
+  const testnetRequest = /\/admin\/testnet\/a2u(?:\/|$)/.test(config.url || "") || /\/user\/testnet\/wallet-consent$/.test(config.url || "");
+  // These endpoints authenticate a Hub bearer, never cross-site cookies.
+  config.withCredentials = !testnetRequest;
   const method = String(config.method || "get").toLowerCase();
   if (typeof navigator !== "undefined" && !navigator.onLine && !["get", "head", "options"].includes(method)) {
     showFeedback("You're offline. This action needs an internet connection.", "info");
@@ -70,8 +72,12 @@ axiosClient.interceptors.request.use(async config => {
     const refreshToken = await getHubRefreshToken();
     if (refreshToken) config.headers.set("X-SMAJ-Refresh-Token", refreshToken);
   }
-  const payoutToken = /\/admin\/testnet\/a2u(?:\/|$)/.test(config.url || "") ? await getHubAccessToken() : "";
-  const accessToken = payoutToken || getStoredAccessToken() || (Capacitor.isNativePlatform()
+  let payoutToken = testnetRequest ? await getHubAccessToken() : "";
+  if (testnetRequest && !payoutToken) {
+    await refreshHubSession(getBaseURL());
+    payoutToken = await getHubAccessToken();
+  }
+  const accessToken = testnetRequest ? payoutToken : getStoredAccessToken() || (Capacitor.isNativePlatform()
     ? await import("./nativeAppLock").then(({ getNativeSessionToken }) => getNativeSessionToken()).catch(() => "")
     : "");
   if (accessToken) {
