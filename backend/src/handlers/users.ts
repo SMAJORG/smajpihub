@@ -1,3 +1,4 @@
+import { recordVerifiedPiLogin } from "../services/piRecoveryOptions";
 import { resolvePiAccount, PiAccountIdentityError, PI_ACCOUNT_RECOVERY_MESSAGE, piLoginContext } from "../services/piAccountIdentity";
 import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
 import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
@@ -226,9 +227,13 @@ export const handleSignIn = async (req: Request, res: Response) => {
   const isConfiguredAdmin = env.admin_pi_usernames.includes(normalizePiUsername(String(normalizedUser.username || "")));
 
   try {
+    const loginContext = piLoginContext(req.body, { ...verifiedUser, uid: verifiedUser.uid });
+    // Capture verified incoming identities even when account continuity stops login.
+    // Failure to record diagnostics must not break an otherwise valid login.
+    try { await recordVerifiedPiLogin(req.app.locals.verifiedPiLoginCollection, { uid: verifiedUser.uid, username: verifiedUser.username }, loginContext); }
+    catch { console.warn("[pi-signin] verified login history could not be recorded"); }
     const resolution = await resolvePiAccount(userCollection, req.app.locals.piIdentityLinkCollection, { uid: verifiedUser.uid, username: verifiedUser.username }, typeof req.body?.expectedAccountUid === "string" ? req.body.expectedAccountUid.slice(0, 200) : undefined);
     let currentUser = resolution.account;
-    const loginContext = piLoginContext(req.body, { ...verifiedUser, uid: verifiedUser.uid });
 
     if (currentUser) {
       if (currentUser.blocked) return res.status(403).json({ error: "blocked", message: "This SMAJ account has been blocked" });

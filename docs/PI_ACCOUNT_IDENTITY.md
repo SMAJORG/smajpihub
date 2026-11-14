@@ -90,3 +90,15 @@ Collisions now say **"We found an existing account. Please complete account reco
 Deployment and production recovery remain unverified here. Production inspection, ownership checks, app-registration review and each final binding approval must be performed by an authorized administrator. No additional test suites were run at the user's request; static compilation/theme checks do not verify runtime behavior or production ownership.
 
 Official Pi token verification/app-specific UID contract: https://developers.minepi.com/docs/api-reference/PlatformAPI .
+
+## Recovery form with automatic identity lookup
+
+The current form no longer asks administrators to enter Pi UIDs or Developer Portal app IDs. It loads paginated original-account choices from MongoDB and incoming choices from server-verified Pi login history, including saved historical `piVerifiedUid`/`lastPiLogin` evidence. Search helps find records only; selecting matching names never establishes ownership.
+
+After a successful `/v2/me` check, sign-in records a token-free identity/context in `pi_verified_logins` **before** continuity checks. A returning user blocked by recovery therefore becomes selectable after one verified login attempt without provisioning another account. Existing original accounts and unrelated authentication behavior are preserved. History-recording failure does not reject an otherwise valid login.
+
+The administrator selects the original account and incoming verified login. The server re-resolves their selection IDs, automatically fills UIDs and available historical app labels, and returns account/history details for **Review → Verify Ownership → Approve Recovery**. It ignores posted replacement UIDs/app IDs. The existing dual-owner proof, record fingerprint, explicit admin approval and duplicate review safeguards remain enforced. Existing recovery requests remain reviewable.
+
+App metadata comes only from saved contexts for the exact verified UID. Current environment settings, usernames, OAuth client hints and payment-network labels never fill missing historical Developer Portal app IDs. Recorded server app labels are explicitly marked as configuration evidence, not Pi-attested app identity. Missing or conflicting historical labels produce **App identity verification required**. Ownership proofs may proceed, but approval is blocked in both UI and backend until reviewed app history is available; reopen a reviewed request if its stored metadata changes. The form does not fabricate app IDs or offer manual identity entry to bypass missing evidence.
+
+The mobile form uses stacked step buttons, wrapping identity/history details and full-width controls. The original and all newer account records remain untouched by the recovery workflow. Production access, affected users' records and deployment remain unverified from this workspace.

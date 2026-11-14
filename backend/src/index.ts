@@ -437,6 +437,7 @@ const start = async () => {
       // Login reads bindings; the admin recovery workflow writes only after dual Pi proof and record review.
       app.locals.piIdentityLinkCollection = db.collection("pi_account_identity_links");
       app.locals.piRecoveryDatabase = db;
+      app.locals.verifiedPiLoginCollection = db.collection("pi_verified_logins");
       app.locals.ssoCodeCollection = db.collection("sso_codes");
       await app.locals.ssoCodeCollection.createIndex({expiresAt:1},{expireAfterSeconds:0});
       app.locals.reportCollection = db.collection("reports");
