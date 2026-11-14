@@ -1,4 +1,5 @@
 import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
+import PiAccountLinkPage from "./pages/PiAccountLinkPage";
 import AdminTestnetPayoutsPage from "./pages/admin/AdminTestnetPayoutsPage";
 import AiSignInPage from "./pages/AiSignInPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
@@ -265,6 +266,7 @@ const swapRoutes: Array<[string, SwapPageKind]> = [
 ];
 
 export const router = createBrowserRouter([
+  { path: "/account-link", element: <PiAccountLinkPage /> },
   {path:"/ai/sign-in",element:<AiSignInPage/>},
   {
     path: "/signin/android",

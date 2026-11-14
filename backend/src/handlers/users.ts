@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import mountPiIdentityLinks from "./piIdentityLinks";
+import { IdentityLinkError, resolveLinkedPiAccount } from "../services/piIdentityLinks";
 import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
 import { SESSION_TTL_MS, REFRESH_COOKIE } from "../services/sessionPolicy";
 import { issuePersistentSession, refreshPersistentSession, setRefreshCookie } from "../services/persistentSessions";
@@ -229,18 +231,20 @@ export const handleSignIn = async (req: Request, res: Response) => {
   try {
     // Original Pi sign-in: use only the identity verified by Pi's /me endpoint.
     stage = "account_lookup";
-    let currentUser = await userCollection.findOne({ uid: normalizedUser.uid });
+    let currentUser = await resolveLinkedPiAccount(req.app.locals, normalizedUser.uid);
     if (currentUser) {
       if (currentUser.blocked) return failure(403, "blocked", "This SMAJ account has been blocked.");
+      const linked = currentUser.uid !== normalizedUser.uid;
+      if (linked) normalizedUser.username = currentUser.piUsername || currentUser.username || "";
       normalizedUser.username ||= currentUser.piUsername || currentUser.username || "";
       stage = "account_write";
       const updates: Record<string, any> = {
         lastSeenAt: new Date(), username: normalizedUser.username, piUsername: normalizedUser.username,
-        ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }, currentUser),
-        accessToken: auth.accessToken, accessTokenRevokedAt: null,
+        // Keep original app payment credentials and wallet consent isolated.
+        ...(!linked ? { ...verifiedPiIdentityFields({ uid: verifiedUser.uid, wallet_address: verifiedUser.wallet_address }, currentUser), accessToken: auth.accessToken, accessTokenRevokedAt: null } : {}),
       };
       // Keep saved profile, verification, seller state and additional roles intact.
-      if (isConfiguredAdmin && currentUser.role !== "admin") {
+      if (!linked && isConfiguredAdmin && currentUser.role !== "admin") {
         updates.role = "admin";
         updates.roles = [...new Set([...(Array.isArray(currentUser.roles) ? currentUser.roles : []), "admin"])];
       }
@@ -289,11 +293,13 @@ export const handleSignIn = async (req: Request, res: Response) => {
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
     return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session, requestId });
   } catch (err) {
+    if (err instanceof IdentityLinkError) return failure(err.status, err.code, err.message);
     return failure(503, stage.startsWith("session_") ? "signin_session_unavailable" : "signin_storage_unavailable", stage.startsWith("session_") ? "The account server verified Pi but could not save your login session. Please retry shortly." : "The account server could not read or save your account. Please retry shortly.");
   }
 };
 
 export default function mountUserEndpoints(router: Router) {
+  mountPiIdentityLinks(router);
   router.post("/refresh", async (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "no-store");
     try {

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import "./SignIn.css";
 
 interface SignInProps {
   onSignIn: () => void;
@@ -7,13 +8,14 @@ interface SignInProps {
 }
 
 const modalStyle: CSSProperties = {
-  background: "white",
+  background: "var(--surface)",
+  color: "var(--text)",
   position: "absolute",
   left: "15vw",
   top: "40%",
   width: "70vw",
-  height: "25vh",
-  border: "1px solid black",
+  minHeight: "25vh",
+  border: "1px solid var(--border)",
   textAlign: "center",
   display: "flex",
   flexDirection: "column",
@@ -31,8 +33,9 @@ const buttonContainerStyle: CSSProperties = {
 
 const SignIn = ({ onSignIn, onModalClose, disabled }: SignInProps) => {
   return (
-    <div style={modalStyle}>
+    <div className="smaj-signin-panel" role="dialog" aria-modal="true" aria-label="Pi sign-in" style={modalStyle}>
       <p style={{ fontWeight: "bold" }}>You need to sign in first.</p>
+      <a href="/account-link" onClick={onModalClose} style={{ color: "var(--primary)" }}>Existing account in another Pi app? Connect your identities</a>
       <div style={buttonContainerStyle}>
         <button onClick={onSignIn} disabled={disabled}>
           Login with Pi

@@ -2,9 +2,10 @@ import type { RequestHandler } from "express";
 import { resolveHubAccessUser } from "./persistentSessions";
 const identityPaths = new Set(["/user", "/user/signin", "/user/refresh", "/user/signout", "/user/presence"]);
 const normalized = (path: string) => path.replace(/\/+$/, "");
+const isLinkProofPath = (path: string) => /^\/user\/pi-identities\/(start|preview|complete)$/.test(normalized(path));
 // Authentication remains mandatory even when credentials are missing: CORS must
 // allow the dashboard to report configuration errors. Mainnet routes stay excluded.
-export const allowsTestnetSandboxOrigin = (path: string, origin: string | undefined, _testnetConfigured: boolean) => Boolean(origin === "https://sandbox.minepi.com" && (/^\/admin\/testnet(?:\/|$)/.test(path) || identityPaths.has(normalized(path)) || normalized(path) === "/user/testnet/wallet-consent"));
+export const allowsTestnetSandboxOrigin = (path: string, origin: string | undefined, _testnetConfigured: boolean) => Boolean(origin === "https://sandbox.minepi.com" && (/^\/admin\/testnet(?:\/|$)/.test(path) || identityPaths.has(normalized(path)) || isLinkProofPath(path) || normalized(path) === "/user/testnet/wallet-consent"));
 
 // Never let a Sandbox page exchange another site's cookies for Hub credentials.
 // Signin verifies its own Pi token; refresh requires its own explicit secret;

@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { resolveLinkedPiAccount } from "./piIdentityLinks";
 import type { Request, Response } from "express";
 import env from "../environments";
 import { currentDeviceSessionKey, ensureDeviceSession } from "./deviceSessions";
@@ -28,7 +29,7 @@ export const resolveHubAccessUser = async (req: Request, token: string) => {
   } catch { return null; }
   const record = await req.app.locals.deviceSessionCollection?.findOne({ sessionKey: digest(claims.deviceId), userId: claims.uid, active: true, expiresAt: { $gt: new Date() } });
   if (!record || record.revokedAt) return null;
-  const user = await req.app.locals.userCollection.findOne({ uid: claims.uid });
+  const user = await resolveLinkedPiAccount(req.app.locals, claims.uid);
   if (!user || user.blocked) return null;
   req.session.deviceSessionId = claims.deviceId;
   req.session.user = { userId: String(user._id), uid: user.uid, piUsername: user.piUsername || user.username, role: user.role };
@@ -56,7 +57,7 @@ export const refreshPersistentSession = async (req: Request) => {
   const query = { refreshTokenHash: digest(token), active: true, expiresAt: { $gt: new Date() } };
   const record = await collection?.findOne(query);
   if (!record || record.revokedAt) return null;
-  const user = await req.app.locals.userCollection.findOne({ uid: record.userId });
+  const user = await resolveLinkedPiAccount(req.app.locals, record.userId);
   if (!user || user.blocked) return null;
   // Keep the random refresh credential stable across concurrent tabs and lost
   // responses. Only its hash is stored; revocation is checked on every use.
@@ -68,7 +69,8 @@ export const refreshPersistentSession = async (req: Request) => {
   req.session.deviceSessionId = id;
   req.session.cookie.maxAge = SESSION_TTL_MS;
   req.session.user = { userId: String(user._id), uid: user.uid, piUsername: user.piUsername || user.username, role: user.role };
-  return { user, session: { ...accessToken(user, id), refreshToken: token, expiresAt: expiresAt.toISOString() } };
+  // Existing secondary-device records retain their owning UID until next login.
+  return { user, session: { ...accessToken({ uid: record.userId }, id), refreshToken: token, expiresAt: expiresAt.toISOString() } };
 };
 
 export const setRefreshCookie = (res: Response, token: string, options: any) => {

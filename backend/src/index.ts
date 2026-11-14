@@ -434,6 +434,10 @@ const start = async () => {
       app.locals.orderDisputeCollection = db.collection("order_disputes");
       app.locals.productCollection = db.collection("products");
       app.locals.userCollection = db.collection("users");
+      app.locals.piIdentityLinkCollection = db.collection("pi_account_identity_links");
+      app.locals.piIdentityChallengeCollection = db.collection("pi_identity_challenges");
+      await app.locals.piIdentityChallengeCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+      await app.locals.piIdentityLinkCollection.createIndex({ canonicalUid: 1 });
       app.locals.ssoCodeCollection = db.collection("sso_codes");
       await app.locals.ssoCodeCollection.createIndex({expiresAt:1},{expireAfterSeconds:0});
       app.locals.reportCollection = db.collection("reports");

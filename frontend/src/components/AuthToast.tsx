@@ -7,6 +7,7 @@ const AuthToast = () => {
   if (isCapacitorNative() && !isAuthenticated && authFeedback?.type === "error") return null;
   return authFeedback ? <div className={`smaj-toast ${authFeedback.type}`} role="status">
     {authFeedback.message}
+    {authFeedback.type === "error" && authFeedback.message.includes("could not match this identity") && <a href="/account-link" style={{ color: "var(--text)", textDecoration: "underline" }}> Verify both Pi identities</a>}
   </div> : null;
 };
 export default AuthToast;

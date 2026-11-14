@@ -1,4 +1,5 @@
 import { resolveHubAccessUser } from "./persistentSessions";
+import { resolveLinkedPiAccount } from "./piIdentityLinks";
 import { validateAndTouchDeviceSession } from "./deviceSessions";
 import { getUserPlatformAPIClient } from "./platformAPIClient";
 import { Request } from "express";
@@ -19,9 +20,10 @@ const resolveUser = async (req: Request): Promise<UserData | null> => {
   if (suppliedToken.startsWith("hub_access.")) return resolveHubAccessUser(req, suppliedToken);
 
   if (req.session.user?.userId && ObjectId.isValid(req.session.user.userId)) {
-    const sessionUser = await userCollection.findOne({ _id: new ObjectId(req.session.user.userId) });
+    const savedUser = await userCollection.findOne({ _id: new ObjectId(req.session.user.userId) });
+    const sessionUser = savedUser ? await resolveLinkedPiAccount(req.app.locals, savedUser.uid) : null;
     if (!sessionUser || sessionUser.blocked) return null;
-    if (req.session.deviceSessionId && !await validateAndTouchDeviceSession(req, sessionUser.uid)) return null;
+    if (req.session.deviceSessionId && !await validateAndTouchDeviceSession(req, savedUser.uid)) return null;
     return sessionUser;
   }
 
@@ -36,7 +38,8 @@ const resolveUser = async (req: Request): Promise<UserData | null> => {
     if (verified?.uid !== currentUser.uid) return null;
     if (verified.credentials?.valid_until?.timestamp && verified.credentials.valid_until.timestamp * 1000 <= Date.now()) return null;
   } catch { return null; }
-  return currentUser;
+  const canonical = await resolveLinkedPiAccount(req.app.locals, currentUser.uid);
+  return canonical && !canonical.blocked ? canonical : null;
 };
 
 // Share verification only within the same HTTP request; never reuse authentication across requests.

@@ -1,0 +1,10 @@
+.pi-account-link { max-width: 760px; margin: 2rem auto; padding: 1rem; color: var(--text); background: var(--bg); }
+.pi-account-link section { padding: 1.25rem; margin: 1rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; box-shadow: var(--shadow-soft); }
+.pi-account-link p { line-height: 1.6; overflow-wrap: anywhere; }
+.pi-account-link label { display: block; margin: 1rem 0 .4rem; }
+.pi-account-link input { display: block; box-sizing: border-box; width: 100%; padding: .8rem; margin-bottom: 1rem; color: var(--text); background: var(--soft-bg); border: 1px solid var(--border); border-radius: .5rem; }
+.pi-account-link button { padding: .75rem 1rem; color: var(--text); background: var(--primary-soft); border: 1px solid var(--border); border-radius: .5rem; cursor: pointer; }
+.pi-account-link button:hover:not(:disabled) { background: var(--soft-bg); border-color: var(--primary); }
+.pi-account-link button:disabled { color: var(--muted); cursor: wait; }
+.pi-account-link :is(button, input, a):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.pi-account-link a { color: var(--primary); }

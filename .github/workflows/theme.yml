@@ -47,3 +47,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Check all desktop panels in light and dark mode
         run: npm run test:header:browser --prefix frontend -- --grep "desktop panels follow"
+      - name: Verify paired Pi identity linking in light and dark mode
+        run: npm run test:pi-links --prefix frontend

@@ -30,6 +30,8 @@ function setup() {
             },
           }),
         }
+      : name === "./piIdentityLinks"
+        ? { resolveLinkedPiAccount: async (locals, uid) => locals.userCollection.findOne({ uid }) }
       : name === "mongodb"
         ? require("mongodb")
         : {},

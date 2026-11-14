@@ -1,0 +1,4 @@
+.smaj-signin-panel button { background: var(--primary-soft); color: var(--text); border: 1px solid var(--border); border-radius: .5rem; padding: .65rem 1rem; }
+.smaj-signin-panel button:hover:not(:disabled) { background: var(--soft-bg); border-color: var(--primary); }
+.smaj-signin-panel button:disabled { color: var(--muted); }
+.smaj-signin-panel :is(button, a):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }

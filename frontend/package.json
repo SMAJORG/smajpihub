@@ -18,6 +18,7 @@
     "check:theme": "node scripts/check-theme.mjs",
     "test:theme-check": "node --test tests/themeCheck.test.mjs",
     "test:pi-accounts": "playwright test --config tests/piAccounts.playwright.config.ts",
+    "test:pi-links": "playwright test --config tests/piLink.playwright.config.ts",
     "test:pi-environments": "node --test tests/piIdentityEnvironment.test.mjs",
     "test:testnet-payouts": "playwright test --config tests/payouts.playwright.config.ts",
     "test:jobs": "node tests/jobsUi.test.mjs",
