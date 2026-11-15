@@ -396,10 +396,10 @@ export const useAuth = () => {
       const message = isAxiosError<BackendErrorBody>(err) || err instanceof PiSignInResponseError
         ? toErrorMessage(err)
         : sdkMessage === "PI_AUTH_TIMEOUT"
-          ? "Pi login timed out. Reopen Pi Browser, confirm your sandbox account is signed in, and try again."
+          ? isPiSandboxMode() ? "Pi login timed out. Reopen Pi Browser, confirm your sandbox account is signed in, and try again." : "Pi login timed out. Reopen Pi Browser and approve the Pi sign-in request again."
           : /cancel|denied|reject/i.test(sdkMessage)
             ? "Pi login was cancelled. Please approve the Pi Browser sign-in request and try again."
-            : "Pi login failed before reaching the server. In Pi Sandbox mobile preview, sign in to a sandbox Pi account and try again.";
+            : isPiSandboxMode() ? "Pi login failed before reaching the server. In Pi Sandbox mobile preview, sign in to a sandbox Pi account and try again." : "Pi login failed before reaching the server. Reopen SMAJ PI HUB in Pi Browser and approve the sign-in request.";
       setAuthFeedback({ type: "error", message });
       return false;
     } finally {
