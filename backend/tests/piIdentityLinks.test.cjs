@@ -37,7 +37,7 @@ for(const role of ['seller','admin'])test(`dual Pi verification restores origina
  const after=await users.findOne({uid:primary.uid});for(const key of ['uid','displayName','settings','bio','country','role','roles','createdAt','accessToken','piVerifiedUid'])assert.deepEqual(after[key],before[key],key);
  const secondaryAfter=await users.findOne({uid:secondary.uid});delete secondaryAfter.piIdentityLinkVersion;assert.deepEqual(secondaryAfter,secondaryBefore);
  assert.equal((await users.find({}).toArray()).length,2);assert.equal((await tables.productCollection.find({sellerId:primary.uid}).toArray()).length,1);assert.equal((await tables.marketplaceOrderCollection.find({buyerId:primary.uid}).toArray()).length,1);
- assert.equal((await complete(challenge.body.code)).status,409);assert.equal((await post('signin',{authResult:{accessToken:'original'}})).body.user.uid,primary.uid);
+ assert.equal((await complete(challenge.body.code)).status,200);assert.equal((await post('signin',{authResult:{accessToken:'original'}})).body.user.uid,primary.uid);
 },role));
 test('invalid Pi proof, same identity, wrong confirmation and expired codes cannot bind',()=>fixture(async({post,start,complete,challenges,links})=>{
  assert.equal((await post('pi-identities/start',{accessToken:'forged',uid:'testnet-original'})).status,401);
@@ -68,4 +68,28 @@ test('linking revokes secondary sessions while original sessions stay valid',()=
  const request=()=>({app:{locals},session:{}});
  assert.equal(await resolveHubAccessUser(request(),secondary.accessToken),null);
  assert.equal((await resolveHubAccessUser(request(),primary.accessToken)).uid,'testnet-original');
+}));
+
+for(const role of ['seller','admin'])test(`existing signed SMAJ session proves original ${role} ownership without a Testnet visit`,()=>fixture(async({post,complete,primary,secondary,locals,links,users})=>{
+ const original=await post('signin',{authResult:{accessToken:'original'}});assert.equal(original.status,200);
+ const session=original.body.session;
+ assert.equal((await post('pi-identities/session-start',{accessToken:'incoming',originalAccountAccessToken:'fake',uid:primary.uid})).status,401);
+ const challenge=await post('pi-identities/session-start',{accessToken:'incoming',originalAccountAccessToken:session.accessToken});assert.equal(challenge.status,200);
+ assert.equal((await post('pi-identities/preview',{accessToken:'new',code:challenge.body.code})).status,409);
+ const before=await users.findOne({uid:primary.uid});
+ assert.equal((await complete(challenge.body.code)).status,200);
+ const after=await users.findOne({uid:primary.uid});assert.equal(after.uid,primary.uid);assert.equal(after.role,role);assert.equal(after.displayName,before.displayName);
+ const binding=await links.findOne({_id:secondary.uid});assert.equal(binding.proofMethod,'hub_session_pi_me');
+ const repeated=await complete(challenge.body.code);assert.equal(repeated.status,200);
+ assert.equal((await links.find({}).toArray()).length,1);
+ const signed=await post('signin',{authResult:{accessToken:'incoming'}});assert.equal(signed.status,200);assert.equal(signed.body.user.uid,primary.uid);assert.equal(signed.body.user.role,role);
+ assert.equal((await users.find({}).toArray()).length,2);
+},role));
+
+test('revoked original-session proof cannot finish linking and Pi authentication is still mandatory',()=>fixture(async({post,complete,locals,links})=>{
+ const original=(await post('signin',{authResult:{accessToken:'original'}})).body.session;
+ assert.equal((await post('pi-identities/session-start',{accessToken:'invalid',originalAccountAccessToken:original.accessToken})).status,401);
+ const challenge=await post('pi-identities/session-start',{accessToken:'incoming',originalAccountAccessToken:original.accessToken});assert.equal(challenge.status,200);
+ await locals.deviceSessionCollection.updateMany({userId:'testnet-original'},{$set:{active:false,revokedAt:new Date()}});
+ assert.equal((await complete(challenge.body.code)).status,409);assert.equal((await links.find({}).toArray()).length,0);
 }));

@@ -27,8 +27,8 @@ export async function resolveLinkedPiAccount(locals: any, uid: string, options: 
   const exact = first ? await locals.userCollection.find({ uid }, options).limit(2).toArray() : [];
   if (exact.length > 1) reject("Multiple records use this UID. An account review is required.");
   // Legacy recovery requests are not verified links and cannot change login.
-  if (!binding || binding.proofMethod !== "dual_pi_me") return exact[0] || null;
-  if (binding.status !== "verified" || binding.proofMethod !== "dual_pi_me" || !ObjectId.isValid(binding.canonicalUserId) || !binding.verifiedAt || exact[0]?.blocked) reject("This identity binding is unavailable. Contact support.");
+  if (!binding || !["dual_pi_me", "hub_session_pi_me"].includes(binding.proofMethod)) return exact[0] || null;
+  if (binding.status !== "verified" || !ObjectId.isValid(binding.canonicalUserId) || !binding.verifiedAt || exact[0]?.blocked) reject("This identity binding is unavailable. Contact support.");
   if (await links.findOne({ _id: binding.canonicalUid }, options)) reject("Chained identity bindings are not permitted.");
   const canonical = await locals.userCollection.findOne({ _id: new ObjectId(binding.canonicalUserId), uid: binding.canonicalUid }, options);
   if (!canonical) reject("The original account is unavailable. Contact support.");
@@ -37,12 +37,13 @@ export async function resolveLinkedPiAccount(locals: any, uid: string, options: 
   return canonical;
 }
 
-export async function startIdentityLink(locals: any, identity: { uid: string }) {
+export async function startIdentityLink(locals: any, identity: { uid: string }, originalProofMethod: "pi_me" | "hub_session" = "pi_me", originalSessionKey?: string, boundIncomingUid?: string) {
+  if (originalProofMethod === "hub_session" && !originalSessionKey) reject("An active original device session is required.");
   const account = await resolveLinkedPiAccount(locals, identity.uid);
   if (!account || account.blocked || account.uid !== identity.uid) reject("Start verification from the original account's Pi app.");
   const code = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-  await locals.piIdentityChallengeCollection.insertOne({ _id: digest(code), canonicalUserId: String(account._id), canonicalUid: account.uid, createdAt: new Date(), expiresAt, consumedAt: null });
+  await locals.piIdentityChallengeCollection.insertOne({ _id: digest(code), canonicalUserId: String(account._id), canonicalUid: account.uid, originalProofMethod, ...(originalSessionKey ? { originalSessionKey } : {}), ...(boundIncomingUid ? { boundIncomingUid } : {}), createdAt: new Date(), expiresAt, consumedAt: null });
   return { code, expiresAt, original: { username: account.piUsername || account.username, uid: account.uid, role: account.role } };
 }
 
@@ -50,6 +51,7 @@ async function review(locals: any, code: unknown, identity: { uid: string; usern
   if (typeof code !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(code)) throw new IdentityLinkError(400, "pi_link_code_invalid", "Enter the verification code from the original app.");
   const challenge = await locals.piIdentityChallengeCollection.findOne({ _id: digest(code), consumedAt: null, expiresAt: { $gt: new Date() } }, options);
   if (!challenge) reject("This code expired or was already used. Generate a new code in the original app.");
+  if (challenge.boundIncomingUid && challenge.boundIncomingUid !== identity.uid) reject("This proof belongs to a different incoming identity.");
   const canonical = await resolveLinkedPiAccount(locals, challenge.canonicalUid, options);
   if (!canonical || canonical.blocked || String(canonical._id) !== challenge.canonicalUserId || canonical.uid !== challenge.canonicalUid) reject("The original account is unavailable.");
   if (canonical.uid === identity.uid) reject("Both proofs identify the same Pi UID. Open the paired app to verify the other identity.");
@@ -72,7 +74,22 @@ export async function completeIdentityLink(locals: any, code: unknown, identity:
   try {
     await session.withTransaction(async () => {
       const options = { session };
+      if (typeof code === "string" && /^[A-Za-z0-9_-]{43}$/.test(code)) {
+        const completed = await locals.piIdentityChallengeCollection.findOne({ _id: digest(code), incomingUid: identity.uid, consumedAt: { $ne: null } }, options);
+        if (completed && completed.canonicalUid === confirmedUid) {
+          const binding = await locals.piIdentityLinkCollection.findOne({ _id: identity.uid, challengeId: completed._id, status: "verified" }, options);
+          const canonical = binding ? await resolveLinkedPiAccount(locals, identity.uid, options) : null;
+          if (canonical && !canonical.blocked && canonical.uid === confirmedUid) return;
+        }
+      }
       const { challenge, canonical, duplicate } = await review(locals, code, identity, options);
+      if (challenge.originalProofMethod === "hub_session") {
+        const device = await locals.deviceSessionCollection.findOne({ sessionKey: challenge.originalSessionKey, active: true, expiresAt: { $gt: new Date() } }, options);
+        const owner = device && !device.revokedAt ? await resolveLinkedPiAccount(locals, device.userId, options) : null;
+        if (!owner || owner.blocked || owner.uid !== canonical.uid) reject("The original SMAJ session expired or was revoked. No identity was linked.");
+        const lockedDevice = await locals.deviceSessionCollection.updateOne({ sessionKey: device.sessionKey, active: true, expiresAt: { $gt: new Date() } }, { $inc: { identityLinkVersion: 1 } }, options);
+        if (lockedDevice.matchedCount !== 1) reject("The original device session changed. No identity was linked.");
+      }
       if (confirmedUid !== canonical.uid) reject("Review and confirm the original account before linking.");
       // Serialize competing links involving either existing account. Transaction
       // retries re-read bindings and reject reversed links rather than form cycles.
@@ -81,7 +98,7 @@ export async function completeIdentityLink(locals: any, code: unknown, identity:
       if (duplicate) await locals.userCollection.updateOne({ _id: duplicate._id }, { $inc: { piIdentityLinkVersion: 1 } }, options);
       const consumed = await locals.piIdentityChallengeCollection.updateOne({ _id: challenge._id, consumedAt: null, expiresAt: { $gt: new Date() } }, { $set: { consumedAt: new Date(), incomingUid: identity.uid } }, options);
       if (consumed.matchedCount !== 1) reject("This code expired or was already used.");
-      await locals.piIdentityLinkCollection.insertOne({ _id: identity.uid, canonicalUserId: String(canonical._id), canonicalUid: canonical.uid, status: "verified", proofMethod: "dual_pi_me", verifiedAt: new Date(), originalVerifiedAt: challenge.createdAt, challengeId: challenge._id, secondaryAccountId: duplicate ? String(duplicate._id) : null }, options);
+      await locals.piIdentityLinkCollection.insertOne({ _id: identity.uid, canonicalUserId: String(canonical._id), canonicalUid: canonical.uid, status: "verified", proofMethod: challenge.originalProofMethod === "hub_session" ? "hub_session_pi_me" : "dual_pi_me", verifiedAt: new Date(), originalVerifiedAt: challenge.createdAt, challengeId: challenge._id, secondaryAccountId: duplicate ? String(duplicate._id) : null }, options);
       // Retained secondary records must not keep active device credentials after
       // the user has explicitly switched future access to the original account.
       await locals.deviceSessionCollection?.updateMany({ userId: identity.uid }, { $set: { active: false, revokedAt: new Date() } }, options);

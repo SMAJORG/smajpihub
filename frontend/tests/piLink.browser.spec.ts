@@ -11,7 +11,8 @@ for (const theme of ['light', 'dark']) test(`identity verification and controls 
     const action=route.request().url().split('/').pop();
     const original={uid:'original-uid',username:'Original seller',role:'seller'};
     if(action==='complete')expect(body.confirmedOriginalUid).toBe(original.uid);
-    await route.fulfill({json:action==='start'?{code,original,expiresAt:new Date(Date.now()+600000).toISOString()}:action==='preview'?{original,incoming:{uid:'second-uid',username:'Second identity'},existingSecondaryAccount:true}:{linked:true}});
+    if(action==='session-start')expect(body.originalAccountAccessToken).toBe('hub_access.fixture');
+    await route.fulfill({json:action==='start'||action==='session-start'?{code,original,expiresAt:new Date(Date.now()+600000).toISOString()}:action==='preview'?{original,incoming:{uid:'second-uid',username:'Second identity'},existingSecondaryAccount:true}:{linked:true}});
   });
   await page.goto('/tests/piLink.html', { waitUntil: 'domcontentloaded' });
   await page.evaluate(selected=>{document.documentElement.dataset.theme=selected;}, theme);
@@ -34,6 +35,11 @@ for (const theme of ['light', 'dark']) test(`identity verification and controls 
   await confirm.click();await expect(page.getByRole('status')).toContainText('Identities connected');
   expect(await page.evaluate(()=>JSON.stringify({...localStorage}))).not.toContain(code);
   expect(await page.evaluate(()=>JSON.stringify({...localStorage}))).not.toContain('test-token');
+  await page.evaluate(()=>localStorage.setItem('smaj_hub_session',JSON.stringify({accessToken:'hub_access.fixture'})));
+  await page.getByRole('button',{name:'Verify with my existing SMAJ session'}).click();
+  await expect(confirm).toBeVisible();await confirm.click();
+  await expect(page.getByRole('status')).toContainText('Identities connected');
+  expect(await page.evaluate(()=>JSON.stringify({...localStorage}))).not.toContain('hub_access.fixture');
   await page.goto('/tests/piLink.html?dialog', { waitUntil: 'domcontentloaded' });
   await page.evaluate(selected=>{document.documentElement.dataset.theme=selected;}, theme);
   const dialog=page.getByRole('dialog',{name:'Pi sign-in'});

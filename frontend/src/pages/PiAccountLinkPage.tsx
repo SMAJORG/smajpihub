@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { axiosClient } from "../lib/axiosClient";
 import { ensurePiInitialized, withPiTimeout } from "../lib/piSdk";
 import { piSignInErrorMessage } from "../lib/piSignInErrors";
-import { clearSessionCredentials } from "../lib/sessionCredentials";
+import { clearSessionCredentials, getHubAccessToken } from "../lib/sessionCredentials";
 import "./pi-account-link.css";
 
 type Review = { original: { uid: string; username: string; role: string }; incoming: { uid: string; username: string }; existingSecondaryAccount: boolean };
@@ -30,6 +30,18 @@ export default function PiAccountLinkPage() {
   return <main className="pi-account-link">
     <h1>Use your original SMAJ PI HUB account</h1>
     <p>Verify your two Pi identities once. Your original profile, seller or administrator role, products, orders and history stay with your original account.</p>
+    <section aria-labelledby="link-saved-session">
+      <h2 id="link-saved-session">Already signed in to your original SMAJ account?</h2>
+      <p>Use your saved SMAJ session and approve your current Mainnet Pi identity. Review the original account before confirming. No Testnet visit is needed when your original session is still valid.</p>
+      <button disabled={busy} onClick={()=>void run(async()=>{
+        const originalAccountAccessToken=await getHubAccessToken();
+        if (!originalAccountAccessToken) throw new Error("This browser does not have a valid original SMAJ session.");
+        token.current=await authenticate();
+        const challenge=await request("session-start",token.current,{originalAccountAccessToken});
+        setCode(challenge.code);
+        setReview(await request("preview",token.current,{code:challenge.code}));
+      })}>Verify with my existing SMAJ session</button>
+    </section>
     <section aria-labelledby="link-original">
       <h2 id="link-original">1. In your original Pi app</h2>
       <p>Open this page in Pi Browser through the app where you first created your SMAJ profile. Existing Testnet users should start in their original Testnet app. Authenticate to the Pi account that owns that profile.</p>
