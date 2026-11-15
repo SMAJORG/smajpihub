@@ -9,7 +9,7 @@ import { recoverJobsBilling } from "./services/jobsBillingRecovery";
 import { expireUnfundedReservations } from "./services/inventoryRecovery";
 import mountInstitutionEndpoints from "./handlers/institutions";
 import fs from "fs";
-import { commerceDatabase, commerceMode, commerceCollectionName } from "./services/commerceEnvironment";
+import { commerceDatabase, commerceMode, commerceCollectionName, freshMainnetAccounts } from "./services/commerceEnvironment";
 import mountTestnetHistory from "./handlers/testnetHistory";
 import path from "path";
 import crypto from "crypto";
@@ -406,6 +406,7 @@ app.get("/health", async (_, res) => {
     service: "smaj-pi-hub-backend",
     database: env.use_memory_db ? "memory" : "mongodb",
     commerceMode: commerceMode(),
+    accountMode: freshMainnetAccounts() ? "fresh" : "shared",
     paymentNetwork: env.pi_network,
     paymentsEnabled: env.pi_payments_enabled,
     uptimeSeconds: Math.round(process.uptime()),
@@ -437,7 +438,7 @@ const start = async () => {
       const client = await getMongoClient();
       const originalDb = client.db(dbName);
       const db = commerceDatabase(originalDb, commerceMode());
-      app.locals.testnetHistoryDb = originalDb;
+      if (!freshMainnetAccounts()) app.locals.testnetHistoryDb = originalDb;
       const topology = await db.admin().command({ hello: 1 });
       if (env.is_production && !topology.setName && topology.msg !== "isdbgrid") throw new Error("Production requires transaction-capable MongoDB; configure a replica set before rollout");
       app.locals.mongoClient = client;

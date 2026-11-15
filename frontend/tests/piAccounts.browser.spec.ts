@@ -1,4 +1,28 @@
 import {test,expect} from '@playwright/test';
+
+for(const theme of ['light','dark'])test(`fresh Mainnet login preserves ${theme} theme and never requests legacy linking`,async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.addInitScript(selected=>{
+  localStorage.setItem('smaj_public_theme',selected);
+  window.__ENV={sandbox:'false'};
+  window.Pi={init:()=>undefined,authenticate:async()=>({accessToken:'fresh-proof',user:{uid:'stale-testnet-uid',username:'pioneer'}})} as unknown as NonNullable<Window['Pi']>;
+ },theme);
+ let linking=0;
+ await page.route('**/user/pi-identities/**',async route=>{linking++;await route.fulfill({status:500,json:{}});});
+ await page.route(/\/user(?:[/?]|$)/,async route=>{
+  if(new URL(route.request().url()).pathname==='/user/signin')return route.fallback();
+  if(new URL(route.request().url()).pathname==='/user/presence')return route.fulfill({json:{updated:true}});
+  await route.fulfill({status:401,json:{error:'no_mainnet_session'}});
+ });
+ const mainnet={uid:'fresh-mainnet-uid',username:'pioneer',displayName:'Fresh Mainnet profile',role:'buyer',roles:['buyer'],accountEnvironment:'mainnet',settings:{theme,language:'en',notifications:true}};
+ await page.route('**/user/signin',async route=>{expect(route.request().postDataJSON().authResult).toEqual({accessToken:'fresh-proof'});await route.fulfill({json:{user:mainnet,session}});});
+ await page.goto('/tests/piAccounts.html');
+ await page.evaluate(selected=>{document.documentElement.dataset.theme=selected;},theme);
+ await page.getByTestId('login').click();
+ await expect(page.getByTestId('profile')).toContainText('fresh-mainnet-uid');await expect(page.getByTestId('profile')).toContainText('buyer');
+ expect(linking).toBe(0);expect(await page.evaluate(()=>localStorage.getItem('smaj_public_theme'))).toBe(theme);
+ await expect(page.getByTestId('feedback')).toContainText('Signed in as pioneer');
+});
 const original={uid:'canonical-testnet-uid',username:'pioneer',displayName:'Completed seller',role:'seller',roles:['seller'],country:'NG',verificationStatus:'approved',verificationLevel:'seller_verified',sellerActive:true,settings:{theme:'dark',language:'en',notifications:true}};
 const session={accessToken:'hub_access.test-session',refreshToken:'hub_refresh_test-session',accessTokenExpiresAt:new Date(Date.now()+3600000).toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()};
 async function setup(page:import('@playwright/test').Page,sandbox:boolean){

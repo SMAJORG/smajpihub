@@ -1,3 +1,4 @@
+import { assertPiPaymentsReady } from "../../lib/piPaymentReadiness";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
@@ -94,6 +95,7 @@ const CourseDetailPage = () => {
     }
     try {
       await window.Pi!.authenticate(["payments"]);
+      await assertPiPaymentsReady();
       await window.Pi!.createPayment(
         {
           amount: payment.amount_pi,

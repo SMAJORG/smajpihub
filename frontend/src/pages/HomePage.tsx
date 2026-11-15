@@ -2,7 +2,6 @@ import { Link, Navigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import ServiceArt from "../components/ServiceArt";
-import LiveTransactions from "../components/LiveTransactions";
 import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 import {
   getServiceLaunchLabel,
@@ -174,7 +173,6 @@ const HomePage = () => {
           </ol>
         </section>
 
-        <LiveTransactions />
 
         <section className="home-section public-home-section public-home-trust" aria-labelledby="trust-title">
           <div className="home-section-head public-home-section-head">

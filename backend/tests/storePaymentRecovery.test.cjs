@@ -29,9 +29,11 @@ function setup({ mismatch, absentTransaction = false, cancelled = false, unverif
     },
   };
   const ledger = { updateOne: async () => ({ matchedCount: 1 }) };
-  const app = { locals: { marketplaceOrderCollection: collection, settlementCollection: ledger } };
-  const shared = load("storePayments.ts", { mongodb: { ObjectId }, "./platformAPIClient": { platformAPIKeyClient: api }, "./financialIntegrity": { financialTransaction: async (app, fn) => fn(), bindPayment: async () => {}, verifyIncomingPayment: () => {} }, "./notifications": { createNotification: async () => {} } });
-  const recovery = load("storePaymentRecovery.ts", { "./platformAPIClient": { platformAPIKeyClient: api }, "./storePayments": shared });
+  payment.network='Pi Network';
+  const ownership={paymentOwnedBy:async(_locals,payer,account)=>payer===account};
+  const app = { locals: { piNetwork:'Pi Network',marketplaceOrderCollection: collection, settlementCollection: ledger } };
+  const shared = load("storePayments.ts", { "./paymentIdentity":ownership,mongodb: { ObjectId }, "./platformAPIClient": { platformAPIKeyClient: api }, "./financialIntegrity": { financialTransaction: async (app, fn) => fn(), bindPayment: async () => {}, verifyIncomingPayment: () => {} }, "./notifications": { createNotification: async () => {} } });
+  const recovery = load("storePaymentRecovery.ts", { "./paymentIdentity":ownership,"./platformAPIClient": { platformAPIKeyClient: api }, "./storePayments": shared });
   return { app, order, payment, api, recover: () => recovery.recoverPendingStorePayments(app), posts: () => posts, reads: () => reads, scans: () => scans };
 }
 test("server completes a submitted transfer without any browser completion callback", async () => {

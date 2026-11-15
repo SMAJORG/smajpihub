@@ -30,7 +30,7 @@ export async function authenticateWithCapacitorPi(
 
   const bridgeUrl = new URL(BRIDGE_URL);
   bridgeUrl.searchParams.set("state", state);
-  bridgeUrl.searchParams.set("sandbox", import.meta.env.VITE_SANDBOX_SDK === "true" ? "1" : "0");
+  bridgeUrl.searchParams.set("sandbox", "0");
 
   return new Promise<AuthResult>((resolve, reject) => {
     let finished = false;
@@ -46,10 +46,11 @@ export async function authenticateWithCapacitorPi(
     };
 
     const handleCallback = async (url: string) => {
-      if (!url.startsWith("smajpihub://oauth/pi") && !url.startsWith("https://smajpihub.com/signin/callback")) return;
+      let callback: URL;
+      try { callback = new URL(url); } catch { return; }
+      if (!((callback.protocol === "smajpihub:" && callback.hostname === "oauth" && callback.pathname === "/pi") || (callback.origin === "https://smajpihub.com" && callback.pathname === "/signin/callback"))) return;
       try {
         onStageChange?.("verifying");
-        const callback = new URL(url);
         const params = new URLSearchParams(callback.hash.replace(/^#/, ""));
         const storedState = (await Preferences.get({ key: STATE_KEY })).value || "";
         if (!storedState || params.get("state") !== storedState) {

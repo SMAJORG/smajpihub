@@ -1,4 +1,4 @@
-const DB_NAME = "smaj-offline";
+const DB_NAME = "smaj-mainnet-offline";
 const STORE_NAME = "responses";
 const VERSION = 1;
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;

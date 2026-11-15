@@ -1,3 +1,4 @@
+import { assertPiPaymentsReady } from "../../lib/piPaymentReadiness";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AirplanemodeActiveRoundedIcon from "@mui/icons-material/AirplanemodeActiveRounded";
@@ -168,6 +169,7 @@ const FlightsPage = () => {
       });
       setPendingBooking(booking);
       await window.Pi!.authenticate(["payments"], () => setError("An incomplete Pi payment was found. Finish or cancel it before retrying."));
+      await assertPiPaymentsReady();
       await window.Pi!.createPayment(
         {
           amount: booking.farePi,

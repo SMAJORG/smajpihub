@@ -1,4 +1,5 @@
 import { ensurePiInitialized, withPiTimeout } from "../lib/piSdk";
+import { assertPiPaymentsReady } from "../lib/piPaymentReadiness";
 import { useCallback, useRef, useState } from "react";
 import { axiosClient } from "../lib/axiosClient";
 import { requestPiBrowserHandoff } from "../lib/piBrowserHandoff";
@@ -51,6 +52,7 @@ export const usePiPayment = () => {
     payingRef.current = true;
     setIsPaying(true);
     try {
+      await assertPiPaymentsReady();
       const pi = await ensurePiInitialized();
       const recoveries: Promise<{ orderId: string; error?: unknown }>[] = [];
       const recoveryPaymentIds = new Set<string>();

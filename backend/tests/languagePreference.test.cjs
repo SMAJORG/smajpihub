@@ -18,8 +18,8 @@ function fixture() {
     findOne: async query => query.uid === user?.uid ? user : null,
   };
   const output = {};
-  const code = ts.transpileModule(fs.readFileSync('backend/src/handlers/users.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', code)(name => name.endsWith('/auth') ? { resolveCurrentUser: async () => user } : name.endsWith('/deviceSessions') ? { currentDeviceSessionKey: () => 'device' } : name.endsWith('/environments') ? { default: { admin_pi_usernames: [] } } : {}, output);
+  const code = ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/handlers/users.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  new Function('require', 'exports', code)(name => name.endsWith('/piIdentityLinks') ? {default:()=>{}} : name.endsWith('/commerceEnvironment') ? {freshMainnetAccounts:()=>false} : name.endsWith('/auth') ? { resolveCurrentUser: async () => user } : name.endsWith('/deviceSessions') ? { currentDeviceSessionKey: () => 'device' } : name.endsWith('/environments') ? { default: { admin_pi_usernames: [] } } : {}, output);
   const routes = new Map();
   const router = {};
   for (const method of ['get','put','post','delete','patch']) router[method] = (path, handler) => routes.set(`${method} ${path}`, handler);

@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { freshMainnetAccounts } from "../services/commerceEnvironment";
 import mountPiIdentityLinks from "./piIdentityLinks";
 import { IdentityLinkError, resolveLinkedPiAccount } from "../services/piIdentityLinks";
 import { verifiedPiIdentityFields } from "../services/piRecipientIdentity";
@@ -49,6 +50,7 @@ const publicVerificationLevel = (user: any) => verificationStatus(user) === "app
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const toClientUser = (user: any) => user ? ({
+  accountEnvironment: freshMainnetAccounts() ? "mainnet" : "legacy",
   uid: user.uid,
   username: user.username,
   piUsername: user.piUsername,
@@ -260,7 +262,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
       if (existing) return failure(409, "signin_account_identity_conflict", "Pi authentication succeeded, but the account server could not match this identity to the saved account. No account was created or changed.");
       stage = "account_write";
       const role = isConfiguredAdmin ? "admin" : "buyer";
-      const insertResult = await userCollection.insertOne({
+      await userCollection.updateOne({ uid: normalizedUser.uid }, { $setOnInsert: {
         username: normalizedUser.username,
         piUsername: normalizedUser.username,
         uid: normalizedUser.uid,
@@ -278,9 +280,9 @@ export const handleSignIn = async (req: Request, res: Response) => {
         lastSeenAt: new Date(),
         ...verifiedPiIdentityFields({ uid: verifiedUser.uid!, wallet_address: verifiedUser.wallet_address }),
         accessToken: auth.accessToken,
-      });
+      } }, { upsert: true });
 
-      currentUser = await userCollection.findOne({ _id: insertResult.insertedId });
+      currentUser = await userCollection.findOne({ uid: normalizedUser.uid });
     }
 
     if (!currentUser) return failure(503, "signin_account_unavailable", "The account server could not load your saved profile. Please retry shortly.");

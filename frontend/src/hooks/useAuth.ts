@@ -1,6 +1,5 @@
 import { piSignInErrorMessage, PiSignInResponseError } from "../lib/piSignInErrors";
-import { refreshHubSession, saveSessionCredentials, clearSessionCredentials, getHubAccessToken, getHubRefreshToken, SESSION_CHANGED, SESSION_ENDED, type HubSession } from "../lib/sessionCredentials";
-import { linkFromExistingSession } from "../lib/mainnetAccountContinuity";
+import { refreshHubSession, saveSessionCredentials, clearSessionCredentials, SESSION_CHANGED, SESSION_ENDED, type HubSession } from "../lib/sessionCredentials";
 import { ensurePiInitialized, isPiSandboxMode } from "../lib/piSdk";
 import { isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -58,6 +57,7 @@ const toUser = (candidate: Partial<User> | null | undefined, fallback: User): Us
   const settingsLanguage = typeof candidate?.settings?.language === "string" && candidate.settings.language.trim() && candidate.settings.language !== "English" ? candidate.settings.language : undefined;
   return ({
   uid: candidate?.uid || fallback.uid,
+  accountEnvironment: candidate?.accountEnvironment || fallback.accountEnvironment,
   username: candidate?.username || fallback.username,
   wallet_address: candidate?.wallet_address || fallback.wallet_address,
   roles: Array.isArray(candidate?.roles) ? candidate.roles : Array.isArray(fallback.roles) ? fallback.roles : [],
@@ -88,6 +88,7 @@ const getStoredPiUser = () => {
     const stored = window.localStorage.getItem(PI_USER_STORAGE_KEY);
     if (!stored) return null;
     const parsed = JSON.parse(stored) as User;
+    if (["public", "capacitor"].includes(import.meta.env.MODE) && parsed.accountEnvironment !== "mainnet") return null;
     if (isCapacitorNative() && parsed.accessToken) {
       const token = parsed.accessToken;
       parsed.accessToken = undefined;
@@ -268,15 +269,6 @@ export const useAuth = () => {
   const signInUser = useCallback(async (authResult: AuthResult) => {
     if (!getBaseURL()) throw new PiSignInResponseError("The account server address is not configured. Contact the administrator.");
     const device = await getLoginDeviceMetadata();
-    // SDK user fields are presentation data. Let the server compare its verified
-    // Pi identity with the original credential even when the SDK UID is stale.
-    if (["smajpihub.com", "www.smajpihub.com"].includes(window.location.hostname) && !isPiSandboxMode()) {
-      const originalAccessToken = await getHubAccessToken();
-      let originalRefreshToken = "";
-      try { originalRefreshToken = await getHubRefreshToken(); } catch { /* Corrupt old storage must not block registration. */ }
-      await linkFromExistingSession({ accessToken: authResult.accessToken, originalAccessToken, originalRefreshToken,
-        post: (path, body) => axiosClient.post(path, body, AUTH_REQUEST_CONFIG), confirm: message => window.confirm(message) });
-    }
     const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult: { accessToken: authResult.accessToken }, sandbox: isPiSandboxMode(), device }, AUTH_REQUEST_CONFIG);
     if (!response.data.user?.uid || !response.data.user.username) throw new PiSignInResponseError("The account server did not return a confirmed account. Please retry shortly.");
     const fallback = authResultUser({ accessToken: authResult.accessToken, user: { uid: response.data.user.uid, username: response.data.user.username } });
@@ -374,7 +366,7 @@ export const useAuth = () => {
       }
       await waitForPiSdk();
     }
-    if (!window.Pi) {
+    if (!window.Pi || (!import.meta.env.DEV && !isPiSandboxMode() && !/PiBrowser|Pi Browser/i.test(navigator.userAgent))) {
       if (isPiSandboxMode()) {
         setAuthFeedback({ type: "error", message: "Pi SDK is unavailable in this Sandbox preview. Refresh the preview, confirm your sandbox Pi account is signed in, and try again." });
         loginInProgressRef.current = false;

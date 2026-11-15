@@ -1,6 +1,3 @@
-import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
-import PiAccountLinkPage from "./pages/PiAccountLinkPage";
-import AdminTestnetPayoutsPage from "./pages/admin/AdminTestnetPayoutsPage";
 import AiSignInPage from "./pages/AiSignInPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
@@ -266,7 +263,6 @@ const swapRoutes: Array<[string, SwapPageKind]> = [
 ];
 
 export const router = createBrowserRouter([
-  { path: "/account-link", element: <PiAccountLinkPage /> },
   {path:"/ai/sign-in",element:<AiSignInPage/>},
   {
     path: "/signin/android",
@@ -607,10 +603,6 @@ export const router = createBrowserRouter([
         </PrivateLayout>
       </ProtectedRoute>
     ),
-  },
-  {
-    path: "/testnet-wallet",
-    element: <ProtectedRoute><PrivateLayout><TestnetWalletConsentPage /></PrivateLayout></ProtectedRoute>,
   },
   {
     path: "/wallet",
@@ -1308,10 +1300,6 @@ export const router = createBrowserRouter([
         </AdminLayout>
       </ProtectedRoute>
     ),
-  },
-  {
-    path: "/admin/testnet-payouts",
-    element: <ProtectedRoute><AdminLayout><AdminTestnetPayoutsPage /></AdminLayout></ProtectedRoute>,
   },
   {
     path: "/admin/home-content",

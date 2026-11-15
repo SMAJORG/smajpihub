@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto";
 import { ObjectId } from "mongodb";
 import { getUserPlatformAPIClient } from "./platformAPIClient";
+import { freshMainnetAccounts } from "./commerceEnvironment";
 
 export class IdentityLinkError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -21,6 +22,7 @@ export async function verifyLinkIdentity(token: unknown) {
 
 // UID is the only lookup key. A binding is usable only after both Pi /me proofs.
 export async function resolveLinkedPiAccount(locals: any, uid: string, options: any = {}) {
+  if (freshMainnetAccounts()) return locals.userCollection.findOne({ uid }, options);
   const links = locals.piIdentityLinkCollection;
   const binding = await links?.findOne({ _id: uid }, options);
   const first = await locals.userCollection.findOne({ uid }, options);

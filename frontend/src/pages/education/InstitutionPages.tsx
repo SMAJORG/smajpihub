@@ -1,3 +1,4 @@
+import { assertPiPaymentsReady } from "../../lib/piPaymentReadiness";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { isAxiosError } from "axios";
@@ -428,6 +429,7 @@ export function InstitutionProfilePage() {
         setBusy(false);
         return;
       }
+      await assertPiPaymentsReady();
       await window.Pi!.createPayment(
         {
           amount: payment.amount_pi,

@@ -1,6 +1,7 @@
 export type AuthResult = {
   accessToken: string;
   user: {
+    accountEnvironment?: "mainnet" | "legacy";
     uid?: string;
     username?: string;
     wallet_address?: string;

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { freshMainnetAccounts } from "../services/commerceEnvironment";
 import { resolveCurrentUser } from "../services/auth";
 
 const sources: Record<string, { collection: string; fields: string[] }> = {
@@ -11,6 +12,7 @@ const sources: Record<string, { collection: string; fields: string[] }> = {
 };
 export default function mountTestnetHistory(router: Router) {
   router.all("/:source", async (req, res) => {
+    if (freshMainnetAccounts()) return res.status(404).json({ error: "not_found" });
     res.setHeader("Cache-Control", "private, no-store");
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.setHeader("Allow", "GET, HEAD");

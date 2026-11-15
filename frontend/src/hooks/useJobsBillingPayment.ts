@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { assertPiPaymentsReady } from "../lib/piPaymentReadiness";
 import {
   approveJobsBillingPayment,
   cancelJobsBillingPayment,
@@ -28,6 +29,7 @@ export const useJobsBillingPayment = () => {
     busy.current = true;
     setIsPaying(true);
     try {
+      await assertPiPaymentsReady();
       const { data } = await axiosClient.get("/jobs/billing/intents/" + encodeURIComponent(billingId));
       if (data.intent.status === "paid") {
         callbacks?.onComplete?.({});

@@ -1,3 +1,4 @@
+import { assertPiPaymentsReady } from "../../lib/piPaymentReadiness";
 import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
 import { getStreamDownloadRecommendations } from "../../lib/streamCatalog";
 import StreamVideoActions from "./StreamVideoActions";
@@ -1638,6 +1639,7 @@ const StreamPlansPanel = () => {
           }
         })();
       });
+      await assertPiPaymentsReady();
       await window.Pi!.createPayment(
         {
           amount: result.checkout.amountPi,

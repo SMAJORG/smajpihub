@@ -35,7 +35,6 @@ const SignIn = ({ onSignIn, onModalClose, disabled }: SignInProps) => {
   return (
     <div className="smaj-signin-panel" role="dialog" aria-modal="true" aria-label="Pi sign-in" style={modalStyle}>
       <p style={{ fontWeight: "bold" }}>You need to sign in first.</p>
-      <a href="/account-link" onClick={onModalClose} style={{ color: "var(--primary)" }}>Existing account in another Pi app? Connect your identities</a>
       <div style={buttonContainerStyle}>
         <button onClick={onSignIn} disabled={disabled}>
           Login with Pi

@@ -1,6 +1,7 @@
 type PiSdk = NonNullable<Window["Pi"]>;
 const initialized = new WeakMap<PiSdk, Promise<PiSdk>>();
 export const isPiSandboxMode = () => {
+  if (["public", "capacitor"].includes(import.meta.env.MODE)) return false;
   const sandboxReferrer = (() => { try { return new URL(document.referrer).hostname === "sandbox.minepi.com"; } catch { return false; } })();
   const sandboxFrame = window.location.hostname === "sandbox.minepi.com" || sandboxReferrer;
   // The Mainnet domain must not inherit an obsolete Sandbox build setting.

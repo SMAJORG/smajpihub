@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ensurePiInitialized } from "../lib/piSdk";
 import "../mobile-pi-bridge.css";
 
 type BridgeStatus = "connecting" | "ready" | "authorizing" | "error";
@@ -14,7 +15,6 @@ const waitForPiSdk = async (timeoutMs = 8000) => {
 export default function MobilePiBridgePage() {
   const query = new URLSearchParams(window.location.search);
   const state = query.get("state") || "";
-  const sandbox = query.get("sandbox") === "1";
   const [status, setStatus] = useState<BridgeStatus>("connecting");
   const [message, setMessage] = useState("Preparing secure Pi sign-in…");
   const runningRef = useRef(false);
@@ -36,14 +36,10 @@ export default function MobilePiBridgePage() {
         throw new Error("Pi authentication is available only inside Pi Browser.");
       }
 
-      try {
-        window.Pi!.init({ version: "2.0", sandbox });
-      } catch {
-        // The site bootstrap may already have initialized the SDK.
-      }
+      await ensurePiInitialized();
 
       const authResult = await window.Pi!.authenticate(
-        ["username", "wallet_address"],
+        ["username"],
         () => undefined
       );
       if (!authResult.accessToken) throw new Error("Pi did not return an access token.");
@@ -58,7 +54,7 @@ export default function MobilePiBridgePage() {
       setStatus("error");
       setMessage((error as Error)?.message || "Pi sign-in failed. Please try again.");
     }
-  }, [sandbox, state]);
+  }, [state]);
 
   useEffect(() => {
     let cancelled = false;

@@ -65,8 +65,12 @@ jobs:
           echo "VITE_APP_VERSION=1.0.$code" >> "$GITHUB_ENV"
       - name: Install web dependencies
         run: npm ci --no-audit --no-fund
+      - name: Verify Mainnet SDK and Android authentication
+        run: node --test tests/capacitorPiAuth.test.mjs tests/piPaymentReadiness.test.mjs tests/piIdentityEnvironment.test.mjs
       - name: Build and sync Capacitor
         env:
+          VITE_SANDBOX_SDK: 'false'
+          VITE_PI_PAYMENTS_ENABLED: 'false'
           SMAJ_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/smaj-updates.keystore
           SMAJ_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SMAJ_ANDROID_KEYSTORE_PASSWORD }}
         run: npm run android:sync

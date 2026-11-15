@@ -1,4 +1,5 @@
 import type { Router } from "express";
+import { freshMainnetAccounts } from "../services/commerceEnvironment";
 import { resolveHubAccessUser, refreshPersistentSession } from "../services/persistentSessions";
 import { currentDeviceSessionKey } from "../services/deviceSessions";
 import { completeIdentityLink, IdentityLinkError, previewIdentityLink, startIdentityLink, verifyLinkIdentity, resolveLinkedPiAccount } from "../services/piIdentityLinks";
@@ -7,6 +8,7 @@ export default function mountPiIdentityLinks(router: Router) {
   const attempts = new Map<string, { until: number; count: number }>();
   for (const action of ["start", "session-start", "preview", "complete"] as const) {
     router.post(`/pi-identities/${action}`, async (req, res) => {
+      if (freshMainnetAccounts()) return res.status(404).json({ error: "not_found" });
       res.setHeader("Cache-Control", "no-store");
       const now = Date.now(), key = req.ip || "unknown";
       for (const [address, attempt] of attempts) if (attempt.until <= now) attempts.delete(address);

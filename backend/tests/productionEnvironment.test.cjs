@@ -5,11 +5,11 @@ const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/env
 function resolve(overrides = {}) {
   const exports = {};
   const environment = { NODE_ENV: 'production', SESSION_SECRET: 'isolated-test-secret', PI_API_KEY: 'isolated-test-key', FRONTEND_URL: 'https://example.test', MONGODB_URI: 'mongodb://127.0.0.1:27017/unused', CLOUDINARY_CLOUD_NAME: 'isolated-test-cloud', CLOUDINARY_UPLOAD_PRESET: 'isolated-test-preset', ...overrides };
-  new Function('require', 'exports', 'process', 'console', code)(() => ({ config: () => ({}) }), exports, { env: environment }, { warn() {}, error() {} });
+  new Function('require', 'exports', 'process', 'console', code)(name => name.endsWith('/commerceEnvironment') ? {commerceMode:()=>require('../build/services/commerceEnvironment').commerceMode(environment)} : ({ config: () => ({}) }), exports, { env: environment }, { warn() {}, error() {} });
   return exports.default;
 }
 test('Render production retains Testnet default when PI_NETWORK is absent', () => { assert.equal(resolve({ RENDER: 'true' }).pi_network, 'Pi Testnet'); });
-test('explicit network selection is retained and whitespace normalized', () => { assert.equal(resolve({ PI_NETWORK: 'Pi Network' }).pi_network, 'Pi Network'); assert.equal(resolve({ PI_NETWORK: ' Pi Testnet ' }).pi_network, 'Pi Testnet'); });
+test('fresh Mainnet launch uses the official network without requiring unapproved payment credentials', () => { assert.equal(resolve({ PI_NETWORK: 'Pi Network', PI_COMMERCE_MODE:'mainnet', PI_MAINNET_ACCOUNT_MODE:'fresh', PI_PAYMENTS_ENABLED:'false' }).pi_network, 'Pi Network'); assert.equal(resolve({ PI_NETWORK: ' Pi Testnet ' }).pi_network, 'Pi Testnet'); assert.throws(()=>resolve({PI_NETWORK:'Pi Network'}),/legacy Testnet/); });
 test('invalid explicit production payment network fails closed', () => { assert.throws(() => resolve({ PI_NETWORK: 'invalid-network' }), /PI_NETWORK/); });
 test('other required production configuration remains enforced', () => { assert.throws(() => resolve({ SESSION_SECRET: '' }), /SESSION_SECRET/); });
 
