@@ -20,6 +20,7 @@ const profile = {
 function setup() {
   const env = {
       pi_payments_enabled: true,
+      pi_network: "Pi Testnet",
       cloudinary_cloud_name: "test-cloud",
     },
     cache = new Map(),
@@ -29,6 +30,7 @@ function setup() {
     get: async () => ({ data: pi.remote }),
     post: async (...args) => {
       requests.push(args);
+      if (String(args[0]).endsWith("/complete")) pi.remote.status = { ...pi.remote.status, developer_completed: true, transaction_verified: true };
       return { data: {} };
     },
   };
@@ -482,6 +484,7 @@ test("Pi approval rejects mismatched payer, amount, or metadata before contactin
         { params },
       );
     app.pi.remote = {
+      identifier: "pi-payment", direction: "user_to_app", network: "Pi Testnet",
       user_uid: app.user.uid,
       amount: 2,
       metadata: { coursePaymentId: enrolled.body.payment.id },
@@ -524,6 +527,7 @@ test("confirmed Pi completion activates enrollment and program courses; repeat c
     ),
     paymentId = enrolled.body.payment.id;
   app.pi.remote = {
+    identifier: "pi-payment", direction: "user_to_app", network: "Pi Testnet",
     user_uid: app.user.uid,
     amount: 2,
     metadata: { coursePaymentId: paymentId },

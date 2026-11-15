@@ -296,6 +296,7 @@ export default function mountMarketplaceEndpoints(router: Router) {
     const autoApprove = env.marketplace_auto_approve_products;
     const sellerVerificationLevel = publicVerificationLevel(user);
     const product = {
+      network: env.pi_network,
       sellerId: user.uid,
       sellerName: user.displayName || user.piUsername || user.username,
       sellerAvatar: user.avatar || "",
@@ -374,7 +375,7 @@ export default function mountMarketplaceEndpoints(router: Router) {
         if (!Number.isFinite(unitPricePi) || unitPricePi <= 0) throw financialError("Invalid product price", 400);
         const stock = await req.app.locals.productCollection.updateOne({ _id: product._id, quantity: { $gte: quantity }, active: true, approved: true }, { $inc: { quantity: -quantity } }, options);
         if (!stock.modifiedCount) throw financialError("Requested quantity is unavailable");
-        const created = { _id: orderId, buyerId: user.uid, buyerName: user.displayName || user.username, sellerId: product.sellerId,
+        const created = { _id: orderId, network: env.pi_network, buyerId: user.uid, buyerName: user.displayName || user.username, sellerId: product.sellerId,
           sellerName: product.sellerName, productId, productTitle: product.title, productImage: product.image, productCategory: product.category,
           quantity, unitPricePi, pricePi: unitPricePi * quantity, status: "pending", paymentStatus: "pending", paymentId: null, paymentTxid: null,
           paidAt: null, inventoryReserved: true, inventoryReleased: false, reservationExpiresAt: new Date(Date.now()+30*60*1000),
@@ -634,7 +635,7 @@ export default function mountMarketplaceEndpoints(router: Router) {
     res.setHeader("Cache-Control", "private, no-store");
     try {
       const snapshot = await buildSellerDashboard(req.app.locals, user);
-      return res.json({ ...snapshot, defaultNetwork: env.pi_network === "Pi Mainnet" ? "Pi Mainnet" : "Pi Testnet", products: await publicProducts(req, snapshot.products) });
+      return res.json({ ...snapshot, defaultNetwork: env.pi_network === "Pi Network" ? "Pi Mainnet" : "Pi Testnet", products: await publicProducts(req, snapshot.products) });
     }
     catch { return res.status(503).json({ message: "Seller dashboard is temporarily unavailable. Please retry." }); }
   });

@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { paymentOwnedBy } from "./paymentIdentity";
 import {
   bindPayment,
   financialError,
@@ -29,6 +30,7 @@ export const recordMerchantSettlement = async (
     );
   const payment = await verifyOutboundPayment(paymentId, {
     uid: order.sellerId,
+    locals: app.locals,
     amount: Number(order.pricePi),
     metadataKey: "orderId",
     intentId: orderId,
@@ -55,7 +57,7 @@ export const recordMerchantSettlement = async (
     if (
       !payable ||
       payable.amountPi !== payment.amount ||
-      payable.sellerUid !== payment.user_uid
+      !await paymentOwnedBy(app.locals, payment.user_uid, payable.sellerUid)
     )
       throw financialError(
         "Payable missing or mismatched; reconciliation required",

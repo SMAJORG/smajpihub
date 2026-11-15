@@ -31,7 +31,7 @@ export const getStreamSubscription = async () =>
 
 export type StreamCheckoutResult =
   | { subscription: StreamSubscription; message: string; checkout?: never }
-  | { checkout: { plan: StreamPlanId; amountPi: number; memo: string }; subscription?: never; message?: never };
+  | { checkout: { id: string; plan: StreamPlanId; amountPi: number; memo: string }; subscription?: never; message?: never };
 
 export const startStreamSubscriptionCheckout = async (plan: StreamPlanId) =>
   (await axiosClient.post<StreamCheckoutResult>("/stream/subscription/checkout", { plan })).data;

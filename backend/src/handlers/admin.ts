@@ -711,7 +711,7 @@ export default function mountAdminEndpoints(router: Router) {
     if (order.settlementStatus === "settled") return res.status(409).json({ message: "Merchant already settled; reconcile before issuing an app refund" });
     let verifiedReturn: any;
     if (action === "complete") {
-      try { verifiedReturn = await verifyOutboundPayment(reference, { uid: order.buyerId, amount: Number(order.pricePi), metadataKey: "refundOrderId", intentId: req.params.id }); }
+      try { verifiedReturn = await verifyOutboundPayment(reference, { uid: order.buyerId, locals: req.app.locals, amount: Number(order.pricePi), metadataKey: "refundOrderId", intentId: req.params.id }); }
       catch (error: any) { return res.status(error.status || 503).json({ message: "Refund transfer is not verified" }); }
     }
     const note = String(req.body?.note || "").trim().slice(0, 500);

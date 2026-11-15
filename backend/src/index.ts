@@ -9,6 +9,8 @@ import { recoverJobsBilling } from "./services/jobsBillingRecovery";
 import { expireUnfundedReservations } from "./services/inventoryRecovery";
 import mountInstitutionEndpoints from "./handlers/institutions";
 import fs from "fs";
+import { commerceDatabase, commerceMode, commerceCollectionName } from "./services/commerceEnvironment";
+import mountTestnetHistory from "./handlers/testnetHistory";
 import path from "path";
 import crypto from "crypto";
 import cors from "cors";
@@ -82,6 +84,7 @@ const maskMongoUri = (uri: string) =>
 const app: express.Application = express();
 const serviceStartedAt = new Date();
 app.locals.piNetwork = env.pi_network;
+app.locals.commerceMode = commerceMode();
 const isProduction = env.is_production;
 const crossSiteSession = isProduction && !env.is_solohost;
 const sessionTtlSeconds = SESSION_TTL_SECONDS;
@@ -209,7 +212,7 @@ app.use(
           store: MongoStore.create({
             clientPromise: getMongoClient(),
             dbName: dbName,
-            collectionName: "user_sessions",
+            collectionName: commerceCollectionName("user_sessions", commerceMode()),
             ttl: sessionTtlSeconds,
             autoRemove: "native",
           }),
@@ -218,6 +221,13 @@ app.use(
 );
 
 app.use(guardTestnetSandboxIdentity);
+app.use((req, res, next) => {
+  if (commerceMode() === "mainnet" && (/^\/admin\/testnet(?:\/|$)/.test(req.path) || req.path === "/user/testnet/wallet-consent")) {
+    res.status(410).json({ error: "testnet_development_only", message: "Use the separate Testnet development app. Historical transactions remain read-only." });
+    return;
+  }
+  next();
+});
 
 app.use(async (req, res, next) => {
   const bearer = (req.get("authorization") || "").replace(/^Bearer\s+/i, "") || req.get("x-smaj-access-token") || "";
@@ -266,6 +276,9 @@ if (env.session_debug) {
 const paymentsRouter = express.Router();
 mountPaymentsEndpoints(paymentsRouter);
 app.use("/payments", paymentsRouter);
+const testnetHistoryRouter = express.Router();
+mountTestnetHistory(testnetHistoryRouter);
+app.use("/history/testnet", testnetHistoryRouter);
 const transactionsRouter = express.Router();
 mountLiveTransactions(transactionsRouter);
 app.use("/api/transactions", transactionsRouter);
@@ -392,6 +405,9 @@ app.get("/health", async (_, res) => {
     status: ready ? "ok" : "starting",
     service: "smaj-pi-hub-backend",
     database: env.use_memory_db ? "memory" : "mongodb",
+    commerceMode: commerceMode(),
+    paymentNetwork: env.pi_network,
+    paymentsEnabled: env.pi_payments_enabled,
     uptimeSeconds: Math.round(process.uptime()),
     startedAt: serviceStartedAt.toISOString(),
     features: {
@@ -419,7 +435,9 @@ const start = async () => {
       );
     } else {
       const client = await getMongoClient();
-      const db = client.db(dbName);
+      const originalDb = client.db(dbName);
+      const db = commerceDatabase(originalDb, commerceMode());
+      app.locals.testnetHistoryDb = originalDb;
       const topology = await db.admin().command({ hello: 1 });
       if (env.is_production && !topology.setName && topology.msg !== "isdbgrid") throw new Error("Production requires transaction-capable MongoDB; configure a replica set before rollout");
       app.locals.mongoClient = client;

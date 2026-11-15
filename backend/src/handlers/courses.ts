@@ -1,4 +1,6 @@
 import { assertInstitutionCourse, assertInstitutionPayment, canManageInstitution, isInstitutionPartner, assertPiPaymentBinding, grantInstitutionProgramCourses } from "../services/institutions";
+import { commerceMode } from "../services/commerceEnvironment";
+import { verifyAccountIncomingPayment, bindPayment } from "../services/financialIntegrity";
 import type { Request, Response, Router } from "express";
 import axios from "axios";
 import { ObjectId } from "mongodb";
@@ -188,6 +190,7 @@ export default function mountCourseEndpoints(router: Router) {
   });
 
   const ensureSeedCourses = async (req: Request) => {
+    if (commerceMode() === "mainnet") return;
     const collection = req.app.locals.courseCollection;
     if (!collection) return;
     const count = await collection.countDocuments({});
@@ -1046,9 +1049,12 @@ export default function mountCourseEndpoints(router: Router) {
           .status(400)
           .json({ error: "bad_request", message: "Pi payment ID is required" });
       await assertInstitutionPayment(req, payment);
+      const remote = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(piPaymentId)}`)).data;
+      await verifyAccountIncomingPayment(req.app.locals, remote, { paymentId: piPaymentId, payer: currentUser.uid, amount: Number(payment.amount_pi), metadataKey: "coursePaymentId", intentId: String(payment._id) });
+      if (payment.pi_payment_identifier && payment.pi_payment_identifier !== piPaymentId) throw new Error("Resume the original enrollment payment.");
+      await bindPayment(req.app, remote, "course:" + String(payment._id));
       if (payment.institutionId) {
-        const { data: remote } = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(piPaymentId)}`);
-        assertPiPaymentBinding(remote, payment, currentUser);
+        assertPiPaymentBinding(remote, payment, { ...currentUser, uid: remote.user_uid });
         const reused = await paymentCollection.findOne({ pi_payment_identifier: piPaymentId, _id: { $ne: payment._id } });
         if (reused) throw new Error("This Pi payment is already assigned to another enrollment.");
       }
@@ -1108,16 +1114,20 @@ export default function mountCourseEndpoints(router: Router) {
         });
 
       await assertInstitutionPayment(req, payment);
-      if (payment.institutionId) {
-        if (!payment.pi_payment_identifier || !["processing", "paid"].includes(payment.status)) throw new Error("An approved Pi payment is required.");
-        const payer = await req.app.locals.userCollection.findOne({ _id: new ObjectId(payment.user_id) });
-        const { data: remote } = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(payment.pi_payment_identifier)}`);
-        assertPiPaymentBinding(remote, payment, payer, txid);
-      }
+      if (!payment.pi_payment_identifier || !["processing", "paid"].includes(payment.status)) throw new Error("An approved Pi payment is required.");
+      const payer = await req.app.locals.userCollection.findOne({ _id: new ObjectId(payment.user_id) });
+      if (!payer || payer.blocked) throw new Error("Enrollment owner is unavailable.");
+      const remote = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(payment.pi_payment_identifier)}`)).data;
+      const expected = { paymentId: payment.pi_payment_identifier, payer: payer.uid, amount: Number(payment.amount_pi), metadataKey: "coursePaymentId", intentId: String(payment._id) };
+      await verifyAccountIncomingPayment(req.app.locals, remote, expected);
+      if (payment.institutionId) assertPiPaymentBinding(remote, payment, { ...payer, uid: remote.user_uid }, txid);
       await platformAPIKeyClient.post(
         `/v2/payments/${encodeURIComponent(payment.pi_payment_identifier || payment.payment_id)}/complete`,
         { txid },
       );
+      const confirmed = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(payment.pi_payment_identifier)}`)).data;
+      await verifyAccountIncomingPayment(req.app.locals, confirmed, expected, true, txid);
+      await bindPayment(req.app, confirmed, "course:" + String(payment._id));
 
       await paymentCollection.updateOne(
         { _id: payment._id },

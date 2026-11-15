@@ -1,3 +1,7 @@
+import { commerceMode } from "../services/commerceEnvironment";
+import { randomUUID } from "crypto";
+import { bindPayment, verifyAccountIncomingPayment } from "../services/financialIntegrity";
+import { paymentOwnedBy } from "../services/paymentIdentity";
 import { deleteAdminStreamVideo, StreamAdminDeletionError } from "../services/streamAdminDeletion";
 import { deleteCreatorContent, editCreatorContent, parseCreatorContentPatch } from "../services/streamCreatorContent";
 import { getStreamPlaybackTotals, recordStreamPlayback } from "../services/streamAnalytics";
@@ -8,6 +12,10 @@ import { ObjectId } from "mongodb";
 import env from "../environments";
 import { resolveCurrentUser } from "../services/auth";
 import { platformAPIKeyClient } from "../services/platformAPIClient";
+
+const subscriptionPrefix = commerceMode() === "mainnet" ? "mainnet" : commerceMode() === "testnet-development" ? "testnetDev" : "";
+const streamSubscriptionField = subscriptionPrefix ? `${subscriptionPrefix}StreamSubscription` : "streamSubscription";
+const pendingStreamSubscriptionField = subscriptionPrefix ? `${subscriptionPrefix}PendingStreamSubscription` : "pendingStreamSubscription";
 
 const TMDB_API_URL = "https://api.themoviedb.org/3";
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -419,7 +427,7 @@ const mountStreamEndpoints = (router: Router) => {
     const title = String(req.body?.title || "").trim().slice(0, 180);
     if (!Number.isInteger(tmdbId) || tmdbId <= 0 || !mediaType || !title) return res.status(400).json({ error: "bad_request", message: "A valid TMDB title is required." });
     const storedViewer = await req.app.locals.userCollection.findOne({ _id: user._id });
-    const subscription = normalizeStreamSubscription(storedViewer?.streamSubscription);
+    const subscription = normalizeStreamSubscription(storedViewer?.[streamSubscriptionField]);
     if (subscription.status !== "active" || (subscription.plan !== "plus" && subscription.plan !== "family"))
       return res.status(403).json({ error: "download_plan_required", message: "Downloads require an active Plus or Family plan." });
     const licensedVideo = await req.app.locals.streamContentCollection?.findOne({ "catalogAttachment.tmdbId": tmdbId, "catalogAttachment.mediaType": mediaType, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", ...downloadableSourceFilter });
@@ -442,7 +450,7 @@ const mountStreamEndpoints = (router: Router) => {
     const stored = await req.app.locals.userCollection.findOne({ _id: user._id });
     return res.json({
       plans: Object.values(streamPlans).map(plan => ({ ...plan, ...streamPlanPrice(plan.priceUsd) })),
-      subscription: normalizeStreamSubscription(stored?.streamSubscription),
+      subscription: normalizeStreamSubscription(stored?.[streamSubscriptionField]),
     });
   });
 
@@ -453,9 +461,9 @@ const mountStreamEndpoints = (router: Router) => {
     const selected = streamPlans[plan];
     const pricing = streamPlanPrice(selected.priceUsd);
     if (selected.priceUsd > 0) {
-      const checkout = { plan, amountPi: pricing.pricePi, memo: `SMAJ Stream ${selected.name} monthly plan`, createdAt: new Date() };
-      await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { pendingStreamSubscription: checkout } });
-      return res.status(201).json({ checkout: { plan, amountPi: pricing.pricePi, memo: checkout.memo } });
+      const checkout = { id: randomUUID(), plan, amountPi: pricing.pricePi, memo: `SMAJ Stream ${selected.name} monthly plan`, createdAt: new Date() };
+      await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { [pendingStreamSubscriptionField]: checkout } });
+      return res.status(201).json({ checkout: { id: checkout.id, plan, amountPi: pricing.pricePi, memo: checkout.memo } });
     }
     const now = new Date();
     const subscription = {
@@ -469,7 +477,7 @@ const mountStreamEndpoints = (router: Router) => {
       paymentStatus: "free",
       updatedAt: now,
     };
-    await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { streamSubscription: subscription } });
+    await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { [streamSubscriptionField]: subscription } });
     return res.status(201).json({
       subscription: normalizeStreamSubscription(subscription),
       message: "Free Stream plan activated.",
@@ -482,18 +490,22 @@ const mountStreamEndpoints = (router: Router) => {
     const plan = String(req.body?.plan || "") as StreamPlanId;
     if (!paymentId || !(plan in streamPlans) || streamPlans[plan].priceUsd <= 0) return res.status(400).json({ error: "invalid_payment", message: "A valid paid Stream plan and Pi payment are required." });
     const stored = await req.app.locals.userCollection.findOne({ _id: user._id });
-    const pending = stored?.pendingStreamSubscription;
+    const pending = stored?.[pendingStreamSubscriptionField];
     const expectedAmount = streamPlanPrice(streamPlans[plan].priceUsd).pricePi;
     if (!pending || pending.plan !== plan || Math.abs(Number(pending.amountPi) - expectedAmount) > 0.00000001) return res.status(409).json({ error: "checkout_mismatch", message: "Start this Stream checkout again." });
     try {
       const remote = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`, { timeout: 6000 });
       const payment = remote.data;
-      if (payment?.metadata?.service !== "stream" || payment?.metadata?.plan !== plan || Math.abs(Number(payment?.amount) - expectedAmount) > 0.00000001 || (payment?.user_uid && user.uid && payment.user_uid !== user.uid))
+      if ((pending.paymentId && pending.paymentId !== paymentId) || stored?.[streamSubscriptionField]?.paymentId === paymentId || (commerceMode() === "mainnet" && !pending.id))
+        return res.status(409).json({ error: "checkout_mismatch", message: "Resume the original Stream checkout." });
+      await verifyAccountIncomingPayment(req.app.locals, payment, { paymentId, payer: user.uid, amount: expectedAmount, metadataKey: commerceMode() === "mainnet" ? "checkoutId" : "plan", intentId: commerceMode() === "mainnet" ? pending.id : plan });
+      if (payment?.metadata?.service !== "stream" || payment?.metadata?.plan !== plan || Math.abs(Number(payment?.amount) - expectedAmount) > 0.00000001 || (payment?.network !== env.pi_network || !await paymentOwnedBy(req.app.locals, payment?.user_uid, user.uid)))
         return res.status(409).json({ error: "payment_mismatch", message: "This Pi payment does not match the selected Stream plan." });
       // Pi may repeat the approval callback after returning from Wallet.
-      if (!payment?.status?.developer_approved)
-        await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/approve`);
-      await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { "pendingStreamSubscription.paymentId": paymentId, "pendingStreamSubscription.approvedAt": new Date() } });
+      await bindPayment(req.app, payment, "stream:" + (pending.id || paymentId));
+      const bound = await req.app.locals.userCollection.updateOne({ _id: user._id, [pendingStreamSubscriptionField]: pending }, { $set: { [pendingStreamSubscriptionField]: { ...pending, paymentId, approvedAt: new Date() } } });
+      if (!bound.matchedCount) return res.status(409).json({ error: "checkout_changed", message: "Resume your current Stream checkout." });
+      if (!payment?.status?.developer_approved) await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/approve`);
       return res.json({ approved: true });
     } catch (error) {
       const status = Number((error as { response?: { status?: number } }).response?.status || 502);
@@ -507,27 +519,34 @@ const mountStreamEndpoints = (router: Router) => {
     const txid = String(req.body?.txid || "").trim();
     const plan = String(req.body?.plan || "") as StreamPlanId;
     const stored = await req.app.locals.userCollection.findOne({ _id: user._id });
-    if (stored?.streamSubscription?.paymentStatus === "paid" && stored.streamSubscription.paymentId === paymentId && stored.streamSubscription.plan === plan)
-      return res.json({ subscription: normalizeStreamSubscription(stored.streamSubscription), message: `${streamPlans[plan].name} is already active.` });
-    const pending = stored?.pendingStreamSubscription;
+    if (stored?.[streamSubscriptionField]?.paymentStatus === "paid" && stored[streamSubscriptionField].paymentId === paymentId && stored[streamSubscriptionField].plan === plan)
+      return res.json({ subscription: normalizeStreamSubscription(stored[streamSubscriptionField]), message: `${streamPlans[plan].name} is already active.` });
+    const pending = stored?.[pendingStreamSubscriptionField];
     if (!paymentId || !txid || !(plan in streamPlans) || !pending || pending.plan !== plan || pending.paymentId !== paymentId)
       return res.status(409).json({ error: "payment_mismatch", message: "This Pi payment does not match an approved Stream checkout." });
     try {
-      // A successful Pi Platform completion response is authoritative. The
-      // completion payload does not always include `transaction.verified`, so
-      // requiring that optional field rejected valid Stream purchases.
+      const payment = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`)).data;
+      if (commerceMode() === "mainnet" && !pending.id) return res.status(409).json({ error: "checkout_mismatch", message: "Start a new Mainnet checkout." });
+      const expected = { paymentId, payer: user.uid, amount: Number(pending.amountPi), metadataKey: commerceMode() === "mainnet" ? "checkoutId" : "plan", intentId: commerceMode() === "mainnet" ? pending.id : plan };
+      await verifyAccountIncomingPayment(req.app.locals, payment, expected);
+      if (payment?.identifier !== paymentId || payment?.network !== env.pi_network || payment?.direction !== "user_to_app" || !await paymentOwnedBy(req.app.locals, payment?.user_uid, user.uid)
+          || payment?.metadata?.service !== "stream" || payment?.metadata?.plan !== plan || !Number.isFinite(payment?.amount) || Math.round(payment.amount * 1e7) !== Math.round(Number(pending.amountPi) * 1e7)
+          || payment?.status?.cancelled || payment?.status?.user_cancelled)
+        return res.status(409).json({ error: "payment_mismatch", message: "Pi payment does not match this Stream checkout." });
       const completedResponse = await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/complete`, { txid });
-      const completedPayment = completedResponse.data;
+      const completedPayment = completedResponse.data?.identifier ? completedResponse.data : (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`)).data;
       const completedTxid = String(completedPayment?.transaction?.txid || "").trim();
-      if (completedPayment?.status?.developer_completed === false || (completedTxid && completedTxid !== txid))
+      await verifyAccountIncomingPayment(req.app.locals, completedPayment, expected, true, txid);
+      await bindPayment(req.app, completedPayment, "stream:" + (pending.id || paymentId));
+      if (completedPayment?.identifier !== paymentId || completedPayment?.user_uid !== payment.user_uid || completedPayment?.network !== env.pi_network || completedPayment?.status?.developer_completed !== true || completedPayment?.status?.transaction_verified !== true || completedTxid !== txid)
         return res.status(409).json({ error: "payment_not_completed", message: "Pi has not fully confirmed this payment. Your Stream plan was not changed." });
       const now = new Date();
       const expiresAt = new Date(now); expiresAt.setUTCMonth(expiresAt.getUTCMonth() + 1);
       const pricing = streamPlanPrice(streamPlans[plan].priceUsd);
       const subscription = { plan, status: "active", startedAt: now, expiresAt, priceUsd: pricing.priceUsd, pricePi: pricing.pricePi, piRateUsed: pricing.piRateUsed, paymentStatus: "paid", paymentId, paymentTxid: txid, updatedAt: now };
       const activation = await req.app.locals.userCollection.updateOne(
-        { _id: user._id, "pendingStreamSubscription.plan": plan, "pendingStreamSubscription.paymentId": paymentId },
-        { $set: { streamSubscription: subscription }, $unset: { pendingStreamSubscription: "" } },
+        { _id: user._id, [pendingStreamSubscriptionField]: pending },
+        { $set: { [streamSubscriptionField]: subscription }, $unset: { [pendingStreamSubscriptionField]: "" } },
       );
       if (!activation.matchedCount) return res.status(409).json({ error: "checkout_changed", message: "This checkout is no longer active. Contact support with your Pi transaction ID." });
       return res.json({ subscription: normalizeStreamSubscription(subscription), message: `${streamPlans[plan].name} is active for one month.` });
@@ -540,9 +559,9 @@ const mountStreamEndpoints = (router: Router) => {
   router.post("/subscription/cancel", async (req, res) => {
     const user = await requireViewer(req, res); if (!user) return;
     const stored = await req.app.locals.userCollection.findOne({ _id: user._id });
-    const current = normalizeStreamSubscription(stored?.streamSubscription);
+    const current = normalizeStreamSubscription(stored?.[streamSubscriptionField]);
     const subscription = { ...current, status: "cancelled", updatedAt: new Date() };
-    await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { streamSubscription: subscription } });
+    await req.app.locals.userCollection.updateOne({ _id: user._id }, { $set: { [streamSubscriptionField]: subscription } });
     return res.json({ subscription, message: "Stream subscription cancelled." });
   });
 
@@ -1334,7 +1353,7 @@ const mountStreamEndpoints = (router: Router) => {
     if (!video || video.visibility !== "public" || video.moderationStatus !== "approved" || video.playbackAllowed !== true || video.processingStatus !== "ready") return res.json({ available: false, downloadAllowed: false });
     if (video.contentSource === "internet_archive" && !/^https:\/\/archive\.org\/download\//i.test(String(video.playback?.mp4 || ""))) return res.json({ available: false, downloadAllowed: false, message: NO_PLAYABLE_ARCHIVE_SOURCE_MESSAGE });
     const storedViewer = await req.app.locals.userCollection.findOne({ _id: user._id });
-    const subscription = normalizeStreamSubscription(storedViewer?.streamSubscription);
+    const subscription = normalizeStreamSubscription(storedViewer?.[streamSubscriptionField]);
     const paidDownloads = subscription.status === "active" && (subscription.plan === "plus" || subscription.plan === "family");
     const sourceAllowsDownload = video.contentSource === "cloudflare_stream" || video.downloadAllowed === true;
     return res.json({ available: true, playbackId: video.cloudflareUid, title: video.title, creatorName: video.creatorName || "SMAJ Stream", downloadAllowed: paidDownloads && sourceAllowsDownload });
@@ -1454,7 +1473,7 @@ const mountStreamEndpoints = (router: Router) => {
     const user = await requireViewer(req, res); if (!user) return;
     const uid = String(req.params.uid || "").slice(0, 180);
     const storedViewer = await req.app.locals.userCollection.findOne({ _id: user._id });
-    const subscription = normalizeStreamSubscription(storedViewer?.streamSubscription);
+    const subscription = normalizeStreamSubscription(storedViewer?.[streamSubscriptionField]);
     if (subscription.status !== "active" || (subscription.plan !== "plus" && subscription.plan !== "family"))
       return res.status(403).json({ error: "download_plan_required", message: "Downloads require an active Plus or Family plan." });
     const video = await req.app.locals.streamContentCollection?.findOne({ cloudflareUid: uid, visibility: "public", moderationStatus: "approved", playbackAllowed: true, processingStatus: "ready", ...downloadableSourceFilter });

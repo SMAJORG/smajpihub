@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { paymentOwnedBy } from "../services/paymentIdentity";
 import { visibleCv } from "../services/candidateAuthorization";
 import { verifyIncomingPayment, bindPayment, financialTransaction, validPaymentId } from "../services/financialIntegrity";
 import type { Request, Response, Router } from "express";
@@ -886,7 +887,8 @@ export default function mountJobsEndpoints(router: Router) {
       return res.status(503).json({ error: "payments_unavailable", message: "Pi payment activation is pending platform payment configuration." });
     if (!validPaymentId(paymentId) || (intent.paymentId && intent.paymentId !== paymentId)) return res.status(409).json({ message: "Resume the bound payment" });
     const payment = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;
-    verifyIncomingPayment(payment, { paymentId, payer: user.uid, amount: Number(intent.pricePi), metadataKey: "billingId", intentId: billingId });
+    if (!await paymentOwnedBy(req.app.locals, payment.user_uid, user.uid)) return res.status(403).json({ message: "Payment belongs to another Pi account" });
+    verifyIncomingPayment(payment, { paymentId, payer: payment.user_uid, amount: Number(intent.pricePi), metadataKey: "billingId", intentId: billingId });
     await bindPayment(req.app, payment, "jobs:" + billingId);
     const binding = await req.app.locals.jobBillingCollection.updateOne(
       { billingId, status: { $in: ["pending_payment", "processing"] }, $or: [{ paymentId: { $exists: false } }, { paymentId }] },
@@ -1890,8 +1892,9 @@ export const completeJobsBillingRequest = async (req: Request, res: Response) =>
     if (!env.pi_api_key)
       return res.status(503).json({ error: "payments_unavailable", message: "Pi payment activation is pending platform payment configuration." });
     if (!validPaymentId(paymentId) || (intent.paymentId && intent.paymentId !== paymentId)) return res.status(409).json({ message: "Payment binding conflict" });
-    const expected = { paymentId, payer: user.uid, amount: Number(intent.pricePi), metadataKey: "billingId", intentId: billingId };
     let payment = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;
+    if (!await paymentOwnedBy(req.app.locals, payment.user_uid, user.uid)) return res.status(403).json({ message: "Payment belongs to another Pi account" });
+    const expected = { paymentId, payer: payment.user_uid, amount: Number(intent.pricePi), metadataKey: "billingId", intentId: billingId };
     verifyIncomingPayment(payment, expected);
     if (!payment.status?.developer_completed) await platformAPIKeyClient.post("/v2/payments/" + encodeURIComponent(paymentId) + "/complete", { txid });
     payment = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;

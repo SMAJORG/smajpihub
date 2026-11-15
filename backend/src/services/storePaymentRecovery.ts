@@ -1,4 +1,5 @@
 import { platformAPIKeyClient } from "./platformAPIClient";
+import { paymentOwnedBy } from "./paymentIdentity";
 import { completeStorePayment } from "./storePayments";
 
 const activeScans = new WeakSet<object>();
@@ -30,7 +31,7 @@ export const recoverPendingStorePayments = async (app: any) => {
           const { data: payment } = await platformAPIKeyClient.get(
             "/v2/payments/" + encodeURIComponent(order.paymentId), { timeout: 6000 }
           );
-          if (payment.identifier !== order.paymentId || payment.user_uid !== order.buyerId ||
+          if (payment.identifier !== order.paymentId || !await paymentOwnedBy(app.locals, payment.user_uid, order.buyerId) ||
               payment.direction !== "user_to_app" || String(payment.metadata?.orderId || "") !== order._id.toString()) {
             await record({ paymentRecoveryState: "blocked", paymentRecoveryError: "Payment identity does not match this order" });
             continue;

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { commerceMode } from "../services/commerceEnvironment";
 import env from "../environments";
 import { platformAPIKeyClient } from "../services/platformAPIClient";
 import { LiveTransactionFeed } from "../services/liveTransactions";
@@ -7,6 +8,14 @@ export default function mountLiveTransactions(router: Router) {
   let feed: LiveTransactionFeed | undefined;
   router.get("/live", async (req, res) => {
     res.set("Cache-Control", "no-store");
+    if (commerceMode() !== "legacy") {
+      try {
+        const transactions = await req.app.locals.testnetHistoryDb.collection("pi_live_testnet_transactions")
+          .find({ network: "Pi Testnet", verified: true }, { projection: { _id: 0, transactionId: 1, amount: 1, time: 1, timeKind: 1, verified: 1, network: 1, explorerUrl: 1 } })
+          .sort({ time: -1 }).limit(20).maxTimeMS(8000).toArray();
+        return res.json({ network: "Pi Testnet", transactions, availability: "archived", readOnly: true });
+      } catch { return res.status(503).json({ error: "transactions_unavailable" }); }
+    }
     if (env.use_memory_db || !req.app.locals.liveTransactionCollection) {
       return res.status(503).json({
         error: "transactions_unavailable",

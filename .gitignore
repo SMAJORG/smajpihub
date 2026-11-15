@@ -2,6 +2,9 @@
 docker-data
 .DS_Store
 node_modules/
+.private-backups/
+*.archive.gz.aes
+*.archive.gz.aes.json
 # Capacitor generated output and signing material
 frontend/dist-capacitor/
 frontend/android/.gradle/

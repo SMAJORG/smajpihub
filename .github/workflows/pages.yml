@@ -37,6 +37,9 @@ jobs:
       - name: Build backend
         run: npm run build --prefix backend
 
+      - name: Verify Mainnet migration, account ownership and payment isolation
+        run: node --test backend/tests/mainnetMigration.test.cjs backend/tests/piAccountIdentity.test.cjs backend/tests/piIdentityLinks.test.cjs backend/tests/walletActivity.test.cjs backend/tests/p0Integrity.test.cjs backend/tests/institutions.test.cjs backend/tests/testnetA2U.test.cjs backend/tests/persistentSessions.test.cjs backend/tests/streamDownloadEligibility.test.cjs
+
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
@@ -45,7 +48,8 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || vars.VITE_BACKEND_URL || 'https://smajpihub.onrender.com' }}
           VITE_BACKEND_URL: ${{ vars.VITE_API_BASE_URL || vars.VITE_BACKEND_URL || 'https://smajpihub.onrender.com' }}
           VITE_SMAJ_AI_PUBLIC_URL: ${{ vars.VITE_SMAJ_AI_PUBLIC_URL || 'https://smaj-verified-delegation.onrender.com' }}
-          VITE_SANDBOX_SDK: "true"
+          # Enable only after the backup, backend cutover and Mainnet wallet checks.
+          VITE_SANDBOX_SDK: ${{ vars.PI_MAINNET_READY == 'true' && 'false' || 'true' }}
           VITE_BUILD_ID: ${{ github.sha }}
         run: npm run build:public --prefix frontend
 

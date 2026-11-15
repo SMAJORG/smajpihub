@@ -36,6 +36,7 @@ const fields = [
   "candidateId",
   "sellerUid",
   "payerUid",
+  "accountUid",
   "amountPi",
   "amount_pi",
   "pricePi",
@@ -241,8 +242,8 @@ export async function buildWalletActivity(
     read("settlementCollection", { sellerUid: uid }, "Store earnings"),
   ]);
   const streamRows = [
-    user.streamSubscription,
-    user.pendingStreamSubscription,
+    locals.commerceMode === "mainnet" ? user.mainnetStreamSubscription : locals.commerceMode === "testnet-development" ? user.testnetDevStreamSubscription : user.streamSubscription,
+    locals.commerceMode === "mainnet" ? user.mainnetPendingStreamSubscription : locals.commerceMode === "testnet-development" ? user.testnetDevPendingStreamSubscription : user.pendingStreamSubscription,
   ].filter(
     (row) =>
       row &&
@@ -271,6 +272,7 @@ export async function buildWalletActivity(
       _id: { $regex: "^payment:" },
       $or: [
         { payerUid: uid },
+        { accountUid: uid },
         ...(ids.length ? [{ paymentId: { $in: ids } }] : []),
       ],
     },
@@ -292,7 +294,7 @@ export async function buildWalletActivity(
         r.paymentId === id &&
         (!hash || !r.txid || r.txid === hash) &&
         (!intent || r.intentKey === intent) &&
-        (r.payerUid === party || (!r.verified && Boolean(intent))),
+        (r.payerUid === party || r.accountUid === party || (!r.verified && Boolean(intent))),
     );
     return candidates.length === 1 ? candidates[0] : undefined;
   };
@@ -321,7 +323,7 @@ export async function buildWalletActivity(
     const receipt = findReceipt(id, hash, party, config.intent);
     const verified = Boolean(
       receipt?.verified === true &&
-      receipt.payerUid === party &&
+      (receipt.payerUid === party || receipt.accountUid === party) &&
       receipt.direction ===
         (config.direction === "incoming" ? "app_to_user" : "user_to_app") &&
       typeof receipt.txid === "string" &&

@@ -1,4 +1,5 @@
 import { bindPayment, financialTransaction, verifyIncomingPayment } from "./financialIntegrity";
+import { paymentOwnedBy } from "./paymentIdentity";
 import { ObjectId } from "mongodb";
 import { platformAPIKeyClient } from "./platformAPIClient";
 import { createNotification } from "./notifications";
@@ -27,11 +28,11 @@ export const completeStorePayment = async (
       return reply(400, { error: "bad_request", message: "Only pending orders can be completed with payment." });
     }
     const payment = recoveredPayment || (await platformAPIKeyClient.get(`/v2/payments/${paymentId}`)).data;
-    const mismatch = (candidate: any) => {
+    const mismatch = async (candidate: any) => {
       if (candidate?.identifier !== paymentId) return "Pi returned a different payment identifier.";
       if (candidate.network !== app.locals.piNetwork) return "Payment network differs from this deployment.";
       if (candidate.direction !== "user_to_app") return "This is not a payment to this app.";
-      if (candidate.user_uid !== order.buyerId) return "This payment belongs to a different Pi account.";
+      if (!await paymentOwnedBy(app.locals, candidate.user_uid, order.buyerId)) return "This payment belongs to a different Pi account.";
       if (String(candidate.metadata?.orderId || "") !== order._id.toString()) return "This payment belongs to a different order. Resume its original order.";
       if (!Number.isFinite(Number(order.pricePi)) || Number(order.pricePi) <= 0) return "This order has no valid Pi payment price. Refresh the order or contact support.";
       if (!Number.isFinite(Number(candidate.amount)) || Number(candidate.amount) <= 0 || (!recovering && Math.round(Number(candidate.amount) * 1e7) !== Math.round(Number(order.pricePi) * 1e7))) return "The Pi payment amount differs from this order's total. Check the original order before paying again.";
@@ -39,15 +40,15 @@ export const completeStorePayment = async (
       if (candidate.status?.cancelled || candidate.status?.user_cancelled) return "Pi reports that this payment was cancelled.";
       return null;
     };
-    if (!recovering) verifyIncomingPayment(payment, { paymentId, payer: order.buyerId, amount: Number(order.pricePi), metadataKey: "orderId", intentId: order._id.toString() });
-    const problem = mismatch(payment);
+    const problem = await mismatch(payment);
     if (problem) return reply(400, { error: "payment_mismatch", message: problem });
+    if (!recovering) verifyIncomingPayment(payment, { paymentId, payer: payment.user_uid, amount: Number(order.pricePi), metadataKey: "orderId", intentId: order._id.toString() });
 
     // /complete validates the SDK hash at Pi; an earlier GET can lack transaction data.
     const completed = payment.status?.developer_completed === true ? payment :
       (await platformAPIKeyClient.post(`/v2/payments/${paymentId}/complete`, { txid })).data;
     const confirmed = completed?.identifier ? completed : (await platformAPIKeyClient.get(`/v2/payments/${paymentId}`)).data;
-    const confirmedProblem = mismatch(confirmed);
+    const confirmedProblem = await mismatch(confirmed);
     if (confirmedProblem) return reply(400, { error: "payment_mismatch", message: confirmedProblem });
     if (confirmed.transaction?.txid !== txid || confirmed.transaction?.verified !== true || confirmed.status?.transaction_verified !== true || confirmed.status?.developer_completed !== true) {
       return reply(409, { error: "verification_pending", message: "Pi has not confirmed completion yet. Check Pi Wallet and retry Continue Payment; do not make another payment." });

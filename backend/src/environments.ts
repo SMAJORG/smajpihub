@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { commerceMode } from "./services/commerceEnvironment";
 
 const result = dotenv.config();
 
@@ -64,6 +65,7 @@ interface Environment {
 }
 
 const nodeEnv = process.env.NODE_ENV || "development";
+const deploymentCommerceMode = commerceMode();
 const isRender = Boolean(
   process.env.RENDER ||
   process.env.RENDER_SERVICE_ID ||
@@ -88,7 +90,7 @@ const env: Environment = {
   pi_payments_enabled: String(process.env.PI_PAYMENTS_ENABLED ?? (isSoloHost ? "false" : "true")).toLowerCase() === "true",
   port: parseInt(process.env.PORT || "8000"),
   session_secret: process.env.SESSION_SECRET || defaultSessionSecret,
-  pi_api_key: process.env.PI_API_KEY || "",
+  pi_api_key: (deploymentCommerceMode === "mainnet" ? process.env.PI_MAINNET_API_KEY : process.env.PI_API_KEY) || "",
   platform_api_url: platformApiURL,
   mongodb_uri: process.env.MONGODB_URI || "",
   mongo_host: process.env.MONGO_HOST || "localhost:27017",

@@ -11,7 +11,7 @@ function setup({ plan = 'plus', status = 'active', expiresAt, source = 'cloudfla
   const axios = { get: async()=>{ calls.push('export');return {data:{result:{default:{status:'ready',url:'https://customer.cloudflarestream.com/video/downloads/default.mp4'}}}};}, isAxiosError:()=>false };
   const env={cloudflare_stream_account_id:'account', cloudflare_stream_api_token:'token', youtube_api_key:'',youtube_live_channel_ids:[]};
   const code=ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/handlers/stream.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText;
-  const exports={};new Function('require','exports','setInterval','console',code)(name=>name==='axios'?axios:name==='../environments'?env:name==='../services/auth'?{resolveCurrentUser:async()=>user}:{},exports,()=>({unref(){}}),{...console,warn(){}});
+  const exports={};new Function('require','exports','setInterval','console',code)(name=>name==='axios'?axios:name==='../environments'?env:name==='../services/commerceEnvironment'?{commerceMode:()=> 'legacy'}:name==='../services/auth'?{resolveCurrentUser:async()=>user}:{},exports,()=>({unref(){}}),{...console,warn(){}});
   exports.default(new Proxy({}, {get:(_,method)=>(path,handler)=>routes.set(method+' '+path,handler)}));
   return {updates,calls,async request(method,path,body={}){let code=200,payload;const res={status(value){code=value;return this},json(value){payload=value;return this}};await routes.get(method+' '+path)({params:{uid:'video-id',id:'123',type:'movie'},body,app:{locals}},res);return{code,payload}}};
 }

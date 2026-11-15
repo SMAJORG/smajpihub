@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { resolveCurrentUser } from "../services/auth";
 import { PI_USDT_RATE, piFromUsdt } from "../services/piPricing";
 import { platformAPIKeyClient } from "../services/platformAPIClient";
+import { verifyAccountIncomingPayment, bindPayment } from "../services/financialIntegrity";
 import { createNotification } from "../services/notifications";
 import {
   UniversityData,
@@ -164,6 +165,7 @@ const generatePaymentId = () =>
   `EDU-PAY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
 const ensureSeedUniversities = async (req: Request) => {
+  if (req.app.locals.commerceMode === "mainnet") return;
   const collection = req.app.locals.universityCollection;
   if (!collection) return;
   const count = await collection.countDocuments({});
@@ -1322,10 +1324,18 @@ export default function mountEducationEndpoints(router: Router) {
             message: "Transaction ID is required",
           });
 
+        const payer = await req.app.locals.userCollection.findOne({ _id: new ObjectId(payment.user_id) });
+        if (!payer || payer.blocked || !payment.pi_payment_identifier) throw new Error("A verified payment for this application is required.");
+        const expected = { paymentId: payment.pi_payment_identifier, payer: payer.uid, amount: Number(payment.amount_pi), metadataKey: "universityPaymentId", intentId: String(payment._id) };
+        const remote = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(payment.pi_payment_identifier)}`)).data;
+        await verifyAccountIncomingPayment(req.app.locals, remote, expected);
         await platformAPIKeyClient.post(
           `/v2/payments/${payment.pi_payment_identifier || payment.payment_id}/complete`,
           { txid },
         );
+        const confirmed = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(payment.pi_payment_identifier)}`)).data;
+        await verifyAccountIncomingPayment(req.app.locals, confirmed, expected, true, txid);
+        await bindPayment(req.app, confirmed, "university:" + String(payment._id));
 
         await collection.updateOne(
           { _id: payment._id },

@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { resolveCurrentUser } from "../services/auth";
 import { createNotification } from "../services/notifications";
 import { platformAPIKeyClient } from "../services/platformAPIClient";
+import { verifyAccountIncomingPayment, bindPayment } from "../services/financialIntegrity";
 import { PI_USDT_RATE, piFromUsdt } from "../services/piPricing";
 import env from "../environments";
 import axios from "axios";
@@ -291,6 +292,9 @@ export default function mountTransportEndpoints(router: Router) {
     try {
       const remote = await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`);
       const payment = remote.data;
+      await verifyAccountIncomingPayment(req.app.locals, payment, { paymentId, payer: user.uid, amount: Number(booking.farePi), metadataKey: "bookingId", intentId: booking.bookingId });
+      if (booking.paymentId && booking.paymentId !== paymentId) return res.status(409).json({ error: "payment_conflict", message: "Resume the bound flight payment" });
+      await bindPayment(req.app, payment, "transport:" + booking.bookingId);
       const metadataBookingId = payment?.metadata?.bookingId;
       if (metadataBookingId !== booking.bookingId || Math.abs(Number(payment?.amount) - Number(booking.farePi)) > 0.000001) {
         return res.status(400).json({ error: "payment_mismatch", message: "Pi payment does not match this flight booking" });
@@ -318,11 +322,16 @@ export default function mountTransportEndpoints(router: Router) {
     if (!booking.providerRef) {
       return res.status(409).json({ error: "inventory_not_live", message: "This flight is demo inventory and cannot accept payment" });
     }
-    if (booking.paymentId && booking.paymentId !== paymentId) {
+    if (!booking.paymentId || booking.paymentId !== paymentId) {
       return res.status(409).json({ error: "payment_mismatch", message: "Payment identifier does not match" });
     }
     try {
+      const payment = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`)).data;
+      await verifyAccountIncomingPayment(req.app.locals, payment, { paymentId, payer: user.uid, amount: Number(booking.farePi), metadataKey: "bookingId", intentId: booking.bookingId });
       await platformAPIKeyClient.post(`/v2/payments/${encodeURIComponent(paymentId)}/complete`, { txid });
+      const confirmed = (await platformAPIKeyClient.get(`/v2/payments/${encodeURIComponent(paymentId)}`)).data;
+      await verifyAccountIncomingPayment(req.app.locals, confirmed, { paymentId, payer: user.uid, amount: Number(booking.farePi), metadataKey: "bookingId", intentId: booking.bookingId }, true, txid);
+      await bindPayment(req.app, confirmed, "transport:" + booking.bookingId);
       const ticketNumber = booking.ticketNumber || `SMJ-${Date.now().toString(36).toUpperCase()}`;
       const timeline = [...(Array.isArray(booking.timeline) ? booking.timeline : []), TIMELINE("confirmed", "Ticket Issued", "Pi payment confirmed and electronic ticket issued.")];
       await req.app.locals.transportBookingCollection.updateOne(

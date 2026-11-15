@@ -1642,7 +1642,7 @@ const StreamPlansPanel = () => {
         {
           amount: result.checkout.amountPi,
           memo: result.checkout.memo,
-          metadata: { service: "stream", plan: result.checkout.plan },
+          metadata: { service: "stream", plan: result.checkout.plan, checkoutId: result.checkout.id },
         },
         {
           onReadyForServerApproval: async paymentId => {

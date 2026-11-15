@@ -1,4 +1,6 @@
 import { ClientSession } from "mongodb";
+import { paymentOwnedBy } from "./paymentIdentity";
+import { resolveLinkedPiAccount } from "./piIdentityLinks";
 import { platformAPIKeyClient } from "./platformAPIClient";
 import env from "../environments";
 
@@ -121,6 +123,7 @@ export const bindPayment = async (
     payment.status?.transaction_verified === true &&
     payment.transaction?.verified === true
   ) {
+    const owner = app.locals.userCollection ? await resolveLinkedPiAccount(app.locals, payment.user_uid, options) : null;
     await app.locals.paymentCollection.updateOne(
       { _id: paymentKey, intentKey },
       {
@@ -128,6 +131,7 @@ export const bindPayment = async (
           verified: true,
           amountPi: payment.amount,
           payerUid: payment.user_uid,
+          accountUid: owner?.uid || payment.user_uid,
           direction: payment.direction,
           recipientAddress: payment.to_address,
           txid: payment.transaction.txid,
@@ -163,10 +167,17 @@ export const bindPayment = async (
     );
   }
 };
+export async function verifyAccountIncomingPayment(locals: any, payment: any, expected: {
+  paymentId: string; payer: string; amount: number; metadataKey: string; intentId: string;
+}, completed = false, txid?: string) {
+  if (!await paymentOwnedBy(locals, payment?.user_uid, expected.payer)) throw financialError("Payment belongs to another Pi account", 403);
+  verifyIncomingPayment(payment, { ...expected, payer: payment.user_uid }, completed, txid);
+}
 export const verifyOutboundPayment = async (
   paymentId: string,
   expected: {
     uid: string;
+    locals?: any;
     amount: number;
     metadataKey: string;
     intentId: string;
@@ -182,7 +193,7 @@ export const verifyOutboundPayment = async (
   if (
     payment?.identifier !== paymentId ||
     payment.direction !== "app_to_user" ||
-    payment.user_uid !== expected.uid ||
+    !(expected.locals ? await paymentOwnedBy(expected.locals, payment.user_uid, expected.uid) : payment.user_uid === expected.uid) ||
     payment.network !== (env as any).pi_network ||
     Number(payment.amount) !== expected.amount ||
     payment.metadata?.[expected.metadataKey] !== expected.intentId ||

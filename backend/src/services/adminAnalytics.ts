@@ -36,13 +36,16 @@ export function parseAnalyticsRange(query: Row, now = Date.now()): AnalyticsRang
 const timestamp = (value: unknown): number => value ? new Date(value as any).getTime() : NaN;
 const id = (row: Row) => String(row._id || row.uid || row.transactionId || "");
 const inPeriod = (time: number, start: number, end: number) => Number.isFinite(time) && time >= start && time < end;
-const projection = Object.fromEntries(["_id", "uid", "username", "displayName", "createdAt", "lastSeenAt", "blocked", "role", "sellerActive", "verificationStatus", "verificationLevel", "verificationRequested", "transactionId", "paymentId", "verified", "network", "amount", "time", "timeKind", "verifiedAt", "paidAt", "paymentTxid", "paymentStatus", "status", "pricePi", "productTitle", "title", "courseTitle", "jobTitle", "pi_payment_identifier", "transaction_identifier", "completed_at", "startedAt", "streamSubscription", "amount_pi"].map(key => [key, 1]));
+const projection = Object.fromEntries(["_id", "uid", "username", "displayName", "createdAt", "lastSeenAt", "blocked", "role", "sellerActive", "verificationStatus", "verificationLevel", "verificationRequested", "transactionId", "paymentId", "verified", "network", "amount", "time", "timeKind", "verifiedAt", "paidAt", "paymentTxid", "paymentStatus", "status", "pricePi", "productTitle", "title", "courseTitle", "jobTitle", "pi_payment_identifier", "transaction_identifier", "completed_at", "startedAt", "streamSubscription", "mainnetStreamSubscription", "testnetDevStreamSubscription", "amountPi", "txid", "direction", "amount_pi"].map(key => [key, 1]));
 async function read(locals: Row, key: string): Promise<{ rows: Row[]; error: string | null }> {
-  if (!locals[key]) return { rows: [], error: "Required collection: " + key };
+  const mainnetLedger = key === "liveTransactionCollection" && locals.commerceMode === "mainnet";
+  const collection = mainnetLedger ? locals.paymentCollection : locals[key];
+  if (!collection) return { rows: [], error: "Required collection: " + key };
   try {
-    const cursor = locals[key].find({}).project(projection).limit(MAX_ROWS + 1);
+    const cursor = collection.find(mainnetLedger ? { _id: { $regex: "^payment:" }, network: "Pi Network", verified: true, direction: "user_to_app" } : {}).project(projection).limit(MAX_ROWS + 1);
     if (typeof cursor.maxTimeMS === "function") cursor.maxTimeMS(8000);
-    const rows = await cursor.toArray();
+    const persisted = await cursor.toArray();
+    const rows = mainnetLedger ? persisted.map((row: Row) => ({ ...row, transactionId: row.txid, amount: row.amountPi, time: row.verifiedAt })) : persisted;
     if (rows.length > MAX_ROWS) return { rows: [], error: "Database aggregation required for " + key + " above 50,000 records; totals are withheld." };
     return { rows, error: null };
   } catch { return { rows: [], error: "Could not read " + key + ". Retry refresh." }; }
@@ -58,7 +61,8 @@ export async function buildAdminAnalytics(locals: Row, range: AnalyticsRange, no
     if (!Number.isFinite(ms)) return;
     records.push({ id: id(row), title: String(row.displayName || row.username || row.productTitle || row.courseTitle || row.jobTitle || row.title || row.transactionId || id(row)), time: new Date(ms).toISOString(), value, service, status, href, metric, unit });
   };
-  const users = data.userCollection.rows;
+  const users: Row[] = data.userCollection.rows.map((row: Row) => ({ ...row, streamSubscription: locals.commerceMode === "mainnet" ? row.mainnetStreamSubscription : locals.commerceMode === "testnet-development" ? row.testnetDevStreamSubscription : row.streamSubscription }));
+  const financialNetwork = locals.commerceMode === "mainnet" ? "Pi Network" : "Pi Testnet";
   for (const row of users) add(row, "growth", row.createdAt, 1, "platform", row.blocked ? "blocked" : "active", "/admin/users", "users");
   const active = users.filter((row: Row) => !row.blocked && inPeriod(timestamp(row.lastSeenAt), now - ADMIN_ACTIVITY_WINDOW_MS, now + 1));
   for (const row of active) add(row, "active", row.lastSeenAt, 1, "platform", "recent activity", "/admin/users", "users");
@@ -76,7 +80,7 @@ export async function buildAdminAnalytics(locals: Row, range: AnalyticsRange, no
   for (const row of users) if (row.streamSubscription?.paymentId) attempts.set(row.streamSubscription.paymentId, { ...row.streamSubscription, _id: row._id, service: "stream", createdAt: row.streamSubscription.startedAt });
   const verified = new Map<string, Row>();
   for (const row of data.liveTransactionCollection.rows) {
-    if (row.verified !== true || row.network !== "Pi Testnet" || !/^[a-f0-9]{64}$/i.test(row.transactionId || "") || typeof row.amount !== "number" || !Number.isFinite(row.amount) || row.amount <= 0 || !Number.isFinite(timestamp(row.time))) continue;
+    if (row.verified !== true || row.network !== financialNetwork || !/^[a-f0-9]{64}$/i.test(row.transactionId || "") || typeof row.amount !== "number" || !Number.isFinite(row.amount) || row.amount <= 0 || !Number.isFinite(timestamp(row.time))) continue;
     verified.set(row.transactionId, row);
   }
   const verifiedIds = new Set<string>();
@@ -86,7 +90,7 @@ export async function buildAdminAnalytics(locals: Row, range: AnalyticsRange, no
     // The verification service distinguishes completion timestamps from payment creation.
     const time = row.time;
     const service = attempt?.service || "unattributed";
-    add(row, "payments", time, row.amount, service, "verified", "/admin/analytics?service=" + service, "Pi Testnet");
+    add(row, "payments", time, row.amount, service, "verified", "/admin/analytics?service=" + service, financialNetwork);
     add(row, "status", time, 1, service, "successful", "/admin/analytics", "transactions");
   }
   for (const [paymentId, row] of attempts) {
@@ -148,7 +152,7 @@ export async function buildAdminAnalytics(locals: Row, range: AnalyticsRange, no
       status: { available: statusAvailable, reason: statusAvailable ? null : "A payment source is unavailable; status totals are withheld.", data: statusAvailable ? ["successful", "pending", "failed", "unverified"].map(status => ({ name: status, value: selected.filter(row => row.metric === "status" && row.status === status).length, previous: previous.filter(row => row.metric === "status" && row.status === status).length })) : [] },
     },
     contributions: [...analyticsServices.map(service => ({ service: service.id, name: service.name, value: sum(selected, "payments", service.id), previous: sum(previous, "payments", service.id) })), { service: "unattributed", name: "Unattributed", value: sum(selected, "payments", "unattributed"), previous: sum(previous, "payments", "unattributed") }],
-    definitions: { active: "Accounts not blocked with lastSeenAt in the last 15 minutes. This currently tracks login/profile activity, not continuous browsing.", financial: "Pi Testnet only. Persisted transactions independently verified by the existing Pi Platform verification feed. This is a verified subset, not all payment attempts or Mainnet revenue. Completion time is used when known; otherwise payment creation time.", usage: "Recorded operational actions: orders, playback sessions, job applications, enrollments and transport bookings. These are different units, not comparable unique visitors. Unsupported services are unavailable, not zero.", status: "Current recorded status grouped by attempt creation time; successful uses the verified ledger time. Historical status transitions are not stored. Unverified completions are separate from successful payments." },
+    definitions: { active: "Accounts not blocked with lastSeenAt in the last 15 minutes. This currently tracks login/profile activity, not continuous browsing.", financial: locals.commerceMode === "mainnet" ? "Pi Mainnet only. Verified incoming receipts from the isolated Mainnet ledger. Testnet history and outgoing settlements are excluded." : "Pi Testnet only. Persisted transactions independently verified by the existing Pi Platform verification feed. This is a verified subset, not all payment attempts or Mainnet revenue. Completion time is used when known; otherwise payment creation time.", usage: "Recorded operational actions: orders, playback sessions, job applications, enrollments and transport bookings. These are different units, not comparable unique visitors. Unsupported services are unavailable, not zero.", status: "Current recorded status grouped by attempt creation time; successful uses the verified ledger time. Historical status transitions are not stored. Unverified completions are separate from successful payments." },
     records,
   };
 }

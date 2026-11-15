@@ -1,4 +1,5 @@
 import { buildWalletActivity } from "../services/walletActivity";
+import { paymentOwnedBy } from "../services/paymentIdentity";
 import { verifyIncomingPayment, bindPayment, validPaymentId } from "../services/financialIntegrity";
 import { Request, Response, Router } from "express";
 import { ObjectId } from "mongodb";
@@ -108,7 +109,7 @@ export default function mountPaymentsEndpoints(router: Router) {
     const paymentId = String(req.body?.paymentId || "");
     if (!/^[a-z0-9_-]{1,200}$/i.test(paymentId)) return res.status(400).json({ message: "Invalid Pi payment identifier." });
     const { data: payment } = await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId));
-    if (payment.user_uid !== user.uid) return res.status(403).json({ message: "This Pi payment belongs to a different account." });
+    if (!await paymentOwnedBy(req.app.locals, payment.user_uid, user.uid)) return res.status(403).json({ message: "This Pi payment belongs to a different account." });
     const orderId = String(payment.metadata?.orderId || "");
     if (!ObjectId.isValid(orderId)) return res.status(409).json({ message: "This pending payment belongs to another service. Open that service to finish it before paying for a Store order." });
     const txid = payment.transaction?.txid || req.body?.txid;
@@ -134,12 +135,13 @@ export default function mountPaymentsEndpoints(router: Router) {
     if (order.paymentId && order.paymentId !== paymentId) {
       if (!validPaymentId(order.paymentId)) return res.status(409).json({ message: "Invalid historical payment; reconciliation required" });
       const previous = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(order.paymentId))).data;
-      if (previous.identifier !== order.paymentId || previous.user_uid !== order.buyerId || String(previous.metadata?.orderId) !== order._id.toString()
+      if (previous.identifier !== order.paymentId || !await paymentOwnedBy(req.app.locals, previous.user_uid, order.buyerId) || String(previous.metadata?.orderId) !== order._id.toString()
           || !(previous.status?.cancelled || previous.status?.user_cancelled) || previous.transaction?.txid)
         return res.status(409).json({ message: "Resume the existing payment; its outcome is not safely cancelled" });
     }
     const authoritative = (await platformAPIKeyClient.get("/v2/payments/" + encodeURIComponent(paymentId))).data;
-    verifyIncomingPayment(authoritative, { paymentId, payer: order.buyerId, amount: Number(order.pricePi), metadataKey: "orderId", intentId: order._id.toString() });
+    if (!await paymentOwnedBy(req.app.locals, authoritative.user_uid, order.buyerId)) return res.status(403).json({ message: "This payment belongs to another account." });
+    verifyIncomingPayment(authoritative, { paymentId, payer: authoritative.user_uid, amount: Number(order.pricePi), metadataKey: "orderId", intentId: order._id.toString() });
     await bindPayment(req.app, authoritative, "store:" + order._id.toString());
     if (order.paymentId === paymentId && order.paymentStatus === "processing") {
       if (!authoritative.status?.developer_approved) await platformAPIKeyClient.post("/v2/payments/" + encodeURIComponent(paymentId) + "/approve");
