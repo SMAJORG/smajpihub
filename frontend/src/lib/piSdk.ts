@@ -1,9 +1,11 @@
 type PiSdk = NonNullable<Window["Pi"]>;
 const initialized = new WeakMap<PiSdk, Promise<PiSdk>>();
 export const isPiSandboxMode = () => {
-  const sandboxFrame = window.location.hostname === "sandbox.minepi.com" || (() => { try { return new URL(document.referrer).hostname === "sandbox.minepi.com"; } catch { return false; } })();
+  const sandboxReferrer = (() => { try { return new URL(document.referrer).hostname === "sandbox.minepi.com"; } catch { return false; } })();
+  const sandboxFrame = window.location.hostname === "sandbox.minepi.com" || sandboxReferrer;
   // The Mainnet domain must not inherit an obsolete Sandbox build setting.
-  if (["smajpihub.com", "www.smajpihub.com"].includes(window.location.hostname) && !sandboxFrame) return false;
+  // A top-level navigation from Sandbox leaves a referrer but is not its preview iframe.
+  if (["smajpihub.com", "www.smajpihub.com"].includes(window.location.hostname) && !(window.self !== window.top && sandboxReferrer)) return false;
   const runtime = window.__ENV?.sandbox;
   const setting = runtime && runtime !== "$$SANDBOX_SDK$$" ? runtime : import.meta.env.VITE_SANDBOX_SDK;
   return setting === "true" || sandboxFrame;
