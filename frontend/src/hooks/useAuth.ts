@@ -268,7 +268,9 @@ export const useAuth = () => {
   const signInUser = useCallback(async (authResult: AuthResult) => {
     if (!getBaseURL()) throw new PiSignInResponseError("The account server address is not configured. Contact the administrator.");
     const device = await getLoginDeviceMetadata();
-    if (["smajpihub.com", "www.smajpihub.com"].includes(window.location.hostname) && !isPiSandboxMode() && getStoredPiUser()?.uid !== authResult.user?.uid) {
+    // SDK user fields are presentation data. Let the server compare its verified
+    // Pi identity with the original credential even when the SDK UID is stale.
+    if (["smajpihub.com", "www.smajpihub.com"].includes(window.location.hostname) && !isPiSandboxMode()) {
       const originalAccessToken = await getHubAccessToken();
       let originalRefreshToken = "";
       try { originalRefreshToken = await getHubRefreshToken(); } catch { /* Corrupt old storage must not block registration. */ }
