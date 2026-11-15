@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import type { SmajVerificationRecord } from "../services/smajVerification";
 
 export interface UserData {
   _id: ObjectId,
@@ -18,6 +19,7 @@ export interface UserData {
   languagePreferenceSaved?: boolean,
   sellerActive?: boolean,
   blocked?: boolean,
+  smajVerification?: SmajVerificationRecord,
   verificationLevel?: "basic" | "pi_verified" | "seller_verified" | "trusted_seller",
   verificationStatus?: "none" | "pending" | "approved" | "rejected",
   verificationRequested?: boolean,

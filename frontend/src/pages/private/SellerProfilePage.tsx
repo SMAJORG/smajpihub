@@ -74,7 +74,7 @@ const SellerProfilePage = () => {
           <p className="private-kicker">SELLER PROFILE</p>
           <h1 className="profile-name-line">
             <span className="profile-name-text">{data.seller.displayName}</span>
-            <TrustBadge level={data.seller.verificationLevel} status={data.seller.verificationStatus} />
+            <TrustBadge userId={data.seller.uid} />
           </h1>
           <p className="seller-profile-username">@{data.seller.piUsername || data.seller.username}</p>
           {data.seller.uid !== user?.uid ? <Link className="private-primary-button" to={chatLink(data.seller)}>Message</Link> : null}

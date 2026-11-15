@@ -26,6 +26,7 @@ import { heroSlides, promoStripItems } from "../../content/storefront";
 import { getHeroBannerState, getHeroBannerLabel, getHeroBannerTarget, getHeroBannerButtonText } from "../../lib/heroBanners";
 import logoImage from "/assets/services/store.png";
 import { PI_USDT_RATE } from "../../lib/piPricing";
+import { useSmajVerifications } from "../../lib/smajVerification";
 
 const STORE_CATEGORIES = ["Deals", "Grocery", "Electronics", "Mobiles", "Laptops", "Fashion", "Beauty", "Home", "Vehicles", "Accessories"];
 const STORE_LOCATION_STORAGE_KEY = "smaj-store-location";
@@ -70,6 +71,7 @@ const StorePage = () => {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
+  const sellerVerifications = useSmajVerifications(products.map(product => product.sellerId));
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
@@ -209,7 +211,7 @@ const StorePage = () => {
     const maximum = maxPrice === "" ? null : Number(maxPrice);
     const filtered = products.filter((product) => {
       const price = product.priceUsdt ?? product.pricePi * PI_USDT_RATE;
-      const verified = product.verificationStatus === "approved" && ["pi_verified", "seller_verified", "trusted_seller"].includes(product.verificationLevel || "");
+      const verified = sellerVerifications[product.sellerId]?.verified === true;
       const inStock = product.productStatus !== "out_of_stock" && (product.quantity === undefined || product.quantity > 0) && (product.variants?.length ? product.variants.some((variant) => (variant.stock || 0) > 0) : true);
       const matchesLocation = locationFilter === "All" || [product.country, product.stateRegion, product.city, product.location].some((value) => value?.toLowerCase().includes(locationFilter.toLowerCase()));
       return (category === "All" || product.category === category)
@@ -231,7 +233,7 @@ const StorePage = () => {
       if (sort === "rated") return (right.rating || 0) - (left.rating || 0);
       return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
     });
-  }, [category, condition, inStockOnly, locationFilter, maxPrice, minPrice, products, search, sort, verifiedOnly]);
+  }, [category, condition, inStockOnly, locationFilter, maxPrice, minPrice, products, search, sort, verifiedOnly, sellerVerifications]);
 
   const hasActiveFilters = Boolean(collection) || category !== "All" || condition !== "All" || verifiedOnly || inStockOnly || minPrice !== "" || maxPrice !== "" || locationFilter !== "All" || sort !== "newest";
   const showSearchResults = Boolean(search.trim()) || hasActiveFilters;

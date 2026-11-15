@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { chatLink } from "../../lib/chatCache";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -130,6 +131,7 @@ const OrdersPage = () => {
             {mode === "buyer"
               ? `Seller: ${order.sellerName || order.sellerId}`
               : `Buyer: ${order.buyerName || order.buyerId}`}
+            <SmajVerifiedBadge userId={mode === "buyer" ? order.sellerId : order.buyerId} />
           </p>
           <p>{new Date(order.createdAt).toLocaleString()}</p>
           {order.paidAt ? <p>Paid: {new Date(order.paidAt).toLocaleString()}</p> : null}

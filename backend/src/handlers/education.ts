@@ -1430,7 +1430,7 @@ export default function mountEducationEndpoints(router: Router) {
 
   router.get("/tutors", async (req, res) => {
     const rows = await req.app.locals.teacherApplicationCollection?.find({ status: "approved", applicant_role: "tutor" }).sort({ reviewed_at: -1 }).toArray() || [];
-    const tutors = rows.map((item: any) => ({ id: item._id.toString(), name: item.full_name, avatar_url: item.avatar_url, headline: item.headline, biography: item.biography, subjects: item.subjects || [], languages: item.languages || [], location: item.country, experience_years: item.experience_years || 0, ratePi: item.proposed_price_pi || 0, verified: true }));
+    const tutors = rows.map((item: any) => ({ id: item._id.toString(), userId: item.user_id, name: item.full_name, avatar_url: item.avatar_url, headline: item.headline, biography: item.biography, subjects: item.subjects || [], languages: item.languages || [], location: item.country, experience_years: item.experience_years || 0, ratePi: item.proposed_price_pi || 0, verified: true }));
     return res.status(200).json({ tutors });
   });
 
@@ -1438,7 +1438,7 @@ export default function mountEducationEndpoints(router: Router) {
     if (!ObjectId.isValid(req.params.id)) return res.status(404).json({ error: "Tutor not found" });
     const item = await req.app.locals.teacherApplicationCollection?.findOne({ _id: new ObjectId(req.params.id), status: "approved", applicant_role: "tutor" });
     if (!item) return res.status(404).json({ error: "Tutor not found" });
-    return res.status(200).json({ tutor: { id: item._id.toString(), name: item.full_name, avatar_url: item.avatar_url, headline: item.headline, biography: item.biography, subjects: item.subjects || [], languages: item.languages || [], location: item.country, experience_years: item.experience_years || 0, education: item.education, certifications: item.certifications, ratePi: item.proposed_price_pi || 0, verified: true } });
+    return res.status(200).json({ tutor: { id: item._id.toString(), userId: item.user_id, name: item.full_name, avatar_url: item.avatar_url, headline: item.headline, biography: item.biography, subjects: item.subjects || [], languages: item.languages || [], location: item.country, experience_years: item.experience_years || 0, education: item.education, certifications: item.certifications, ratePi: item.proposed_price_pi || 0, verified: true } });
   });
   router.post("/tutors/:id/lesson-requests", async (req, res) => {
     const user = await requireUser(req, res);

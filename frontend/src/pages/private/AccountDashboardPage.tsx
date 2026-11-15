@@ -59,7 +59,7 @@ const AccountDashboardPage = () => {
           {user?.avatar ? <img src={user.avatar} alt="" /> : name.slice(0, 1).toUpperCase()}
         </div>
         <div>
-          <h1 className="profile-name-line"><span className="profile-name-text">{name}</span><TrustBadge level={user?.verificationLevel} status={user?.verificationStatus} /></h1>
+          <h1 className="profile-name-line"><span className="profile-name-text">{name}</span><TrustBadge userId={user?.uid} /></h1>
           <p>@{user?.piUsername || user?.username}</p>
         </div>
         <Link

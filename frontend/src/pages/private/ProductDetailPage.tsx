@@ -215,7 +215,7 @@ const ProductDetailPage = () => {
               <span className="seller-role-label">Seller</span>
               <strong className="seller-name-line">
                 <span className="seller-name-text">{sellerName}</span>
-                <TrustBadge level={seller?.verificationLevel || product.verificationLevel} status={seller?.verificationStatus || product.verificationStatus} />
+                <TrustBadge userId={product.sellerId} />
               </strong>
               <p>
                 @{seller?.piUsername || product.piUsername} · {sellerFlag ? `${sellerFlag} ` : ""}{sellerLocation}

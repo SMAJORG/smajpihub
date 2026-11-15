@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ConfirmSignOutModal from "../../components/ConfirmSignOutModal";
 import LanguageSoonButton from "../../components/LanguageSoonButton";
 import TrustBadge from "../../components/TrustBadge";
+import { useSmajVerification } from "../../lib/smajVerification";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -129,6 +130,7 @@ const SettingsGroup = ({
 
 const SettingsPage = () => {
   const { user, updateProfile, updateSettings, signOut } = useAuthContext();
+  const identityVerification = useSmajVerification(user?.uid);
   const navigate = useNavigate();
   const saved = useMemo(() => readSavedSettings(), []);
   const [form, setForm] = useState<SavedSettings>({
@@ -436,10 +438,10 @@ const SettingsPage = () => {
           <strong>{form.fullName || user?.displayName || user?.username || "Pi user"}</strong>
           <span>{piAccount}</span>
           <small>
-            <TrustBadge level={verificationLevel} status={user?.verificationStatus} />
-            {verificationStatus === "approved" && levelRank(verificationLevel) > 0
-              ? "Verified account"
-              : hasRequestedVerification
+            <TrustBadge userId={user?.uid} />
+            {identityVerification?.verified
+              ? "SMAJ Verified"
+              : identityVerification?.status === "pending"
                 ? "Verification pending"
                 : "Not verified"}
           </small>

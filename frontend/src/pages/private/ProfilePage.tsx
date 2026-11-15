@@ -398,8 +398,6 @@ const ProfilePage = () => {
   const selectedLanguage =
     cleanLanguages.find(language => language.name === form.language || language.native === form.language) ||
     cleanLanguages[0];
-  const profileVerificationLevel = user?.verificationLevel || "basic";
-  const profileVerificationStatus = user?.verificationStatus || "none";
 
   const beginCrop = (target: CropTarget, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -628,7 +626,7 @@ const ProfilePage = () => {
           <div>
             <h1 className="profile-name-line">
               <span className="profile-name-text">{name}</span>
-              <TrustBadge level={profileVerificationLevel} status={profileVerificationStatus} />
+              <TrustBadge userId={user?.uid} />
             </h1>
             <span className="profile-username">@{username}</span>
             <div className="real-profile-badges">

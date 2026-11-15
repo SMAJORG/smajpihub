@@ -21,6 +21,7 @@ import VerifiedUserRoundedIcon from "@mui/icons-material/VerifiedUserRounded";
 import FlightRoundedIcon from "@mui/icons-material/FlightRounded";
 import AppLayout from "../../layouts/AppLayout";
 import { useAuthContext } from "../../contexts/AuthContext";
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { transportApi } from "../../lib/transportApi";
 import { formatPiRate, formatServicePrice, usdtFromPi } from "../../lib/piPricing";
 import type { AdminTransportStats, PlaceSuggestion, TransportDriver, TransportReceipt, TransportVehicle } from "../../lib/transportApi";
@@ -142,6 +143,7 @@ const TransportPage = () => {
   const [nearbyDrivers, setNearbyDrivers] = useState<
     Array<{
       driverId: string;
+      userId: string;
       displayName: string;
       vehicleName: string;
       vehiclePlate: string;
@@ -242,6 +244,7 @@ const TransportPage = () => {
             setNearbyDrivers(
               data.drivers.map(d => ({
                 driverId: d.driverId,
+                userId: d.userId,
                 displayName: d.displayName,
                 vehicleName: d.vehicleName,
                 vehiclePlate: d.vehiclePlate,
@@ -598,7 +601,7 @@ const TransportPage = () => {
                   <DirectionsCarRoundedIcon />
                 </span>
                 <div>
-                  <b>{driver.displayName}</b>
+                  <b>{driver.displayName}<SmajVerifiedBadge userId={driver.userId} /></b>
                   <small>
                     {driver.vehicleName} · {driver.vehiclePlate}
                   </small>
@@ -814,7 +817,7 @@ const TransportPage = () => {
         {notice ? <p className="transport-form-notice">{notice}</p> : null}
         {drivers.length ? drivers.map(driver => (
           <article className="transport-driver-record" key={driver.driverId}>
-            <div><b>{driver.displayName}</b><small>{driver.vehicleName} · {driver.vehiclePlate}</small></div>
+            <div><b>{driver.displayName}<SmajVerifiedBadge userId={driver.userId} /></b><small>{driver.vehicleName} · {driver.vehiclePlate}</small></div>
             <span>{driver.isApproved ? "Approved" : "Under review"}</span>
             <Link to="/services/transport/vehicles">Manage vehicles</Link>
           </article>

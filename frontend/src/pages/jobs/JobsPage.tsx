@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { downloadJobsCv } from "../../lib/jobsApi";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -2469,7 +2470,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                     <section className="job-application-profile" aria-label="Application profile and CV">
                       <div>
                         <span>Applying as</span>
-                        <strong>{user?.displayName || user?.username || "Your SMAJ PI profile"}</strong>
+                        <strong>{user?.displayName || user?.username || "Your SMAJ PI profile"}<SmajVerifiedBadge userId={user?.uid} /></strong>
                         <small>
                           {[profile?.title, profile?.location].filter(Boolean).join(" · ") ||
                             "Complete your professional details before applying."}
@@ -4013,7 +4014,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       {currentAvatar ? <img src={currentAvatar} alt="" /> : (user?.displayName || "P")[0]}
                     </span>
                     <div className="jobs-profile-intro">
-                      <h2>Hi {user?.displayName || user?.piUsername || user?.username || "Pioneer"} !</h2>
+                      <h2>Hi {user?.displayName || user?.piUsername || user?.username || "Pioneer"} !<SmajVerifiedBadge userId={user?.uid} /></h2>
                       <p>
                         {profile?.employment?.[0]?.position || profile?.title || "Add your professional title"}
                         {profile?.employment?.[0]?.employer ? ` at ${profile.employment[0].employer}` : ""}

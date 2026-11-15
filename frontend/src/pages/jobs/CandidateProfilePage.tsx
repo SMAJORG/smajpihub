@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { downloadJobsCv } from "../../lib/jobsApi";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -36,7 +37,7 @@ const CandidateProfileContent = ({ candidateId, onBack }: { candidateId: string;
             <span className="jobs-candidate-profile-avatar">{candidate.displayName.slice(0, 2).toUpperCase()}</span>
           )}
           <div>
-            <h1>{candidate.displayName}</h1>
+            <h1>{candidate.displayName}<SmajVerifiedBadge userId={candidate.userId} /></h1>
             <p>{candidate.title || "Candidate"}</p>
             {candidate.location ? <small>{candidate.location}</small> : null}
           </div>

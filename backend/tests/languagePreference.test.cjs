@@ -19,7 +19,7 @@ function fixture() {
   };
   const output = {};
   const code = ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/handlers/users.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', code)(name => name.endsWith('/piIdentityLinks') ? {default:()=>{}} : name.endsWith('/commerceEnvironment') ? {freshMainnetAccounts:()=>false} : name.endsWith('/auth') ? { resolveCurrentUser: async () => user } : name.endsWith('/deviceSessions') ? { currentDeviceSessionKey: () => 'device' } : name.endsWith('/environments') ? { default: { admin_pi_usernames: [] } } : {}, output);
+  new Function('require', 'exports', code)(name => name.endsWith('/smajVerification') ? {default:()=>{},smajVerification:require('../build/services/smajVerification').smajVerification} : name.endsWith('/piIdentityLinks') ? {default:()=>{}} : name.endsWith('/commerceEnvironment') ? {freshMainnetAccounts:()=>false} : name.endsWith('/auth') ? { resolveCurrentUser: async () => user } : name.endsWith('/deviceSessions') ? { currentDeviceSessionKey: () => 'device' } : name.endsWith('/environments') ? { default: { admin_pi_usernames: [] } } : {}, output);
   const routes = new Map();
   const router = {};
   for (const method of ['get','put','post','delete','patch']) router[method] = (path, handler) => routes.set(`${method} ${path}`, handler);

@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 type Document = Record<string, any>;
 type Query = Record<string, any>;
 
-const getValue = (document: Document, key: string) => document[key];
+const getValue = (document: Document, key: string) => key.split(".").reduce((value: any, part) => value?.[part], document);
 
 const sameValue = (left: any, right: any) => {
   if (left == null && right == null) return true;

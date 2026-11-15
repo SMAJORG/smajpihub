@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
@@ -123,6 +124,8 @@ const OrderTrackingPage = () => {
             <div>
               <strong>{order.productTitle}</strong>
               <p>Order ID: {order._id}</p>
+              <p>Seller: {order.sellerName || order.sellerId}<SmajVerifiedBadge userId={order.sellerId} /></p>
+              <p>Buyer: {order.buyerName || order.buyerId}<SmajVerifiedBadge userId={order.buyerId} /></p>
               <small>{formatPiAmount(order.pricePi)}</small>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import type { SmajVerification } from "../lib/smajVerification";
 export type AuthResult = {
   accessToken: string;
   user: {
@@ -26,6 +27,7 @@ export type AuthResult = {
     createdAt?: string;
     verificationLevel?: "basic" | "pi_verified" | "seller_verified" | "trusted_seller";
     verificationStatus?: "none" | "pending" | "approved" | "rejected";
+    smajVerification?: SmajVerification;
     verificationRequested?: boolean;
     verificationRequestType?: "pi_verified" | "seller_verified" | "trusted_seller";
   };

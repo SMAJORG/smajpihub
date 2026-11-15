@@ -1266,7 +1266,7 @@ const MessagesPageContent = () => {
                   <i className={isConversationOnline(item) ? "online" : "offline"} />
                 </span>
                 <div>
-                  <strong className="conversation-name">{getConversationName(item, user?.uid)}<TrustBadge level={item.verificationLevel} status={item.verificationStatus} /></strong>
+                  <strong className="conversation-name">{getConversationName(item, user?.uid)}<TrustBadge userId={item.participantId || (item.buyerId === user?.uid ? item.sellerId : item.buyerId)} /></strong>
                   <p className="conversation-meta-line">{/^Voice (message|note)/.test(item.lastMessage || "") ? <><MicNoneOutlinedIcon aria-hidden="true" />{item.lastMessage}</> : getConversationMeta(item, user?.uid)}</p>
                   <small>{formatLastSeen(item)}</small>
                 </div>
@@ -1296,7 +1296,7 @@ const MessagesPageContent = () => {
                       <i className={isConversationOnline(active) ? "online" : "offline"} />
                     </span>
                     <div>
-                      <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge level={active.verificationLevel} status={active.verificationStatus} /></strong>
+                      <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge userId={active.participantId || (active.buyerId === user?.uid ? active.sellerId : active.buyerId)} /></strong>
                       <small>{active.typing ? "Typing..." : connectionState === "live" ? formatLastSeen(active) : connectionState === "offline" ? "Offline" : "Connecting..."}</small>
                     </div>
                   </div>
@@ -1419,7 +1419,7 @@ const MessagesPageContent = () => {
                       <i className={isConversationOnline(active) ? "online" : "offline"} />
                     </span>
                     <div>
-                      <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge level={active.verificationLevel} status={active.verificationStatus} /></strong>
+                      <strong className="conversation-name">{getConversationName(active, user?.uid)}<TrustBadge userId={active.participantId || (active.buyerId === user?.uid ? active.sellerId : active.buyerId)} /></strong>
                       <small>{active.typing ? "Typing..." : connectionState === "live" ? formatLastSeen(active) : connectionState === "offline" ? "Offline" : "Connecting..."}</small>
                     </div>
                   </div>

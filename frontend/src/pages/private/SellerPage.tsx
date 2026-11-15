@@ -5,6 +5,7 @@ import { axiosClient } from "../../lib/axiosClient";
 import { formatPiAmount } from "../../lib/formatters";
 import { useAuthContext } from "../../contexts/AuthContext";
 import TrustBadge from "../../components/TrustBadge";
+import { useSmajVerification } from "../../lib/smajVerification";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import PullToRefresh from "../../components/PullToRefresh";
 import ActionDialog from "../../components/ActionDialog";
@@ -191,6 +192,7 @@ function SellerWorkspace({
   inventoryOnly?: boolean;
 }) {
   const { user, updateProfile } = useAuthContext();
+  const identityVerification = useSmajVerification(user?.uid);
   const owner = user?.uid || "";
   const [data, setData] = useState<SellerDashboard | null>(
     () => sellerSnapshots.get(owner) || null,
@@ -353,9 +355,7 @@ function SellerWorkspace({
   const finance = data?.finance.find(
     (item) => item.network === selectedNetwork,
   );
-  const verified =
-    data?.seller.verificationStatus === "approved" &&
-    data.seller.verificationLevel !== "basic";
+  const verified = identityVerification?.verified === true;
   return (
     <main className="private-page seller-workspace">
       <PullToRefresh onRefresh={load} />
@@ -368,17 +368,10 @@ function SellerWorkspace({
           <span
             className={"seller-ws-verification " + (verified ? "verified" : "")}
           >
-            <TrustBadge
-              level={data.seller.verificationLevel}
-              status={data.seller.verificationStatus}
-            />
+            <TrustBadge userId={user?.uid} />
             {verified
-              ? data.seller.verificationLevel === "trusted_seller"
-                ? "Trusted Seller"
-                : data.seller.verificationLevel === "seller_verified"
-                  ? "Seller Verified"
-                  : "Pi Verified"
-              : data.seller.verificationStatus === "pending"
+              ? "SMAJ Verified"
+              : identityVerification?.status === "pending"
                 ? "Under review"
                 : "Not verified"}
           </span>

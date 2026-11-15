@@ -213,10 +213,7 @@ const MarketplaceProductCard = ({
                   {product.sellerName || "SMAJ Seller"}
                 </small>
 
-                <TrustBadge
-                  level={product.verificationLevel}
-                  status={product.verificationStatus}
-                />
+                <TrustBadge userId={product.sellerId} />
               </span>
 
               <small className="storefront-seller-location">

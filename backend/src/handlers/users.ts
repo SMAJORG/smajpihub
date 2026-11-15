@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import mountSmajVerification from "./smajVerification";
+import { smajVerification } from "../services/smajVerification";
 import { freshMainnetAccounts } from "../services/commerceEnvironment";
 import mountPiIdentityLinks from "./piIdentityLinks";
 import { IdentityLinkError, resolveLinkedPiAccount } from "../services/piIdentityLinks";
@@ -66,6 +68,7 @@ const toClientUser = (user: any) => user ? ({
   role: user.role,
   roles: user.roles,
   blocked: Boolean(user.blocked),
+  smajVerification: smajVerification(user),
   verificationLevel: publicVerificationLevel(user),
   verificationStatus: verificationStatus(user),
   verificationRequested: Boolean(user.verificationRequested),
@@ -272,8 +275,8 @@ export const handleSignIn = async (req: Request, res: Response) => {
         role,
         roles: [role],
         blocked: false,
-        verificationLevel: isConfiguredAdmin ? "trusted_seller" : "basic",
-        verificationStatus: isConfiguredAdmin ? "approved" : "none",
+        verificationLevel: "basic",
+        verificationStatus: "none",
         verificationRequested: false,
         settings: { theme: "light", language: "English", notifications: true },
         createdAt: new Date(),
@@ -305,6 +308,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
 };
 
 export default function mountUserEndpoints(router: Router) {
+  mountSmajVerification(router);
   mountPiIdentityLinks(router);
   router.post("/refresh", async (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "no-store");
@@ -353,8 +357,8 @@ export default function mountUserEndpoints(router: Router) {
           roles: ["seller"],
           sellerActive: true,
           blocked: false,
-          verificationLevel: "trusted_seller",
-          verificationStatus: "approved",
+          verificationLevel: "basic",
+          verificationStatus: "none",
           verificationRequested: false,
           settings: { theme: "light", language: "English", notifications: true },
           createdAt: new Date(),
@@ -440,7 +444,7 @@ export default function mountUserEndpoints(router: Router) {
 
     const nextVerificationLevel = !sellerActive && ["seller_verified", "trusted_seller"].includes(normalizeVerificationLevel(currentUser)) ? "pi_verified" : normalizeVerificationLevel(currentUser);
 
-    const profileUpdates = { displayName, country, contactPhone, avatar, coverImage, bio, language, sellerActive, role, roles: [role], verificationLevel: nextVerificationLevel, verificationStatus: currentUser.verificationStatus || "none" };
+    const profileUpdates = { displayName, country, contactPhone, avatar, coverImage, bio, language, sellerActive, role, roles: [role], verificationLevel: nextVerificationLevel };
     assertNoBase64Images(profileUpdates, "user");
     await Promise.all([
       userCollection.updateOne(
@@ -533,7 +537,7 @@ export default function mountUserEndpoints(router: Router) {
       userId: currentUser.uid,
       type: "verification_requested",
       title: "Verification request sent",
-      message: requestedLevel === "trusted_seller" ? "Team will review your trusted seller verification request." : requestedLevel === "seller_verified" ? "Team will review your seller verification request." : "Team will review your Pi verified account request.",
+      message: requestedLevel === "trusted_seller" ? "Team will review your trusted seller verification request." : requestedLevel === "seller_verified" ? "Team will review your seller verification request." : "Team will review your SMAJ identity verification request.",
       relatedId: "settings",
     });
     const admins = await req.app.locals.userCollection.find({ role: "admin" }).project({ uid: 1 }).toArray();
@@ -541,7 +545,7 @@ export default function mountUserEndpoints(router: Router) {
       userId: admin.uid,
       type: "admin_verification_request",
       title: "New verification request",
-      message: `${currentUser.displayName || currentUser.username} requested ${requestedLevel === "trusted_seller" ? "Trusted Seller" : requestedLevel === "seller_verified" ? "Seller Verified" : "Pi Verified"} status.`,
+      message: `${currentUser.displayName || currentUser.username} requested ${requestedLevel === "trusted_seller" ? "Trusted Seller" : requestedLevel === "seller_verified" ? "Seller Verified" : "SMAJ Verified"} status.`,
       relatedId: currentUser.uid,
     })));
     const updatedUser = await req.app.locals.userCollection.findOne({ uid: currentUser.uid });

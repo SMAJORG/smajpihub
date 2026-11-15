@@ -40,6 +40,7 @@ test('all services, users and sessions are isolated; fresh registration and retu
   assert.equal((await request('/user/signin',{authResult:{accessToken:'forged',user:{uid:'testnet-0'}}})).status,401);
   const first=await request('/user/signin',{authResult:{accessToken:'fresh-mainnet-proof',user:{uid:'testnet-0',role:'seller'}}});
   assert.equal(first.status,200);assert.equal(first.data.user.uid,'mainnet-uid');assert.equal(first.data.user.role,'buyer');assert.equal(first.data.user.accountEnvironment,'mainnet');
+  assert.equal(first.data.user.smajVerification.verified,false);assert.equal(first.data.user.verificationStatus,'none');
   const saved=await app.locals.userCollection.findOne({uid:'mainnet-uid'});
   await app.locals.userCollection.updateOne({_id:saved._id},{$set:{bio:'New Mainnet profile'}});
   const returning=await request('/user/signin',{authResult:{accessToken:'fresh-mainnet-proof'}});assert.equal(returning.status,200);assert.equal(returning.data.user.bio,'New Mainnet profile');

@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
@@ -63,7 +64,7 @@ const TutorsPage = () => {
                 <div className="tutor-card-profile">
                   <div className="tutor-card-avatar">{tutor.avatar_url ? <img src={tutor.avatar_url} alt={`${tutor.name} profile`} /> : <span>{tutor.name.slice(0, 1).toUpperCase()}</span>}</div>
                   <div className="tutor-card-identity">
-                    <div className="tutor-card-name"><h2>{tutor.name}</h2><span className="tutor-verified-badge"><VerifiedOutlinedIcon /> Verified</span></div>
+                    <div className="tutor-card-name"><h2>{tutor.name}<SmajVerifiedBadge userId={tutor.userId} /></h2><span className="tutor-verified-badge"><VerifiedOutlinedIcon /> Tutor approved</span></div>
                     <p>{tutor.headline}</p>
                   </div>
                 </div>

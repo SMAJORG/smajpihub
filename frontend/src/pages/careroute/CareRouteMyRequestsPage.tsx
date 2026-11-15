@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 ﻿import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CareRouteLayout from "./CareRouteLayout";
@@ -119,7 +120,7 @@ export const CareRouteMyRequestsPage = () => {
       ) : (
         <>
           <div className="cr-account-line">
-            Requests for <strong>@{user.username}</strong>
+            Requests for <strong>@{user.username}<SmajVerifiedBadge userId={user.uid} /></strong>
           </div>
           <div className="cr-segments" role="group" aria-label="Request categories">
             <button aria-pressed={tab === "active"} onClick={() => setTab("active")}>

@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
+import { smajVerification } from "./smajVerification";
 
 const accountFields = ["uid", "username", "piUsername", "displayName", "avatar", "coverImage", "bio", "country", "contactPhone", "email", "language", "role", "roles", "blocked", "sellerActive", "createdAt", "updatedAt", "lastSeenAt", "verificationLevel", "verificationStatus", "verificationRequested", "verificationRequestType"];
 export const adminAccount = (user: Record<string, any>) => Object.fromEntries([
-  ["_id", user._id.toString()], ...accountFields.filter(key => user[key] !== undefined).map(key => [key, user[key]]),
+  ["_id", user._id.toString()], ["smajVerification", smajVerification(user)], ...accountFields.filter(key => user[key] !== undefined).map(key => [key, user[key]]),
 ]);
 
 export async function sendAdminUserMessage(collections: any, sender: Record<string, any>, recipient: Record<string, any>, text: string, requestId: string, notify: (input: any) => Promise<void>) {

@@ -5,6 +5,7 @@ import { verifyOutboundPayment, bindPayment, financialTransaction } from "../ser
 import { Request, Response, Router } from "express";
 import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
+import { smajVerification, verificationStates, type SmajVerificationState } from "../services/smajVerification";
 import { resolveCurrentUser, setSessionUser } from "../services/auth";
 import env from "../environments";
 import { buildAdminAnalytics, parseAnalyticsRange } from "../services/adminAnalytics";
@@ -12,7 +13,7 @@ import { adminAccount, sendAdminUserMessage } from "../services/adminUserMessagi
 import { canTransitionOrder, releaseOrderInventory, timelineEntry } from "../services/orderLifecycle";
 
 const serialize = (document: Record<string, any>) => ({ ...document, _id: document._id.toString(), accessToken: undefined });
-const verificationLabel = (level: string) => level === "trusted_seller" ? "Trusted Seller" : level === "seller_verified" ? "Seller Verified" : level === "pi_verified" || level === "verified" ? "Pi Verified" : "Basic";
+const verificationLabel = (level: string) => level === "trusted_seller" ? "Trusted Seller" : level === "seller_verified" ? "Seller Verified" : level === "pi_verified" || level === "verified" ? "SMAJ Verified" : "Basic";
 const normalizePiUsername = (username = "") => username.trim().replace(/^@+/, "").toLowerCase();
 const isConfiguredAdminUser = (user: Record<string, any>) => {
   const usernames = [user.piUsername, user.username].map((value) => normalizePiUsername(String(value || "")));
@@ -514,20 +515,37 @@ export default function mountAdminEndpoints(router: Router) {
     }
     if (["basic", "pi_verified", "seller_verified", "trusted_seller", "verified"].includes(req.body?.verificationLevel)) {
       updates.verificationLevel = req.body.verificationLevel === "verified" ? "pi_verified" : req.body.verificationLevel;
-      updates.verificationStatus = req.body.verificationLevel === "basic" ? "none" : "approved";
-      updates.verificationRequested = false;
-      updates.verificationRequestType = "";
     }
     if (["none", "pending", "approved", "rejected"].includes(req.body?.verificationStatus)) {
       updates.verificationStatus = req.body.verificationStatus;
       updates.verificationRequested = req.body.verificationStatus === "pending";
       if (req.body.verificationStatus !== "approved" && req.body.verificationStatus !== "pending") updates.verificationLevel = "basic";
     }
-    if (!Object.keys(updates).length) return res.status(400).json({ error: "bad_request", message: "No valid user update supplied" });
+    if (!Object.keys(updates).length && req.body?.smajVerificationStatus === undefined) return res.status(400).json({ error: "bad_request", message: "No valid user update supplied" });
     const before = await req.app.locals.userCollection.findOne({ _id: new ObjectId(req.params.id) });
     if (!before) return res.status(404).json({ message: "Account not found." });
+    const identityReview = req.body?.smajVerificationStatus !== undefined || updates.verificationStatus !== undefined;
+    if (req.body?.smajVerificationStatus !== undefined && !verificationStates.includes(req.body.smajVerificationStatus)) return res.status(400).json({ message: "Invalid SMAJ verification status." });
+    if (identityReview) {
+      if (req.body.expectedVerificationRevision !== undefined && req.body.expectedVerificationRevision !== (before.smajVerification?.revision || 0)) return res.status(409).json({ message: "Verification changed. Refresh before reviewing again." });
+      const actor = await resolveCurrentUser(req);
+      const status = (req.body.smajVerificationStatus ?? updates.verificationStatus) as SmajVerificationState;
+      if (req.body.verificationExpiresAt !== undefined && req.body.verificationExpiresAt !== null && typeof req.body.verificationExpiresAt !== "string") return res.status(400).json({ message: "Choose a valid expiration date." });
+      const expiresAt = req.body.verificationExpiresAt === undefined ? before.smajVerification?.expiresAt || null
+        : req.body.verificationExpiresAt === null || req.body.verificationExpiresAt === "" ? null : new Date(req.body.verificationExpiresAt);
+      if (expiresAt && (!Number.isFinite(new Date(expiresAt).getTime()) || (status === "approved" && new Date(expiresAt).getTime() <= Date.now()))) return res.status(400).json({ message: "Choose a valid future expiration date." });
+      if (typeof req.body.verificationReason !== "undefined" && (typeof req.body.verificationReason !== "string" || req.body.verificationReason.length > 500)) return res.status(400).json({ message: "Verification reason must be at most 500 characters." });
+      updates.smajVerification = { status, reviewedBy: actor!._id.toString(), reviewedAt: new Date(), expiresAt, reason: String(req.body.verificationReason || "Administrator account review").trim(), revision: (before.smajVerification?.revision || 0) + 1 };
+      updates.verificationStatus = ["approved", "pending", "rejected"].includes(status) ? status : "none";
+      if (status === "approved" && (updates.verificationLevel || before.verificationLevel || "basic") === "basic") updates.verificationLevel = "pi_verified";
+      updates.verificationRequested = status === "pending";
+    }
     updates.updatedAt = new Date();
-    await req.app.locals.userCollection.updateOne({ _id: new ObjectId(req.params.id) }, { $set: updates });
+    const saved = await req.app.locals.userCollection.updateOne({ _id: new ObjectId(req.params.id), ...(identityReview ? { "smajVerification.revision": before.smajVerification?.revision ?? { $exists: false } } : {}) }, {
+      $set: updates,
+      ...(identityReview ? { $push: { smajVerificationHistory: updates.smajVerification } } : {}),
+    });
+    if (!saved.matchedCount) return res.status(409).json({ message: "Account verification changed. Refresh before reviewing again." });
     const after = await req.app.locals.userCollection.findOne({ _id: new ObjectId(req.params.id) });
     if (!after) return res.status(404).json({ message: "Account no longer exists." });
     if (after?.uid && (updates.verificationLevel || updates.verificationStatus)) {
@@ -549,7 +567,7 @@ export default function mountAdminEndpoints(router: Router) {
         await createNotification(req.app, { userId: after.uid, type: "verification_update", title, message, relatedId: "settings" });
       }
     }
-    return res.status(200).json({ message: "User updated", user: adminAccount(after) });
+    return res.status(200).json({ message: "User updated", user: { ...adminAccount(after), smajVerification: smajVerification(after) } });
   });
 
   router.get("/verification-requests", async (req, res) => {
