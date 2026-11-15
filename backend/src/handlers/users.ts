@@ -288,11 +288,15 @@ export const handleSignIn = async (req: Request, res: Response) => {
     if (!currentUser) return failure(503, "signin_account_unavailable", "The account server could not load your saved profile. Please retry shortly.");
     stage = "session_create";
     await establishAuthSession(req, currentUser, req.body?.device || {});
-    // The client shows one login confirmation; do not duplicate it with push/inbox alerts.
     stage = "session_issue";
     const session = await issuePersistentSession(req, currentUser);
     await saveSession(req);
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
+    await createNotification(req.app, {
+      userId: currentUser.uid, type: "security_login", title: "Successful Pi login",
+      message: "Your SMAJ PI HUB account was signed in. Review your active devices if this was not you.",
+      relatedId: "settings",
+    });
     return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session, requestId });
   } catch (err) {
     if (err instanceof IdentityLinkError) return failure(err.status, err.code, err.message);

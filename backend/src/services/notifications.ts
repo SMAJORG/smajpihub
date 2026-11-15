@@ -1,3 +1,5 @@
+import { ObjectId } from "mongodb";
+
 type NotificationInput = {
   userId: string;
   type: string;
@@ -10,9 +12,17 @@ type NotificationInput = {
 export const createNotification = async (app: any, input: NotificationInput) => {
   if (!input.userId || !app.locals.notificationCollection) return;
   try {
-    await app.locals.notificationCollection.insertOne({ ...input, read: false, createdAt: new Date() });
+    // Education stores MongoDB user IDs; inboxes and push subscriptions use Pi UIDs.
+    let userId = input.userId;
+    if (ObjectId.isValid(userId) && app.locals.userCollection) {
+      const user = await app.locals.userCollection.findOne({ uid: userId })
+        || await app.locals.userCollection.findOne({ _id: new ObjectId(userId) });
+      if (!user?.uid) return;
+      userId = user.uid;
+    }
+    await app.locals.notificationCollection.insertOne({ ...input, userId, read: false, createdAt: new Date() });
     const { sendPushNotification } = await import("./pushNotifications");
-    await sendPushNotification(app, input.userId, {
+    await sendPushNotification(app, userId, {
       title: input.title,
       body: input.message,
       icon: "/logo.png",

@@ -6,6 +6,7 @@ import { axiosClient } from "../../lib/axiosClient";
 import type { AppNotification } from "../../types/marketplace";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import PullToRefresh from "../../components/PullToRefresh";
+import { showFeedback } from "../../lib/feedback";
 
 const tabs = ["All", "Orders", "Messages", "Payments", "Security", "Updates"];
 
@@ -35,7 +36,7 @@ const NotificationsPage = () => {
       const { data } = await axiosClient.get<{ notifications: AppNotification[] }>("/notifications");
       setItems(data.notifications || []);
     } catch {
-      setItems([]);
+      if (showSkeleton) showFeedback("Notifications could not be loaded. Pull down to retry.", "error");
     } finally {
       setLoading(false);
     }
@@ -43,6 +44,19 @@ const NotificationsPage = () => {
 
   useEffect(() => {
     void loadNotifications(true);
+    const refresh = () => { if (!document.hidden) void loadNotifications(); };
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener("smaj:notifications-refresh", refresh);
+    window.addEventListener("smaj:native-push", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("smaj:notifications-refresh", refresh);
+      window.removeEventListener("smaj:native-push", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [loadNotifications]);
 
   useEffect(() => {
@@ -67,7 +81,8 @@ const NotificationsPage = () => {
 
   const open = async (item: AppNotification) => {
     if (!item.read) {
-      await axiosClient.patch(`/notifications/${item._id}/read`).catch(() => undefined);
+      try { await axiosClient.patch(`/notifications/${item._id}/read`); }
+      catch { showFeedback("Could not mark this notification as read. Try again.", "error"); return; }
     }
     setItems((all) => all.map((entry) => (entry._id === item._id ? { ...entry, read: true } : entry)));
     refreshNotificationBadge();
@@ -88,14 +103,16 @@ const NotificationsPage = () => {
 
   const remove = async () => {
     if (!deleteId) return;
-    await axiosClient.delete(`/notifications/${deleteId}`).catch(() => undefined);
+    try { await axiosClient.delete(`/notifications/${deleteId}`); }
+    catch { showFeedback("Could not delete this notification. Try again.", "error"); return; }
     setItems((all) => all.filter((item) => item._id !== deleteId));
     setDeleteId(null);
     refreshNotificationBadge();
   };
 
   const markAll = async () => {
-    await axiosClient.patch("/notifications/read-all").catch(() => undefined);
+    try { await axiosClient.patch("/notifications/read-all"); }
+    catch { showFeedback("Could not mark notifications as read. Try again.", "error"); return; }
     setItems((current) => current.map((item) => ({ ...item, read: true })));
     refreshNotificationBadge();
   };

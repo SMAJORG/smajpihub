@@ -9,7 +9,7 @@ async function fixture(run){
  const tables=createMemoryCollections(),users=tables.userCollection,links=createMemoryCollections().userCollection;
  const oldAdapter=axios.defaults.adapter;let verified={uid:'original-testnet-uid',username:'pioneer',credentials:{scopes:['username']}};
  axios.defaults.adapter=async config=>({config,status:200,statusText:'OK',headers:{},data:verified});
- const app=express();app.use(express.json());app.use(session({secret:'identity-regression-only',resave:false,saveUninitialized:true}));app.locals.userCollection=users;app.locals.deviceSessionCollection=tables.deviceSessionCollection;app.locals.piIdentityLinkCollection=links;app.post('/user/signin',handleSignIn);
+ const app=express();app.use(express.json());app.use(session({secret:'identity-regression-only',resave:false,saveUninitialized:true}));app.locals.userCollection=users;app.locals.deviceSessionCollection=tables.deviceSessionCollection;app.locals.notificationCollection=tables.notificationCollection;app.locals.piIdentityLinkCollection=links;app.post('/user/signin',handleSignIn);
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
  const login=async(fields={})=>{const response=await fetch(`http://127.0.0.1:${server.address().port}/user/signin`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({authResult:{accessToken:'fresh-incoming-token',user:{uid:verified.uid,username:verified.username}},...fields})});return{status:response.status,body:await response.json()};};
  try{await run({tables,users,links,login,setVerified:value=>{verified=value;}});}finally{axios.defaults.adapter=oldAdapter;await new Promise(r=>server.close(r));}
@@ -33,9 +33,10 @@ for(const role of ['buyer','admin'])test(`original exact-UID login works for inc
  const result=await login({expectedAccountUid:'stale-uid',loginContext:{clientId:'ignored'}});
  assert.equal(result.status,200);assert.equal(result.body.user.uid,'original-testnet-uid');assert.equal(result.body.user.role,role);assert.deepEqual(result.body.user.roles,[role,'moderator']);assert.equal((await users.find({}).toArray()).length,2);
 }));
-test('normal new-user login remains available without continuity requirements',()=>fixture(async({users,login,setVerified})=>{
+test('normal new-user login remains available without continuity requirements',()=>fixture(async({users,tables,login,setVerified})=>{
  setVerified({uid:'genuine-new-user',username:'new-pioneer'});const result=await login({expectedAccountUid:'stale-browser-value'});
  assert.equal(result.status,200);assert.equal(result.body.user.uid,'genuine-new-user');assert.equal((await users.find({}).toArray()).length,1);
+ const alerts=await tables.notificationCollection.find({userId:'genuine-new-user'}).toArray();assert.equal(alerts.length,1);assert.equal(alerts[0].type,'security_login');assert.equal(alerts[0].read,false);
 }));
 test('approved recovery metadata does not alter the restored direct-UID login',()=>fixture(async({users,links,login})=>{
  await users.insertOne(original());await users.insertOne({uid:'other-uid',username:'other-user',role:'buyer'});

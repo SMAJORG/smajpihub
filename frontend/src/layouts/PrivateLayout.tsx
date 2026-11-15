@@ -234,11 +234,13 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     };
     const timer = window.setInterval(onRefresh, 15000);
     window.addEventListener("smaj:notifications-refresh", onRefresh);
+    window.addEventListener("smaj:native-push", onRefresh);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.clearInterval(timer);
       window.clearTimeout(resumeTimer);
       window.removeEventListener("smaj:notifications-refresh", onRefresh);
+      window.removeEventListener("smaj:native-push", onRefresh);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [loadUnreadCount]);
