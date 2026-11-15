@@ -3,6 +3,7 @@ docker-data
 .DS_Store
 node_modules/
 .private-backups/
+.private-audits/
 *.archive.gz.aes
 *.archive.gz.aes.json
 # Capacitor generated output and signing material

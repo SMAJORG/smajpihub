@@ -49,8 +49,8 @@ export const issuePersistentSession = async (req: Request, user: any) => {
   return { ...accessToken(user, req.session.deviceSessionId!), refreshToken, expiresAt: expiresAt.toISOString() };
 };
 
-export const refreshPersistentSession = async (req: Request) => {
-  const token = req.get("x-smaj-refresh-token") || req.cookies?.[REFRESH_COOKIE] || "";
+export const refreshPersistentSession = async (req: Request, explicitToken?: string) => {
+  const token = explicitToken ?? (req.get("x-smaj-refresh-token") || req.cookies?.[REFRESH_COOKIE] || "");
   const parsed = token.match(/^hub_refresh_([a-f0-9]{64})\.[a-f0-9]{64}$/);
   if (!parsed) return null;
   const collection = req.app.locals.deviceSessionCollection;

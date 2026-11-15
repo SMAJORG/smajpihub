@@ -1,0 +1,11 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {transformSync} from 'esbuild';
+const code=transformSync(readFileSync(new URL('../src/lib/mainnetAccountContinuity.ts',import.meta.url),'utf8'),{loader:'ts',format:'esm'}).code;
+const {linkFromExistingSession}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+function fixture(){const calls=[];return{calls,options:{accessToken:'fresh-pi',originalAccessToken:'',originalRefreshToken:'original-refresh',confirm:()=>true,post:async(path,body)=>{calls.push({path,body});return{data:path.endsWith('session-start')?{code:'private-code'}:path.endsWith('preview')?{original:{uid:'original-uid',username:'old-user'},incoming:{uid:'new-uid',username:'new-user'}}:{linked:true}};}}};}
+test('normal login can link with original refresh proof and current Pi proof after explicit confirmation',async()=>{const {calls,options}=fixture();assert.equal(await linkFromExistingSession(options),true);assert.equal(calls.length,3);assert.equal(calls[0].body.originalAccountRefreshToken,'original-refresh');assert.equal(calls[2].body.confirmedOriginalUid,'original-uid');});
+test('new users, invalid old sessions, old backends and already-linked users continue normal login',async()=>{const {options,calls}=fixture();assert.equal(await linkFromExistingSession({...options,originalRefreshToken:''}),false);assert.equal(calls.length,0);for(const status of [401,403,404,405,409])assert.equal(await linkFromExistingSession({...options,post:async()=>{throw{response:{status}};}}),false);});
+test('declining preserves separate accounts and no linking request is sent',async()=>{const {calls,options}=fixture();assert.equal(await linkFromExistingSession({...options,confirm:()=>false}),false);assert.equal(calls.length,2);assert.ok(!calls.some(c=>c.path.endsWith('complete')));});
+test('an unknown completion outcome is not turned into a new registration or a false success',async()=>{const {options}=fixture();await assert.rejects(linkFromExistingSession({...options,post:async(path,body)=>{if(path.endsWith('complete'))throw Error('connection lost');return options.post(path,body);}}),/connection lost/);});

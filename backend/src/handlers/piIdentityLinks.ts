@@ -1,7 +1,7 @@
 import type { Router } from "express";
-import { resolveHubAccessUser } from "../services/persistentSessions";
+import { resolveHubAccessUser, refreshPersistentSession } from "../services/persistentSessions";
 import { currentDeviceSessionKey } from "../services/deviceSessions";
-import { completeIdentityLink, IdentityLinkError, previewIdentityLink, startIdentityLink, verifyLinkIdentity } from "../services/piIdentityLinks";
+import { completeIdentityLink, IdentityLinkError, previewIdentityLink, startIdentityLink, verifyLinkIdentity, resolveLinkedPiAccount } from "../services/piIdentityLinks";
 
 export default function mountPiIdentityLinks(router: Router) {
   const attempts = new Map<string, { until: number; count: number }>();
@@ -24,9 +24,12 @@ export default function mountPiIdentityLinks(router: Router) {
         if (action === "session-start") {
           // Explicit signed Hub bearer + current Pi proof. Cookies and client UIDs cannot authorize linking.
           const token = req.body?.originalAccountAccessToken;
-          const original = typeof token === "string" && token.startsWith("hub_access.") ? await resolveHubAccessUser(req, token) : null;
+          let original = typeof token === "string" && token.startsWith("hub_access.") ? await resolveHubAccessUser(req, token) : null;
+          const refresh = req.body?.originalAccountRefreshToken;
+          if (!original && typeof refresh === "string" && /^hub_refresh_[a-f0-9]{64}\.[a-f0-9]{64}$/.test(refresh)) original = (await refreshPersistentSession(req, refresh))?.user || null;
           if (!original) return res.status(401).json({ error: "original_session_required", message: "A valid signed-in session for your original SMAJ account is required." });
-          if (original.uid === identity.uid) return res.status(409).json({ message: "This identity already opens your account. Sign in normally." });
+          const incomingAccount = await resolveLinkedPiAccount(locals, identity.uid);
+          if (original.uid === identity.uid || (incomingAccount && incomingAccount.uid !== identity.uid)) return res.status(409).json({ message: "This identity already opens its account. Sign in normally." });
           return res.json(await startIdentityLink(locals, { uid: original.uid }, "hub_session", currentDeviceSessionKey(req), identity.uid));
         }
         const result = action === "start" ? await startIdentityLink(locals, identity)

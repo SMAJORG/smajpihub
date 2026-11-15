@@ -83,6 +83,7 @@ for(const role of ['seller','admin'])test(`existing signed SMAJ session proves o
  const repeated=await complete(challenge.body.code);assert.equal(repeated.status,200);
  assert.equal((await links.find({}).toArray()).length,1);
  const signed=await post('signin',{authResult:{accessToken:'incoming'}});assert.equal(signed.status,200);assert.equal(signed.body.user.uid,primary.uid);assert.equal(signed.body.user.role,role);
+ assert.equal((await post('pi-identities/session-start',{accessToken:'incoming',originalAccountAccessToken:signed.body.session.accessToken})).status,409);
  assert.equal((await users.find({}).toArray()).length,2);
 },role));
 
@@ -92,4 +93,15 @@ test('revoked original-session proof cannot finish linking and Pi authentication
  const challenge=await post('pi-identities/session-start',{accessToken:'incoming',originalAccountAccessToken:original.accessToken});assert.equal(challenge.status,200);
  await locals.deviceSessionCollection.updateMany({userId:'testnet-original'},{$set:{active:false,revokedAt:new Date()}});
  assert.equal((await complete(challenge.body.code)).status,409);assert.equal((await links.find({}).toArray()).length,0);
+}));
+
+test('original refresh credential establishes ownership after short access expiry, without accepting cookie-only or revoked proofs',()=>fixture(async({post,complete,primary,locals,links})=>{
+ const original=(await post('signin',{authResult:{accessToken:'original'}})).body.session;
+ assert.equal((await post('pi-identities/session-start',{accessToken:'incoming',originalAccountRefreshToken:'forged'})).status,401);
+ const challenge=await post('pi-identities/session-start',{accessToken:'incoming',originalAccountAccessToken:'hub_access.expired',originalAccountRefreshToken:original.refreshToken});
+ assert.equal(challenge.status,200);assert.equal(challenge.body.original.uid,primary.uid);
+ assert.equal((await complete(challenge.body.code)).status,200);
+ assert.equal((await links.find({}).toArray()).length,1);
+ await locals.deviceSessionCollection.updateMany({userId:primary.uid},{$set:{active:false,revokedAt:new Date()}});
+ assert.equal((await post('pi-identities/session-start',{accessToken:'new',originalAccountRefreshToken:original.refreshToken})).status,401);
 }));

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { axiosClient } from "../lib/axiosClient";
 import { ensurePiInitialized, withPiTimeout } from "../lib/piSdk";
 import { piSignInErrorMessage } from "../lib/piSignInErrors";
-import { clearSessionCredentials, getHubAccessToken } from "../lib/sessionCredentials";
+import { clearSessionCredentials, getHubAccessToken, getHubRefreshToken } from "../lib/sessionCredentials";
 import "./pi-account-link.css";
 
 type Review = { original: { uid: string; username: string; role: string }; incoming: { uid: string; username: string }; existingSecondaryAccount: boolean };
@@ -35,9 +35,10 @@ export default function PiAccountLinkPage() {
       <p>Use your saved SMAJ session and approve your current Mainnet Pi identity. Review the original account before confirming. No Testnet visit is needed when your original session is still valid.</p>
       <button disabled={busy} onClick={()=>void run(async()=>{
         const originalAccountAccessToken=await getHubAccessToken();
-        if (!originalAccountAccessToken) throw new Error("This browser does not have a valid original SMAJ session.");
+        const originalAccountRefreshToken=await getHubRefreshToken();
+        if (!originalAccountAccessToken && !originalAccountRefreshToken) throw new Error("This browser does not have a valid original SMAJ session.");
         token.current=await authenticate();
-        const challenge=await request("session-start",token.current,{originalAccountAccessToken});
+        const challenge=await request("session-start",token.current,{originalAccountAccessToken,originalAccountRefreshToken});
         setCode(challenge.code);
         setReview(await request("preview",token.current,{code:challenge.code}));
       })}>Verify with my existing SMAJ session</button>

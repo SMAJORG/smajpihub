@@ -1,5 +1,6 @@
 import { piSignInErrorMessage, PiSignInResponseError } from "../lib/piSignInErrors";
-import { refreshHubSession, saveSessionCredentials, clearSessionCredentials, SESSION_CHANGED, SESSION_ENDED, type HubSession } from "../lib/sessionCredentials";
+import { refreshHubSession, saveSessionCredentials, clearSessionCredentials, getHubAccessToken, getHubRefreshToken, SESSION_CHANGED, SESSION_ENDED, type HubSession } from "../lib/sessionCredentials";
+import { linkFromExistingSession } from "../lib/mainnetAccountContinuity";
 import { ensurePiInitialized, isPiSandboxMode } from "../lib/piSdk";
 import { isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -267,6 +268,13 @@ export const useAuth = () => {
   const signInUser = useCallback(async (authResult: AuthResult) => {
     if (!getBaseURL()) throw new PiSignInResponseError("The account server address is not configured. Contact the administrator.");
     const device = await getLoginDeviceMetadata();
+    if (["smajpihub.com", "www.smajpihub.com"].includes(window.location.hostname) && !isPiSandboxMode() && getStoredPiUser()?.uid !== authResult.user?.uid) {
+      const originalAccessToken = await getHubAccessToken();
+      let originalRefreshToken = "";
+      try { originalRefreshToken = await getHubRefreshToken(); } catch { /* Corrupt old storage must not block registration. */ }
+      await linkFromExistingSession({ accessToken: authResult.accessToken, originalAccessToken, originalRefreshToken,
+        post: (path, body) => axiosClient.post(path, body, AUTH_REQUEST_CONFIG), confirm: message => window.confirm(message) });
+    }
     const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult: { accessToken: authResult.accessToken }, sandbox: isPiSandboxMode(), device }, AUTH_REQUEST_CONFIG);
     if (!response.data.user?.uid || !response.data.user.username) throw new PiSignInResponseError("The account server did not return a confirmed account. Please retry shortly.");
     const fallback = authResultUser({ accessToken: authResult.accessToken, user: { uid: response.data.user.uid, username: response.data.user.username } });
