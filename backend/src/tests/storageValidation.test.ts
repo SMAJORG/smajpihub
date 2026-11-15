@@ -63,6 +63,7 @@ const main = async () => {
     app: {
       locals: {
         userCollection: {
+          find: () => ({ limit: () => ({ toArray: async () => [await request.app.locals.userCollection.findOne()] }) }),
           findOne: async () => ({
             _id: { toString: () => "user-object-id" },
             uid: "pi-uid",
