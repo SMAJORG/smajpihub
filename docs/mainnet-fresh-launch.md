@@ -41,3 +41,10 @@ the same MongoDB ID; signed APK install/update → Pi Browser → validated app
 callback; Store/Jobs/Education/Health navigation and authorization; no payment SDK
 dialog or server money movement while disabled. These require real device/provider
 verification before declaring production readiness.
+
+Health emergency matching, dispatch and private request queues are disabled in
+fresh Mainnet mode. The legacy module contains demo availability and lacks the
+provider authorization needed for real medical operations. The public directory
+returns no hospitals; it does not auto-seed demo capacity. Verified provider
+onboarding, ownership checks and actual dispatch integration are release blockers
+for that service. Do not enable it by removing the guard alone.

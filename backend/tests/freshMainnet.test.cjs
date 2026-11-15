@@ -12,6 +12,7 @@ const mountLinks=require('../build/handlers/piIdentityLinks').default;
 const mountHistory=require('../build/handlers/testnetHistory').default;
 const {resolveHubAccessUser,refreshPersistentSession}=require('../build/services/persistentSessions');
 const {platformAPIKeyClient}=require('../build/services/platformAPIClient');
+const mountCareRoute=require('../build/handlers/careroute').default;
 
 test('fresh Mainnet login needs no legacy identity, payment key or wallet, but enabling money remains guarded',()=>{
  assert.equal(commerceMode(),'mainnet');
@@ -28,7 +29,7 @@ test('all services, users and sessions are isolated; fresh registration and retu
  for(const name of ['users','orders','products','messages','job_profiles','institutions','courses','careroute_profiles','user_sessions','device_sessions','pi_account_identity_links'])assert.equal(await scoped.collection(name).countDocuments({}),0,name);
  const app=express();app.use(express.json());app.use(session({secret:'fresh-regression',resave:false,saveUninitialized:true}));
  Object.assign(app.locals,{userCollection:scoped.collection('users'),deviceSessionCollection:scoped.collection('device_sessions'),piIdentityLinkCollection:scoped.collection('pi_account_identity_links')});
- app.post('/user/signin',handleSignIn);const links=express.Router();mountLinks(links);app.use('/user',links);const history=express.Router();mountHistory(history);app.use('/history',history);
+ app.post('/user/signin',handleSignIn);const links=express.Router();mountLinks(links);app.use('/user',links);const history=express.Router();mountHistory(history);app.use('/history',history);const care=express.Router();mountCareRoute(care);app.use(care);
  const adapter=axios.defaults.adapter;axios.defaults.adapter=async config=>{
   if(config.headers.Authorization!=='Bearer fresh-mainnet-proof')throw Object.assign(Error('invalid'),{response:{status:401}});
   return{config,status:200,statusText:'OK',headers:{},data:{uid:'mainnet-uid',username:'pioneer'}};
@@ -49,6 +50,9 @@ test('all services, users and sessions are isolated; fresh registration and retu
   assert.equal(await refreshPersistentSession(req,'hub_refresh_'+'a'.repeat(64)+'.'+'b'.repeat(64)),null);
   assert.equal((await request('/user/pi-identities/session-start',{accessToken:'fresh-mainnet-proof'})).status,404);
   assert.equal((await request('/history/orders')).status,404);
+  assert.deepEqual((await request('/careroute/hospitals')).data,{hospitals:[],total:0,live:false});
+  assert.equal((await request('/careroute/requests',{patientName:'No fabricated dispatch'})).status,503);
+  assert.equal((await request('/careroute/hospital/other/requests')).status,503);
   await assert.rejects(platformAPIKeyClient.post('/v2/payments/payment/approve'),/payments are disabled/);
   assert.equal(JSON.stringify(await originalUsers.find({}).toArray()),before);assert.equal(await db.collection('orders').countDocuments({}),1);
  }finally{axios.defaults.adapter=adapter;await new Promise(r=>server.close(r));}

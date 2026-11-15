@@ -2,6 +2,7 @@ import AiSignInPage from "./pages/AiSignInPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import MobileOAuthCallbackPage from "./pages/MobileOAuthCallbackPage.tsx";
@@ -183,6 +184,10 @@ const streamAdminRoutes: Array<[string, StreamPageKind]> = [
   ["analytics", "admin-analytics"],
   ["settings", "stream-settings"],
 ];
+
+const healthRelease = (page: ReactNode) => ["public", "capacitor"].includes(import.meta.env.MODE)
+  ? <main className="private-page" style={{ background: "var(--bg)", color: "var(--text)" }}><h1>Health service is not live</h1><p>Emergency dispatch and hospital availability are awaiting verified provider integration. For urgent medical help, contact local emergency services directly.</p><a href="/app/services" style={{ color: "var(--primary)" }}>Return to SMAJ PI HUB services</a></main>
+  : page;
 
 const sportsRoutes: Array<[string, SportsPageKind]> = [
   ["live", "live"],
@@ -946,7 +951,7 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <PrivateLayout fullScreen>
-          <CareRouteHomePage embedded />
+          {healthRelease(<CareRouteHomePage embedded />)}
         </PrivateLayout>
       </ProtectedRoute>
     ),
@@ -969,27 +974,27 @@ export const router = createBrowserRouter([
   },
   {
     path: "/careroute",
-    element: <CareRouteHomePage />,
+    element: healthRelease(<CareRouteHomePage />),
   },
   {
     path: "/careroute/request",
-    element: <CareRouteRequestPage />,
+    element: healthRelease(<CareRouteRequestPage />),
   },
   {
     path: "/careroute/hospitals",
-    element: <CareRouteHospitalsPage />,
+    element: healthRelease(<CareRouteHospitalsPage />),
   },
   {
     path: "/careroute/track",
-    element: <CareRouteTrackPage />,
+    element: healthRelease(<CareRouteTrackPage />),
   },
   {
     path: "/careroute/track/:requestId",
-    element: <CareRouteTrackPage />,
+    element: healthRelease(<CareRouteTrackPage />),
   },
   {
     path: "/careroute/my-requests",
-    element: <CareRouteMyRequestsPage />,
+    element: healthRelease(<CareRouteMyRequestsPage />),
   },
   {
     path: "/careroute/hospital-login",
@@ -1001,11 +1006,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/careroute/hospital-dashboard",
-    element: <CareRouteHospitalDashboard />,
+    element: healthRelease(<CareRouteHospitalDashboard />),
   },
   {
     path: "/services/health/hospital-dashboard",
-    element: <CareRouteHospitalDashboard />,
+    element: healthRelease(<CareRouteHospitalDashboard />),
   },
   {
     path: "/app/services/stream/movies",

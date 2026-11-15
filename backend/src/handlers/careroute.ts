@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { freshMainnetAccounts } from "../services/commerceEnvironment";
 
 type OnDutyDoctor = {
   id: string;
@@ -485,6 +486,13 @@ async function ensureHospitalsSeeded(hospitalCol: any) {
 }
 
 export default function mountCareRouteEndpoints(router: Router) {
+  // This legacy module contains demo capacity and unauthenticated dispatch queues.
+  // Do not present those as a live medical service in the fresh production space.
+  router.use("/careroute", (req, res, next) => {
+    if (!freshMainnetAccounts()) return next();
+    if (req.method === "GET" && req.path === "/hospitals") return res.json({ hospitals: [], total: 0, live: false });
+    return res.status(503).json({ error: "health_service_not_live", message: "Emergency dispatch is not connected to verified providers. Contact local emergency services directly." });
+  });
   // 0. Intelligent NearER Hospital Matching & Clinical Scoring API
   router.get("/careroute/match", async (req: Request, res: Response) => {
     try {
