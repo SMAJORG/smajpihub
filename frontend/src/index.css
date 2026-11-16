@@ -22817,3 +22817,10 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
   border-color: transparent;
   box-shadow: none;
 }
+
+/* Only service tiles in the Dashboard Trending, Lifestyle and Categories tabs. */
+.private-home .dashboard-tab-service-grid > a {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}

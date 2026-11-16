@@ -248,7 +248,7 @@ const serviceBadgeClass = (service: ServiceDefinition, kind: "card" | "rating" =
 };
 
 const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: "desktop" | "mobile" }) => (mode === "desktop" ? (
-    <div className="desktop-suggested-grid">
+    <div className="desktop-suggested-grid dashboard-tab-service-grid">
       {services.map((service) => (
         <Link to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={`desktop-service-app ${service.inProgress ? "service-in-progress-card" : ""}`} key={service.slug}>
           <ServiceArt index={service.atlasIndex} />
@@ -258,7 +258,7 @@ const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: 
       ))}
     </div>
   ) : (
-    <div className="mobile-services-grid">
+    <div className="mobile-services-grid dashboard-tab-service-grid">
       {services.map((service) => (
         <Link key={service.slug} to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={service.inProgress ? "service-in-progress-card" : undefined}>
           <ServiceArt index={service.atlasIndex} />
