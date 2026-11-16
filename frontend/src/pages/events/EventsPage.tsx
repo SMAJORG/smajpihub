@@ -1,15 +1,13 @@
-import { useMemo, useState, type FormEvent } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import BookmarkBorderOutlinedIcon from "@mui/icons-material/BookmarkBorderOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
-import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
-import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import AppLayout from "../../layouts/AppLayout";
-import ServiceMobileMenu from "../../components/ServiceMobileMenu";
-import { formatServicePrice, piFromUsdt, PI_USDT_RATE } from "../../lib/piPricing";
+import { homeSectionDefaults } from "../../content/homeContentDefaults";
+import { refreshSiteContent, useSiteContent, type ContentCard } from "../../lib/siteContent";
+import { openChatUrl, safeChatUrl } from "../../lib/chatLinks";
 import "./EventsPage.css";
 
 export type EventsPageKind =
@@ -23,111 +21,57 @@ export type EventsPageKind =
   | "checkout"
   | "ticket"
   | "venue";
-type EventItem = {
-  id: string;
-  title: string;
-  category: string;
-  date: string;
-  time: string;
-  city: string;
-  venue: string;
-  venueId: string;
-  organizer: string;
-  organizerId: string;
-  image: string;
-  fromUsdt: number;
-  description: string;
-  tiers: Array<{ name: string; price: number; remaining: number }>;
-};
-const events: EventItem[] = [
-  {
-    id: "pi-build-summit",
-    title: "Pi Builders Summit",
-    category: "Technology",
-    date: "2026-09-12",
-    time: "09:00",
-    city: "Lagos",
-    venue: "Pioneer Convention Centre",
-    venueId: "pioneer-centre",
-    organizer: "SMAJ Community",
-    organizerId: "smaj-community",
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1100&q=85",
-    fromUsdt: 35,
-    description: "A full day of product talks, workshops, founder stories, and community networking.",
-    tiers: [
-      { name: "General", price: 35, remaining: 180 },
-      { name: "Builder", price: 65, remaining: 70 },
-      { name: "VIP", price: 120, remaining: 20 },
-    ],
-  },
-  {
-    id: "afrobeats-night",
-    title: "Afrobeats City Night",
-    category: "Music",
-    date: "2026-10-03",
-    time: "19:30",
-    city: "Accra",
-    venue: "Independence Arena",
-    venueId: "independence-arena",
-    organizer: "Pulse Live",
-    organizerId: "pulse-live",
-    image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1100&q=85",
-    fromUsdt: 22,
-    description: "Live artists, DJs, food, and an unforgettable celebration of African sound.",
-    tiers: [
-      { name: "Standard", price: 22, remaining: 320 },
-      { name: "Front row", price: 48, remaining: 60 },
-    ],
-  },
-  {
-    id: "startup-market",
-    title: "Startup & Creator Market",
-    category: "Business",
-    date: "2026-08-22",
-    time: "11:00",
-    city: "Nairobi",
-    venue: "Urban Works Hall",
-    venueId: "urban-works",
-    organizer: "Build Africa",
-    organizerId: "build-africa",
-    image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1100&q=85",
-    fromUsdt: 12,
-    description: "Discover new products, meet creators, and join practical business sessions.",
-    tiers: [
-      { name: "Entry", price: 12, remaining: 240 },
-      { name: "Exhibitor", price: 80, remaining: 25 },
-    ],
-  },
-  {
-    id: "wellness-weekend",
-    title: "Wellness Weekend",
-    category: "Lifestyle",
-    date: "2026-11-14",
-    time: "08:30",
-    city: "Dakar",
-    venue: "Ocean Garden",
-    venueId: "ocean-garden",
-    organizer: "Nia Wellness",
-    organizerId: "nia-wellness",
-    image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1100&q=85",
-    fromUsdt: 18,
-    description: "Movement, mindfulness, healthy food, and guided wellness sessions.",
-    tiers: [
-      { name: "Day pass", price: 18, remaining: 90 },
-      { name: "Full weekend", price: 42, remaining: 45 },
-    ],
-  },
-];
-const SAVED = "smaj_event_saved",
-  TICKETS = "smaj_event_tickets",
-  CREATED = "smaj_created_events";
+const SAVED = "smaj_event_saved";
 const readSaved = () => {
   try {
-    return new Set<string>(JSON.parse(localStorage.getItem(SAVED) || "[]"));
+    const value: unknown = JSON.parse(localStorage.getItem(SAVED) || "[]");
+    return new Set<string>(Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []);
   } catch {
     return new Set<string>();
   }
 };
+const registrationUrl = (event: ContentCard) =>
+  event.registrationUrl?.startsWith("https://") ? safeChatUrl(event.registrationUrl) : null;
+const validEvent = (event: ContentCard) =>
+  registrationUrl(event) &&
+  Number.isFinite(Date.parse(event.startsAt || "")) &&
+  Date.parse(event.endsAt || "") > Date.parse(event.startsAt || "");
+const formatDate = (value: string) =>
+  new Date(value).toLocaleString("en-GB", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" });
+const Dates = ({ event }: { event: ContentCard }) => (
+  <p className="event-dates">
+    <CalendarMonthOutlinedIcon />
+    <span>
+      <time dateTime={event.startsAt}>{formatDate(event.startsAt!)}</time> –{" "}
+      <time dateTime={event.endsAt}>{formatDate(event.endsAt!)}</time> UTC
+    </span>
+  </p>
+);
+
+function Register({ event, ended }: { event: ContentCard; ended: boolean }) {
+  const url = registrationUrl(event);
+  if (ended) return <p className="events-empty">This event has ended. Registration is closed.</p>;
+  if (!url) return null;
+  return (
+    <a
+      className="event-register"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Register for ${event.title} on the organizer website`}
+      onClick={e => {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        const opened = openChatUrl(url);
+        if (opened) {
+          e.preventDefault();
+          void opened.catch(() => window.location.assign(url));
+        }
+      }}
+    >
+      Register ↗
+    </a>
+  );
+}
 const Header = () => (
   <header className="events-header">
     <Link to="/app/services">← Hub</Link>
@@ -140,72 +84,106 @@ const Header = () => (
       </NavLink>
       <NavLink to="/services/events/search">Browse</NavLink>
       <NavLink to="/services/events/saved">Saved</NavLink>
-      <NavLink to="/services/events/tickets">My tickets</NavLink>
-      <NavLink to="/services/events/organizer">Organize</NavLink>
+      <NavLink to="/services/events/tickets">Registration help</NavLink>
     </nav>
-    <ServiceMobileMenu
-      title="SMAJ Events"
-      accent="#7c3aed"
-      items={[
-        { label: "Discover", to: "/services/events" },
-        { label: "Browse events", to: "/services/events/search" },
-        { label: "Saved", to: "/services/events/saved" },
-        { label: "My tickets", to: "/services/events/tickets" },
-        { label: "Organizer dashboard", to: "/services/events/organizer" },
-        { label: "Create event", to: "/services/events/create" },
-      ]}
-    />
+    <details
+      className="events-menu"
+      onKeyDown={e => {
+        if (e.key === "Escape") {
+          e.currentTarget.open = false;
+          e.currentTarget.querySelector("summary")?.focus();
+        }
+      }}
+    >
+      <summary aria-label="Open SMAJ Events menu">
+        <MenuRoundedIcon />
+      </summary>
+      <nav aria-label="SMAJ Events navigation">
+        {[
+          { label: "Discover", to: "/services/events" },
+          { label: "Browse events", to: "/services/events/search" },
+          { label: "Saved", to: "/services/events/saved" },
+          { label: "Registration help", to: "/services/events/tickets" },
+        ].map(item => (
+          <Link
+            key={item.to}
+            to={item.to}
+            onClick={e => {
+              const menu = e.currentTarget.closest("details");
+              if (menu) menu.open = false;
+            }}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+    </details>
   </header>
 );
-const Card = ({ event, saved, onSave }: { event: EventItem; saved: boolean; onSave: () => void }) => (
-  <article className="event-card">
-    <Link to={`/services/events/event/${event.id}`}>
-      <img src={event.image} alt={event.title} />
-      <div>
-        <small>{event.category}</small>
-        <h2>{event.title}</h2>
-        <p>
-          <CalendarMonthOutlinedIcon />
-          {new Date(`${event.date}T12:00:00`).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}{" "}
-          · {event.time}
-        </p>
-        <p>
-          <LocationOnOutlinedIcon />
-          {event.venue}, {event.city}
-        </p>
-        <strong>From {formatServicePrice(event.fromUsdt)}</strong>
+function Card({ event, saved, onSave, now }: { event: ContentCard; saved: boolean; onSave: () => void; now: number }) {
+  return (
+    <article className="event-card">
+      <Link to={`/services/events/event/${event.id}`}>
+        {event.image ? <img src={event.image} alt="" /> : null}
+        <div>
+          {event.badge ? <small className="event-price">{event.badge}</small> : null}
+          <h2>{event.title}</h2>
+          <Dates event={event} />
+          <p>{event.text.split("\n")[0]}</p>
+          <span className="event-info-link">View event information →</span>
+        </div>
+      </Link>
+      <button
+        className={saved ? "saved" : ""}
+        aria-label={`${saved ? "Unsave" : "Save"} ${event.title}`}
+        aria-pressed={saved}
+        onClick={onSave}
+      >
+        <BookmarkBorderOutlinedIcon />
+      </button>
+      <div className="event-card-registration">
+        <Register event={event} ended={Date.parse(event.endsAt!) <= now} />
       </div>
-    </Link>
-    <button className={saved ? "saved" : ""} onClick={onSave}>
-      <BookmarkBorderOutlinedIcon />
-    </button>
-  </article>
-);
-
+    </article>
+  );
+}
 const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { sections } = useSiteContent();
   const [query, setQuery] = useState(params.get("q") || "");
   const [category, setCategory] = useState("All");
   const [saved, setSaved] = useState(readSaved);
-  const [selectedTier, setSelectedTier] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    void refreshSiteContent().catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    setQuery(params.get("q") || "");
+  }, [params]);
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    const timer = window.setInterval(update, 30000);
+    window.addEventListener("focus", update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", update);
+    };
+  }, []);
+  const section =
+    sections.find(item => item.id === "events") || homeSectionDefaults.find(item => item.id === "events")!;
+  const events = section.cards.filter(validEvent);
   const event = events.find(item => item.id === id);
-  const organizerEvents = events.filter(item => item.organizerId === id);
-  const venueEvents = events.filter(item => item.venueId === id);
-  const visible = useMemo(
-    () =>
-      events.filter(
-        item =>
-          (category === "All" || item.category === category) &&
-          `${item.title} ${item.city} ${item.venue} ${item.organizer}`.toLowerCase().includes(query.toLowerCase())
-      ),
-    [query, category]
+  const upcoming = events
+    .filter(item => Date.parse(item.endsAt!) > now)
+    .sort((a, b) => Date.parse(a.startsAt!) - Date.parse(b.startsAt!));
+  const visible = upcoming.filter(
+    item =>
+      (kind !== "saved" || saved.has(item.id)) &&
+      (category !== "Free" || item.badge.trim().toLowerCase() === "free") &&
+      (category !== "Online" || /online|livestream|virtual/i.test(item.text)) &&
+      `${item.title} ${item.text}`.toLowerCase().includes(query.trim().toLowerCase())
   );
   const toggleSaved = (eventId: string) =>
     setSaved(current => {
@@ -215,367 +193,92 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
       localStorage.setItem(SAVED, JSON.stringify([...next]));
       return next;
     });
-  const readTickets = () => {
-    try {
-      return JSON.parse(localStorage.getItem(TICKETS) || "[]") as Array<Record<string, string | number>>;
-    } catch {
-      return [];
-    }
-  };
-  const tickets = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem(TICKETS) || "[]") as Array<Record<string, string | number>>;
-    } catch {
-      return [];
-    }
-  }, []);
-  const created = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem(CREATED) || "[]") as Array<Record<string, string>>;
-    } catch {
-      return [];
-    }
-  }, []);
-  const checkout = (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    if (!event) return;
-    const tier = event.tiers.find(item => item.name === (selectedTier || params.get("tier"))) || event.tiers[0];
-    if (!tier) return;
-    const form = Object.fromEntries(new FormData(formEvent.currentTarget));
-    const ticket = {
-      id: `TKT-${crypto.randomUUID()}`,
-      eventId: event.id,
-      title: event.title,
-      date: event.date,
-      time: event.time,
-      venue: event.venue,
-      city: event.city,
-      tier: tier.name,
-      quantity,
-      total: piFromUsdt(tier.price * quantity),
-      totalUsdt: tier.price * quantity,
-      piRateUsed: PI_USDT_RATE,
-      status: "Confirmed",
-      ...form,
-    };
-    const current = readTickets();
-    current.unshift(ticket);
-    localStorage.setItem(TICKETS, JSON.stringify(current));
-    sessionStorage.setItem("smaj_latest_event_ticket", JSON.stringify(ticket));
-    navigate(`/services/events/ticket/${ticket.id}`);
-  };
-  const createEvent = (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = Object.fromEntries(new FormData(formEvent.currentTarget));
-    const current = JSON.parse(localStorage.getItem(CREATED) || "[]");
-    current.unshift({ id: `EVT-${crypto.randomUUID()}`, status: "Draft", ticketsSold: "0", ...form });
-    localStorage.setItem(CREATED, JSON.stringify(current));
-    navigate("/services/events/organizer");
-  };
-  const cards = (items: EventItem[]) => (
-    <div className="events-grid">
-      {items.map(item => (
-        <Card key={item.id} event={item} saved={saved.has(item.id)} onSave={() => toggleSaved(item.id)} />
-      ))}
-    </div>
-  );
   let content;
-  if (kind === "detail" && event)
+  if (kind === "detail" || kind === "checkout") {
     content = (
       <section className="event-detail">
-        <Link to="/services/events/search">← Back to events</Link>
-        <div className="event-detail-hero">
-          <img src={event.image} alt={event.title} />
-          <div>
-            <small>{event.category}</small>
-            <h1>{event.title}</h1>
-            <p>
-              <CalendarMonthOutlinedIcon />
-              {event.date} at {event.time}
-            </p>
-            <p>
-              <LocationOnOutlinedIcon />
-              {event.venue}, {event.city}
-            </p>
-            <Link to={`/services/events/organizer/${event.organizerId}`}>
-              <VerifiedOutlinedIcon />
-              {event.organizer}
-            </Link>
-            <p>{event.description}</p>
-          </div>
-        </div>
-        <div className="event-detail-grid">
-          <article>
-            <h2>Choose tickets</h2>
-            {event.tiers.map(tier => (
-              <button
-                key={tier.name}
-                className={selectedTier === tier.name ? "selected" : ""}
-                onClick={() => setSelectedTier(tier.name)}
-              >
-                <span>
-                  <b>{tier.name}</b>
-                  <small>{tier.remaining} remaining</small>
-                </span>
-                <strong>{formatServicePrice(tier.price)}</strong>
-              </button>
-            ))}
-          </article>
-          <aside>
-            <h2>Ready to attend?</h2>
-            <p>Select a ticket tier to continue.</p>
-            <button
-              disabled={!selectedTier}
-              onClick={() => navigate(`/services/events/checkout/${event.id}?tier=${encodeURIComponent(selectedTier)}`)}
-            >
-              Continue to checkout
-            </button>
-            <Link to={`/services/events/venue/${event.venueId}`}>View venue</Link>
-          </aside>
-        </div>
-      </section>
-    );
-  else if (kind === "checkout" && event) {
-    const tierName = params.get("tier") || event.tiers[0].name;
-    const tier = event.tiers.find(item => item.name === tierName) || event.tiers[0];
-    content = (
-      <section className="events-inner">
-        <h1>Ticket checkout</h1>
-        <div className="event-checkout">
-          <form onSubmit={checkout}>
-            <h2>Attendee information</h2>
-            <label>
-              Full name
-              <input name="name" required />
-            </label>
-            <label>
-              Email
-              <input name="email" type="email" required />
-            </label>
-            <label>
-              Quantity
-              <select value={quantity} onChange={e => setQuantity(Number(e.target.value))}>
-                <option>1</option>
-                <option>2</option>
-                <option>3</option>
-                <option>4</option>
-              </select>
-            </label>
-            <label className="event-terms">
-              <input type="checkbox" required />I accept the event and cancellation conditions.
-            </label>
-            <button>Confirm ticket · {formatServicePrice(tier.price * quantity)}</button>
-            <p>Pi payment integration will activate when the event payment backend is enabled.</p>
-          </form>
-          <aside>
-            <img src={event.image} alt="" />
-            <h2>{event.title}</h2>
-            <p>
-              {event.date} · {event.venue}
-            </p>
-            <strong>
-              {tier.name} × {quantity}
-            </strong>
-          </aside>
-        </div>
-      </section>
-    );
-  } else if (kind === "ticket") {
-    let ticket: Record<string, string | number> | null = null;
-    try {
-      ticket = JSON.parse(sessionStorage.getItem("smaj_latest_event_ticket") || "null");
-    } catch {
-      ticket = null;
-    }
-    content = (
-      <section className="events-inner event-ticket-page">
-        {ticket ? (
-          <article className="event-ticket">
-            <small>CONFIRMED TICKET</small>
-            <h1>{ticket.title}</h1>
-            <QrCode2OutlinedIcon />
-            <strong>{ticket.id}</strong>
-            <p>
-              {ticket.date} at {ticket.time}
-            </p>
-            <p>
-              {ticket.venue}, {ticket.city}
-            </p>
-            <div>
-              <span>
-                {ticket.tier} × {ticket.quantity}
-              </span>
-              <b>{formatServicePrice(Number(ticket.totalUsdt ?? 0))}</b>
+        <Link to="/services/events">← Back to events</Link>
+        {event ? (
+          <>
+            <div className="event-detail-hero">
+              {event.image ? <img src={event.image} alt="" /> : null}
+              <div>
+                {event.badge ? <small className="event-price">{event.badge}</small> : null}
+                <h1>{event.title}</h1>
+                <Dates event={event} />
+                <p className="event-description">{event.text}</p>
+              </div>
             </div>
-            <button onClick={() => window.print()}>Download ticket</button>
-          </article>
-        ) : (
-          <div className="events-empty">Ticket not found.</div>
-        )}
-      </section>
-    );
-  } else if (kind === "tickets")
-    content = (
-      <section className="events-inner">
-        <h1>My tickets</h1>
-        {tickets.length ? (
-          <div className="event-records">
-            {tickets.map(ticket => (
-              <article key={String(ticket.id)}>
-                <ConfirmationNumberOutlinedIcon />
-                <div>
-                  <h2>{ticket.title}</h2>
-                  <p>
-                    {ticket.date} · {ticket.venue}
-                  </p>
-                </div>
-                <b>{ticket.status}</b>
+            <div className="event-detail-grid">
+              <article>
+                <h2>Event information</h2>
+                <p>
+                  Dates and times above are shown in UTC. Check the organizer’s website for the latest schedule and
+                  attendance requirements.
+                </p>
+                <a href={registrationUrl(event)!} target="_blank" rel="noopener noreferrer">
+                  Official event website ↗
+                </a>
               </article>
-            ))}
-          </div>
+              <aside>
+                <h2>Register with the organizer</h2>
+                <p>Registration and attendance confirmation are handled on the official event website.</p>
+                <Register event={event} ended={Date.parse(event.endsAt!) <= now} />
+              </aside>
+            </div>
+          </>
         ) : (
-          <div className="events-empty">No event tickets yet.</div>
+          <div className="events-empty">
+            <h1>Event unavailable</h1>
+            <p>This event is not currently listed. Browse upcoming events for available registration.</p>
+          </div>
         )}
       </section>
     );
-  else if (kind === "organizer" && id)
+  } else if (kind === "tickets" || kind === "ticket") {
     content = (
       <section className="events-inner">
-        <div className="organizer-hero">
-          <VerifiedOutlinedIcon />
-          <div>
-            <small>VERIFIED ORGANIZER</small>
-            <h1>{organizerEvents[0]?.organizer || "Event organizer"}</h1>
-            <p>Trusted events and community experiences.</p>
-          </div>
+        <h1>Registration and tickets</h1>
+        <div className="events-empty">
+          <p>
+            Register through the official website shown on each event. The organizer provides your confirmation, joining
+            instructions and any tickets.
+          </p>
+          <p>
+            SMAJ does not issue tickets for these external events. Previous browser-only demo tickets are not valid
+            registrations.
+          </p>
+          <Link to="/services/events">Browse upcoming events</Link>
         </div>
-        {cards(organizerEvents)}
       </section>
     );
-  else if (kind === "venue")
+  } else if (kind === "create" || (kind === "organizer" && !id)) {
     content = (
       <section className="events-inner">
-        <div className="organizer-hero">
-          <LocationOnOutlinedIcon />
-          <div>
-            <small>EVENT VENUE</small>
-            <h1>{venueEvents[0]?.venue || "Venue"}</h1>
-            <p>{venueEvents[0]?.city} · Upcoming events</p>
-          </div>
+        <h1>Event publishing</h1>
+        <div className="events-empty">
+          <p>
+            The events directory contains administrator-managed listings with official registration websites. Local demo
+            drafts are not published events.
+          </p>
+          <Link to="/services/events">Browse upcoming events</Link>
         </div>
-        {cards(venueEvents)}
       </section>
     );
-  else if (kind === "organizer")
-    content = (
-      <section className="events-inner">
-        <div className="events-heading">
-          <div>
-            <small>ORGANIZER WORKSPACE</small>
-            <h1>Manage events</h1>
-          </div>
-          <Link to="/services/events/create">Create event</Link>
-        </div>
-        <div className="event-stats">
-          <article>
-            <strong>{created.length}</strong>
-            <span>Created events</span>
-          </article>
-          <article>
-            <strong>{tickets.length}</strong>
-            <span>Tickets issued</span>
-          </article>
-          <article>
-            <strong>{tickets.reduce((sum, t) => sum + Number(t.total || 0), 0)}</strong>
-            <span>Pi ticket value</span>
-          </article>
-        </div>
-        {created.length ? (
-          <div className="event-records">
-            {created.map(item => (
-              <article key={item.id}>
-                <CalendarMonthOutlinedIcon />
-                <div>
-                  <h2>{item.title}</h2>
-                  <p>
-                    {item.date} · {item.city}
-                  </p>
-                </div>
-                <b>{item.status}</b>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="events-empty">No organizer events yet.</div>
-        )}
-      </section>
-    );
-  else if (kind === "create")
-    content = (
-      <section className="events-inner">
-        <h1>Create an event</h1>
-        <form className="event-form" onSubmit={createEvent}>
-          <label>
-            Event title
-            <input name="title" required />
-          </label>
-          <div>
-            <label>
-              Category
-              <select name="category">
-                <option>Technology</option>
-                <option>Music</option>
-                <option>Business</option>
-                <option>Lifestyle</option>
-                <option>Sports</option>
-              </select>
-            </label>
-            <label>
-              City
-              <input name="city" required />
-            </label>
-          </div>
-          <div>
-            <label>
-              Date
-              <input name="date" type="date" required />
-            </label>
-            <label>
-              Time
-              <input name="time" type="time" required />
-            </label>
-          </div>
-          <label>
-            Venue
-            <input name="venue" required />
-          </label>
-          <label>
-            Description
-            <textarea name="description" minLength={30} rows={6} required />
-          </label>
-          <div>
-            <label>
-              Starting real-world price in USDT
-              <input name="price" type="number" min="0" required />
-            </label>
-            <label>
-              Capacity
-              <input name="capacity" type="number" min="1" required />
-            </label>
-          </div>
-          <button>Save event</button>
-        </form>
-      </section>
-    );
-  else {
-    const items = kind === "saved" ? visible.filter(item => saved.has(item.id)) : visible;
+  } else {
     content = (
       <>
         <section className={kind === "home" ? "events-hero" : "events-search-hero"}>
           <div>
-            <small>LIVE EXPERIENCES. POWERED BY PI.</small>
-            <h1>{kind === "home" ? "Find your next unforgettable moment." : "Discover events near you."}</h1>
-            <p>Explore concerts, conferences, markets, sports, and community experiences.</p>
+            <small>REAL EVENTS. OFFICIAL REGISTRATION.</small>
+            <h1>
+              {kind === "home"
+                ? "Find your next unforgettable moment."
+                : kind === "saved"
+                  ? "Your saved events."
+                  : "Discover upcoming events."}
+            </h1>
+            <p>Explore event details and register directly with the organizer.</p>
             <form
               onSubmit={e => {
                 e.preventDefault();
@@ -584,9 +287,10 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
             >
               <SearchOutlinedIcon />
               <input
+                aria-label="Search events"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Event, venue, city, or organizer"
+                placeholder="Event, topic, or organizer"
               />
               <button>Search events</button>
             </form>
@@ -594,8 +298,13 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
         </section>
         <section className="events-inner">
           <div className="event-categories">
-            {["All", "Technology", "Music", "Business", "Lifestyle"].map(item => (
-              <button className={category === item ? "active" : ""} onClick={() => setCategory(item)} key={item}>
+            {["All", "Free", "Online"].map(item => (
+              <button
+                className={category === item ? "active" : ""}
+                aria-pressed={category === item}
+                onClick={() => setCategory(item)}
+                key={item}
+              >
                 {item}
               </button>
             ))}
@@ -603,11 +312,25 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
           <div className="events-heading">
             <div>
               <small>UPCOMING EVENTS</small>
-              <h1>{kind === "saved" ? "Saved events" : "Popular experiences"}</h1>
+              <h1>{kind === "saved" ? "Saved events" : "Upcoming experiences"}</h1>
             </div>
-            <span>{items.length} events</span>
+            <span>{visible.length} events</span>
           </div>
-          {items.length ? cards(items) : <div className="events-empty">No events match your selection.</div>}
+          {visible.length ? (
+            <div className="events-grid">
+              {visible.map(item => (
+                <Card
+                  key={item.id}
+                  event={item}
+                  saved={saved.has(item.id)}
+                  onSave={() => toggleSaved(item.id)}
+                  now={now}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="events-empty">No upcoming events match your selection.</div>
+          )}
         </section>
       </>
     );
@@ -623,7 +346,7 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
           </NavLink>
           <NavLink to="/services/events/search">Browse</NavLink>
           <NavLink to="/services/events/saved">Saved</NavLink>
-          <NavLink to="/services/events/tickets">Tickets</NavLink>
+          <NavLink to="/services/events/tickets">Registration</NavLink>
         </nav>
       </main>
     </AppLayout>
