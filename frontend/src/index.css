@@ -22794,6 +22794,21 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .language-choice-dialog .language-choice-error { color: #b91c1c; }
 .language-choice-save:disabled { opacity: .6; cursor: wait; }
 
+.managed-event-register {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.managed-event-register:hover { background: var(--soft-bg); }
+.managed-event-register:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
 /* Services directories sit directly on the page; preserve their existing spacing. */
 .services-launcher .services-hub-grid > a,
 .services-launcher .mobile-services-grid > a,

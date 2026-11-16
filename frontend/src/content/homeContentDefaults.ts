@@ -1,4 +1,5 @@
 import type { HomeSection } from "../lib/siteContent";
+import dashboardEvents from "./dashboardEvents.json";
 export const homeSectionDefaults: HomeSection[] = [
   {
     id: "recent",
@@ -177,48 +178,11 @@ export const homeSectionDefaults: HomeSection[] = [
   {
     id: "events",
     title: "Events happening now",
-    subtitle: "Tickets, events and local experiences.",
-    to: "/app/services/events",
+    subtitle: "Free upcoming online events. Register directly with the organizer.",
+    to: "",
     order: 10,
     visible: true,
     mode: "custom",
-    cards: [
-      {
-        id: "event-0",
-        title: "Concerts",
-        text: "SMAJ Events",
-        image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=85",
-        icon: "",
-        to: "/app/services/events",
-        badge: "Live now",
-      },
-      {
-        id: "event-1",
-        title: "Conferences",
-        text: "SMAJ Events",
-        image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=85",
-        icon: "",
-        to: "/app/services/events",
-        badge: "Starts today",
-      },
-      {
-        id: "event-2",
-        title: "Shows",
-        text: "SMAJ Events",
-        image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=85",
-        icon: "",
-        to: "/app/services/events",
-        badge: "This weekend",
-      },
-      {
-        id: "event-3",
-        title: "Experiences",
-        text: "SMAJ Events",
-        image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=85",
-        icon: "",
-        to: "/app/services/events",
-        badge: "Ends on 7/8/26",
-      },
-    ],
+    cards: dashboardEvents,
   },
 ];

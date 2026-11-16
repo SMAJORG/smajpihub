@@ -34,6 +34,21 @@ const number = (value: unknown, min: number, max: number) => {
   if (!Number.isFinite(n)) throw new Error("Enter a valid number.");
   return Math.max(min, Math.min(max, n));
 };
+const registrationUrl = (value: unknown) => {
+  const result = text(value, 2048);
+  if (!result) return "";
+  const parsed = new URL(result);
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || /\s/.test(result))
+    throw new Error("Event registration must use a public HTTPS website.");
+  return parsed.href;
+};
+const eventDate = (value: unknown) => {
+  if (!value) return "";
+  const result = text(value, 40);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(result) || !Number.isFinite(Date.parse(result)))
+    throw new Error("Event dates must be valid UTC timestamps.");
+  return new Date(result).toISOString();
+};
 export function parseSiteContent(input: any) {
   if (
     !input ||
@@ -90,7 +105,17 @@ export function parseSiteContent(input: any) {
         cardIds.add(c.id);
         if (c.serviceSlug && !slugs.has(c.serviceSlug))
           throw new Error("Choose a valid shared service icon.");
+        const event = s.id === "events" ? {
+          registrationUrl: registrationUrl(c.registrationUrl),
+          startsAt: eventDate(c.startsAt),
+          endsAt: eventDate(c.endsAt),
+        } : {};
+        if (event.registrationUrl && (!event.startsAt || !event.endsAt))
+          throw new Error("Registration links need event start and end dates.");
+        if (event.startsAt && event.endsAt && event.endsAt <= event.startsAt)
+          throw new Error("The event must end after it starts.");
         return {
+          ...event,
           serviceSlug: c.serviceSlug || "",
           id: c.id,
           title: text(c.title, 180),

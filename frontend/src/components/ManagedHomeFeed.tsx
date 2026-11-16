@@ -1,11 +1,12 @@
 import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { homeSectionDefaults } from "../content/homeContentDefaults";
 import { useSiteContent, type ContentCard, type HomeSection } from "../lib/siteContent";
 import { serviceCatalog, getServiceLaunchLabel, getServiceLaunchStatus, serviceAppPath } from "../content/serviceCatalog";
 import ServiceArt from "./ServiceArt";
+import { openChatUrl, safeChatUrl } from "../lib/chatLinks";
 export type HomeEntry = { id: string; content?: ReactNode };
 export function SuggestedServices() {
   const { services } = useSiteContent();
@@ -37,7 +38,8 @@ export function SuggestedServices() {
     </div>
   );
 }
-function Card({ card, sports, trust }: { card: ContentCard; sports: boolean; trust: boolean }) {
+function Card({ card, sports, trust, event = false }: { card: ContentCard; sports: boolean; trust: boolean; event?: boolean }) {
+  const registration = event && card.registrationUrl?.startsWith("https://") ? safeChatUrl(card.registrationUrl) : null;
   const body = (
     <>
       {card.image ? <img className="managed-card-image" src={card.image} alt="" /> : null}
@@ -51,6 +53,7 @@ function Card({ card, sports, trust }: { card: ContentCard; sports: boolean; tru
         ) : null}
         {card.badge ? <b>{card.badge}</b> : null}
         <h3>{card.title}</h3>
+        {event && card.startsAt && card.endsAt ? <p className="managed-event-date"><time dateTime={card.startsAt}>{new Date(card.startsAt).toLocaleString("en-GB", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" })}</time> – <time dateTime={card.endsAt}>{new Date(card.endsAt).toLocaleString("en-GB", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" })}</time> UTC</p> : null}
         {sports && (card.homeName || card.awayName) ? (
           <>
             <p>{card.competition}</p>
@@ -70,10 +73,15 @@ function Card({ card, sports, trust }: { card: ContentCard; sports: boolean; tru
           </>
         ) : null}
         <p>{card.text}</p>
+        {registration ? <a className="managed-event-register" href={registration} target="_blank" rel="noopener noreferrer" aria-label={`Register for ${card.title} on the organizer website`} onClick={e => {
+          if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          const opened = openChatUrl(registration);
+          if (opened) { e.preventDefault(); void opened.catch(() => window.location.assign(registration)); }
+        }}>Register ↗</a> : null}
       </div>
     </>
   );
-  return card.to ? (
+  return event ? <article className="managed-content-card">{body}</article> : card.to ? (
     <Link className="managed-content-card" to={card.to} state={card.serviceSlug ? serviceLaunchNavigationState(card.serviceSlug) : undefined}>
       {body}
     </Link>
@@ -90,8 +98,20 @@ export function ManagedHomeSection({
   children?: ReactNode;
   compact?: boolean;
 }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (section.id !== "events") return;
+    const update = () => setNow(Date.now());
+    const timer = window.setInterval(update, 30000);
+    window.addEventListener("focus", update);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", update); };
+  }, [section.id]);
   if (!section.visible) return null;
   const custom = section.mode === "custom";
+  const cards = section.id === "events" ? section.cards.filter(card =>
+    card.registrationUrl?.startsWith("https://") && safeChatUrl(card.registrationUrl)
+    && Number.isFinite(Date.parse(card.startsAt || "")) && Date.parse(card.endsAt || "") > now
+  ) : section.cards;
   return (
     <section
       className={(compact ? "mobile-feed-section" : "desktop-feed-section") + " managed-home-section"}
@@ -106,9 +126,10 @@ export function ManagedHomeSection({
       </div>
       {custom ? (
         <div className={"managed-content-strip " + (section.id === "trust" ? "managed-trust-strip" : "")}>
-          {section.cards.map(card => (
-            <Card key={card.id} card={section.id === "events" && !card.to ? { ...card, to: "/services/events" } : card} sports={section.id === "sports"} trust={section.id === "trust"} />
+          {cards.map(card => (
+            <Card key={card.id} card={card} event={section.id === "events"} sports={section.id === "sports"} trust={section.id === "trust"} />
           ))}
+          {section.id === "events" && !cards.length ? <p>No upcoming events are listed right now.</p> : null}
         </div>
       ) : section.id === "suggested" ? (
         <SuggestedServices />
@@ -117,6 +138,11 @@ export function ManagedHomeSection({
       )}
     </section>
   );
+}
+export function DashboardEventsSection({ compact = true }: { compact?: boolean }) {
+  const { sections } = useSiteContent();
+  const section = sections.find(item => item.id === "events") || homeSectionDefaults.find(item => item.id === "events")!;
+  return <ManagedHomeSection section={section} compact={compact} />;
 }
 export default function ManagedHomeFeed({ entries, compact = true }: { entries: HomeEntry[]; compact?: boolean }) {
   const { sections } = useSiteContent();

@@ -184,3 +184,23 @@ test("admin writes require current revision and do not overwrite concurrent chan
     "Updated globally",
   );
 });
+
+test("event registration preserves official HTTPS links and UTC dates without relaxing app links", () => {
+  const p = payload();
+  const section = p.sections[0];
+  section.id = "events";
+  const card = section.cards[0];
+  Object.assign(card, { registrationUrl: "https://developer.microsoft.com/en-us/reactor/events/27687/", startsAt: "2026-12-01T13:30:00Z", endsAt: "2026-12-01T14:30:00Z" });
+  const saved = parseSiteContent(p).sections[0].cards[0];
+  assert.equal(saved.registrationUrl, card.registrationUrl);
+  assert.equal(saved.endsAt, "2026-12-01T14:30:00.000Z");
+  for (const value of ["javascript:alert(1)", "http://example.com", "//example.com", "https://user:secret@example.com", "https://example.com/ bad"]) {
+    assert.throws(() => parseSiteContent({ ...p, sections: [{ ...section, cards: [{ ...card, registrationUrl: value }] }] }));
+  }
+  for (const fields of [{ endsAt: "" }, { startsAt: "yesterday" }, { endsAt: card.startsAt }, { endsAt: "2026-11-01T00:00:00Z" }]) {
+    assert.throws(() => parseSiteContent({ ...p, sections: [{ ...section, cards: [{ ...card, ...fields }] }] }));
+  }
+  assert.throws(() => parseSiteContent({ ...p, sections: [{ ...section, cards: [{ ...card, to: "https://example.com" }] }] }));
+  section.id = "sports";
+  assert.equal(parseSiteContent(p).sections[0].cards[0].registrationUrl, undefined);
+});

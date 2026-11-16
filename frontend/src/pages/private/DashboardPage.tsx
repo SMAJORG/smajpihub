@@ -1,5 +1,5 @@
 import HeroBannerAction from "../../components/HeroBannerAction";
-import ManagedHomeFeed from "../../components/ManagedHomeFeed";
+import ManagedHomeFeed, { DashboardEventsSection } from "../../components/ManagedHomeFeed";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Hls from "hls.js";
@@ -83,10 +83,6 @@ const featureCards = [
   { title: "Discover new products", text: "Shop from sellers and stores", slug: "store", image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=85" },
 ];
 
-const mediaSections = [
-  { title: "Live sports", slug: "sports", image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=900&q=85", items: ["Live matches", "Latest scores", "Top teams", "Tournament highlights"] },
-  { title: "Events happening now", slug: "events", image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=85", items: ["Concerts", "Conferences", "Shows", "Experiences"], badges: ["Live now", "Starts today", "This weekend", "Ends on 7/8/26"] },
-];
 
 const servicePath = (service: ServiceDefinition) => {
   if (service.slug === "store") return "/store";
@@ -283,7 +279,7 @@ const TrendingMobileContent = ({ products, productsLoading, productsError, strea
     <DashboardStreamSections rows={streamRows.filter((row) => row.title === "Trending now")} loading={streamLoading} compact />
     <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact />
     <RecentlyAddedSection compact products={products.slice(0, 3)} loading={productsLoading} error={productsError} />
-    <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Events happening now</h2><Link to="/app/services/events">See all</Link></div><div className="mobile-media-strip">{mediaSections.filter((section) => section.slug === "events").map((section) => section.items.slice(0, 3).map((item, index) => <Link to={`/app/services/${section.slug}`} className="mobile-media-card" key={item}><img src={section.image} alt="" /><div>{section.badges ? <b>{section.badges[index]}</b> : null}<span>{item}</span><small>SMAJ Events</small></div></Link>))}</div></section>
+    <DashboardEventsSection />
   </>
 );
 

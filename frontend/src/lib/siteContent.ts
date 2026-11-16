@@ -17,6 +17,9 @@ export type ContentCard = {
   homeScore?: string;
   awayScore?: string;
   competition?: string;
+  registrationUrl?: string;
+  startsAt?: string;
+  endsAt?: string;
 };
 export type HomeSection = {
   id: string;

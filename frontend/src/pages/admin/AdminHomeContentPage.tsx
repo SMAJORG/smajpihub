@@ -591,6 +591,11 @@ export default function AdminHomeContentPage() {
                             onChange={e => updateCard(index, { to: e.target.value })}
                           />
                         </label>
+                        {section.id === "events" ? <>
+                          <label>Official registration website<input type="url" value={card.registrationUrl || ""} placeholder="https://organizer.example/register" onChange={e => updateCard(index, { registrationUrl: e.target.value })} /></label>
+                          <label>Starts at (UTC)<input value={card.startsAt || ""} placeholder="2026-12-01T13:30:00Z" onChange={e => updateCard(index, { startsAt: e.target.value })} /></label>
+                          <label>Ends at (UTC)<input value={card.endsAt || ""} placeholder="2026-12-01T14:30:00Z" onChange={e => updateCard(index, { endsAt: e.target.value })} /></label>
+                        </> : null}
                         {section.id === "sports" ? (
                           <>
                             {(["homeName", "awayName", "homeScore", "awayScore", "competition"] as const).map(key => (

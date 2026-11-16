@@ -1,0 +1,38 @@
+[
+  {
+    "id": "reactor-27761",
+    "title": "New Year, New Bot - Bring Your AI Desk Robot to Life",
+    "text": "Microsoft Reactor · Online · English\nLearn how a desk robot connects to .NET services through practical demonstrations. Bruno Capuano presents this IoT session. Register on Microsoft’s website.",
+    "image": "https://developer.microsoft.com/reactor/images/reactor-card-v2.png",
+    "icon": "",
+    "to": "",
+    "badge": "Free",
+    "startsAt": "2026-11-24T18:00:00Z",
+    "endsAt": "2026-11-24T19:00:00Z",
+    "registrationUrl": "https://developer.microsoft.com/en-us/reactor/events/27761/"
+  },
+  {
+    "id": "reactor-27687",
+    "title": "AI Builder Series - Intro",
+    "text": "Microsoft Reactor · Online · English\nAn introduction for developers and AI practitioners to building with models, prompts, workflows and agents. Presented by Kamal Shree S. Register on Microsoft’s website.",
+    "image": "https://developer.microsoft.com/reactor/images/reactor-card-v2.png",
+    "icon": "",
+    "to": "",
+    "badge": "Free",
+    "startsAt": "2026-12-01T13:30:00Z",
+    "endsAt": "2026-12-01T14:30:00Z",
+    "registrationUrl": "https://developer.microsoft.com/en-us/reactor/events/27687/"
+  },
+  {
+    "id": "reactor-27707",
+    "title": "Watch Me Build My First Fabric App",
+    "text": "Microsoft Reactor · Online · English\nWatch a first-time builder create a Fabric app with an expert available to explain decisions and help solve problems. Register on Microsoft’s website.",
+    "image": "https://developer.microsoft.com/reactor/images/reactor-card-v2.png",
+    "icon": "",
+    "to": "",
+    "badge": "Free",
+    "startsAt": "2026-12-03T16:00:00Z",
+    "endsAt": "2026-12-03T17:00:00Z",
+    "registrationUrl": "https://developer.microsoft.com/en-us/reactor/events/27707/"
+  }
+]
