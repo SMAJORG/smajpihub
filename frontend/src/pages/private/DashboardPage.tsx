@@ -307,6 +307,7 @@ const DesktopDiscoveryContent = ({ activeTab, products, productsLoading, product
     <DashboardStreamSections rows={streamRows.filter((row) => row.title === "Trending now")} loading={streamLoading} compact={false} />
     <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact={false} />
     <RecentlyAddedSection products={products.slice(0, 6)} loading={productsLoading} error={productsError} />
+    <DashboardEventsSection compact={false} />
   </>;
   const groups = activeTab === "lifestyle" ? lifestyleGroups : categoryGroups;
   return <>
