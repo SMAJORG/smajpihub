@@ -12576,7 +12576,6 @@ body {
 .continue-grid a,
 .recommended-services a,
 .updates-list article,
-.services-hub-grid > a,
 .services-hub-grid > button,
 .service-page-header,
 .service-modal,
@@ -12747,7 +12746,6 @@ select,
 .contact-info-panel,
 .services-company-hero-card,
 .services-principle-grid article,
-.services-directory-card,
 .how-step-grid article,
 .how-company-explain,
 .how-store-callout,
@@ -12976,9 +12974,9 @@ select,
 
 .services-company-page .services-directory-card {
   color: var(--text) !important;
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: var(--shadow-soft);
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
 }
 
 .services-company-page .services-directory-card h3 {
@@ -14827,7 +14825,6 @@ a.service-in-progress-card[aria-disabled="true"],
 }
 
 .public-home-service-card.service-in-progress-card,
-.services-directory-card.service-in-progress-card,
 .service-discovery-page .service-in-progress-card,
 .service-categories-page .service-in-progress-card {
   border-color: #ded2ff !important;
@@ -22796,3 +22793,12 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 
 .language-choice-dialog .language-choice-error { color: #b91c1c; }
 .language-choice-save:disabled { opacity: .6; cursor: wait; }
+
+/* Services directories sit directly on the page; preserve their existing spacing. */
+.services-launcher .services-hub-grid > a,
+.services-launcher .mobile-services-grid > a,
+.services-company-page .services-directory-grid > .services-directory-card {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
