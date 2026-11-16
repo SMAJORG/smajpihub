@@ -3099,6 +3099,16 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Identity badges stay beside names, independent of Jobs detail-label styles. */
+.jobs-profile-intro h2 > .smaj-verified-badge,
+.job-application-profile strong > .smaj-verified-badge,
+.jobs-candidate-profile-header h1 > .smaj-verified-badge {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-block: 0;
+  font-size: inherit;
+}
 .jobs-profile-intro svg {
   width: 15px;
   height: 15px;
