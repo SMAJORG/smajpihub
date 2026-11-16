@@ -30,7 +30,7 @@ export const serviceCatalog: ServiceDefinition[] = [
 
 export type ServiceLaunchStatus = "live" | "in-progress" | "coming-soon";
 
-const liveServiceSlugs = new Set(["store", "stream", "jobs"]);
+const liveServiceSlugs = new Set(["store", "stream", "jobs", "events"]);
 
 export const getServiceLaunchStatus = (slug: string): ServiceLaunchStatus => {
   const configured = getSiteContent().services.find(service => service.slug === slug);

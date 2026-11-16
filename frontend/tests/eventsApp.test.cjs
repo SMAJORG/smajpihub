@@ -15,7 +15,7 @@ test(
       output = fs.mkdtempSync(path.join(os.tmpdir(), "smaj-events-app-"));
     await build({
       stdin: {
-        contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {MemoryRouter,Routes,Route,useNavigate} from 'react-router-dom';import Events from './src/pages/events/EventsPage';import events from './src/content/dashboardEvents.json';import {publishSiteContent} from './src/lib/siteContent';import './src/index.css';window.site={services:[],sections:[{id:'events',title:'Events happening now',subtitle:'Real events',to:'',visible:true,mode:'custom',order:10,cards:[...events,{...events[0],id:'expired',title:'Completed demo event',endsAt:'2026-11-01T00:00:00Z'},{...events[0],id:'unsafe',title:'Unsafe event',registrationUrl:'javascript:alert(1)'}]}]};publishSiteContent(window.site);function App(){window.go=useNavigate();return <Routes><Route path='/services/events' element={<Events/>}/>{['search','saved','tickets','create'].map(kind=><Route key={kind} path={'/services/events/'+kind} element={<Events kind={kind}/>}/>)}<Route path='/services/events/event/:id' element={<Events kind='detail'/>}/><Route path='/services/events/checkout/:id' element={<Events kind='checkout'/>}/><Route path='/services/events/ticket/:id' element={<Events kind='ticket'/>}/></Routes>}createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={['/services/events']}><App/></MemoryRouter>);`,
+        contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {MemoryRouter,Routes,Route,useNavigate} from 'react-router-dom';import Events from './src/pages/events/EventsPage';import Gate from './src/components/ServiceLaunchGate';import events from './src/content/dashboardEvents.json';import {publishSiteContent} from './src/lib/siteContent';import './src/index.css';window.site={services:[],sections:[{id:'events',title:'Events happening now',subtitle:'Real events',to:'',visible:true,mode:'custom',order:10,cards:[...events,{...events[0],id:'expired',title:'Completed demo event',endsAt:'2026-11-01T00:00:00Z'},{...events[0],id:'unsafe',title:'Unsafe event',registrationUrl:'javascript:alert(1)'}]}]};publishSiteContent(window.site);function App(){window.go=useNavigate();return <><Gate/><Routes><Route path='/services/events' element={<Events/>}/>{['search','saved','tickets','create'].map(kind=><Route key={kind} path={'/services/events/'+kind} element={<Events kind={kind}/>}/>)}<Route path='/services/events/event/:id' element={<Events kind='detail'/>}/><Route path='/services/events/checkout/:id' element={<Events kind='checkout'/>}/><Route path='/services/events/ticket/:id' element={<Events kind='ticket'/>}/></Routes></>}createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={['/services/events']}><App/></MemoryRouter>);`,
         resolveDir: root,
         loader: "tsx",
       },
@@ -28,6 +28,10 @@ test(
         {
           name: "events-boundaries",
           setup(builder) {
+            builder.onResolve({ filter: /\/ServiceLaunchSplash$/ }, () => ({
+              path: "splash",
+              namespace: "decoration",
+            }));
             builder.onResolve({ filter: /^@mui\/icons-material\// }, () => ({ path: "icon", namespace: "decoration" }));
             builder.onLoad({ filter: /.*/, namespace: "decoration" }, () => ({
               contents: "export default function Icon(){return null;}",
@@ -96,6 +100,7 @@ test(
         }, scenario);
         await page.goto(`http://127.0.0.1:${server.address().port}`);
         await page.locator(".event-card").first().waitFor();
+        assert.equal(await page.locator(".service-progress-warning").count(), 0);
         assert.equal(await page.locator(".event-card").count(), 3);
         assert.equal(
           await page
@@ -113,12 +118,10 @@ test(
         if (scenario.width < 1024) {
           await page.getByLabel("Open SMAJ Events menu").click();
           await page.getByRole("navigation", { name: "SMAJ Events navigation" }).waitFor();
-          const palette = await page
-            .locator(".events-menu nav")
-            .evaluate(e => ({
-              bg: getComputedStyle(e).backgroundColor,
-              surface: getComputedStyle(document.querySelector(".events-header")).backgroundColor,
-            }));
+          const palette = await page.locator(".events-menu nav").evaluate(e => ({
+            bg: getComputedStyle(e).backgroundColor,
+            surface: getComputedStyle(document.querySelector(".events-header")).backgroundColor,
+          }));
           assert.equal(palette.bg, palette.surface);
           await page.locator(".events-menu summary").press("Escape");
           assert.equal(await page.locator(".events-menu").getAttribute("open"), null);
