@@ -107,7 +107,7 @@ export function ManagedHomeSection({
       {custom ? (
         <div className={"managed-content-strip " + (section.id === "trust" ? "managed-trust-strip" : "")}>
           {section.cards.map(card => (
-            <Card key={card.id} card={card} sports={section.id === "sports"} trust={section.id === "trust"} />
+            <Card key={card.id} card={section.id === "events" && !card.to ? { ...card, to: "/services/events" } : card} sports={section.id === "sports"} trust={section.id === "trust"} />
           ))}
         </div>
       ) : section.id === "suggested" ? (

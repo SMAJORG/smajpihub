@@ -1103,6 +1103,7 @@ export const router = createBrowserRouter([
     ),
   },
   { path: "/app/services/sports", element: <Navigate to="/services/sports" replace /> },
+  { path: "/app/services/events", element: <Navigate to="/services/events" replace /> },
   {
     path: "/app/services/token/rewards",
     element: (
