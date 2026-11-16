@@ -12406,6 +12406,9 @@ html[data-private-theme="dark"] .storefront-tool-panel label { color: var(--smaj
 
 /* Global SMAJ PI HUB theme system */
 :root {
+  --verified-pi: #1d9bf0; /* theme-color-exception: fixed blue verification status indicator */
+  --verified-seller: #7c3aed; /* theme-color-exception: fixed purple verification status indicator */
+  --verified-trusted: #f59e0b; /* theme-color-exception: fixed gold verification status indicator */
   --bg: #ffffff;
   --surface: #ffffff;
   --text: #0f172a;
@@ -12431,6 +12434,9 @@ html[data-private-theme="dark"] .storefront-tool-panel label { color: var(--smaj
 }
 
 :root[data-theme="dark"] {
+  --verified-pi: #1d9bf0; /* theme-color-exception: fixed blue verification status indicator */
+  --verified-seller: #7c3aed; /* theme-color-exception: fixed purple verification status indicator */
+  --verified-trusted: #f59e0b; /* theme-color-exception: fixed gold verification status indicator */
   --bg: #07111f;
   --surface: #101c2e;
   --text: #ffffff;

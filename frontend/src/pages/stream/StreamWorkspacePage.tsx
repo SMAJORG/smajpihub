@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { assertPiPaymentsReady } from "../../lib/piPaymentReadiness";
 import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
 import { getStreamDownloadRecommendations } from "../../lib/streamCatalog";
@@ -397,7 +398,7 @@ const StreamSearchPage = () => {
                 ) : (
                   <span>{channel.channel.name.slice(0, 1)}</span>
                 )}
-                <b>{channel.channel.name}</b>
+                <b>{channel.channel.name}<SmajVerifiedBadge userId={channel.creatorId} /></b>
                 <small>@{channel.channel.handle}</small>
               </Link>
             ))}
@@ -833,7 +834,7 @@ const Catalogue = ({ kind }: { kind: StreamPageKind }) => {
                     creator.channel.name.slice(0, 2).toUpperCase()
                   )}
                 </span>
-                <strong>{creator.channel.name}</strong>
+                <strong>{creator.channel.name}<SmajVerifiedBadge userId={creator.creatorId} /></strong>
                 <small>@{creator.channel.handle}</small>
               </Link>
             ))}

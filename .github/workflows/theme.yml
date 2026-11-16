@@ -49,3 +49,20 @@ jobs:
         run: npm run test:header:browser --prefix frontend -- --grep "desktop panels follow"
       - name: Verify paired Pi identity linking in light and dark mode
         run: npm run test:pi-links --prefix frontend
+
+      - name: Verify badge colors and Stream channels on mobile and tablet
+        run: node --test frontend/tests/smajVerificationInteraction.test.cjs
+
+  verification-ownership:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm run build --prefix backend
+      - name: Verify identity levels and Stream owner bindings
+        run: node --test backend/tests/smajVerification.test.cjs backend/tests/streamVerification.test.cjs

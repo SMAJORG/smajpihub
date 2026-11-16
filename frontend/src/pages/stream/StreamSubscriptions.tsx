@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import StreamVideoActions from "./StreamVideoActions";
 import StreamSkeleton from "./StreamSkeleton";
 import { useEffect, useState } from "react";
@@ -47,7 +48,7 @@ const StreamSubscriptions = () => {
                     {subscription.channel.avatarUrl ? <img src={subscription.channel.avatarUrl} alt="" /> : initials}
                   </Link>
                   <div>
-                    <h2>{subscription.channel.name}</h2>
+                    <h2>{subscription.channel.name}<SmajVerifiedBadge userId={subscription.creatorId} /></h2>
                     <p>@{subscription.channel.handle}</p>
                   </div>
                   <Link to={`/app/services/stream/channel/${subscription.channel.handle}`}>View channel</Link>

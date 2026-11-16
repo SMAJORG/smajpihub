@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import StreamVideoActions from "./StreamVideoActions";
 import type { CreatorVideo } from "../../lib/streamCreator";
 import StreamSkeleton from "./StreamSkeleton";
@@ -85,7 +86,7 @@ const StreamPublicChannel = () => {
           {data.channel.avatarUrl ? <img src={data.channel.avatarUrl} alt="" /> : initials}
         </div>
         <div>
-          <h1>{data.channel.name}</h1>
+          <h1>{data.channel.name}<SmajVerifiedBadge userId={data.creatorId} /></h1>
           <p>
             @{data.channel.handle}
             {followState === "error" ? "  -  Subscription could not update" : ""}
@@ -114,7 +115,7 @@ const StreamPublicChannel = () => {
             {data.posts.map(post => (
               <article key={post._id}>
                 <header>
-                  <strong>{data.channel.name}</strong>
+                  <strong>{data.channel.name}<SmajVerifiedBadge userId={data.creatorId} /></strong>
                   <small>{post.createdAt ? new Date(post.createdAt).toLocaleString() : ""}</small>
                 </header>
                 <p>{post.body}</p>

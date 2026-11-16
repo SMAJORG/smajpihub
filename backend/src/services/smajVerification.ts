@@ -29,6 +29,9 @@ export function smajVerification(user: any, now = Date.now()) {
     userId: user?._id?.toString() || null,
     status,
     verified: Boolean(user?._id && status === "approved"),
+    level: status === "approved" && user?._id
+      ? user.verificationLevel === "trusted_seller" ? "trusted_seller" : user.verificationLevel === "seller_verified" ? "seller_verified" : "pi_verified"
+      : null,
     expiresAt: expiration !== null && Number.isFinite(expiration) ? new Date(expiration).toISOString() : null,
     revision: record?.revision || 0,
   };

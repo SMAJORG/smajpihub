@@ -1,3 +1,4 @@
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import StreamVideoActions from "./StreamVideoActions";
 import StreamSkeleton from "./StreamSkeleton";
 import { useEffect, useState } from "react";
@@ -105,7 +106,7 @@ const StreamCreatorsDirectory = () => {
               </Link>
               <div className="sw-creator-card-body">
                 <Link to={`/app/services/stream/channel/${creator.channel.handle}`}>
-                  <h2>{creator.channel.name}</h2>
+                  <h2>{creator.channel.name}<SmajVerifiedBadge userId={creator.creatorId} /></h2>
                   <p>@{creator.channel.handle}</p>
                 </Link>
                 {creator.isOwner ? <Link className="sw-creator-manage" to="/app/services/stream/studio/content">Manage</Link> : <button type="button" className={following.has(creator.channel.handle) ? "following" : ""} disabled={savingFollow === creator.channel.handle} onClick={() => void toggleFollow(creator)}>{savingFollow === creator.channel.handle ? "Saving…" : following.has(creator.channel.handle) ? "Following" : "+ Follow"}</button>}

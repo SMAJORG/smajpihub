@@ -12,6 +12,10 @@ test('identity approval is independent of Pi authentication, roles and service a
   assert.equal(smajVerification(user).verified, false);
   assert.equal(smajVerification({ ...user, role: 'admin', verificationStatus: 'approved', verificationLevel: 'trusted_seller' }).verified, false);
   assert.equal(smajVerification({ ...user, verificationStatus: 'approved', verificationLevel: 'pi_verified' }).verified, true);
+  for (const level of ['pi_verified', 'seller_verified', 'trusted_seller']) {
+    assert.equal(smajVerification({ ...user, verificationLevel: level, smajVerification: { status: 'approved' } }).level, level);
+    assert.equal(smajVerification({ ...user, verificationLevel: level, smajVerification: { status: 'revoked' } }).level, null);
+  }
   for (const status of ['pending', 'rejected', 'suspended', 'revoked', 'expired', 'none']) {
     assert.equal(smajVerification({ ...user, verificationStatus: 'approved', verificationLevel: 'pi_verified', smajVerification: { status } }).verified, false);
   }
@@ -55,6 +59,9 @@ test('only admins review identities; approval, suspension, expiration and revoca
     assert.equal((await patch({ smajVerificationStatus: 'approved', verificationExpiresAt: 'bad-date' })).status, 400);
     assert.equal((await patch({ smajVerificationStatus: 'approved', expectedVerificationRevision: 0 })).status, 200);
     assert.equal((await status()).verified, true);
+    assert.equal((await status()).level, 'seller_verified');
+    assert.equal((await patch({ verificationLevel: 'trusted_seller' })).status, 200);
+    assert.equal((await status()).level, 'trusted_seller');
     assert.equal((await patch({ smajVerificationStatus: 'revoked', expectedVerificationRevision: 0 })).status, 409);
     assert.equal((await patch({ smajVerificationStatus: 'suspended' })).status, 200);
     assert.equal((await status()).verified, false);

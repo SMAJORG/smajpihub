@@ -899,6 +899,7 @@ const mountStreamEndpoints = (router: Router) => {
     const followers = await req.app.locals.userCollection.countDocuments({ "streamSubscriptions.handle": handle });
     return res.json({
       isOwner,
+      creatorId,
       channel: {
         name: profile.channelName || creator.displayName || creator.username || "SMAJ Creator",
         handle,

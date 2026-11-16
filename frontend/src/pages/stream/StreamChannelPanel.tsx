@@ -1,3 +1,5 @@
+import { useAuthContext } from "../../contexts/AuthContext";
+import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import StreamSkeleton from "./StreamSkeleton";
 import CameraAltOutlinedIcon from "@mui/icons-material/CameraAltOutlined";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
@@ -62,6 +64,7 @@ const cropImage = (crop: CropState) => new Promise<string>((resolve, reject) => 
 });
 
 const StreamChannelPanel = () => {
+  const { user } = useAuthContext();
   const [profile, setProfile] = useState<StreamProfile | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "saving" | "error">("loading");
   const [message, setMessage] = useState("");
@@ -239,7 +242,7 @@ const StreamChannelPanel = () => {
         {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : initials}
         <span><CameraAltOutlinedIcon /></span>
       </button>
-      <div><h2>{profile.channelName || "My channel"}</h2><p>@{profile.channelHandle || "channel"}</p></div>
+      <div><h2>{profile.channelName || "My channel"}<SmajVerifiedBadge userId={user?.uid} /></h2><p>@{profile.channelHandle || "channel"}</p></div>
     </div>
     <div className="sw-channel-fields">
       <label>Channel name<input required minLength={2} maxLength={80} value={profile.channelName} onChange={event => change("channelName", event.target.value)} /></label>

@@ -6,8 +6,11 @@
   width: 1.1em;
   height: 1.1em;
   margin-inline-start: .3em;
-  color: var(--primary);
+  --badge-color: var(--verified-pi);
+  color: var(--badge-color);
   line-height: 1;
 }
 .smaj-verified-badge > svg { display: block; width: 100%; height: 100%; }
-.smaj-verified-badge > svg > path { fill: var(--primary); }
+.smaj-verified-badge.seller_verified { --badge-color: var(--verified-seller); }
+.smaj-verified-badge.trusted_seller { --badge-color: var(--verified-trusted); }
+.smaj-verified-badge > svg > path { fill: var(--badge-color); }

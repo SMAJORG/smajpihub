@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { axiosClient } from "./axiosClient";
 
-export type SmajVerification = { userId: string | null; status: "none" | "pending" | "approved" | "rejected" | "suspended" | "expired" | "revoked"; verified: boolean; expiresAt: string | null; revision: number };
+export type SmajVerification = { userId: string | null; status: "none" | "pending" | "approved" | "rejected" | "suspended" | "expired" | "revoked"; verified: boolean; level?: "pi_verified" | "seller_verified" | "trusted_seller" | null; expiresAt: string | null; revision: number };
 type Entry = { value: SmajVerification | null; listeners: Set<() => void>; expiry?: ReturnType<typeof setTimeout> };
 const entries = new Map<string, Entry>();
 let timer: ReturnType<typeof setInterval> | undefined;

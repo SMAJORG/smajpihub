@@ -29,6 +29,7 @@ export type PublicChannelPost = {
 };
 export type PublicStreamChannel = {
   isOwner?: boolean;
+  creatorId?: string;
   channel: { name: string; handle: string; description: string; avatarUrl: string; bannerUrl: string };
   posts: PublicChannelPost[];
   videos: PublicChannelVideo[];

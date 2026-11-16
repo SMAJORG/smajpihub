@@ -27,6 +27,9 @@ is computed on every read, so no scheduled job is required for correctness.
 
 `SmajVerifiedBadge` is the shared identity component. Its compatibility export
 `TrustBadge` accepts a user ID only; product snapshot fields cannot render it.
+The server-approved account level selects the indicator color: Pi Verified blue,
+Seller Verified purple, or Trusted Seller gold. Stream channels, creator cards,
+subscriptions and search results use the channel owner's MongoDB account ID.
 Visible identities share batched requests, refresh every 15 seconds and on resume,
 and invalidate immediately after an administrator update in the same browser.
 Local expiry timers remove expired badges without waiting for polling. Failed
