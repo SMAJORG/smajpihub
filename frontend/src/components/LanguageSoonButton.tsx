@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { languages, normalizeLanguage, persistLanguage, profileLanguageCode } from '../localization/languages';
 import { useAuthContext } from '../contexts/AuthContext';
+import { getTutorialRevision, isTutorialActive, subscribeTutorialState, tutorialStorageKey } from '../content/tutorials';
 
 const LanguageSoonButton = ({ dashboardPrompt = false }: { dashboardPrompt?: boolean }) => {
   const { i18n } = useTranslation();
   const { user, updateLanguage } = useAuthContext();
+  const tutorialRevision = useSyncExternalStore(subscribeTutorialState, getTutorialRevision);
+  const userKey = user?.uid || user?.piUsername || user?.username;
+  const tutorialComplete = localStorage.getItem(tutorialStorageKey(userKey, 'main-tour')) === 'true'
+    || localStorage.getItem(userKey ? `smaj_welcome_seen:${userKey}` : 'smaj_welcome_seen') === 'true';
+  const tutorialBlocked = isTutorialActive() || (dashboardPrompt && !tutorialComplete);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(normalizeLanguage(i18n.resolvedLanguage || 'en'));
   const [busy, setBusy] = useState(false);
@@ -16,10 +22,10 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: { dashboardPrompt?: boo
   useEffect(() => {
     setDraft(profileLanguageCode(user?.language || user?.settings?.language || i18n.resolvedLanguage || 'en'));
     setError('');
-    if (dashboardPrompt) setOpen(Boolean(user?.uid && !user.languagePreferenceSaved));
-  }, [user?.uid, user?.languagePreferenceSaved, user?.language, user?.settings?.language, dashboardPrompt, i18n]);
+    if (dashboardPrompt) setOpen(Boolean(user?.uid && !user.languagePreferenceSaved && !tutorialBlocked));
+  }, [user?.uid, user?.languagePreferenceSaved, user?.language, user?.settings?.language, dashboardPrompt, i18n, tutorialBlocked, tutorialRevision]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || tutorialBlocked) return;
     select.current?.focus();
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') close();
@@ -34,7 +40,7 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: { dashboardPrompt?: boo
     };
     document.addEventListener('keydown', escape);
     return () => document.removeEventListener('keydown', escape);
-  }, [open, busy]);
+  }, [open, busy, tutorialBlocked]);
   const save = async () => {
     if (busy) return;
     setBusy(true); setError('');
@@ -50,7 +56,7 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: { dashboardPrompt?: boo
   if (dashboardPrompt && (!user?.uid || user.languagePreferenceSaved)) return null;
   return <>
     <button ref={trigger} type="button" className="language-soon-button" aria-label="Choose language" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><span aria-hidden="true">文</span><span aria-hidden="true">A</span></button>
-    {open ? <div className="language-choice-backdrop" role="presentation" onClick={close}>
+    {open && !tutorialBlocked ? <div className="language-choice-backdrop" role="presentation" onClick={close}>
       <section className="language-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="language-choice-title" aria-busy={busy} onClick={event => event.stopPropagation()}>
         <button type="button" className="language-choice-close" aria-label="Close" disabled={busy} onClick={close}>×</button>
         <h2 id="language-choice-title">Pick language</h2>

@@ -9,7 +9,7 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
-import { TUTORIAL_OPEN_EVENT, tutorialById, tutorialStorageKey, type TutorialDefinition } from "../content/tutorials";
+import { TUTORIAL_OPEN_EVENT, tutorialById, tutorialStorageKey, publishTutorialState, type TutorialDefinition } from "../content/tutorials";
 
 const WELCOME_STORAGE_KEY="smaj_welcome_seen";
 const WELCOME_REPLAY_EVENT="smaj:welcome-tour-open";
@@ -28,7 +28,8 @@ const WelcomeTour=()=>{
  const start=useCallback((id:string)=>{const found=tutorialById(id);if(!found)return;sessionStorage.setItem(ACTIVE_TOUR_KEY,JSON.stringify({id,index:0}));setTutorial(found);setIndex(0);if(location.pathname!==found.steps[0].route)navigate(found.steps[0].route);},[location.pathname,navigate]);
  useEffect(()=>{try{const saved=JSON.parse(sessionStorage.getItem(ACTIVE_TOUR_KEY)||"null") as {id?:string;index?:number}|null;const found=saved?.id?tutorialById(saved.id):undefined;if(found){setTutorial(found);setIndex(Math.min(saved?.index||0,found.steps.length-1));}}catch{sessionStorage.removeItem(ACTIVE_TOUR_KEY)}},[]);
  useEffect(()=>{const replay=()=>start("main-tour");const open=(e:Event)=>start((e as CustomEvent<{id?:string}>).detail?.id||"main-tour");window.addEventListener(WELCOME_REPLAY_EVENT,replay);window.addEventListener(TUTORIAL_OPEN_EVENT,open);return()=>{window.removeEventListener(WELCOME_REPLAY_EVENT,replay);window.removeEventListener(TUTORIAL_OPEN_EVENT,open)}},[start]);
- useEffect(()=>{if(!isAuthenticated||isLoading||!user)return;if(localStorage.getItem(oldKey)==="true"||localStorage.getItem(tutorialStorageKey(userKey,"main-tour"))==="true")return;const timer=setTimeout(()=>start("main-tour"),650);return()=>clearTimeout(timer)},[isAuthenticated,isLoading,oldKey,start,user,userKey]);
+ useLayoutEffect(()=>{publishTutorialState(Boolean(tutorial));return()=>publishTutorialState(false)},[tutorial]);
+ useEffect(()=>{if(!isAuthenticated||isLoading||!user||tutorial)return;if(localStorage.getItem(oldKey)==="true"||localStorage.getItem(tutorialStorageKey(userKey,"main-tour"))==="true")return;const timer=setTimeout(()=>start("main-tour"),650);return()=>clearTimeout(timer)},[isAuthenticated,isLoading,oldKey,start,user,userKey,tutorial]);
  useEffect(()=>{if(!step)return;if(location.pathname!==step.route)navigate(step.route);},[location.pathname,navigate,step]);
  const measure=useCallback(()=>{if(!step?.target){setBox(null);return}const element=visibleTarget(step.target);if(!element){setBox(null);return}const r=element.getBoundingClientRect(),pad=7;setBox({top:Math.max(6,r.top-pad),left:Math.max(6,r.left-pad),width:Math.min(innerWidth-12,r.width+pad*2),height:Math.min(innerHeight-12,r.height+pad*2),right:Math.min(innerWidth-6,r.right+pad),bottom:Math.min(innerHeight-6,r.bottom+pad)});},[step]);
  useEffect(()=>{if(!tutorial)return;setCard(c=>({...c,ready:false}));const timer=setTimeout(measure,180);addEventListener("resize",measure);addEventListener("orientationchange",measure);addEventListener("scroll",measure,true);return()=>{clearTimeout(timer);removeEventListener("resize",measure);removeEventListener("orientationchange",measure);removeEventListener("scroll",measure,true)}},[index,measure,tutorial,location.pathname]);

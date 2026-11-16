@@ -25,3 +25,19 @@ export const tutorials:TutorialDefinition[]=[
 export const TUTORIAL_OPEN_EVENT="smaj:tutorial-open";
 export const tutorialById=(id:string)=>tutorials.find(t=>t.id===id);
 export const tutorialStorageKey=(userId:string|undefined,id:string)=>`smaj_tutorial:${userId||"guest"}:${id}`;
+
+// Shared modal ownership keeps dashboard onboarding sequential, including replays.
+let tutorialActive = false;
+let tutorialRevision = 0;
+const tutorialListeners = new Set<() => void>();
+export const subscribeTutorialState = (listener: () => void) => {
+  tutorialListeners.add(listener);
+  return () => { tutorialListeners.delete(listener); };
+};
+export const getTutorialRevision = () => tutorialRevision;
+export const isTutorialActive = () => tutorialActive;
+export const publishTutorialState = (active: boolean) => {
+  tutorialActive = active;
+  tutorialRevision += 1;
+  tutorialListeners.forEach(listener => listener());
+};
