@@ -45,7 +45,7 @@ test('shared identity badges and Stream channels follow admin-selected colors on
       await page.getByRole('menuitem', { name: 'Manage verification' }).click();
       const dialog = page.getByRole('dialog');
       for (const [level, color] of [['pi_verified', 'rgb(29, 155, 240)'], ['seller_verified', 'rgb(124, 58, 237)'], ['trusted_seller', 'rgb(245, 158, 11)']]) {
-        await dialog.getByLabel('Verification level', { exact: true }).selectOption(level);
+        await dialog.getByLabel('Verification level').selectOption(level);
         await dialog.getByRole('button', { name: 'Save changes' }).click();
         await page.waitForFunction(color => [...document.querySelectorAll('.smaj-verified-badge path')].length === 7 && [...document.querySelectorAll('.smaj-verified-badge path')].every(element => getComputedStyle(element).fill === color), color);
       }
