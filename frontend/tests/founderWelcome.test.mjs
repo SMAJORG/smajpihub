@@ -39,21 +39,39 @@ CONNECT • EMPOWER • GROW
 — Founder & CEO, SMAJ PI HUB`,
 };
 
-test("only recognizes the versioned automatic welcome sent by the conversation participant", () => {
+test("recognizes the versioned automatic welcome for both sender and recipient", () => {
   assert.equal(isFounderWelcomeMessage({ participantId: "founder-uid" }, welcome, "recipient"), true);
+  assert.equal(isFounderWelcomeMessage({ participantId: "recipient" }, welcome, "founder-uid"), true);
   assert.equal(isFounderWelcomeMessage({ participantId: "someone-else" }, welcome, "recipient"), false);
   assert.equal(isFounderWelcomeMessage({ participantId: "founder-uid" }, { ...welcome, welcomeVersion: undefined }, "recipient"), false);
-  assert.equal(isFounderWelcomeMessage({ participantId: "founder-uid" }, { ...welcome, senderId: "recipient" }, "recipient"), false);
+  assert.equal(isFounderWelcomeMessage({ participantId: "founder-uid" }, { ...welcome, senderId: "outsider" }, "recipient"), false);
 });
 
 test("formats section headings, service lists, paragraphs, and links on separate lines", () => {
   const formatted = formatFounderWelcomeMessage(welcome.message);
   assert.match(formatted, /Our Live Services\n\n• SMAJ Store — Buy and sell\.\n• SMAJ Jobs — Find work and hire\.\n• SMAJ Stream — Watch and explore\./u);
   assert.match(formatted, /Coming Soon:\n• SMAJ Education\./u);
-  assert.match(formatted, /Stay Connected\n\nFollow our official SMAJ PI HUB social media channels:/u);
+  assert.match(formatted, /Stay Connected\n\nFollow SMAJ PI HUB on:/u);
   assert.match(formatted, /https:\/\/smajpihub\.com\/terms,\nhttps:\/\/smajpihub\.com\/privacy,\nand https:\/\/smajpihub\.com\/seller-agreement/u);
   assert.match(formatted, /Telegram:\nhttps:\/\/t\.me\/smajpihub\nX:\nhttps:\/\/x\.com\/smajpihub/u);
-  assert.match(formatted, /A Message from the Founder & CEO/u);
+  assert.match(formatted, /Message from the SMAJ PI HUB Team/u);
+  assert.match(formatted, /— SMAJ PI HUB Team/u);
+  assert.doesNotMatch(formatted, /Founder & CEO/u);
+});
+
+test("normalizes a legacy single-paragraph welcome without losing links or section spacing", () => {
+  const legacy = welcome.message.replace(/\n+/gu, " ");
+  const formatted = formatFounderWelcomeMessage(legacy);
+  assert.match(formatted, /Our Live Services\n\n/u);
+  assert.match(formatted, /Stay Connected\n\nFollow SMAJ PI HUB on:/u);
+  assert.match(formatted, /Message from the SMAJ PI HUB Team\n\n/u);
+  assert.match(formatted, /https:\/\/smajpihub\.com\/terms/u);
+  assert.match(formatted, /https:\/\/smajpihub\.com\/privacy/u);
+  assert.match(formatted, /https:\/\/smajpihub\.com\/seller-agreement/u);
+  assert.match(formatted, /https:\/\/t\.me\/smajpihub/u);
+  assert.match(formatted, /https:\/\/x\.com\/smajpihub/u);
+  assert.match(formatted, /https:\/\/x\.com\/Devsmaj/u);
+  assert.doesNotMatch(formatted, /Founder & CEO|honest feedback|Follow me on X/u);
 });
 
 test("translates prose using the selected language while retaining section and URL lines", async () => {
@@ -101,4 +119,14 @@ test("rejects incomplete translations so the component can display the full Engl
     translateFounderWelcomeMessage(welcome.message, "zh", async lines => lines.map((line, index) => index ? line : `ZH:${line}`)),
     /welcome_translation_invalid_response/u,
   );
+});
+
+test("unversioned ordinary messages are not treated as automatic welcomes", () => {
+  assert.equal(isFounderWelcomeMessage({participantId:"founder-uid"},{senderId:"founder-uid",message:"An ordinary reply"},"recipient"),false);
+});
+test("legacy heading without A is replaced and retains readable sections",()=>{
+ const formatted=formatFounderWelcomeMessage(welcome.message.replace("A Message from the Founder & CEO","Message from the Founder & CEO").replace(/\n+/gu," "));
+ assert.match(formatted,/Message from the SMAJ PI HUB Team\n\n/u);
+ assert.doesNotMatch(formatted,/Founder & CEO/u);
+ assert.match(formatted,/Complete your profile and review:/u);
 });

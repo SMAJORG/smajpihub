@@ -128,6 +128,12 @@ test('one welcome under concurrent delivery appears in both normal inboxes and s
   assert.equal(h.notifications.length,1);
   const message=h.locals.messageCollection.items[0], id=message.conversationId;
   assert.equal(message.senderId,'bob'); assert.equal(h.recipient.welcomeMessagePending,false);
+  assert.match(message.message,/Message from the SMAJ PI HUB Team/u);
+  assert.match(message.message,/— SMAJ PI HUB Team/u);
+  assert.doesNotMatch(message.message,/Founder & CEO/u);
+  assert.match(message.message,/https:\/\/smajpihub\.com\/terms/u);
+  assert.match(message.message,/https:\/\/smajpihub\.com\/privacy/u);
+  assert.match(message.message,/https:\/\/smajpihub\.com\/seller-agreement/u);
   assert.deepEqual(Array.from(message.message.matchAll(/\p{Extended_Pictographic}/gu),m=>m[0]),['🎉']);
   for(const uid of ['alice','bob']){
     const inbox=await h.call('get','/',{uid});

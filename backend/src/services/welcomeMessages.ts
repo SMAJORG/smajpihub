@@ -8,9 +8,9 @@ export const welcomeLinks = [
 ];
 export const welcomeMessage = `🎉 Welcome to SMAJ PI HUB!
 
-Welcome to our real-world utility and GCV community-focused platform.
+A real-world utility and GCV community-focused platform.
 
-Please complete your profile and read our ${welcomeLinks[0].href}, ${welcomeLinks[1].href}, and ${welcomeLinks[2].href} before using our services.
+Complete your profile and review: ${welcomeLinks[0].href}, ${welcomeLinks[1].href}, and ${welcomeLinks[2].href}.
 
 Our Live Services
 
@@ -22,21 +22,21 @@ Coming Soon: SMAJ Education.
 
 Stay Connected
 
-Follow our official SMAJ PI HUB social media channels:
+Follow SMAJ PI HUB on:
 
 Telegram: https://t.me/smajpihub
 
 X: https://x.com/smajpihub
 
-A Message from the Founder & CEO
+Message from the SMAJ PI HUB Team
 
-Your honest feedback matters. Please share your suggestions and message me directly here on SMAJ PI HUB.
+We welcome your feedback. Message the SMAJ PI HUB Team here on SMAJ PI HUB.
 
-Follow me on X: https://x.com/Devsmaj
+Follow SMAJ PI HUB on X: https://x.com/Devsmaj
 
 CONNECT • EMPOWER • GROW
 
-— Founder & CEO, SMAJ PI HUB`;
+— SMAJ PI HUB Team`;
 
 // Only registration creates this durable pending flag. Existing accounts are
 // never backfilled, and client-supplied sender identities are never accepted.
