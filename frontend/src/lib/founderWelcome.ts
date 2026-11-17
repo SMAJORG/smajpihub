@@ -1,26 +1,24 @@
 type WelcomeConversation = {
   participantId?: string;
-  participantName?: string;
-  participantUsername?: string;
 };
 
-  type WelcomeMessage = {
-    senderId: string;
-    welcomeAccountId?: string;
-    welcomeVersion?: number;
-    message: string;
-  };
+type WelcomeMessage = {
+  senderId: string;
+  welcomeAccountId?: string;
+  welcomeVersion?: number;
+  message: string;
+};
 
-  const standaloneUrl = /^https?:\/\/\S+$/iu;
-  const sectionHeadingLine = /^(?:(?:our\s+)?live\s+services?|current\s+services?|available\s+services?|upcoming\s+services?|coming\s+soon|(?:official\s+)?social(?:\s+media)?\s+links?|stay\s+connected|(?:a\s+message\s+from\s+the\s+)?(?:founder\s*(?:&|and)\s*CEO|CEO)(?:\s+message|\s+note)?|现有服务|目前服务|即将推出的服务|官方社交链接|الخدمات الحالية|الخدمات القادمة|الخدمات المتاحة|روابط التواصل الرسمية|servicios disponibles|próximos servicios|serviços disponíveis|próximos serviços|services disponibles|services à venir|huduma zinazopatikana|huduma zijazo|उपलब्ध सेवाएँ|आगामी सेवाएँ|mevcut hizmetler|yaklaşan hizmetler)\s*[:：]?$/iu;
-  const sectionType = (line: string) => {
-    if (/\b(?:our\s+)?live\s+services?\b|\bcoming\s+soon\b|\bupcoming\s+services?\b|现有服务|目前服务|即将推出的服务|الخدمات الحالية|الخدمات القادمة|الخدمات المتاحة|servicios disponibles|serviços disponíveis|services disponibles|services à venir|huduma zinazopatikana|huduma zijazo|उपलब्ध सेवाएँ|आगामी सेवाएँ|mevcut hizmetler|yaklaşan hizmetler/iu.test(line)) return "services";
-    if (/\b(?:social(?:\s+media)?\s+links?|stay\s+connected)\b|官方社交链接|روابط التواصل الرسمية/iu.test(line)) return "other";
-    if (/\b(?:founder\s*(?:&|and)\s*CEO|CEO)\b/iu.test(line)) return "other";
-    return "";
-  };
-  export const isFounderWelcomeSectionHeading = (line: string) =>
-    sectionHeadingLine.test(line.trim());
+const standaloneUrl = /^https?:\/\/\S+$/iu;
+const sectionHeadingLine = /^(?:(?:our\s+)?live\s+services?|current\s+services?|available\s+services?|upcoming\s+services?|coming\s+soon|(?:official\s+)?social(?:\s+media)?\s+links?|stay\s+connected|(?:a\s+message\s+from\s+the\s+)?(?:founder\s*(?:&|and)\s*CEO|CEO)(?:\s+message|\s+note)?|现有服务|目前服务|即将推出的服务|官方社交链接|الخدمات الحالية|الخدمات القادمة|الخدمات المتاحة|روابط التواصل الرسمية|servicios disponibles|próximos servicios|serviços disponíveis|próximos serviços|services disponibles|services à venir|huduma zinazopatikana|huduma zijazo|उपलब्ध सेवाएँ|आगामी सेवाएँ|mevcut hizmetler|yaklaşan hizmetler)\s*[:：]?$/iu;
+const sectionType = (line: string) => {
+  if (/\b(?:our\s+)?live\s+services?\b|\bcoming\s+soon\b|\bupcoming\s+services?\b|现有服务|目前服务|即将推出的服务|الخدمات الحالية|الخدمات القادمة|الخدمات المتاحة|servicios disponibles|serviços disponíveis|services disponibles|services à venir|huduma zinazopatikana|huduma zijazo|उपलब्ध सेवाएँ|आगामी सेवाएँ|mevcut hizmetler|yaklaşan hizmetler/iu.test(line)) return "services";
+  if (/\b(?:social(?:\s+media)?\s+links?|stay\s+connected)\b|官方社交链接|روابط التواصل الرسمية/iu.test(line)) return "other";
+  if (/\b(?:founder\s*(?:&|and)\s*CEO|CEO)\b/iu.test(line)) return "other";
+  return "";
+};
+export const isFounderWelcomeSectionHeading = (line: string) =>
+  sectionHeadingLine.test(line.trim());
 
 export function isFounderWelcomeMessage(
   conversation: WelcomeConversation,
@@ -88,7 +86,8 @@ export async function translateFounderWelcomeMessage(
   });
   if (!textLines.length) return lines.join("\n");
   const translated = await translateLines(textLines, target);
-  if (translated.length !== textLines.length || translated.some((line) => typeof line !== "string" || !line.trim())) {
+  if (translated.length !== textLines.length || translated.some((line, index) =>
+    typeof line !== "string" || !line.trim() || line.trim() === textLines[index].trim())) {
     throw new Error("welcome_translation_invalid_response");
   }
   textIndexes.forEach((index, translatedIndex) => { lines[index] = translated[translatedIndex]; });

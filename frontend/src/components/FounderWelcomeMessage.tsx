@@ -7,14 +7,7 @@ import { formatFounderWelcomeMessage, isFounderWelcomeSectionHeading, translateF
 
 type WelcomeLink = { href: string; label: string };
 const emptyLinks: WelcomeLink[] = [];
-type TranslationState =
-  | { source: string; target: string; value: string; links: WelcomeLink[] }
-  | { source: string; target: string; error: true };
-
-const containsNonLatinLetters = (text: string) =>
-  [...text].some((character) => /\p{L}/u.test(character) && !/[a-z]/i.test(character));
-const hasNonEnglishLanguageSignal = (text: string) =>
-  containsNonLatinLetters(text) || /\b(?:bienvenue|bienvenido|bem-vind[oa]|karibu|barka da zuwa|ayyuka|huduma|hoş ?geld|servicios|serviços|services disponibles|services à venir)\b/iu.test(text);
+type TranslationState = { source: string; target: string; value: string; links: WelcomeLink[] };
 
 async function translateLines(lines: string[], target: string, signal: AbortSignal): Promise<string[]> {
   const translations: string[] = [];
@@ -23,12 +16,15 @@ async function translateLines(lines: string[], target: string, signal: AbortSign
     const response = await apiFetch("/translations/batch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texts: batch, source: "auto", target }),
+      body: JSON.stringify({ texts: batch, source: "auto", target, allowUnchanged: true }),
       signal,
     });
     const data = await response.json();
     if (!response.ok || data.status !== "translated" || !Array.isArray(data.translations) || data.translations.length !== batch.length || data.translations.some((value: unknown) => typeof value !== "string" || !value.trim())) {
       throw new Error("welcome_translation_unavailable");
+    }
+    if (data.translations.some((value: string, index: number) => value.trim() === batch[index].trim())) {
+      throw new Error("welcome_translation_incomplete");
     }
     translations.push(...data.translations);
   }
@@ -40,46 +36,46 @@ export default function FounderWelcomeMessage({ text, links = emptyLinks }: { te
   const target = normalizeLanguage(i18n.resolvedLanguage || "en");
   const [result, setResult] = useState<TranslationState>();
   const request = useRef<AbortController | null>(null);
+  const original = useMemo(() => formatFounderWelcomeMessage(text), [text]);
   const sourceHeadingIndexes = useMemo(() => new Set(
     formatFounderWelcomeMessage(text).split("\n").filter(Boolean)
       .flatMap((line, index) => isFounderWelcomeSectionHeading(line) ? [index] : []),
   ), [text]);
   const translated = result?.source === text && result.target === target && "value" in result ? result.value : undefined;
   const displayLinks = result?.source === text && result.target === target && "links" in result ? result.links : links;
-  const failed = result?.source === text && result.target === target && "error" in result;
+  const display = translated ?? original;
+  const translating = target !== "en" && translated === undefined;
 
   useEffect(() => {
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
     setResult(undefined);
-    if (target === "en" && !hasNonEnglishLanguageSignal(text)) {
-      setResult({ source: text, target, value: formatFounderWelcomeMessage(text), links });
+    if (target === "en") {
+      setResult({ source: text, target, value: original, links });
       return () => controller.abort();
     }
+    let cancelled = false;
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     void translateFounderWelcomeMessage(text, target, (lines, language) => translateLines(lines, language, controller.signal))
       .then(async (value) => {
-        const translatedLabels = target === "en" || !links.length
+        const translatedLabels = !links.length
           ? links
           : (await translateLines(links.map((link) => link.label), target, controller.signal))
             .map((label, index) => ({ ...links[index], label }));
         if (!controller.signal.aborted) setResult({ source: text, target, value, links: translatedLabels });
       })
-      .catch(() => { if (!controller.signal.aborted) setResult({ source: text, target, error: true }); });
-    return () => controller.abort();
-  }, [text, target, links]);
+      .catch(() => {
+        if (!cancelled) setResult({ source: text, target, value: original, links });
+      })
+      .finally(() => window.clearTimeout(timeout));
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(timeout); };
+  }, [text, target, links, original]);
 
-  const display = translated ?? (failed ? "" : undefined);
-  const failureText = i18n.t("Welcome message cannot be displayed in your selected language right now.", {
-    ns: "ui", keySeparator: false, nsSeparator: false,
-    defaultValue: "Welcome message cannot be displayed in your selected language right now.",
-  });
   let visibleLineIndex = 0;
 
-  return <div className="founder-welcome-message" aria-busy={display === undefined} aria-live="polite">
-    {failed ? <p role="alert">{failureText}</p> : display === undefined ? <span className="founder-welcome-loading" aria-label={i18n.t("Translating welcome message...", {
-      ns: "ui", keySeparator: false, nsSeparator: false, defaultValue: "Translating welcome message...",
-    })} /> : display.split(/\n{2,}/u).map((paragraph, paragraphIndex) => (
+  return <div className="founder-welcome-message" aria-busy={translating} aria-live="polite">
+    {display.split(/\n{2,}/u).map((paragraph, paragraphIndex) => (
       <p key={paragraphIndex}>{paragraph.split("\n").map((line, lineIndex) => {
         const heading = isFounderWelcomeSectionHeading(line) || sourceHeadingIndexes.has(visibleLineIndex);
         visibleLineIndex += 1;

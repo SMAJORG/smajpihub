@@ -80,3 +80,25 @@ test("translates mixed-language prose into the selected language", async () => {
   assert.ok(result.includes("ZH:欢迎来到 SMAJ PI HUB"));
   assert.ok(result.includes("ZH:欢迎来到 SMAJ PI HUB。Live services: SMAJ STORE."));
 });
+
+test("translates the complete message in every supported application language", async () => {
+  const languages = ["en", "fr", "ar", "ha", "es", "pt", "zh", "sw", "hi", "tr"];
+  for (const target of languages) {
+    if (target === "en") continue;
+    const result = await translateFounderWelcomeMessage(welcome.message, target, async (lines, language) => {
+      assert.equal(language, target);
+      return lines.map(line => `${target.toUpperCase()}:${line}`);
+    });
+    assert.ok(result.includes(`${target.toUpperCase()}:🎉 Welcome to SMAJ PI HUB!`));
+    assert.ok(result.includes("https://smajpihub.com/terms"));
+    assert.ok(result.includes("https://t.me/smajpihub"));
+    assert.ok(result.includes("https://x.com/Devsmaj"));
+  }
+});
+
+test("rejects incomplete translations so the component can display the full English original", async () => {
+  await assert.rejects(
+    translateFounderWelcomeMessage(welcome.message, "zh", async lines => lines.map((line, index) => index ? line : `ZH:${line}`)),
+    /welcome_translation_invalid_response/u,
+  );
+});

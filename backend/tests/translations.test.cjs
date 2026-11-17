@@ -50,6 +50,18 @@ test('missing, truncated, blank and unchanged output never report success or cac
     assert.equal(res.body.status, 'unavailable'); assert.ok(res.statusCode >= 400); assert.equal(calls.length, 2); assert.equal(res.body.translations, undefined);
   }
 });
+test('welcome callers may inspect unchanged batch items without changing the default contract', async () => {
+  const { invoke, calls } = fixture({ post: async (_url, body) => ({
+    data: { translatedText: body.q.map(text => text === 'Founder' ? text : 'Traduit') },
+  }) });
+  const unchanged = await invoke({ ...request, texts: ['Hello', 'Founder'], allowUnchanged: true });
+  assert.equal(unchanged.body.status, 'translated');
+  assert.deepEqual(Array.from(unchanged.body.translations), ['Traduit', 'Founder']);
+  const defaultBehavior = await invoke({ ...request, texts: ['Hello', 'Founder'] });
+  assert.equal(defaultBehavior.statusCode, 422);
+  assert.equal(defaultBehavior.body.code, 'translation_unchanged');
+  assert.equal(calls.length, 2);
+});
 test('unsupported source/target pairs are rejected before provider translation', async () => {
   const { invoke, calls } = fixture();
   assert.equal((await invoke({ ...request, target: 'ha' })).body.code, 'translation_unsupported_pair');
@@ -57,7 +69,7 @@ test('unsupported source/target pairs are rejected before provider translation',
   assert.equal(calls.length, 0);
 });
 test('input validation preserves strings and rejects invalid types and oversized batches', async () => {
-  for (const body of [{ ...request, texts: [1] }, { ...request, texts: [' '] }, { ...request, texts: ['a'.repeat(1001)] }, { ...request, texts: Array(21).fill('Hi') }, { ...request, target: 'de' }, { ...request, source: 'fr' }]) {
+  for (const body of [{ ...request, texts: [1] }, { ...request, texts: [' '] }, { ...request, texts: ['a'.repeat(1001)] }, { ...request, texts: Array(21).fill('Hi') }, { ...request, target: 'de' }, { ...request, source: 'fr' }, { ...request, allowUnchanged: 'yes' }]) {
     const { invoke, calls } = fixture(); assert.equal((await invoke(body)).statusCode, 400); assert.equal(calls.length, 0);
   }
 });

@@ -84,14 +84,15 @@ export const mountTranslationEndpoints = (router: Router, configuration: Configu
     const texts: unknown = req.body?.texts;
     const target = typeof req.body?.target === 'string' ? req.body.target.toLowerCase() : '';
     const source = typeof req.body?.source === 'string' ? req.body.source.toLowerCase() : 'auto';
-    if (!LANGUAGES.has(target) || (source !== 'auto' && !LANGUAGES.has(source)) || source === target || !Array.isArray(texts) || !texts.length || texts.length > 20 || texts.some(text => typeof text !== 'string' || !text.trim() || text.length > 1000)) {
+    const allowUnchanged = req.body?.allowUnchanged === true;
+    if ((req.body?.allowUnchanged !== undefined && typeof req.body.allowUnchanged !== 'boolean') || !LANGUAGES.has(target) || (source !== 'auto' && !LANGUAGES.has(source)) || source === target || !Array.isArray(texts) || !texts.length || texts.length > 20 || texts.some(text => typeof text !== 'string' || !text.trim() || text.length > 1000)) {
       res.status(400).json({ status: 'unavailable', code: 'translation_invalid_request' }); return;
     }
     const input = texts as string[];
     let slot = false;
     try {
       const url = baseUrl(target);
-      const keyFor = (text: string) => createHash('sha256').update(JSON.stringify([url, source, target, text])).digest('hex');
+      const keyFor = (text: string) => createHash('sha256').update(JSON.stringify([url, source, target, allowUnchanged, text])).digest('hex');
       for (const [key, entry] of cache) if (entry.expires <= timestamp) cache.delete(key);
       const missing = [...new Set(input.filter(text => !cache.has(keyFor(text))))];
       if (missing.length) {
@@ -111,7 +112,7 @@ export const mountTranslationEndpoints = (router: Router, configuration: Configu
         const data = response.data;
         const results = Array.isArray(data?.translatedText) ? data.translatedText : Array.isArray(data) ? data.map(item => item?.translatedText) : missing.length === 1 ? [data?.translatedText] : [];
         if (results.length !== missing.length || results.some((text: unknown) => typeof text !== 'string' || !text.trim() || text.length > 10000)) throw new TranslationError(502, 'translation_invalid_response');
-        if (results.some((text: string, index: number) => text.trim() === missing[index].trim())) throw new TranslationError(422, 'translation_unchanged');
+        if (!allowUnchanged && results.some((text: string, index: number) => text.trim() === missing[index].trim())) throw new TranslationError(422, 'translation_unchanged');
         // Validate the whole batch before caching any result.
         missing.forEach((text, index) => {
           cache.set(keyFor(text), { text: results[index], expires: now() + 300000 });
