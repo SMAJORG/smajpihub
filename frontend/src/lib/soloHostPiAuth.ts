@@ -11,8 +11,10 @@ const randomState = () => {
 };
 
 export const completeSoloHostOAuthCallback = () => {
-  if (window.__ENV?.soloHost !== "true" || !window.location.hash) return false;
+  if (!window.opener || !window.location.hash) return false;
   const fragment = new URLSearchParams(window.location.hash.slice(1));
+  if (!fragment.has("state")) return false;
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
   const message: OAuthMessage = {
     source: "smaj-solohost-pi-oauth",
     accessToken: fragment.get("access_token") || undefined,
@@ -28,10 +30,10 @@ export const completeSoloHostOAuthCallback = () => {
 };
 
 export const authenticateWithSoloHostPi = async (): Promise<AuthResult> => {
-  const clientId = window.__ENV?.piOAuthClientId?.trim() || "";
-  const redirectUri = window.__ENV?.piOAuthRedirectUri?.trim() || "";
-  if (!clientId || !redirectUri) throw new Error("Pi Sign-In is not configured for this SoloHost installation.");
-  if (new URL(redirectUri).origin !== window.location.origin) throw new Error("The Pi OAuth redirect must use this SoloHost origin.");
+  const clientId = window.__ENV?.piOAuthClientId?.trim() || import.meta.env.VITE_PI_OAUTH_CLIENT_ID || "";
+  const redirectUri = window.__ENV?.piOAuthRedirectUri?.trim() || import.meta.env.VITE_PI_OAUTH_REDIRECT_URI || "";
+  if (!clientId || !redirectUri) throw new Error("Pi Sign-in requires the original app’s OAuth client ID and registered callback URL. Contact the administrator.");
+  if (new URL(redirectUri).origin !== window.location.origin) throw new Error("The Pi OAuth redirect must use this website origin.");
   const state = randomState();
   sessionStorage.setItem(STATE_KEY, state);
   const authorizeUrl = new URL("https://accounts.pinet.com/oauth/authorize");
@@ -45,6 +47,7 @@ export const authenticateWithSoloHostPi = async (): Promise<AuthResult> => {
 
   return new Promise<AuthResult>((resolve, reject) => {
     let finished = false;
+    let verifying = false;
     const finish = (error?: Error, result?: AuthResult) => {
       if (finished) return;
       finished = true;
@@ -57,9 +60,10 @@ export const authenticateWithSoloHostPi = async (): Promise<AuthResult> => {
     };
     const onMessage = async (event: MessageEvent<OAuthMessage>) => {
       if (event.origin !== window.location.origin || event.source !== popup || event.data?.source !== "smaj-solohost-pi-oauth") return;
-      if (event.data.error) return finish(new Error(event.data.error));
       if (!event.data.state || event.data.state !== sessionStorage.getItem(STATE_KEY)) return finish(new Error("Pi OAuth state validation failed."));
+      if (event.data.error) return finish(new Error(event.data.error));
       if (!event.data.accessToken) return finish(new Error("Pi did not return an access token."));
+      verifying = true;
       try {
         const response = await fetch("https://api.minepi.com/v2/me", { headers: { Authorization: `Bearer ${event.data.accessToken}` } });
         if (!response.ok) throw new Error("Pi could not verify this sign-in.");
@@ -71,7 +75,7 @@ export const authenticateWithSoloHostPi = async (): Promise<AuthResult> => {
       }
     };
     const timeout = window.setTimeout(() => finish(new Error("Pi Sign-In timed out.")), 120_000);
-    const poll = window.setInterval(() => { if (popup.closed) finish(new Error("Pi Sign-In was closed before completion.")); }, 500);
+    const poll = window.setInterval(() => { if (popup.closed && !verifying) finish(new Error("Pi Sign-In was closed before completion.")); }, 500);
     window.addEventListener("message", onMessage);
   });
 };

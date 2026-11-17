@@ -4,14 +4,12 @@ import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
 import QRCode from "qrcode";
-import { Capacitor } from "@capacitor/core";
 import { PI_BROWSER_HANDOFF_EVENT, type PiBrowserHandoffDetail } from "../lib/piBrowserHandoff";
 import logoImage from "/logo.png";
 
 const ANDROID_URL = "https://play.google.com/store/apps/details?id=pi.browser";
 const IOS_URL = "https://apps.apple.com/us/app/pi-browser/id1560911608";
 
-const AUTO_HANDOFF_DISMISSED_KEY = "smaj_pi_handoff_dismissed";
 const PiBrowserHandoff = () => {
   const [detail, setDetail] = useState<PiBrowserHandoffDetail | null>(null);
   const [qrCode, setQrCode] = useState("");
@@ -29,29 +27,7 @@ const PiBrowserHandoff = () => {
         : "",
     [detail, publicUrl]
   );
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) return;
-    const isMobileOrTablet = window.matchMedia("(max-width: 1023px)").matches;
-    const isPiBrowser = /PiBrowser|Pi Browser/i.test(navigator.userAgent || "");
-    const isMinePiSandbox =
-      window.location.hostname === "sandbox.minepi.com" || document.referrer.includes("sandbox.minepi.com");
-    const dismissed = window.sessionStorage.getItem(AUTO_HANDOFF_DISMISSED_KEY) === "true";
-    const isAndroid = /Android/i.test(navigator.userAgent || "");
-    const isDownloadPromptPage = ["/home", "/about", "/services", "/white-paper", "/how-it-works", "/onboarding", "/contact"].includes(window.location.pathname) || window.location.pathname.startsWith("/services/");
-    if (!isMobileOrTablet || isPiBrowser || isMinePiSandbox || dismissed || (isAndroid && isDownloadPromptPage)) return;
-
-    const timer = window.setTimeout(() => {
-      setDetail({
-        reason: "Open SMAJ PI HUB in Pi Browser",
-        path: `${window.location.pathname}${window.location.search}${window.location.hash}`,
-        automatic: true,
-      });
-    }, 500);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   const closeHandoff = useCallback(() => {
-    if (detail?.automatic) window.sessionStorage.setItem(AUTO_HANDOFF_DISMISSED_KEY, "true");
     setDetail(null);
   }, [detail?.automatic]);
 
@@ -61,7 +37,9 @@ const PiBrowserHandoff = () => {
       const isMinePiSandbox =
         window.location.hostname === "sandbox.minepi.com" || document.referrer.includes("sandbox.minepi.com");
       if (isMinePiSandbox) return;
-      setDetail((event as CustomEvent<PiBrowserHandoffDetail>).detail || {});
+      const requested = (event as CustomEvent<PiBrowserHandoffDetail>).detail || {};
+      if (/login|sign.?in/i.test(requested.reason || "")) return;
+      setDetail(requested);
     };
     window.addEventListener(PI_BROWSER_HANDOFF_EVENT, open);
     return () => window.removeEventListener(PI_BROWSER_HANDOFF_EVENT, open);

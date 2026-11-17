@@ -58,6 +58,8 @@ jobs:
           VITE_SANDBOX_SDK: 'false'
           VITE_PI_PAYMENTS_ENABLED: 'false'
           VITE_PI_ADS_ENABLED: ${{ vars.VITE_PI_ADS_ENABLED || 'false' }}
+          VITE_PI_OAUTH_CLIENT_ID: ${{ vars.VITE_PI_OAUTH_CLIENT_ID }}
+          VITE_PI_OAUTH_REDIRECT_URI: ${{ vars.VITE_PI_OAUTH_REDIRECT_URI }}
           VITE_BUILD_ID: ${{ github.sha }}
         run: npm run build:public --prefix frontend
 

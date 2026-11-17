@@ -5,7 +5,6 @@ import { isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient, getBaseURL } from "../lib/axiosClient";
 import type { AuthResult, User } from "../types/pi";
-import { requestPiBrowserHandoff } from "../lib/piBrowserHandoff";
 import { authenticateWithCapacitorPi, isCapacitorNative, type CapacitorPiAuthStage } from "../lib/capacitorPiAuth";
 import { isSoloHostRuntime } from "../lib/soloHost";
 import { authenticateWithSoloHostPi } from "../lib/soloHostPiAuth";
@@ -306,7 +305,7 @@ export const useAuth = () => {
         setIsLoading(false);
       }
     }
-    if (isSoloHostRuntime()) {
+    if (isSoloHostRuntime() || (!isCapacitorNative() && !/PiBrowser|Pi Browser/i.test(navigator.userAgent) && window.location.hostname !== "sandbox.minepi.com" && !document.referrer.startsWith("https://sandbox.minepi.com/"))) {
       try {
         setAuthFeedback({ type: "success", message: "Opening Pi Sign-In…" });
         const authResult = await authenticateWithSoloHostPi();
@@ -376,8 +375,7 @@ export const useAuth = () => {
         setIsLoading(false);
         return false;
       }
-      requestPiBrowserHandoff("Pi login required");
-      setAuthFeedback(null);
+      setAuthFeedback({ type: "error", message: "Pi authentication could not initialize. Please retry sign-in." });
       loginInProgressRef.current = false;
         setIsPiLoginPending(false);
         setPiLoginStage(null);
