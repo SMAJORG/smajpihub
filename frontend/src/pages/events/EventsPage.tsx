@@ -6,6 +6,7 @@ import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import AppLayout from "../../layouts/AppLayout";
 import { homeSectionDefaults } from "../../content/homeContentDefaults";
+import { restoredEventDetails } from "../../content/restoredEventDetails";
 import { refreshSiteContent, useSiteContent, type ContentCard } from "../../lib/siteContent";
 import { openChatUrl, safeChatUrl } from "../../lib/chatLinks";
 import "./EventsPage.css";
@@ -32,13 +33,17 @@ const readSaved = () => {
 };
 const registrationUrl = (event: ContentCard) =>
   event.registrationUrl?.startsWith("https://") ? safeChatUrl(event.registrationUrl) : null;
+type EventListing = ContentCard & { dateLabel?: string; location?: string; endDate?: string; websiteUrl?: string; actionLabel?: string };
+const endedEvent = (event: EventListing, now: number) => event.endDate
+  ? event.endDate < new Date(now).toISOString().slice(0, 10)
+  : Number.isFinite(Date.parse(event.endsAt || "")) && Date.parse(event.endsAt!) <= now;
 const validEvent = (event: ContentCard) =>
-  registrationUrl(event) &&
-  Number.isFinite(Date.parse(event.startsAt || "")) &&
-  Date.parse(event.endsAt || "") > Date.parse(event.startsAt || "");
+  Boolean(event.id && event.title && (!event.registrationUrl || registrationUrl(event)));
 const formatDate = (value: string) =>
   new Date(value).toLocaleString("en-GB", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" });
-const Dates = ({ event }: { event: ContentCard }) => (
+const Dates = ({ event }: { event: EventListing }) => event.dateLabel || !event.startsAt || !event.endsAt ? (
+  <p className="event-dates"><CalendarMonthOutlinedIcon /><span>{event.dateLabel || event.badge || "Check the organizer for dates"}</span></p>
+) : (
   <p className="event-dates">
     <CalendarMonthOutlinedIcon />
     <span>
@@ -48,17 +53,17 @@ const Dates = ({ event }: { event: ContentCard }) => (
   </p>
 );
 
-function Register({ event, ended }: { event: ContentCard; ended: boolean }) {
+function Register({ event, ended }: { event: EventListing; ended: boolean }) {
   const url = registrationUrl(event);
   if (ended) return <p className="events-empty">This event has ended. Registration is closed.</p>;
-  if (!url) return null;
+  if (!url) return <p className="events-empty">Booking details have not been published.</p>;
   return (
     <a
       className="event-register"
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={`Register for ${event.title} on the organizer website`}
+      aria-label={`${event.actionLabel || "Register"} for ${event.title} on the organizer website`}
       onClick={e => {
         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         const opened = openChatUrl(url);
@@ -68,7 +73,7 @@ function Register({ event, ended }: { event: ContentCard; ended: boolean }) {
         }
       }}
     >
-      Register ↗
+      {event.actionLabel || "Register"} ↗
     </a>
   );
 }
@@ -120,7 +125,7 @@ const Header = () => (
     </details>
   </header>
 );
-function Card({ event, saved, onSave, now }: { event: ContentCard; saved: boolean; onSave: () => void; now: number }) {
+function Card({ event, saved, onSave, now }: { event: EventListing; saved: boolean; onSave: () => void; now: number }) {
   return (
     <article className="event-card">
       <Link to={`/services/events/event/${event.id}`}>
@@ -142,7 +147,7 @@ function Card({ event, saved, onSave, now }: { event: ContentCard; saved: boolea
         <BookmarkBorderOutlinedIcon />
       </button>
       <div className="event-card-registration">
-        <Register event={event} ended={Date.parse(event.endsAt!) <= now} />
+        <Register event={event} ended={endedEvent(event, now)} />
       </div>
     </article>
   );
@@ -173,15 +178,13 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
   }, []);
   const section =
     sections.find(item => item.id === "events") || homeSectionDefaults.find(item => item.id === "events")!;
-  const events = section.cards.filter(validEvent);
+  const events: EventListing[] = section.cards.map(item => ({ ...item, ...restoredEventDetails[item.id] })).filter(validEvent);
   const event = events.find(item => item.id === id);
-  const upcoming = events
-    .filter(item => Date.parse(item.endsAt!) > now)
-    .sort((a, b) => Date.parse(a.startsAt!) - Date.parse(b.startsAt!));
+  const upcoming = events;
   const visible = upcoming.filter(
     item =>
       (kind !== "saved" || saved.has(item.id)) &&
-      (category !== "Free" || item.badge.trim().toLowerCase() === "free") &&
+      (category !== "Free" || /\bfree\b/i.test(item.badge)) &&
       (category !== "Online" || /online|livestream|virtual/i.test(item.text)) &&
       `${item.title} ${item.text}`.toLowerCase().includes(query.trim().toLowerCase())
   );
@@ -206,6 +209,7 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
                 {event.badge ? <small className="event-price">{event.badge}</small> : null}
                 <h1>{event.title}</h1>
                 <Dates event={event} />
+                {event.location ? <p>{event.location}</p> : null}
                 <p className="event-description">{event.text}</p>
               </div>
             </div>
@@ -213,17 +217,17 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
               <article>
                 <h2>Event information</h2>
                 <p>
-                  Dates and times above are shown in UTC. Check the organizer’s website for the latest schedule and
+                  Times use the timezone stated above. Check the organizer’s website for the latest schedule and
                   attendance requirements.
                 </p>
-                <a href={registrationUrl(event)!} target="_blank" rel="noopener noreferrer">
+                {safeChatUrl(event.websiteUrl || event.registrationUrl || "") ? <a href={safeChatUrl(event.websiteUrl || event.registrationUrl || "")!} target="_blank" rel="noopener noreferrer">
                   Official event website ↗
-                </a>
+                </a> : null}
               </article>
               <aside>
-                <h2>Register with the organizer</h2>
-                <p>Registration and attendance confirmation are handled on the official event website.</p>
-                <Register event={event} ended={Date.parse(event.endsAt!) <= now} />
+                <h2>{event.actionLabel?.startsWith("Watch") ? "Watch with the organizer" : "Register with the organizer"}</h2>
+                <p>Attendance, registration and any tickets are handled on the official event website.</p>
+                <Register event={event} ended={endedEvent(event, now)} />
               </aside>
             </div>
           </>
@@ -276,7 +280,7 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
                 ? "Find your next unforgettable moment."
                 : kind === "saved"
                   ? "Your saved events."
-                  : "Discover upcoming events."}
+                  : "Discover events."}
             </h1>
             <p>Explore event details and register directly with the organizer.</p>
             <form
@@ -311,8 +315,8 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
           </div>
           <div className="events-heading">
             <div>
-              <small>UPCOMING EVENTS</small>
-              <h1>{kind === "saved" ? "Saved events" : "Upcoming experiences"}</h1>
+              <small>SMAJ EVENTS</small>
+              <h1>{kind === "saved" ? "Saved events" : "Events and experiences"}</h1>
             </div>
             <span>{visible.length} events</span>
           </div>
@@ -329,7 +333,7 @@ const EventsPage = ({ kind = "home" }: { kind?: EventsPageKind }) => {
               ))}
             </div>
           ) : (
-            <div className="events-empty">No upcoming events match your selection.</div>
+            <div className="events-empty">No events match your selection.</div>
           )}
         </section>
       </>
