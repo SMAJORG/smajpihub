@@ -1,6 +1,8 @@
 import AiSignInPage from "./pages/AiSignInPage";
 import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
+import AdminTestnetPayoutsPage from "./pages/admin/AdminTestnetPayoutsPage";
+import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
@@ -268,6 +270,10 @@ const swapRoutes: Array<[string, SwapPageKind]> = [
 ];
 
 export const router = createBrowserRouter([
+  ...(import.meta.env.VITE_TESTNET_PAYOUT_TOOLS === "true" ? [
+    { path: "/testnet-wallet", element: <ProtectedRoute><PrivateLayout><TestnetWalletConsentPage /></PrivateLayout></ProtectedRoute> },
+    { path: "/admin/testnet-payouts", element: <ProtectedRoute><AdminLayout><AdminTestnetPayoutsPage /></AdminLayout></ProtectedRoute> },
+  ] : []),
   {path:"/ai/sign-in",element:<AiSignInPage/>},
   {
     path: "/signin/android",

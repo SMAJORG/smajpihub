@@ -7,13 +7,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-BASE = "https://smajpihub.onrender.com"
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--send", action="store_true", help="Offer to send after successful preflight and typed approval")
+    parser.add_argument("--base-url", required=True, help="Isolated Testnet backend HTTPS URL; never the Mainnet backend")
     args = parser.parse_args()
+    base = args.base_url.rstrip("/")
+    parsed = urllib.parse.urlsplit(base)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.hostname in ("smajpihub.onrender.com", "smajpihub.com", "www.smajpihub.com"):
+        raise SystemExit("Use the isolated Testnet backend HTTPS URL. Mainnet endpoints and embedded credentials are forbidden.")
     token = getpass.getpass("Admin Hub access token (hidden): ").strip()
     if not token.startswith("hub_access.") or any(c.isspace() for c in token):
         raise SystemExit("Use the current admin Hub access token, not an API key, seed or refresh token.")
@@ -24,7 +26,7 @@ def main():
         if payload is not None:
             headers["Content-Type"] = "application/json"
             body = json.dumps(payload).encode()
-        req = urllib.request.Request(BASE + path, data=body, headers=headers)
+        req = urllib.request.Request(base + path, data=body, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=90) as response:
                 return json.load(response)
@@ -54,7 +56,7 @@ def main():
     approval = f"SEND 0.01 TEST-PI TO {uid}"
     if input(f"To approve this one payout, type exactly: {approval}\n").strip() != approval:
         raise SystemExit("Stopped. No payment sent.")
-    payout = request("/admin/testnet/a2u", {"uid": uid}).get("payout") or {}
+    payout = request("/admin/testnet/a2u", {"uid": uid, "recipientWalletAddress": check["recipientWalletAddress"], "senderWalletAddress": check["senderWalletAddress"], "approved": True, "approvalToken": check["approvalToken"]}).get("payout") or {}
     print(json.dumps({key: payout.get(key) for key in ("status", "amount", "network", "paymentId", "txid", "recipientWalletAddress")}, indent=2))
     if payout.get("status") != "completed":
         raise SystemExit("Completion not confirmed. Reconcile before any retry.")

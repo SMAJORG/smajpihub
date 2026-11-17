@@ -20,6 +20,7 @@ export async function testnetA2UPreflight(locals: any, uid: string) {
   const wallet = await testnetWalletSnapshot();
   if (!wallet.ready) throw new PayoutError(wallet.incompletePayments ? 409 : 422, wallet.message);
   const address = wallet.address;
+  if (recipient.walletAddress === address) throw new PayoutError(422, "The recipient wallet must differ from the Testnet app wallet.");
   try { await testnetGet(`/accounts/${recipient.walletAddress}`); }
   catch (error: any) {
     const status = error.response?.status;
