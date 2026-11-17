@@ -3,7 +3,8 @@ import { Request, Response } from "express";
 import env from "../environments";
 import { resolveHubAccessUser } from "../services/persistentSessions";
 import { testnetA2UPreflight } from "../services/testnetA2UPreflight";
-import { makeTestnetSdk, PayoutError, sendTestnetPayout, verifyTestnetRecipient } from "../services/testnetA2U";
+import { makeTestnetSdk, PayoutError, sendTestnetPayout, verifyTestnetRecipient, reconcileTestnetPayout } from "../services/testnetA2U";
+import { payoutApproval, validPayoutApproval, requireTestnetPayoutDeployment } from "../services/testnetA2USafety";
 
 async function requirePayoutAdmin(req: Request, res: Response) {
   res.setHeader("Cache-Control", "no-store");
@@ -14,6 +15,7 @@ async function requirePayoutAdmin(req: Request, res: Response) {
   if (!admin) { res.status(401).json({ code: "admin_session_expired", message: "Your admin session expired or was revoked. Sign in again." }); return null; }
   const configuredAdmin = [admin.username, admin.piUsername].some(value => env.admin_pi_usernames.includes(String(value || "").trim().replace(/^@+/, "").toLowerCase()));
   if (admin.role !== "admin" && !configuredAdmin) { res.status(403).json({ code: "admin_required", message: "This signed-in account is not an authorized SMAJ administrator." }); return null; }
+  try { requireTestnetPayoutDeployment(); } catch (error: any) { throw new PayoutError(503, error.message, "testnet_deployment_required"); }
   return admin;
 }
 const validUid = (uid: unknown): uid is string => typeof uid === "string" && /^[a-zA-Z0-9_-]{1,200}$/.test(uid);
@@ -27,10 +29,12 @@ const fail = (res: Response, error: unknown) => {
 
 export async function testnetA2UPreflightHandler(req: Request, res: Response) {
   try {
-    if (!await requirePayoutAdmin(req, res)) return;
+    const admin = await requirePayoutAdmin(req, res);
+    if (!admin) return;
     const uid = req.query.uid;
     if (!validUid(uid)) return res.status(400).json({ message: "Supply a verified recipient uid." });
-    return res.json(await testnetA2UPreflight(req.app.locals, uid));
+    const check = await testnetA2UPreflight(req.app.locals, uid);
+    return res.json({ ...check, approvalToken: payoutApproval(admin.uid, check) });
   } catch (error) { return fail(res, error); }
 }
 
@@ -40,9 +44,10 @@ export async function testnetA2UHandler(req: Request, res: Response) {
     if (!admin) return;
     const uid = req.body?.uid;
     const confirmed = { recipientWalletAddress: req.body?.recipientWalletAddress, senderWalletAddress: req.body?.senderWalletAddress };
-    if (!validUid(uid) || Object.keys(req.body).some(key => !["uid", "recipientWalletAddress", "senderWalletAddress"].includes(key)) || Object.values(confirmed).some(address => address !== undefined && (typeof address !== "string" || !/^G[A-Z2-7]{55}$/.test(address)))) {
-      return res.status(400).json({ message: "Supply a verified Pi user uid and optional confirmed wallet addresses; amount is fixed at 0.01 Test-Pi." });
+    if (!validUid(uid) || Object.keys(req.body).some(key => !["uid", "recipientWalletAddress", "senderWalletAddress", "approved", "approvalToken"].includes(key)) || Object.values(confirmed).some(address => typeof address !== "string" || !/^G[A-Z2-7]{55}$/.test(address))) {
+      return res.status(400).json({ message: "Supply a verified Pi user uid and both confirmed wallet addresses; amount is fixed at 0.01 Test-Pi." });
     }
+    if (req.body.approved !== true || !validPayoutApproval(req.body.approvalToken, admin.uid, { recipientUid: uid, ...confirmed } as any)) return res.status(403).json({ code: "payout_approval_required", message: "Run preflight and explicitly approve this recipient, both wallets and 0.01 Test-Pi. Approval expires after five minutes." });
     const collection = req.app.locals.testnetA2UCollection;
     if (!collection) return res.status(503).json({ message: "Payout database unavailable." });
     // Preserve idempotent completed responses, but verify current recipient identity first.
@@ -72,5 +77,13 @@ export async function testnetRecipientsHandler(req: Request, res: Response) {
   try {
     if (!await requirePayoutAdmin(req, res)) return;
     return res.json(await testnetRecipients(req.app.locals, payoutPage(req.query.page), String(req.query.search || "").trim().slice(0, 80)));
+  } catch (error) { return fail(res, error); }
+}
+export async function testnetReconcileHandler(req: Request, res: Response) {
+  try {
+    if (!await requirePayoutAdmin(req, res)) return;
+    if (!validUid(req.body?.uid)) return res.status(400).json({ message: "Supply the recorded recipient UID." });
+    const payout = await reconcileTestnetPayout(req.app.locals.testnetA2UCollection, req.body.uid, makeTestnetSdk());
+    return res.json({ payout, paymentSent: false });
   } catch (error) { return fail(res, error); }
 }

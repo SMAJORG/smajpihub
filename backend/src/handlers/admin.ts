@@ -1,4 +1,4 @@
-import { testnetA2UHandler, testnetA2UPreflightHandler, testnetDashboardHandler, testnetRecipientsHandler } from "./testnetA2U";
+import { testnetA2UHandler, testnetA2UPreflightHandler, testnetDashboardHandler, testnetRecipientsHandler, testnetReconcileHandler } from "./testnetA2U";
 import { parseSiteContent } from "../services/siteContent";
 import { recordMerchantSettlement } from "../services/merchantSettlement";
 import { verifyOutboundPayment, bindPayment, financialTransaction } from "../services/financialIntegrity";
@@ -107,6 +107,7 @@ export default function mountAdminEndpoints(router: Router) {
   });
   // Testnet handlers validate their Hub bearer and admin role themselves.
   router.post("/testnet/a2u", testnetA2UHandler);
+  router.post("/testnet/a2u/reconcile", testnetReconcileHandler);
   router.get("/testnet/a2u/preflight", testnetA2UPreflightHandler);
   router.get("/testnet/a2u/dashboard", testnetDashboardHandler);
   router.get("/testnet/a2u/recipients", testnetRecipientsHandler);

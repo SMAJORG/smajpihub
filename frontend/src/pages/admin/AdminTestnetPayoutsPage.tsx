@@ -9,7 +9,7 @@ import "./testnet-payouts.css";
 type Recipient = { uid: string; username: string; displayName: string; walletAddress: string; canReceive: boolean; status: string };
 type Payment = { recipientUid: string; recipientWalletAddress?: string; amount: number; status: string; paymentId?: string; txid?: string; createdAt?: string };
 type Snapshot = { backendRevision?: string | null; wallet: { address: string; balance: number | null; spendable: number | null; ready: boolean; message: string; apiKeyAccepted?: boolean; apiStatus?: number | null; seedValid?: boolean }; records: Payment[]; successfulUniqueWallets: number; walletLocked: boolean; hasMore: boolean; appWalletConnection: string };
-type Check = { checksPassed: boolean; recipientWalletAddress: string; senderWalletAddress: string };
+type Check = { checksPassed: boolean; recipientWalletAddress: string; senderWalletAddress: string; approvalToken: string };
 const options = { timeout: 90000, smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } };
 const amount = (value: number | null) => value === null ? "Unavailable" : `${value.toLocaleString(undefined, { maximumFractionDigits: 7 })} Test-Pi`;
 
@@ -56,7 +56,7 @@ export default function AdminTestnetPayoutsPage() {
     if (inFlight.current || !selected || !check?.checksPassed || !confirmedWallet) return;
     inFlight.current = true; setSending(true); setError("");
     try {
-      const response = await axiosClient.post<{ payout: Payment }>("/admin/testnet/a2u", { uid: selected.uid, recipientWalletAddress: check.recipientWalletAddress, senderWalletAddress: check.senderWalletAddress }, options);
+      const response = await axiosClient.post<{ payout: Payment }>("/admin/testnet/a2u", { uid: selected.uid, recipientWalletAddress: check.recipientWalletAddress, senderWalletAddress: check.senderWalletAddress, approved: true, approvalToken: check.approvalToken }, options);
       if (response.data.payout.status !== "completed") throw new Error("Completion not confirmed");
       setNotice(`0.01 Test-Pi sent successfully. Payment ID: ${response.data.payout.paymentId}`);
     } catch (error) { setError(`${messageFor(error)} Do not resend an uncertain payment; check its recorded status.`); }
@@ -66,6 +66,16 @@ export default function AdminTestnetPayoutsPage() {
     }
   };
   const ready = Boolean(data?.wallet.ready && !data.walletLocked && selected?.canReceive && check?.checksPassed && !checking && !loading && !sending);
+  const reconcile = async (uid: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true; setSending(true); setError(""); setNotice("");
+    try {
+      const response = await axiosClient.post<{ payout: Payment; paymentSent: boolean }>("/admin/testnet/a2u/reconcile", { uid }, options);
+      if (response.data.payout.status !== "completed" || response.data.paymentSent !== false) throw new Error("Verification not confirmed");
+      setNotice("Existing Testnet transfer verified. No payment was sent or resent.");
+    } catch (error) { setError(messageFor(error)); }
+    finally { inFlight.current = false; setSending(false); setSelected(null); setCheck(null); await load(); await loadRecipients(); }
+  };
   return <main className="private-page admin-enterprise-page testnet-payouts">
     <header className="ea-page-head"><div><p className="ea-eyebrow">SMAJ PI HUB / PI PAYMENTS</p><h1>Testnet Payouts</h1><p>Send 0.01 Test-Pi to a verified Pi user.</p></div><button className="ea-button" disabled={loading || sending || usersLoading} onClick={() => { ++selectionVersion.current; setSelected(null); setCheck(null); setChecking(false); setError(""); void load(); void loadRecipients(); }}>Refresh</button></header>
     <p className="tp-hint">Payout API: {getBaseURL()}</p>
@@ -86,7 +96,7 @@ export default function AdminTestnetPayoutsPage() {
       {selected && <div className="tp-selected"><strong>Recipient: {selected.displayName}</strong><p className="tp-address">{check?.recipientWalletAddress || selected.walletAddress}</p><p role="status">{checking ? "Checking recipient readiness…" : check?.checksPassed ? "Recipient checks passed" : "Recipient is not ready"}</p></div>}
       <button className="private-primary-button tp-send" disabled={!ready} onClick={() => { setConfirmedWallet(false); setDialogOpen(true); }}>Send 0.01 Test-Pi</button>
     </section>
-    <section className="ea-card tp-card"><h2>Payment history</h2>{data?.records.length ? <div className="tp-history">{data.records.map((record, index) => <article key={record.paymentId || record.recipientUid + index}><header><strong>0.01 Test-Pi</strong><span className="tp-badge">{record.status.replaceAll("_", " ")}</span></header><dl><dt>Recipient UID</dt><dd>{record.recipientUid}</dd><dt>Wallet address</dt><dd>{record.recipientWalletAddress || "Awaiting verification"}</dd><dt>Payment ID</dt><dd>{record.paymentId || "Not assigned"}</dd><dt>Transaction ID</dt><dd>{record.txid || "Not submitted"}</dd><dt>Created</dt><dd>{record.createdAt ? new Date(record.createdAt).toLocaleString() : "Unavailable"}</dd></dl></article>)}</div> : <p>No payments recorded on this page.</p>}<nav className="tp-pagination" aria-label="Payment history pages"><button className="ea-button" disabled={page <= 1 || loading || sending} onClick={() => setPage(value => value - 1)}>Previous payments</button><span>Page {page}</span><button className="ea-button" disabled={!data?.hasMore || loading || sending} onClick={() => setPage(value => value + 1)}>Next payments</button></nav></section>
+    <section className="ea-card tp-card"><h2>Payment history</h2>{data?.records.length ? <div className="tp-history">{data.records.map((record, index) => <article key={record.paymentId || record.recipientUid + index}><header><strong>0.01 Test-Pi</strong><span className="tp-badge">{record.status.replaceAll("_", " ")}</span></header><dl><dt>Recipient UID</dt><dd>{record.recipientUid}</dd><dt>Wallet address</dt><dd>{record.recipientWalletAddress || "Awaiting verification"}</dd><dt>Payment ID</dt><dd>{record.paymentId || "Not assigned"}</dd><dt>Transaction ID</dt><dd>{record.txid || "Not submitted"}</dd><dt>Created</dt><dd>{record.createdAt ? new Date(record.createdAt).toLocaleString() : "Unavailable"}</dd></dl>{record.status !== "completed" && record.paymentId && <button className="ea-button" disabled={sending} onClick={() => void reconcile(record.recipientUid)}>Verify existing transfer (no resend)</button>}</article>)}</div> : <p>No payments recorded on this page.</p>}<nav className="tp-pagination" aria-label="Payment history pages"><button className="ea-button" disabled={page <= 1 || loading || sending} onClick={() => setPage(value => value - 1)}>Previous payments</button><span>Page {page}</span><button className="ea-button" disabled={!data?.hasMore || loading || sending} onClick={() => setPage(value => value + 1)}>Next payments</button></nav></section>
     <dialog ref={dialog} className="tp-dialog" aria-labelledby="tp-confirm-title" onCancel={event => { if (sending) event.preventDefault(); else setDialogOpen(false); }} onClose={() => { if (!sending) setDialogOpen(false); }}><h2 id="tp-confirm-title">Confirm Testnet payout</h2><p>Send <strong>0.01 Test-Pi</strong> to <strong>{selected?.displayName}</strong>?</p><dl><dt>Recipient wallet</dt><dd>{check?.recipientWalletAddress}</dd><dt>App wallet</dt><dd>{check?.senderWalletAddress}</dd></dl><label className="tp-confirm"><input type="checkbox" checked={confirmedWallet} disabled={sending} onChange={event => setConfirmedWallet(event.target.checked)} />I confirm the app wallet matches the connected Testnet wallet in Pi Developer Portal.</label><p>This transfer cannot be reversed after submission.</p><footer><button className="ea-button" disabled={sending} onClick={() => setDialogOpen(false)}>Cancel</button><button className="private-primary-button" disabled={!confirmedWallet || sending} onClick={() => void send()}>{sending ? "Sending…" : "Confirm and send 0.01 Test-Pi"}</button></footer></dialog>
   </main>;
 }

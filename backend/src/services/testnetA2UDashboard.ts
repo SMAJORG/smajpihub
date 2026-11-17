@@ -14,7 +14,7 @@ export async function testnetDashboard(locals: any, page: number) {
   const [wallet, records, total, completedWallets, lock] = await Promise.all([
     testnetWalletSnapshot(), collection.find(filter).project(safePaymentFields).sort({ createdAt: -1 }).skip((page - 1) * 20).limit(20).toArray(),
     collection.countDocuments(filter),
-    collection.distinct("recipientWalletAddress", { network: "Pi Testnet", status: "completed", "piStatus.transaction_verified": true, "piStatus.developer_completed": true, txid: { $type: "string" }, recipientWalletAddress: { $regex: "^G[A-Z2-7]{55}$" } }),
+    collection.distinct("recipientWalletAddress", { network: "Pi Testnet", status: "completed", ledgerVerified: true, "piStatus.transaction_verified": true, "piStatus.developer_completed": true, txid: { $type: "string" }, recipientWalletAddress: { $regex: "^G[A-Z2-7]{55}$" } }),
     collection.findOne({ _id: "wallet-lock" }),
   ]);
   return { backendRevision: process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || null, wallet, records, page, hasMore: page * 20 < total, total, successfulUniqueWallets: completedWallets.length, target: 5, walletLocked: Boolean(lock), appWalletConnection: "Compare this configured wallet address with the connected Testnet App Wallet in Pi Developer Portal. Pi verifies the sender during payout." };

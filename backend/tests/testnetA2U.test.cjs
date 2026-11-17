@@ -1,19 +1,73 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { sendTestnetPayout, makeTestnetSdk } = require('../build/services/testnetA2U');
+process.env.PI_NETWORK = 'Pi Testnet';
+process.env.PI_COMMERCE_MODE = 'testnet-development';
+process.env.PI_TESTNET_PAYOUTS_ENABLED = 'true';
+process.env.MONGODB_DATABASE_NAME = process.env.PI_TESTNET_PAYOUT_DATABASE_NAME = 'qualification_testnet_a2u';
+delete process.env.PI_MAINNET_ACCOUNT_MODE;
+const { sendTestnetPayout: realSend, makeTestnetSdk } = require('../build/services/testnetA2U');
+// No live blockchain calls: normal flow tests inject ledger verification;
+// dedicated proof tests below exercise the actual verifier with HTTP mocks.
+const sendTestnetPayout = (...args) => realSend(...args.slice(0, 4), args[4] || {}, async (_payment, txid) => ({ txid, ledger: 1, network: 'Pi Testnet', verifiedAt: new Date() }));
 class Store {
   rows = new Map();
   async findOne(q) { return this.rows.get(q._id) || null; }
   async insertOne(d) { if (this.rows.has(d._id)) throw Object.assign(new Error(), { code: 11000 }); this.rows.set(d._id, {...d}); }
   async updateOne(q,u) { const d=this.rows.get(q._id); if (!d) return {matchedCount:0}; Object.assign(d,u.$set); return {matchedCount:1}; }
   async deleteOne(q) { this.rows.delete(q._id); }
+  async countDocuments() { return [...this.rows.values()].filter(row => row.status === 'completed' && row.ledgerVerified === true).length; }
 }
 function sdk(overrides={}) {
   const calls=[];
-  const payment={identifier:'p1',network:'Pi Testnet',direction:'app_to_user',user_uid:'user',amount:0.01,to_address:'G'+'A'.repeat(55),status:{},transaction:null};
+  const payment={identifier:'p1',network:'Pi Testnet',direction:'app_to_user',user_uid:'user',amount:0.01,from_address:'G'+'B'.repeat(55),to_address:'G'+'A'.repeat(55),status:{},transaction:null};
   return {calls,payment, createPayment:async args=>{calls.push('create');assert.equal(args.amount,0.01);return 'p1';},getPayment:async()=>payment,
     submitPayment:async()=>{calls.push('submit');return 'tx1';},completePayment:async()=>{calls.push('complete');return {...payment,status:{transaction_verified:true,developer_completed:true},transaction:{txid:'tx1',verified:true}};},...overrides};
 }
+test('isolation guard rejects Mainnet, disabled payouts and the production database',()=>{
+ const {requireTestnetPayoutDeployment}=require('../build/services/testnetA2USafety');
+ for(const [name,value] of [['PI_NETWORK','Pi Network'],['PI_TESTNET_PAYOUTS_ENABLED','false'],['PI_TESTNET_PAYOUT_DATABASE_NAME','smajpihub']]){
+  const old=process.env[name];process.env[name]=value;try{assert.throws(requireTestnetPayoutDeployment);}finally{process.env[name]=old;}
+ }
+ assert.doesNotThrow(requireTestnetPayoutDeployment);
+});
+test('approval binds admin, recipient, wallets, amount and expiry',()=>{
+ const {payoutApproval,validPayoutApproval}=require('../build/services/testnetA2USafety');
+ const check={recipientUid:'user',recipientWalletAddress:'G'+'A'.repeat(55),senderWalletAddress:'G'+'B'.repeat(55)};
+ const token=payoutApproval('admin',check);assert(validPayoutApproval(token,'admin',check));
+ assert(!validPayoutApproval(token,'other-admin',check));assert(!validPayoutApproval(token,'admin',{...check,recipientUid:'other'}));
+ assert(!validPayoutApproval(token,'admin',{...check,senderWalletAddress:'G'+'C'.repeat(55)}));
+ assert(!validPayoutApproval(token+'tampered','admin',check));assert(!validPayoutApproval(undefined,'admin',check));
+ const old=Date.now;Date.now=()=>old()+300001;try{assert(!validPayoutApproval(token,'admin',check));}finally{Date.now=old;}
+});
+test('actual Testnet ledger verifier checks success, hash, source, memo and exact native operation',async()=>{
+ const axios=require('axios'),old=axios.get,{verifyTestnetPayoutLedger}=require('../build/services/testnetA2USafety');
+ const payment=sdk().payment,hash='a'.repeat(64);let change={},operationChange={},calls=[];
+ axios.get=async url=>{calls.push(url);return {data:url.includes('/operations?')?{_embedded:{records:[{type:'payment',transaction_successful:true,transaction_hash:hash,asset_type:'native',from:payment.from_address,to:payment.to_address,amount:'0.0100000',...operationChange}]}}:{hash,successful:true,source_account:payment.from_address,memo_type:'text',memo:payment.identifier,operation_count:1,ledger:123,...change}};};
+ try{
+  assert.equal((await verifyTestnetPayoutLedger(payment,hash)).ledger,123);
+  for(const invalid of [{successful:false},{source_account:payment.to_address},{memo:'other'},{operation_count:2}]){change=invalid;await assert.rejects(verifyTestnetPayoutLedger(payment,hash));}
+  change={};for(const invalid of [{to:payment.from_address},{amount:'1.0000000'},{asset_type:'credit_alphanum4'},{transaction_successful:false}]){operationChange=invalid;await assert.rejects(verifyTestnetPayoutLedger(payment,hash));}
+  assert(calls.every(url=>url.startsWith('https://api.testnet.minepi.com/transactions/')));
+ }finally{axios.get=old;}
+});
+test('sixth qualification payout is refused before creating a payment',async()=>{
+ const db=new Store();for(let i=0;i<5;i++)db.rows.set('done:'+i,{status:'completed',ledgerVerified:true});
+ const pi=sdk();await assert.rejects(sendTestnetPayout(db,'user','admin',pi),/Five verified/);assert.deepEqual(pi.calls,[]);assert(!db.rows.has('wallet-lock'));
+});
+test('failed ledger verification retains transaction evidence and blocks any resend',async()=>{
+ const db=new Store(),pi=sdk();await assert.rejects(realSend(db,'user','admin',pi,{},async()=>{throw Error('ledger unavailable');}));
+ assert.equal(db.rows.get('recipient:user').txid,'tx1');assert.equal(db.rows.get('recipient:user').status,'reconciliation_required');
+ assert(db.rows.has('wallet-lock'));assert(!db.rows.get('recipient:user').ledgerVerified);
+});
+test('reconciliation only reads an already completed Pi payment and never creates/submits/completes',async()=>{
+ const {reconcileTestnetPayout}=require('../build/services/testnetA2U'),db=new Store(),pi=sdk();
+ db.rows.set('recipient:user',{_id:'recipient:user',recipientUid:'user',paymentId:'p1',txid:'tx1',recipientWalletAddress:pi.payment.to_address,senderWalletAddress:pi.payment.from_address,status:'reconciliation_required'});
+ db.rows.set('wallet-lock',{recipientUid:'user'});
+ pi.getPayment=async()=>({...pi.payment,metadata:{testnetPayoutId:'recipient:user'},transaction:{txid:'tx1',verified:true},status:{transaction_verified:true,developer_completed:true}});
+ const row=await reconcileTestnetPayout(db,'user',pi,async()=>({ledger:123,verifiedAt:new Date()}));
+ assert.equal(row.status,'completed');assert.equal(row.ledgerVerified,true);assert.deepEqual(pi.calls,[]);assert(!db.rows.has('wallet-lock'));
+ pi.getPayment=async()=>pi.payment;await assert.rejects(reconcileTestnetPayout(db,'user',pi));assert.deepEqual(pi.calls,[]);
+});
 test('persists IDs, wallet and completion; repeat does not send again',async()=>{
  const db=new Store(), pi=sdk(); const row=await sendTestnetPayout(db,'user','admin',pi);
  assert.equal(row.txid,'tx1');assert.equal(row.paymentId,'p1');assert.equal(row.recipientWalletAddress,pi.payment.to_address);assert.equal(row.status,'completed');
@@ -60,6 +114,7 @@ test('endpoint validates bearer independently of admin cookies and rejects non-a
   }
   role='buyer';assert.equal((await fetch(url+'/payout',{method:'POST',headers:{Authorization:'Bearer '+signed}})).status,403);for(const path of ['/dashboard','/recipients','/preflight']) assert.equal((await fetch(url+path,{headers:{Authorization:'Bearer '+signed}})).status,403);
   role='admin';assert.equal((await fetch(url+'/payout',{method:'POST',headers:{Authorization:'Bearer '+signed}})).status,400);
+  const unapproved=await fetch(url+'/payout',{method:'POST',headers:{Authorization:'Bearer '+signed,'Content-Type':'application/json'},body:JSON.stringify({uid:'user',recipientWalletAddress:'G'+'A'.repeat(55),senderWalletAddress:'G'+'B'.repeat(55)})});assert.equal(unapproved.status,403);assert.equal((await unapproved.json()).code,'payout_approval_required');
   app.locals.deviceSessionCollection.findOne=async()=>null;
   assert.equal((await fetch(url+'/preflight',{headers:{Authorization:'Bearer '+signed}})).status,401);
  }finally{await new Promise(r=>server.close(r));}

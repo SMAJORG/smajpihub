@@ -1,103 +1,69 @@
-# Testnet admin payout
+﻿# Testnet A2U qualification payouts
 
-`POST /admin/testnet/a2u` accepts JSON `{ "uid": "<Pi app-specific UID>" }` and an `Authorization: Bearer <admin hub_access token>` header. Existing admin middleware and a second handler authorization check protect the endpoint. Cookie-only requests and Pi-token headers are rejected. The Hub token is validated independently of cookies and the shared authentication cache, including signature, expiry, device revocation, and current database admin role/configured admin username. The recipient must exist, be unblocked, and have server-verified Pi identity and wallet-sharing evidence. Fresh `/v2/me` responses establish or refresh that evidence; a saved verified login can survive recipient OAuth expiry. Pi payment creation remains authoritative for current UID, consent and wallet address before signing. The amount is always 0.01 Test-Pi; other body fields are rejected. One payout is allowed per UID across all administrators, including when a caller changes credentials or retries.
+Reviewed 17 November 2026 against the official Pi [Advanced Payments](https://developers.minepi.com/docs/accept-payment/PaymentsAdvanced), [Platform API](https://developers.minepi.com/docs/api-reference/PlatformAPI), and [Node.js backend SDK](https://github.com/pi-apps/pi-nodejs). The public documentation describes A2U; confirm the particular five-recipient qualification checklist and paired-app relationship in your Developer Portal. Code cannot approve a Mainnet App Wallet.
 
-Only the official published `pi-backend@0.1.3` SDK is used. Its createPayment → getPayment → submitPayment → completePayment flow is isolated from existing U2A payments, Mainnet configuration, UI, settlement, and services. The authoritative payment must have network `Pi Testnet`, the expected UID, amount, direction, and recipient address before blockchain submission. Completion requires a matching verified txid and both completion flags.
+## Current investigation
 
-## Prerequisites
+The connected Render workspace has a Mainnet SMAJ backend, but no separate Testnet backend service was found. The Mainnet backend deliberately returns HTTP 410 for Testnet payout routes. Keep that boundary. No live keys or seed were available in the local configuration, so app-key ownership, wallet funding and portal pairing cannot be certified here. Do not send credentials in chat.
 
-- Render must redeploy this backend commit and install the updated dependency locks. The existing Docker build uses Yarn; both npm and Yarn locks include the SDK. Existing Node 20 deployment meets runtime requirements.
-- `PI_TESTNET_API_KEY` must belong to the same Testnet app used by the recipient. `PI_TESTNET_WALLET_SEED` must be its connected wallet's **56-character Stellar secret seed starting with S**, not a 24-word passphrase. Credentials are read only server-side; no default or Mainnet credentials are used.
-- The connected Testnet app wallet must be activated and funded for 0.01 Test-Pi plus network fees and minimum reserve. Its public address must match the payment's sender (also checked by the SDK).
-- Recipient needs an activated Testnet wallet and wallet-address sharing consent for this app, a verified Pi login with wallet-sharing evidence saved on the server, and an app-specific UID from verified authentication. A profile verification badge alone is insufficient. Existing login flows are unchanged.
-- MongoDB must be writable. Payout collection uses majority, journaled writes; its built-in unique `_id` index reserves each recipient and the wallet operation across processes.
+No payout records were found in the existing qualification collections during this investigation. No payment has been created, signed, submitted or completed by Codex. Five confirmed transaction IDs cannot be reported until the five approved transfers actually complete.
 
-No real payout was attempted during local tests: no recipient UID was supplied, and Render credentials/balance were not accessed. Presence, correctness, funding, consent, and successful deployment must be confirmed in that runtime before a live test.
+## Safety and approval
 
-## Storage and failures
+- Only the official pinned `pi-backend@0.1.3` SDK creates/submits/completes payments. Amount is fixed at **0.01 Test-Pi**. Five recipients total means **0.05 Test-Pi plus network fees**, preserving the sender's reserve.
+- Payouts require `PI_NETWORK=Pi Testnet`, `PI_COMMERCE_MODE=testnet-development`, no fresh-Mainnet account mode, an explicit enable flag, and a separate database ending in `_testnet_a2u`. The production `smajpihub` database is rejected.
+- Every recipient authenticates through the **existing paired Testnet app**, shares `wallet_address`, and is verified server-side with Pi `/v2/me`. No username matching, copied Mainnet UID, manually supplied wallet, original-profile update or account migration is involved. Qualification users and wallet evidence live only in the isolated Testnet database.
+- The administrator must have a current Testnet Hub bearer session. Preflight returns a five-minute signed approval binding administrator, recipient UID, amount, network and both wallets. Sending requires that approval plus `approved: true` after the confirmation dialog. A read-only preflight never creates a payment.
+- A persistent sender lock serializes requests across replicas. UID and recipient-wallet reservations never expire automatically. Retries do not create another transfer. After five ledger-verified completions, further qualification payouts are refused before creating a payment.
+- Before submission, the authoritative Pi payment must match Testnet, UID, amount, direction and both confirmed wallets. After completion, both Pi flags and the exact transaction ID must match. The Testnet Horizon transaction and its single native-payment operation must also match sender, recipient, amount and the SDK's payment-ID memo. Only then does progress count.
+- Uncertain outcomes remain locked. **Verify existing transfer (no resend)** uses only Pi/chain GET requests and updates isolated local evidence if Pi already confirms completion. It never creates, submits or completes a remote payment. Missing payment IDs or incomplete Pi completion still require operator investigation; do not remove locks or resend.
 
-`testnet_a2u_payments` stores recipient UID, initiating admin UID, fixed amount/network, payment ID, recipient wallet address, txid, Pi completion flags, status and timestamps. IDs and address are saved before advancing to the next irreversible step. Tokens and seeds are never stored in this collection, logged, or returned by the handler. Completed retries return the saved record.
+## Isolated deployment (owner setup required)
 
-A separate `_id: "wallet-lock"` record serializes this wallet's operations. Only successful completion releases it. SDK errors, rejected network details, database failures, and process crashes leave reservations intact. There is deliberately no automatic expiry, recreation, or blockchain resubmission; a timed-out submit may already have transferred funds. A failed operation returns a sanitized error. Inspect the recipient record and lock rather than retrying with another UID.
+Do not change the current Mainnet service, MongoDB accounts, wallet, domain or login configuration. Deploy a separate copy of the existing backend/frontend for the existing paired Testnet app. No new Pi Developer Portal app is needed.
 
-For reconciliation, use the official SDK's `getPayment` and `getIncompleteServerPayments`, matching metadata.testnetPayoutId and the payment ID with the database. If a txid was saved (or independently confirmed on Testnet), verify it and call only `completePayment(paymentId, txid)`; never submit the payment again merely because completion timed out. Record verified completion and address in the original recipient record before removing the matching lock. If create/submit outcome is unknown, inspect Pi's records and the wallet's Testnet transaction history first. Do not delete reservations to bypass uncertainty. This version intentionally requires operator reconciliation rather than offering a force-resend endpoint.
+Backend settings on that separate service:
 
-Run `npm run test:testnet-a2u --prefix backend`. Tests use a mocked SDK and in-memory Mongo collection stand-in; they do not prove credentials, actual Mongo durability, wallet balance, Pi consent or live blockchain success.
+| Setting | Value |
+| --- | --- |
+| `NODE_ENV` | `production` |
+| `PI_NETWORK` | `Pi Testnet` |
+| `PI_COMMERCE_MODE` | `testnet-development` |
+| `PI_MAINNET_ACCOUNT_MODE` | unset |
+| `PI_PAYMENTS_ENABLED` | `false` (unrelated U2A remains disabled) |
+| `PI_TESTNET_PAYOUTS_ENABLED` | `true` only when ready to use explicit admin approvals |
+| `MONGODB_DATABASE_NAME` | `smajpihub_testnet_a2u` |
+| `PI_TESTNET_PAYOUT_DATABASE_NAME` | same isolated database name |
+| `MONGODB_URI` | secure connection using a database user restricted to the isolated database |
+| `SESSION_SECRET` | a new strong secret unique to this Testnet service |
+| `FRONTEND_URL` | the separate Testnet frontend HTTPS origin |
+| `ADMIN_PI_USERNAMES` | your existing authorized administrator's verified Pi username |
+| `PI_TESTNET_API_KEY` | server API key from the existing paired **Testnet** app |
+| `PI_TESTNET_WALLET_SEED` | that connected Testnet app wallet's 56-character Stellar secret seed beginning with S |
 
-Sources: [official Node SDK](https://github.com/pi-apps/pi-nodejs), [advanced payments](https://developers.minepi.com/docs/accept-payment/PaymentsAdvanced), [Platform API](https://developers.minepi.com/docs/api-reference/PlatformAPI).
+Keep existing required non-payment deployment settings (such as Cloudinary public configuration) appropriate to the isolated copy. Never copy Mainnet secrets. The payout SDK does not fall back to `PI_API_KEY` or Mainnet credentials. It rejects a Testnet key equal to `PI_MAINNET_API_KEY`.
 
+Frontend build settings for the separate Testnet site:
 
-## Read-only preflight and first payout
+- `VITE_TESTNET_PAYOUT_TOOLS=true` exposes `/testnet-wallet` and `/admin/testnet-payouts` only in this build. It is absent by default in Mainnet builds.
+- `VITE_API_BASE_URL` and `VITE_BACKEND_URL`: the isolated backend HTTPS URL.
+- `VITE_SANDBOX_SDK=false` for the registered Testnet app's normal production URL. Testnet app registration selects Testnet; Sandbox is a development-preview mode, not a synonym for Testnet. No Run in Sandbox step is needed.
+- `VITE_PI_PAYMENTS_ENABLED=false`; `VITE_PI_ADS_ENABLED=false`.
+- Build using `npm run build --prefix frontend`, publish `frontend/dist`, and configure SPA fallback. Register/verify that separate URL on the **existing paired Testnet app**. The Mainnet app keeps `https://smajpihub.com`.
 
-`GET /admin/testnet/a2u/preflight?uid=<UID>` uses the same strict Hub bearer authentication. It performs only external GET requests: `/v2/me`, `/v2/payments/incomplete_server_payments`, and Testnet Horizon account/ledger reads. It never invokes create, submit, cancel, or complete. It checks recipient identity and wallet-address consent, valid seed format, API key acceptance, activated sender/recipient wallets, spendable balance after reserve/fee, and existing recipient/lock records. It returns public wallet addresses and booleans, never credentials. The POST performs these checks again before reserving a new payout. Completed payouts retain idempotent responses.
+Credentials belong only in the hosting provider's protected environment settings, not in source, frontend variables, screenshots or chat. No new service or production configuration was changed by this code task.
 
-An accepted API key on the read-only endpoint alone does **not** prove it belongs to the intended Testnet app or that the seed wallet is connected to that app. Compare `senderWalletAddress` against the connected Testnet App Wallet in Pi Developer Portal and confirm this API key belongs to that same app. The payment response's network is still checked before submission. Preflight also cannot guarantee future network fees/balances or outcomes.
+## Complete the five transfers
 
-Normal Pi Browser login now requests `wallet_address` alongside `username` only when the existing SDK runs in sandbox/Testnet mode. Mainnet login scopes and SDK initialization are unchanged. Existing users must sign out and sign in again through the same Testnet app and approve wallet sharing; a persistent Hub session does not refresh an expired upstream Pi token. A UID from another app (or before revoked permissions) must not be reused.
+1. In Pi Browser **Develop**, open the existing paired Testnet app. Confirm its server API key and connected App Wallet correspond to the isolated server settings. Compare the public sender address shown on `/admin/testnet-payouts` with the portal. Activate/fund that wallet on **Testnet**; do not fund a different network.
+2. Ask five distinct recipients to activate their Testnet wallets in Pi Wallet, then open the **same Testnet app**, sign in normally and visit `/testnet-wallet`. Each chooses **Verify my Testnet wallet sharing** and approves wallet sharing. This writes only isolated qualification evidence and sends no payment.
+3. Sign in as the authorized administrator on that Testnet site, open `/admin/testnet-payouts`, select one eligible recipient and run readiness checks. Review the exact recipient and sender addresses. Each recipient wallet must differ from the app wallet and the other four recipients.
+4. For each transfer you approve, open **Send 0.01 Test-Pi**, check the wallet confirmation and click **Confirm and send 0.01 Test-Pi** within five minutes of preflight. Nothing sends merely by opening the page, searching, refreshing or running preflight.
+5. Wait for **completed** and record the displayed **Transaction ID**, not just the Pi payment ID. Progress must reach **5 / 5** unique verified wallets. If a timeout occurs, inspect history and use **Verify existing transfer (no resend)** when appropriate. Do not automatically retry an uncertain payment.
+6. Return to the Mainnet app's wallet application checklist in the Pi Developer Portal, refresh the paired Testnet payment requirement, and complete the remaining owner-only wallet/application steps shown there. If the portal does not count five verified transactions, confirm pairing and ask Pi support with the five public transaction IDs. Do not repeat payments or switch wallets blindly.
 
-1. Wait until `https://smajpihub.onrender.com/health` reports the new commit and MongoDB, and GitHub Pages has deployed the login change.
-2. Recipient signs in freshly on the Testnet app and approves wallet sharing. Obtain **only** `user.uid` from the successful backend `/user/signin` response or authenticated `/user` response. Never trust a guessed UID or a profile badge. For a first payout to your own admin account, the helper below obtains your UID through authenticated `/user` automatically.
-3. Sign in as admin. Privately obtain the current `session.accessToken` (`hub_access.…`) from your own sign-in response or the `accessToken` field of your browser's `smaj_hub_session` storage entry. Do not share/copy the full response, seed, API key, or refresh token into chat, screenshots, shell commands, or repository files.
-4. In a trusted terminal at the repository root, run `python3 scripts/testnet-a2u.py`. Paste the admin Hub token at its hidden prompt. Enter the recipient UID, or press Enter to use your own verified admin UID. This command **cannot send a payment**; it only runs preflight. Compare its public sender address with the connected Testnet wallet in Pi Developer Portal. Confirm the key belongs to that app and both wallets are Testnet wallets.
-5. Only when ready to approve the payment, run `python3 scripts/testnet-a2u.py --send`. It repeats preflight, asks you to confirm the wallet mapping, then requires the exact typed approval `SEND 0.01 TEST-PI TO <UID>`. It sends one POST only after that approval.
-6. Expect `status: completed`, amount `0.01`, network `Pi Testnet`, paymentId, txid, and recipientWalletAddress; confirm receipt in Pi Wallet's Testnet view. On timeout/409, stop and reconcile. Never clear a lock to try again.
+Optional CLI: `python scripts/testnet-a2u.py --base-url https://YOUR-ISOLATED-TESTNET-BACKEND` is read-only preflight. Adding `--send` asks for an exact typed approval and sends one payment only after confirmation. The CLI now refuses the existing Mainnet backend URL and forwards both confirmed wallets and signed approval. Use only in a trusted local terminal; never paste its token into chat.
 
-The helper uses only Python's standard library, never saves credentials, and defaults to a read-only check. Render access and an authenticated admin session are required to verify private runtime prerequisites; a public health response cannot verify the secret values or wallet connection.
+## Tests
 
-
-## Admin website dashboard
-
-Open **Admin Dashboard → Pi Payments → Testnet Payouts**, or `/admin/testnet-payouts`. Existing admin authentication is attached automatically by the shared API client; there is no token-entry flow. The page never reads, renders, or persists credentials itself. All payout APIs remain restricted to a valid admin Hub session, with credentials excluded from response projections and caching disabled.
-
-The dashboard shows the configured Testnet wallet address, balance, available balance after reserve, API readiness, and any unresolved wallet lock. A read-only API cannot establish the Developer Portal app-to-wallet mapping: compare the displayed address with the connected Testnet app wallet before confirming a payout. Wallet seeds and API keys remain on the backend.
-
-The recipient directory freshly verifies Pi `/me` identity and wallet sharing on the server, in batches of four across pages of twenty recent logged-in accounts. Search names, usernames or UID to find older accounts. Only users with verified identity and wallet consent are listed; previously reserved/paid users or wallets are disabled. No stored user token is returned. An empty page may require signing in again, granting wallet consent, searching, or moving to the next page.
-
-Selecting a user runs preflight. **Send 0.01 Test-Pi** opens a native confirmation dialog showing recipient and sender addresses. Confirm the Developer Portal mapping and explicitly confirm the transfer. Cancellation sends no payment. New sends repeat server preflight and use the existing SDK flow. The page disables repeated clicks and does not retry uncertain transfers; a failed/unknown result requires checking the persisted history and reconciliation.
-
-Each UID and wallet address can receive only once. `_id: wallet:<address>` reservations are acquired inside the existing serialized wallet operation before submission and retained after completion or uncertainty. Legacy completed/submitted records are also checked, so an alternate UID sharing an already paid wallet cannot bypass the protection. Never delete these reservations to force a resend.
-
-The five-wallet progress indicator counts distinct recipient addresses only from Testnet records with completed status, a txid, and both Pi verification/completion flags. Reserved, pending, failed, cancelled or duplicate-wallet records do not count. History displays persisted IDs and addresses for all Testnet payout attempts, with pagination.
-
-New read-only APIs: `GET /admin/testnet/a2u/dashboard?page=1` and `GET /admin/testnet/a2u/recipients?page=1&search=...`. Neither creates or submits a payment. Run backend checks with `npm run test:testnet-a2u --prefix backend` and mocked mobile/desktop browser checks with `npm run test:testnet-payouts --prefix frontend` (or append `-- --browser firefox`). The three browser checks passed in Firefox at 390px and 1280px, including cancel, confirm, history/progress, and uncertain-result behavior. Chromium could not launch in this execution environment. No real payment or production admin credential is used in these tests.
-
-Deployment: both the GitHub Pages frontend and Render backend must serve this commit. A healthy `/health` on an older revision is not a completed backend deployment. Render must contain `PI_TESTNET_API_KEY` and `PI_TESTNET_WALLET_SEED`; the admin must have authorized access; recipient and sender wallets must be activated and funded appropriately. Mainnet and other service endpoints/configuration are unchanged.
-
-Dashboard confirmations bind both displayed wallet addresses to the POST request. If either address changes, the server rejects before creation; the SDK payment addresses are checked against preflight again before submission. The optional `recipientWalletAddress` and `senderWalletAddress` fields are accepted for this purpose; existing UID-only clients remain compatible.
-
-
-## Dashboard request/search investigation and fixes
-
-Public production inspection confirmed backend `86a3a5f` was live with MongoDB and `/health` HTTP 200. Anonymous payout endpoints correctly returned HTTP 401; the `smajpihub.com` CORS preflight succeeded. The same preflight from `https://sandbox.minepi.com` was rejected. Sandbox CORS is now permitted only for Testnet payout and identity/session paths when the Testnet app key is configured. Mainnet payment and unrelated service routes retain their existing policy.
-
-Confirmed source defects:
-
-- Search used only username/name/UID and treated `@` literally. Wallet addresses were not indexed by verified login, so wallet lookup could not work. Search now normalizes `@username` and queries UID/name or locally known wallet addresses. This is not global discovery of arbitrary Pi wallets; a user must first authenticate with this app. Search by username can verify/backfill a legacy login's wallet; a subsequent wallet lookup then works.
-- `/user/signin` discarded the wallet address returned by Pi's server. It now saves `piVerifiedUid`, `piIdentityVerifiedAt`, `piWalletAddress`, and `piWalletVerifiedAt` exclusively from the server's `/me` response, rejects missing authoritative UID/username, and never trusts a browser-supplied wallet address. Signup/signin failure logs no longer dump Axios headers/tokens.
-- The directory silently discarded every upstream verification failure and required a live recipient OAuth token even though A2U itself uses app credentials and UID. Previously saved, server-verified consent may now survive OAuth expiry. A fresh identity mismatch, missing consent or denied permission removes eligibility and invalidates saved wallet evidence. Blocked/revoked local access remains rejected. Pi's payment DTO still must match the confirmed wallets, UID, network and amount before submission.
-- The shared API client selected the cached profile token even when the canonical `smaj_hub_session` held a newer Hub token. Only payout requests now prefer the existing canonical Hub credential; no user copy/paste or weaker admin authentication is introduced.
-- A generic shared admin check could intercept requests before payout-specific JSON errors. Payout routes now run their existing strict Hub/admin handler directly before the unrelated admin middleware. Session, role, API route, network/CORS, timeout and server errors receive distinct messages. Search errors and missing consent/API-outage counts are shown separately from a genuine no-match result.
-
-The reported `[pi-payment-recovery]` 401 loop belongs to `storePaymentRecovery.ts`, which retries using **PI_API_KEY** through `platformAPIKeyClient`. Testnet A2U uses **PI_TESTNET_API_KEY**. Those log entries alone do not demonstrate failure of the A2U key. The Store worker, its credentials, Mainnet and other services were not rerouted or changed. Production access is needed to determine whether its separate key is missing, invalid, or belongs to a different app/payment history.
-
-Readiness now distinguishes absent/invalid seed, missing Testnet app key, Pi HTTP 401, Pi HTTP 403, API outage, incomplete payment, unactivated wallet and insufficient spendable funds. Only configured booleans, HTTP status, public wallet address, balances and safe messages leave the server. Backend revision is displayed. Public health and anonymous checks cannot verify the private seed/key, connected-app mapping, or an authenticated admin's exact failing response; none of those are claimed verified without access.
-
-The mobile test fixture now renders AuthProvider, BrowserRouter and the full AdminLayout, with the complete application CSS. Payout-specific mobile styles reserve space beneath the fixed admin header and constrain the SPI logo. Browser checks assert logo/header/title separation and inspect both light and dark confirmation dialogs.
-
-Validation includes a real local HTTP Express login/session/admin-router flow with in-memory database and mocked Pi/Horizon responses. It checks server wallet evidence against spoofed client input, `@username`, UID and wallet searches, OAuth expiry, revoked consent, admin access and read-only readiness. External mutation calls are forbidden in that integration test. Browser send tests use mocked responses, never production payment credentials.
-
-Sandbox identity requests cannot exchange cookie-only sessions for credentials: login verifies its own Pi token, refresh requires an explicit Hub refresh header, and allowed identity reads/presence/signout require a verified Hub bearer. Profile editing and Mainnet payment paths are not added to the Sandbox CORS allowance. Full-layout dark-theme inspection also exposed shared root input tokens overriding the admin theme; payout search now bridges semantic control tokens to the selected admin theme without adding global overrides or new !important declarations.
-
-## Consent persistence and connection follow-up
-
-Read-only public checks during this fix: the Render dashboard endpoint returned the expected anonymous HTTP 401 with `Access-Control-Allow-Origin: https://smajpihub.com`. Sandbox payout and refresh preflights returned HTTP 204 and allowed the requested authorization/refresh headers. These checks establish public reachability/CORS at that moment, not the cause of an individual administrator's no-response failure. No production admin credential, MongoDB connection or Testnet wallet credential was available in this workspace.
-
-Confirmed code defects: username-only login could replace saved wallet evidence with an empty address; a narrower Pi response could erase it again during recipient search; local Hub logout was incorrectly treated as Pi wallet-consent revocation. Exact-UID evidence is now preserved across omitted wallet fields, token expiry and local logout. An explicit empty wallet, Pi HTTP 403 or verified UID mismatch still invalidates consent. A previous wallet from a different UID cannot be relabelled to the current UID. Blocked accounts remain ineligible.
-
-Testnet payout/consent requests now use only the canonical Hub bearer and disable cross-site cookies. Token-header refresh also works without cookies. Sandbox CORS no longer disappears when a Testnet credential is missing; guarded identity endpoints still require their own authenticated credentials and payouts still require authorized admins. Missing Testnet configuration can therefore produce a readable readiness response instead of an opaque CORS failure. Mainnet and unrelated routes are not added to the allowance.
-
-The admin dashboard includes **Verify my Testnet wallet sharing**. Other recipients can open `/testnet-wallet` through the same Testnet Pi app while signed in. The explicit action requests `username` and `wallet_address`, immediately verifies the Pi token through `/v2/me`, checks its UID equals the authenticated Hub account and saves the server-returned wallet evidence. It refreshes the existing server-held Pi token without exposing it in any response. Upstream Pi token expiry returns HTTP 422 so it cannot be mistaken for Hub/admin session expiry. No Pi SDK network/configuration setting is changed; a different app UID is refused rather than changing accounts or trusting a client-supplied wallet.
-
-Normal SDK authentication scopes are unchanged. Evidence already erased by old code cannot be reconstructed: those recipients must use the explicit wallet-sharing action. Pi UID verification is app-specific; Testnet activation is checked via the Testnet blockchain API, and the existing payment DTO network/UID/confirmed-wallet checks remain mandatory before signing. The read-only API cannot attest the Developer Portal app/connected-wallet mapping; the administrator must still check it.
-
-Search now retains matched ineligible accounts with an explicit reason, and distinguishes them from no matches or a Pi outage. The dashboard displays its configured API address and rejects unexpected HTML/response payloads. Recipient wallet HTTP 404 is distinguished from an upstream Testnet outage. Existing UID/wallet reservations and reconciliation locks are unchanged. No payment was sent, no records were reset and no Mainnet configuration was changed.
+`npm run test:testnet-a2u --prefix backend` covers approval binding/expiry, environment isolation, ledger proof, five-payout cap, duplicate wallets/UIDs, concurrency, uncertain submission and read-only reconciliation. `npm run test:testnet-payouts --prefix frontend` exercises the existing admin interface with mocked endpoints in light/dark mobile/desktop scenarios. Automated tests never contact a live payment-writing endpoint. Live credentials, five recipient consents, each explicit payment approval and portal acceptance remain owner-controlled steps.

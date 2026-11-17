@@ -2,11 +2,13 @@ import type { Request, Response } from "express";
 import { resolveHubAccessUser } from "../services/persistentSessions";
 import { getUserPlatformAPIClient } from "../services/platformAPIClient";
 import { piWalletPattern, verifiedPiIdentityFields } from "../services/piRecipientIdentity";
+import { requireTestnetPayoutDeployment } from "../services/testnetA2USafety";
 
 // Consent-only: no SDK payment or blockchain mutation is permitted here.
 export async function saveTestnetWalletConsent(req: Request, res: Response) {
   res.setHeader("Cache-Control", "no-store");
   try {
+    try { requireTestnetPayoutDeployment(); } catch { return res.status(503).json({ code: "testnet_deployment_required", message: "Use the isolated Testnet payout deployment. Mainnet and original account data cannot be used for wallet consent." }); }
     const hubToken = req.get("authorization")?.match(/^Bearer (hub_access\.[^\s]+)$/i)?.[1];
     const user = hubToken ? await resolveHubAccessUser(req, hubToken) : null;
     if (!user) return res.status(401).json({ code: "hub_session_required", message: "Sign in to SMAJ PI HUB before verifying Testnet wallet sharing." });
