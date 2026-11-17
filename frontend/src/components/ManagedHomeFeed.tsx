@@ -1,5 +1,5 @@
 import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { homeSectionDefaults } from "../content/homeContentDefaults";
@@ -81,7 +81,7 @@ function Card({ card, sports, trust, event = false }: { card: ContentCard; sport
       </div>
     </>
   );
-  return event ? <article className="managed-content-card">{body}</article> : card.to ? (
+  return registration ? <article className="managed-content-card">{body}</article> : card.to ? (
     <Link className="managed-content-card" to={card.to} state={card.serviceSlug ? serviceLaunchNavigationState(card.serviceSlug) : undefined}>
       {body}
     </Link>
@@ -98,20 +98,9 @@ export function ManagedHomeSection({
   children?: ReactNode;
   compact?: boolean;
 }) {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    if (section.id !== "events") return;
-    const update = () => setNow(Date.now());
-    const timer = window.setInterval(update, 30000);
-    window.addEventListener("focus", update);
-    return () => { window.clearInterval(timer); window.removeEventListener("focus", update); };
-  }, [section.id]);
   if (!section.visible) return null;
   const custom = section.mode === "custom";
-  const cards = section.id === "events" ? section.cards.filter(card =>
-    card.registrationUrl?.startsWith("https://") && safeChatUrl(card.registrationUrl)
-    && Number.isFinite(Date.parse(card.startsAt || "")) && Date.parse(card.endsAt || "") > now
-  ) : section.cards;
+  const cards = section.cards;
   return (
     <section
       className={(compact ? "mobile-feed-section" : "desktop-feed-section") + " managed-home-section"}

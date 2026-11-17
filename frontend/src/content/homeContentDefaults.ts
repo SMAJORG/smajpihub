@@ -178,8 +178,8 @@ export const homeSectionDefaults: HomeSection[] = [
   {
     id: "events",
     title: "Events happening now",
-    subtitle: "Free upcoming online events. Register directly with the organizer.",
-    to: "",
+    subtitle: "Tickets, events and local experiences.",
+    to: "/app/services/events",
     order: 10,
     visible: true,
     mode: "custom",
