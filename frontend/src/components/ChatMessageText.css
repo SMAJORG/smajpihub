@@ -8,3 +8,9 @@
 }
 .chat-message-link:hover { text-decoration-thickness: 2px; }
 .chat-message-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 2px; }
+.founder-welcome-message { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.founder-welcome-message p { margin: 0 0 0.8em; white-space: pre-wrap; line-height: 1.5; }
+.founder-welcome-message p:last-child { margin-bottom: 0; }
+.founder-welcome-link-line { display: block; overflow-wrap: anywhere; }
+.founder-welcome-loading { display: inline-block; width: 1.2em; height: 1.2em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: founder-welcome-spin 0.8s linear infinite; }
+@keyframes founder-welcome-spin { to { transform: rotate(360deg); } }

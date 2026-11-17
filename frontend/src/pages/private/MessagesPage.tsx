@@ -1,4 +1,5 @@
 import ChatMessageText from "../../components/ChatMessageText";
+import FounderWelcomeMessage from "../../components/FounderWelcomeMessage";
 import MessageDeliveryStatus from "../../components/MessageDeliveryStatus";
 import { useChatViewport } from "../../hooks/useChatViewport";
 import VoiceMessagePlayer from "../../components/VoiceMessagePlayer";
@@ -32,6 +33,7 @@ import PrivateSkeleton from "../../components/PrivateSkeleton";
 import VoiceNoteComposer from "../../components/VoiceNoteComposer";
 import ChatAttachmentSheet from "../../components/ChatAttachmentSheet";
 import { VoiceRecordingClock } from "../../lib/voiceRecordingClock";
+import { isFounderWelcomeMessage } from "../../lib/founderWelcome";
 
 type RichConversation = Conversation & {
   profileImage?: string;
@@ -1352,7 +1354,9 @@ const MessagesPageContent = () => {
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
                             <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
-                            <p><ChatMessageText text={item.message || "Message"} links={item.linkLabels} /></p>
+                            isFounderWelcomeMessage(active, item, user?.uid || "")
+                              ? <FounderWelcomeMessage text={item.message || "Message"} links={item.linkLabels} />
+                              : <p><ChatMessageText text={item.message || "Message"} links={item.linkLabels} /></p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
@@ -1475,7 +1479,9 @@ const MessagesPageContent = () => {
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
                             <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
-                            <p><ChatMessageText text={item.message || "Message"} links={item.linkLabels} /></p>
+                            isFounderWelcomeMessage(active, item, user?.uid || "")
+                              ? <FounderWelcomeMessage text={item.message || "Message"} links={item.linkLabels} />
+                              : <p><ChatMessageText text={item.message || "Message"} links={item.linkLabels} /></p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
