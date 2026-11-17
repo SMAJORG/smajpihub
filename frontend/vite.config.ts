@@ -53,6 +53,16 @@ export default defineConfig(({ mode }) => {
       react({ jsxImportSource: "@smaj/localization", babel: { plugins: [require('./scripts/localization/protect-content.cjs')] } }),
       tailwindcss(),
       {
+        name: "testnet-pi-domain-verification",
+        closeBundle() {
+          if (mode !== "production" || env.VITE_TESTNET_PAYOUT_TOOLS !== "true" || !env.PI_DOMAIN_VALIDATION_KEY) return;
+          if (!/^[a-f0-9]{128}$/.test(env.PI_DOMAIN_VALIDATION_KEY)) {
+            throw new Error("PI_DOMAIN_VALIDATION_KEY must contain exactly 128 lowercase hexadecimal characters.");
+          }
+          fs.writeFileSync(path.resolve(rootDir, "dist/validation-key.txt"), env.PI_DOMAIN_VALIDATION_KEY, "utf8");
+        },
+      },
+      {
         name: "app-version-manifest",
         generateBundle() {
           this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ version: appVersion, buildId: appBuildId, details: "The latest SMAJ PI HUB build includes the newest fixes and improvements." }) });
