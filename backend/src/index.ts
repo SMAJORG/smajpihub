@@ -1,4 +1,5 @@
 import { saveTestnetWalletConsent } from "./handlers/testnetWalletConsent";
+import { startWelcomeDelivery } from "./services/welcomeMessages";
 import { allowsTestnetSandboxOrigin, guardTestnetSandboxIdentity } from "./services/testnetCors";
 import { SESSION_TTL_SECONDS } from "./services/sessionPolicy";
 import { isHubAccessToken } from "./services/persistentSessions";
@@ -595,6 +596,8 @@ const start = async () => {
         ),
         app.locals.messageCollection.createIndex({ conversationId: 1, senderId: 1, clientMessageId: 1 }, { unique: true, partialFilterExpression: { clientMessageId: { $type: "string" } } }),
         app.locals.messageCollection.createIndex({ conversationId: 1, _id: -1 }),
+        app.locals.messageCollection.createIndex({ welcomeAccountId: 1 }, { unique: true, partialFilterExpression: { welcomeAccountId: { $type: "string" } } }),
+        app.locals.userCollection.createIndex({ welcomeMessagePending: 1 }, { partialFilterExpression: { welcomeMessagePending: true } }),
         app.locals.messageCollection.createIndex({
           conversationId: 1,
           createdAt: 1,
@@ -890,6 +893,7 @@ const start = async () => {
       const inventoryTimer = setInterval(() => { void expireUnfundedReservations(app).catch(() => console.error("Inventory recovery unavailable")); }, 60000);
       inventoryTimer.unref();
     }
+    startWelcomeDelivery(app);
     app.listen(env.port, () => {
       console.log(`SMAJ PI HUB backend listening on port ${env.port}!`);
       console.log(

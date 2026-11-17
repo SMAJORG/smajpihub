@@ -51,3 +51,18 @@ test('React escapes malicious markup and produces protected anchors instead of i
   assert.match(markup, /href="https:\/\/example.com\/\?a=1&amp;b=2"/);
   assert.match(markup, /rel="noopener noreferrer"/); assert.match(markup, /target="_blank"/);
 });
+
+test('approved welcome renders individually named legal links and functional official social URLs', () => {
+  const file=path.join(__dirname,'../src/components/ChatMessageText.tsx');
+  const appRequire=require('node:module').createRequire(file), React=appRequire('react');
+  const serviceFile=path.join(__dirname,'../../backend/src/services/welcomeMessages.ts');
+  const service={};
+  new Function('require','exports',ts.transpileModule(fs.readFileSync(serviceFile,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(()=>({}),service);
+  const component={};
+  new Function('require','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(name=>name.endsWith('/chatLinks')?api:name.endsWith('.css')?{}:appRequire(name),component);
+  const html=appRequire('react-dom/server').renderToStaticMarkup(React.createElement(component.default,{text:service.welcomeMessage,links:service.welcomeLinks}));
+  for(const {href,label} of service.welcomeLinks){assert(html.includes(`href="${href}"`));assert(html.includes(label.replaceAll('&','&amp;')));}
+  for(const href of ['https://t.me/smajpihub','https://x.com/smajpihub','https://x.com/Devsmaj'])assert(html.includes(`href="${href}"`));
+  assert.equal((html.match(/class="chat-message-link"/g)||[]).length,6);
+  assert(!html.includes('Make each document'));
+});

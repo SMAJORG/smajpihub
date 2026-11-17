@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { deliverWelcomeMessage } from "../services/welcomeMessages";
 import mountSmajVerification from "./smajVerification";
 import { smajVerification } from "../services/smajVerification";
 import { freshMainnetAccounts } from "../services/commerceEnvironment";
@@ -267,6 +268,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
       const role = isConfiguredAdmin ? "admin" : "buyer";
       await userCollection.updateOne({ uid: normalizedUser.uid }, { $setOnInsert: {
         username: normalizedUser.username,
+        welcomeMessagePending: true,
         piUsername: normalizedUser.username,
         uid: normalizedUser.uid,
         displayName: normalizedUser.username,
@@ -295,6 +297,9 @@ export const handleSignIn = async (req: Request, res: Response) => {
     const session = await issuePersistentSession(req, currentUser);
     await saveSession(req);
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
+    if (currentUser.welcomeMessagePending) {
+      void deliverWelcomeMessage(req.app, currentUser).catch(() => console.error("Welcome delivery deferred; will retry"));
+    }
     await createNotification(req.app, {
       userId: currentUser.uid, type: "security_login", title: "Successful Pi login",
       message: "Your SMAJ PI HUB account was signed in. Review your active devices if this was not you.",

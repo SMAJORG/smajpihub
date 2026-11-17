@@ -12,7 +12,7 @@ function matches(doc, query) {
     if (key === '$or') return value.some(item => matches(doc,item));
     const actual=doc[key];
     if (value && typeof value === 'object' && !(value instanceof ObjectId) && !(value instanceof Date)) {
-      return Object.entries(value).every(([op,target]) => op === '$ne' ? !(Array.isArray(actual) ? actual.some(item=>equal(item,target)) : equal(actual,target)) : op === '$exists' ? (actual !== undefined) === target : op === '$lt' ? String(actual)<String(target) : op === '$in' ? target.some(item=>equal(actual,item)) : false);
+      return Object.entries(value).every(([op,target]) => op === '$all' ? target.every(wanted=>Array.isArray(actual)&&actual.some(item=>equal(item,wanted))) : op === '$ne' ? !(Array.isArray(actual) ? actual.some(item=>equal(item,target)) : equal(actual,target)) : op === '$exists' ? (actual !== undefined) === target : op === '$lt' ? String(actual)<String(target) : op === '$in' ? target.some(item=>equal(actual,item)) : false);
     }
     return Array.isArray(actual) ? actual.some(item=>equal(item,value)) : equal(actual,value);
   });
@@ -29,13 +29,13 @@ class Collection {
     const stored={...doc,_id:doc._id || new ObjectId()};this.items.push(stored);return {insertedId:stored._id};
   }
   async updateOne(query, update, options={}) {
-    let item=this.items.find(item=>matches(item,query));
-    if (!item && options.upsert) { const result=await this.insertOne(update.$setOnInsert);item=this.items.find(item=>equal(item._id,result.insertedId)); }
+    let item=this.items.find(item=>matches(item,query)); let inserted=false;
+    if (!item && options.upsert) { const result=await this.insertOne(update.$setOnInsert);item=this.items.find(item=>equal(item._id,result.insertedId)); inserted=true; }
     if (!item) return {matchedCount:0};
     Object.assign(item,update.$set || {});
     for (const [key,value] of Object.entries(update.$pull || {})) item[key]=(item[key] || []).filter(entry=>value && value.$in ? !value.$in.some(target=>equal(entry,target)) : !equal(entry,value));
     for (const [key,value] of Object.entries(update.$addToSet || {})) item[key]=[...new Set([...(item[key]||[]),value])];
-    return {matchedCount:1};
+    return {matchedCount:inserted?0:1,upsertedCount:inserted?1:0};
   }
   async updateMany(query,update) { for(const item of this.items.filter(item=>matches(item,query))) await this.updateOne({_id:item._id},update); }
   async deleteOne(query) { this.items=this.items.filter(item=>!matches(item,query)); }
@@ -106,4 +106,70 @@ test('presence for an unsent profile chat needs no conversation or message write
   assert.equal(result.body.peers[0].uid,'bob'); assert.equal(h.locals.conversationCollection.items.length,0); assert.equal(h.locals.messageCollection.items.length,0);
   h.locals.userCollection.find = () => { throw Error('database unavailable'); };
   assert.equal((await h.call('get','/presence',{query:{recipient:'bob'}})).status,503);
+});
+
+function welcomeHarness() {
+  const h = harness(), notifications = [];
+  Object.assign(h.locals.userCollection.items[0], { _id: new ObjectId(), welcomeMessagePending: true });
+  Object.assign(h.locals.userCollection.items[1], { _id: new ObjectId(), role: 'admin' });
+  h.locals.siteContentCollection = new Collection([{ _id: 'welcome-message', senderUid: 'bob' }]);
+  h.locals.messageCollection.unique = (a,b) => Boolean(b.welcomeAccountId && a.welcomeAccountId === b.welcomeAccountId);
+  const service = {};
+  const code = ts.transpileModule(fs.readFileSync('backend/src/services/welcomeMessages.ts','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  vm.runInNewContext(code, { exports: service, require: name => name === 'mongodb' ? {ObjectId} : {createNotification:async(app,n)=>notifications.push(n)}, Date, console, setInterval, clearInterval });
+  return {...h, service, notifications, recipient: h.locals.userCollection.items[0], app: {locals:h.locals}};
+}
+
+test('one welcome under concurrent delivery appears in both normal inboxes and supports authenticated replies', async () => {
+  const h=welcomeHarness();
+  await Promise.all(Array.from({length:12},()=>h.service.deliverWelcomeMessage(h.app,{...h.recipient})));
+  assert.equal(h.locals.messageCollection.items.length,1);
+  assert.equal(h.locals.conversationCollection.items.length,1);
+  assert.equal(h.notifications.length,1);
+  const message=h.locals.messageCollection.items[0], id=message.conversationId;
+  assert.equal(message.senderId,'bob'); assert.equal(h.recipient.welcomeMessagePending,false);
+  assert.deepEqual(Array.from(message.message.matchAll(/\p{Extended_Pictographic}/gu),m=>m[0]),['🎉']);
+  for(const uid of ['alice','bob']){
+    const inbox=await h.call('get','/',{uid});
+    assert.equal(inbox.body.conversations.length,1);
+    const history=await h.call('get','/:id',{uid,params:{id}});
+    assert.equal(history.body.messages[0].message,message.message);
+    assert.equal(history.body.messages[0].linkLabels.length,3);
+  }
+  const reply=await h.call('post','/:id',{uid:'alice',params:{id},body:{message:'Thank you. I have a question.',clientMessageId:'reply_0001'}});
+  assert.equal(reply.status,201);
+  assert(h.locals.conversationCollection.items[0].unreadBy.includes('bob'));
+  const adminReply=await h.call('post','/:id',{uid:'bob',params:{id},body:{message:'How can I help?',clientMessageId:'reply_0002'}});
+  assert.equal(adminReply.status,201);
+  assert.equal((await h.call('get','/:id',{uid:'mallory',params:{id}})).status,404);
+  assert.equal((await h.call('post','/:id',{uid:'mallory',params:{id},body:{message:'No access'}})).status,404);
+});
+
+test('partial welcome delivery retries without a duplicate, overwritten replies or renewed unread state', async () => {
+  const h=welcomeHarness(), original=h.locals.conversationCollection.updateOne.bind(h.locals.conversationCollection);
+  let failed=false;
+  h.locals.conversationCollection.updateOne=async(q,u,o)=>{
+    if(u.$set?.lastMessageId&&!failed){failed=true;throw Error('temporary storage failure');}
+    return original(q,u,o);
+  };
+  await assert.rejects(h.service.deliverWelcomeMessage(h.app,h.recipient));
+  assert.equal(h.locals.messageCollection.items.length,1);
+  assert.equal(h.recipient.welcomeMessagePending,true);
+  await h.service.deliverWelcomeMessage(h.app,h.recipient);
+  const conversation=h.locals.conversationCollection.items[0];
+  conversation.lastMessage='A later reply';conversation.lastMessageId=new ObjectId().toString();conversation.unreadBy=[];
+  await h.service.deliverWelcomeMessage(h.app,{...h.recipient,welcomeMessagePending:true});
+  assert.equal(h.locals.messageCollection.items.length,1);
+  assert.equal(conversation.lastMessage,'A later reply');assert.deepEqual(conversation.unreadBy,[]);
+});
+
+test('no welcome for existing users, missing config, blocked accounts or a non-admin sender', async () => {
+  const h=welcomeHarness();
+  await h.service.deliverWelcomeMessage(h.app,{...h.recipient,welcomeMessagePending:false});
+  await h.service.deliverWelcomeMessage(h.app,{...h.recipient,blocked:true});
+  h.locals.userCollection.items[1].role='buyer';
+  await h.service.deliverWelcomeMessage(h.app,h.recipient);
+  h.locals.siteContentCollection.items=[];
+  await h.service.deliverWelcomeMessage(h.app,h.recipient);
+  assert.equal(h.locals.messageCollection.items.length,0);assert.equal(h.recipient.welcomeMessagePending,true);
 });

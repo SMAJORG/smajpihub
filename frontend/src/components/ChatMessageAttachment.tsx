@@ -162,7 +162,7 @@ export default function ChatMessageAttachment({
         </a>
       ) : null}
       <figcaption>
-        <ChatMessageText text={message.message || message.attachmentName || "Attachment"} />
+        <ChatMessageText text={message.message || message.attachmentName || "Attachment"} links={message.linkLabels} />
       </figcaption>
       {error ? <small role="status">{error}</small> : null}
     </figure>

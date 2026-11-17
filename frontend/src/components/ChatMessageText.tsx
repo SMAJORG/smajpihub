@@ -2,7 +2,7 @@ import type { MouseEvent } from "react";
 import { chatLinkParts, openChatUrl } from "../lib/chatLinks";
 import "./ChatMessageText.css";
 
-export default function ChatMessageText({ text }: { text: string }) {
+export default function ChatMessageText({ text, links = [] }: { text: string; links?: { href: string; label: string }[] }) {
   const open = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
     event.stopPropagation();
     if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -17,6 +17,6 @@ export default function ChatMessageText({ text }: { text: string }) {
     <a key={index} className="chat-message-link" href={part.href} target="_blank" rel="noopener noreferrer"
       onClick={event => open(event, part.href!)}
       onMouseDown={event => event.stopPropagation()} onMouseUp={event => event.stopPropagation()}
-      onTouchStart={event => event.stopPropagation()} onTouchEnd={event => event.stopPropagation()}>{part.text}</a>
+      onTouchStart={event => event.stopPropagation()} onTouchEnd={event => event.stopPropagation()}>{links.find(link => link.href === part.href)?.label || part.text}</a>
   ) : part.text)}</>;
 }

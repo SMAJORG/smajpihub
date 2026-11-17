@@ -1352,7 +1352,7 @@ const MessagesPageContent = () => {
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
                             <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
-                            <p><ChatMessageText text={item.message || "Message"} /></p>
+                            <p><ChatMessageText text={item.message || "Message"} links={item.linkLabels} /></p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
@@ -1475,7 +1475,7 @@ const MessagesPageContent = () => {
                           ) : ["image", "document"].includes(item.messageType || "") && (item.mediaAvailable || item.attachmentDataUrl || item.attachmentUrl) ? (
                             <ChatMessageAttachment message={item} owner={user?.uid || ""} onImage={url => setImagePreview({ src: url, caption: item.message, message: item })} onLoad={restoreChatViewport} uploadPercent={uploadProgress[item.clientMessageId || ""]} onRetry={() => retryMessage(item)} onCancel={() => cancelMessage(item)} />
                           ) : (
-                            <p><ChatMessageText text={item.message || "Message"} /></p>
+                            <p><ChatMessageText text={item.message || "Message"} links={item.linkLabels} /></p>
                           )}
                           <small className="chat-message-meta">
                             <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
