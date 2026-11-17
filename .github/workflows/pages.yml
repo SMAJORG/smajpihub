@@ -46,6 +46,9 @@ jobs:
       - name: Verify Mainnet login continuity and environment selection
         run: node --test frontend/tests/capacitorPiAuth.test.mjs frontend/tests/piPaymentReadiness.test.mjs frontend/tests/piIdentityEnvironment.test.mjs
 
+      - name: Verify Pi Ad Network isolation and SDK handling
+        run: node --test frontend/tests/piAds.test.cjs frontend/tests/nativeAds.test.mjs frontend/tests/adPolicy.test.mjs
+
       - name: Build frontend (GitHub Pages public mode)
         env:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || vars.VITE_BACKEND_URL || 'https://smajpihub.onrender.com' }}
@@ -54,6 +57,7 @@ jobs:
           # Enable only after the backup, backend cutover and Mainnet wallet checks.
           VITE_SANDBOX_SDK: 'false'
           VITE_PI_PAYMENTS_ENABLED: 'false'
+          VITE_PI_ADS_ENABLED: ${{ vars.VITE_PI_ADS_ENABLED || 'false' }}
           VITE_BUILD_ID: ${{ github.sha }}
         run: npm run build:public --prefix frontend
 

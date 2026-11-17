@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CookieOutlinedIcon from "@mui/icons-material/CookieOutlined";
 import { isCapacitorNative } from "../lib/capacitorPiAuth";
+import { isPiBrowserForAds } from "../lib/piAds";
 import "./CookieConsent.css";
 
 export const COOKIE_CONSENT_KEY = "smaj_cookie_consent_v1";
@@ -42,7 +43,7 @@ const loadOptionalServices = (consent: Consent) => {
     analyticsWindow.gtag("js", new Date());
     analyticsWindow.gtag("config", "G-TV6K9N9NE3", { anonymize_ip: true });
   }
-  if (consent.marketing && !document.querySelector('script[data-smaj-consent="marketing"]')) {
+  if (consent.marketing && !isPiBrowserForAds() && !document.querySelector('script[data-smaj-consent="marketing"]')) {
     const script = document.createElement("script");
     script.async = true;
     script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5794291397799733";

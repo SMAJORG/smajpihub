@@ -1,0 +1,10 @@
+.pi-dashboard-ad { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 20px clamp(12px, 3vw, 32px); padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); }
+.pi-dashboard-ad > div { min-width: 0; }
+.pi-dashboard-ad small { color: var(--muted); }
+.pi-dashboard-ad p { margin: 6px 0 0; line-height: 1.5; overflow-wrap: anywhere; }
+.pi-dashboard-ad .pi-dashboard-ad-status { color: var(--muted); font-size: 13px; }
+.pi-dashboard-ad button { flex-shrink: 0; min-height: 44px; padding: 10px 16px; border: 1px solid var(--primary); border-radius: 10px; background: var(--primary-soft); color: var(--text); font: inherit; cursor: pointer; }
+.pi-dashboard-ad button:hover:not(:disabled) { background: var(--soft-bg); }
+.pi-dashboard-ad button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.pi-dashboard-ad button:disabled { opacity: .65; cursor: default; }
+@media (max-width: 600px) { .pi-dashboard-ad { flex-direction: column; align-items: stretch; } }

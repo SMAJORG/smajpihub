@@ -1,0 +1,34 @@
+# Pi Ad Network — SMAJ PI HUB
+
+Reviewed 17 November 2026 against the official [Ads guide](https://developers.minepi.com/docs/setup-ads/Ads), [SDK reference](https://developers.minepi.com/docs/api-reference/SdkReference), and [application announcement](https://minepi.com/blog/ad-network-expansion/).
+
+## Implemented
+
+- Dashboard-only, optional interstitial, explicitly labeled as an advertisement. No automatic display on login, navigation, reload, timers or scrolling. No incentive, reward, artificial impression or click generation.
+- Uses the existing `https://sdk.minepi.com/pi-sdk.js` and existing `ensurePiInitialized()` configuration. No authentication, wallet, payment, API endpoint or database changes. Interstitials require no extra authentication scope or server API key.
+- Checks Pi Browser and `nativeFeaturesList()` for `ad_network`, then `Ads.isAdReady("interstitial")`, one `Ads.requestAd("interstitial")` if needed, and `Ads.showAd("interstitial")`. SDK controls the full-screen creative and close controls; no iframe/banner substitute.
+- Single outstanding request, two-minute per-tab attempt cap, graceful SDK/no-inventory errors, and a 45-second UI watchdog that retains the native lock until the original operation settles. Navigation, logout, dialogs, text entry, hidden pages and existing advertising opt-outs prevent display.
+- Unsupported desktop/mobile browsers and standalone Android WebViews do not show this placement. A Pi Browser version must advertise the official feature; there is no forced desktop emulation. Existing Android-only ads remain separate and excluded from Pi Browser. The website's AdSense loader is now excluded from Pi Browser too.
+- No rewarded ads: implementing rewards would require an actual reward product, authenticated users and server-side `adId` verification with Pi before any reward grant. This integration grants nothing.
+
+## Activation settings
+
+`VITE_PI_ADS_ENABLED` is a **public build flag**, not a credential. Default: `false`. No other new environment variables, API keys, ad-unit IDs or server secrets are needed.
+
+For the existing GitHub Pages deployment: repository **Settings → Secrets and variables → Actions → Variables**, set `VITE_PI_ADS_ENABLED=true` when ready to enable the placement, then rerun **Deploy GitHub Pages**. `.github/workflows/pages.yml` forwards this variable to the public build. Other hosts may set the same build environment variable before building the frontend. Set it to `false` and rebuild to disable. No backend redeployment is necessary.
+
+## Developer Portal steps (owner access required)
+
+1. In Pi Browser, open `https://develop.pinet.com`, then select the existing **SMAJ PI HUB Mainnet** app registered for `https://smajpihub.com`. Do not create a new app or change Testnet, credentials, wallet or domain ownership for this integration.
+2. Confirm eligibility for the Mainnet Ecosystem Interface and compliance with Pi's current developer/ecosystem requirements. Pi's published application announcement requires an ecosystem-listed Mainnet app; applying does not guarantee approval.
+3. Open **Dev Ad Network → Ads Checklist**. Complete the three items and submit the application using the current portal instructions. Review and accept the actual ad-content, placement and monetization terms shown there; owner-only checklist wording and approval status cannot be verified from this repository.
+4. Wait for Pi Core Team approval and complete any publisher/payout confirmation explicitly requested by the portal. Code does not grant approval or activate revenue. Do not send passwords, tokens or wallet keys in chat.
+5. Optionally enable **Dev Ad Network → Settings → Enable Loading Banner Ads**, if available for the app. These are Pi-managed loading banners; the SDK does not expose an in-page banner API. Portal settings may be cached in Pi Browser.
+6. Enable the build flag above and deploy. In an up-to-date supported Pi Browser, sign in normally, finish onboarding, open `/dashboard`, and make a controlled manual test using **View advertisement**. Verify inventory/no-fill, closing, navigation and error behavior. Follow any test procedure supplied by the portal; the public SDK docs do not document a test ad-unit ID or an ads-specific test-mode parameter. Do not alter production Sandbox/authentication settings or click live creatives to test revenue.
+7. Confirm application approval and actual monetization reporting in the portal. SDK feature availability or a successful ad display alone does not prove revenue is active.
+
+## Verification
+
+`node --test frontend/tests/piAds.test.cjs` exercises official call sequences, eligibility, opt-outs, no-fill, SDK errors, concurrency, cooldown, cancellation and delayed native completion. `frontend/tests/piAdsBrowser.test.cjs` covers the actual dashboard placement with mocked SDK responses and full application CSS in light/dark themes at phone, tablet and desktop sizes. No live ad traffic is generated by automated tests.
+
+Physical Pi Browser testing and owner-only portal approval remain release requirements; mocked SDK tests do not establish ad inventory or publisher approval.

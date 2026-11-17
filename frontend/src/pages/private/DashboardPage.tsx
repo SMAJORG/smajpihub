@@ -1,4 +1,5 @@
 import HeroBannerAction from "../../components/HeroBannerAction";
+import PiDashboardAd from "../../components/PiDashboardAd";
 import ManagedHomeFeed, { DashboardEventsSection } from "../../components/ManagedHomeFeed";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -596,7 +597,7 @@ const DashboardPage = () => {
 
   if (!dashboardStartupComplete && dashboardLoading) return <main className="dashboard-circle-loading" role="status" aria-live="polite" aria-label="Opening dashboard"><span /></main>;
 
-  return <main className="private-home"><LanguageSoonButton dashboardPrompt /><PullToRefresh onRefresh={() => loadProducts(false)} /><DesktopFeedHome activeTab={activeTab} onTabChange={setActiveTab} products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /><MobileHome activeTab={activeTab} onTabChange={setActiveTab} products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /></main>;
+  return <main className="private-home"><LanguageSoonButton dashboardPrompt /><PullToRefresh onRefresh={() => loadProducts(false)} /><DesktopFeedHome activeTab={activeTab} onTabChange={setActiveTab} products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /><MobileHome activeTab={activeTab} onTabChange={setActiveTab} products={products} productsLoading={productsLoading} productsError={productsError} sellers={sellers} recentItems={recentItems} recommendedServices={recommendedServices} streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} /><PiDashboardAd /></main>;
 };
 
 export default DashboardPage;
