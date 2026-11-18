@@ -32,7 +32,7 @@ Message from the SMAJ PI HUB Team
 
 We welcome your feedback. Message the SMAJ PI HUB Team here on SMAJ PI HUB.
 
-Follow SMAJ PI HUB on X: https://x.com/Devsmaj
+Follow the Founder on X: https://x.com/Devsmaj
 
 CONNECT • EMPOWER • GROW
 

@@ -55,6 +55,7 @@ test("formats section headings, service lists, paragraphs, and links on separate
   assert.match(formatted, /https:\/\/smajpihub\.com\/terms,\nhttps:\/\/smajpihub\.com\/privacy,\nand https:\/\/smajpihub\.com\/seller-agreement/u);
   assert.match(formatted, /Telegram:\nhttps:\/\/t\.me\/smajpihub\nX:\nhttps:\/\/x\.com\/smajpihub/u);
   assert.match(formatted, /Message from the SMAJ PI HUB Team/u);
+  assert.match(formatted, /Follow the Founder on X:\nhttps:\/\/x\.com\/Devsmaj/u);
   assert.match(formatted, /— SMAJ PI HUB Team/u);
   assert.doesNotMatch(formatted, /Founder & CEO/u);
 });
