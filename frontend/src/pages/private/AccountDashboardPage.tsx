@@ -16,6 +16,7 @@ import XIcon from "@mui/icons-material/X";
 import YouTubeIcon from "@mui/icons-material/YouTube";
 import { useAuthContext } from "../../contexts/AuthContext";
 import TrustBadge from "../../components/TrustBadge";
+import InvitePromoCard from "../../components/InvitePromoCard";
 
 const quickLinks = [
   ["Profile", "/profile", PersonOutlineOutlinedIcon],
@@ -90,6 +91,8 @@ const AccountDashboardPage = () => {
           </Link>
         ))}
       </section>
+
+      <InvitePromoCard placement="account" />
 
       <section className="account-dashboard-list">
         {accountRows.map(([label, description, to]) => (

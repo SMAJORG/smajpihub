@@ -18,6 +18,7 @@ declare global {
         showAd(type: "interstitial"): Promise<{ type: "interstitial"; result: "AD_CLOSED" | "AD_DISPLAY_ERROR" | "AD_NETWORK_ERROR" | "AD_NOT_AVAILABLE" | "ADS_NOT_SUPPORTED" }>;
       };
       init(config: { version: string; sandbox: boolean }): void | Promise<void>;
+      openShareDialog?(title: string, message: string): void;
 
       authenticate(scopes: string[], onIncompletePaymentFound?: (payment: PaymentDTO) => void): Promise<AuthResult>;
 

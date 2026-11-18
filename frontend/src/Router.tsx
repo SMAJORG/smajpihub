@@ -53,6 +53,7 @@ import SettingsPage from "./pages/private/SettingsPage";
 import DeviceSessionsPage from "./pages/private/DeviceSessionsPage";
 import AppLockSettingsPage from "./pages/private/AppLockSettingsPage";
 import AccountDashboardPage from "./pages/private/AccountDashboardPage";
+import ReferralPage from "./pages/private/ReferralPage";
 import SellerPage, { SellerProductsPage } from "./pages/private/SellerPage";
 import EditProductPage from "./pages/private/EditProductPage";
 import SellerProfilePage from "./pages/private/SellerProfilePage";
@@ -1196,6 +1197,16 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <PrivateLayout>
           <AccountDashboardPage />
+        </PrivateLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/referrals",
+    element: (
+      <ProtectedRoute>
+        <PrivateLayout>
+          <ReferralPage />
         </PrivateLayout>
       </ProtectedRoute>
     ),

@@ -37,6 +37,7 @@ import { getStreamPlayback, type StreamPlaybackVideo } from "../../lib/streamPla
 import type { Product, VerificationLevel, VerificationStatus } from "../../types/marketplace";
 import useSportsCatalog from "../../hooks/useSportsCatalog";
 import type { SportsCatalog } from "../../types/sports";
+import InvitePromoCard from "../../components/InvitePromoCard";
 
 type DiscoveryTab = "for-you" | "trending" | "lifestyle" | "categories";
 
@@ -457,6 +458,7 @@ const MobileHome = ({ activeTab, onTabChange, products, productsLoading, product
       <div className="mobile-home-hero-dots" aria-label="Hero slides">{heroImages.map((_, index) => <button type="button" className={index === heroSlide ? "active" : ""} aria-label={`Show hero image ${index + 1}`} aria-current={index === heroSlide ? "true" : undefined} onClick={() => setHeroSlide(index)} key={index} />)}</div>
     </section> : null}
     <div ref={tabsAnchorRef} className={`mobile-home-tabs-anchor ${tabsPinned ? "is-pinned" : ""}`}><DiscoveryTabButtons className="mobile-home-tabs" activeTab={activeTab} onTabChange={handleTabChange} /></div>
+    {activeTab === "for-you" ? <InvitePromoCard placement="home" /> : null}
     {activeTab === "for-you" ? <ManagedHomeFeed entries={[
  {id:"recent",content:<RecentlyAddedSection compact={true} products={products} loading={productsLoading} error={productsError}/>},
  {id:"sellers",content:<FeaturedSellersSection compact={true} sellers={sellers} loading={productsLoading} error={productsError}/>},
@@ -473,6 +475,7 @@ const MobileHome = ({ activeTab, onTabChange, products, productsLoading, product
 const DesktopFeedHome = ({ activeTab, onTabChange, products, productsLoading, productsError, sellers, recentItems, streamRows, streamLoading, sportsCatalog, sportsLoading }: { activeTab: DiscoveryTab; onTabChange: (tab: DiscoveryTab) => void; products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => <div className="desktop-private-home desktop-feed-home">
   <section className="desktop-feed-hero"><div><p className="private-kicker">SMAJ PI HUB</p><h1>Everything you need.<br />One place.</h1><p>Discover services, products, media, support, and everyday tools from one connected dashboard.</p><div className="desktop-feed-hero-actions"><Link className="private-primary-button" to="/app/services">Explore Services <ArrowForwardOutlinedIcon /></Link><Link className="private-secondary-button" to="/store">Open SMAJ Store</Link></div></div><div className="desktop-feed-hero-icons">{serviceCatalog.slice(0, 6).map((service) => <Link key={service.slug} to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} title={service.name}><ServiceArt index={service.atlasIndex} /><em className={serviceBadgeClass(service)}>{getServiceLaunchLabel(service.slug)}</em></Link>)}</div></section>
   <DiscoveryTabButtons className="desktop-feed-tabs" activeTab={activeTab} onTabChange={onTabChange} />
+  {activeTab === "for-you" ? <InvitePromoCard placement="home" /> : null}
   {activeTab === "for-you" ? <><div className="desktop-feed-priority-grid"><ContinueSection items={recentItems}/><PopularSearchSection/></div><ManagedHomeFeed compact={false} entries={[
  {id:"recent",content:<RecentlyAddedSection compact={false} products={products} loading={productsLoading} error={productsError}/>},
  {id:"sellers",content:<FeaturedSellersSection compact={false} sellers={sellers} loading={productsLoading} error={productsError}/>},
