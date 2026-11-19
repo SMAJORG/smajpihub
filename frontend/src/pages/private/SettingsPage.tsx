@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ConfirmSignOutModal from "../../components/ConfirmSignOutModal";
 import LanguageSoonButton from "../../components/LanguageSoonButton";
 import TrustBadge from "../../components/TrustBadge";
-import { useSmajVerification } from "../../lib/smajVerification";
+import { isSmajVerificationApproved, useSmajVerification } from "../../lib/smajVerification";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -439,7 +439,7 @@ const SettingsPage = () => {
           <span>{piAccount}</span>
           <small>
             <TrustBadge userId={user?.uid} />
-            {identityVerification?.verified
+            {isSmajVerificationApproved(identityVerification)
               ? "SMAJ Verified"
               : identityVerification?.status === "pending"
                 ? "Verification pending"

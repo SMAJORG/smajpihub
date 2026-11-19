@@ -1,9 +1,9 @@
-import { useSmajVerification } from "../lib/smajVerification";
+import { isSmajVerificationApproved, useSmajVerification } from "../lib/smajVerification";
 import "./SmajVerifiedBadge.css";
 
 export default function SmajVerifiedBadge({ userId }: { userId?: string }) {
   const verification = useSmajVerification(userId);
-  if (!verification?.verified || verification.status !== "approved") return null;
+  if (!isSmajVerificationApproved(verification)) return null;
   const level = verification.level || "pi_verified";
   const label = level === "trusted_seller" ? "Trusted Seller" : level === "seller_verified" ? "Seller Verified" : "Pi Verified";
   return <span className={`smaj-verified-badge ${level}`} role="img" aria-label={`SMAJ Verified — ${label}`} title={`SMAJ Verified — ${label}. Product, professional and institutional approvals are separate.`}>

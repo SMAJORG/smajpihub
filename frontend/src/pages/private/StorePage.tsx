@@ -26,7 +26,7 @@ import { heroSlides, promoStripItems } from "../../content/storefront";
 import { getHeroBannerState, getHeroBannerLabel, getHeroBannerTarget, getHeroBannerButtonText } from "../../lib/heroBanners";
 import logoImage from "/assets/services/store.png";
 import { PI_USDT_RATE } from "../../lib/piPricing";
-import { useSmajVerifications } from "../../lib/smajVerification";
+import { isSmajVerificationApproved, useSmajVerifications } from "../../lib/smajVerification";
 
 const STORE_CATEGORIES = ["Deals", "Grocery", "Electronics", "Mobiles", "Laptops", "Fashion", "Beauty", "Home", "Vehicles", "Accessories"];
 const STORE_LOCATION_STORAGE_KEY = "smaj-store-location";
@@ -211,7 +211,7 @@ const StorePage = () => {
     const maximum = maxPrice === "" ? null : Number(maxPrice);
     const filtered = products.filter((product) => {
       const price = product.priceUsdt ?? product.pricePi * PI_USDT_RATE;
-      const verified = sellerVerifications[product.sellerId]?.verified === true;
+      const verified = isSmajVerificationApproved(sellerVerifications[product.sellerId]);
       const inStock = product.productStatus !== "out_of_stock" && (product.quantity === undefined || product.quantity > 0) && (product.variants?.length ? product.variants.some((variant) => (variant.stock || 0) > 0) : true);
       const matchesLocation = locationFilter === "All" || [product.country, product.stateRegion, product.city, product.location].some((value) => value?.toLowerCase().includes(locationFilter.toLowerCase()));
       return (category === "All" || product.category === category)

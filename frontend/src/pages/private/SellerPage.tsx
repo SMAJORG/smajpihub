@@ -5,7 +5,7 @@ import { axiosClient } from "../../lib/axiosClient";
 import { formatPiAmount } from "../../lib/formatters";
 import { useAuthContext } from "../../contexts/AuthContext";
 import TrustBadge from "../../components/TrustBadge";
-import { useSmajVerification } from "../../lib/smajVerification";
+import { isSmajVerificationApproved, useSmajVerification } from "../../lib/smajVerification";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import PullToRefresh from "../../components/PullToRefresh";
 import ActionDialog from "../../components/ActionDialog";
@@ -355,7 +355,7 @@ function SellerWorkspace({
   const finance = data?.finance.find(
     (item) => item.network === selectedNetwork,
   );
-  const verified = identityVerification?.verified === true;
+  const verified = isSmajVerificationApproved(identityVerification);
   return (
     <main className="private-page seller-workspace">
       <PullToRefresh onRefresh={load} />
