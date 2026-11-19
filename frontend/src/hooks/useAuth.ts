@@ -8,6 +8,7 @@ import type { AuthResult, User } from "../types/pi";
 import { authenticateWithCapacitorPi, isCapacitorNative, type CapacitorPiAuthStage } from "../lib/capacitorPiAuth";
 import { isSoloHostRuntime } from "../lib/soloHost";
 import { authenticateWithSoloHostPi } from "../lib/soloHostPiAuth";
+import { clearCachedResponsesForNamespace } from "../lib/offlineCache";
 
 type AuthFeedback = { type: "success" | "error"; message: string };
 type BackendErrorBody = { error?: string; message?: string };
@@ -102,6 +103,12 @@ const getStoredPiUser = () => {
 };
 
 const storeUser = (user: User) => {
+  const previous = getStoredPiUser();
+  if (previous?.uid && previous.uid !== user.uid) {
+    void clearCachedResponsesForNamespace(previous.uid).catch(error => {
+      console.warn("Could not clear the previous account's cached API responses.", error);
+    });
+  }
   const browserSafeUser = isCapacitorNative() ? { ...user, accessToken: undefined } : user;
   window.localStorage.setItem(PI_USER_STORAGE_KEY, JSON.stringify(browserSafeUser));
   if (isCapacitorNative() && user.accessToken) {
@@ -256,7 +263,21 @@ export const useAuth = () => {
       setUser(current => current ? storeUser(toUser({ avatar }, current)) : current);
     };
     const syncTab = (event: StorageEvent) => {
-      if (event.key === PI_USER_STORAGE_KEY) setUser(getStoredPiUser());
+      if (event.key !== PI_USER_STORAGE_KEY) return;
+      const current = getStoredPiUser();
+      if (event.oldValue) {
+        try {
+          const previous = JSON.parse(event.oldValue) as User;
+          if (previous.uid && previous.uid !== current?.uid) {
+            void clearCachedResponsesForNamespace(previous.uid).catch(error => {
+              console.warn("Could not clear the previous account's cached API responses.", error);
+            });
+          }
+        } catch {
+          // A malformed prior profile cannot identify a cache namespace to clear.
+        }
+      }
+      setUser(current);
     };
     window.addEventListener("smaj:profile-avatar-updated", updateAvatar);
     window.addEventListener("storage", syncTab);
@@ -412,7 +433,7 @@ export const useAuth = () => {
   }, [signInUser]);
 
   const refreshPiSession = useCallback(async () => {
-    try { return Boolean(await refreshHubSession(getBaseURL())); }
+    try { return Boolean(await refreshHubSession(getBaseURL(), true)); }
     catch { return false; }
   }, []);
 

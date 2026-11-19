@@ -233,7 +233,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       window.clearTimeout(resumeTimer);
       if (!document.hidden) resumeTimer = window.setTimeout(loadUnreadCount, 300);
     };
-    const timer = window.setInterval(onRefresh, 15000);
+    const timer = window.setInterval(onRefresh, 60_000);
     window.addEventListener("smaj:notifications-refresh", onRefresh);
     window.addEventListener("smaj:native-push", onRefresh);
     document.addEventListener("visibilitychange", onVisibilityChange);
