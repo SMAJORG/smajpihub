@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import IosShareOutlinedIcon from "@mui/icons-material/IosShareOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import QueryStatsOutlinedIcon from "@mui/icons-material/QueryStatsOutlined";
 import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 import "./ReferralPage.css";
+
+type ReferralToast = { id: number; type: "success" | "info" | "error"; message: string; dismissing: boolean };
 
 const createInvitationUrl = (userId?: string) => {
   if (!userId) return "";
@@ -19,16 +23,36 @@ const createInvitationUrl = (userId?: string) => {
 const ReferralPage = () => {
   const { user } = useAuthContext();
   const { t } = useTranslation();
-  const [notice, setNotice] = useState("");
+  const [toast, setToast] = useState<ReferralToast | null>(null);
+  const toastSequence = useRef(0);
   const invitationUrl = createInvitationUrl(user?.uid);
+  const toastId = toast?.id;
+
+  useEffect(() => {
+    if (toastId === undefined) return;
+    const fadeTimer = window.setTimeout(() => {
+      setToast((current) => current?.id === toastId ? { ...current, dismissing: true } : current);
+    }, 2700);
+    const dismissTimer = window.setTimeout(() => {
+      setToast((current) => current?.id === toastId ? null : current);
+    }, 3000);
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(dismissTimer);
+    };
+  }, [toastId]);
+
+  const showToast = (type: ReferralToast["type"], message: string) => {
+    setToast({ id: ++toastSequence.current, type, message, dismissing: false });
+  };
 
   const copyLink = async () => {
     if (!invitationUrl) return;
     try {
       await navigator.clipboard.writeText(invitationUrl);
-      setNotice("Link copied");
+      showToast("success", "Link copied successfully.");
     } catch {
-      setNotice("Could not copy the invitation link. Please copy it manually.");
+      showToast("error", "Could not copy the invitation link. Please copy it manually.");
     }
   };
 
@@ -37,21 +61,21 @@ const ReferralPage = () => {
     const title = t("Invite to SMAJ PI HUB", { ns: "ui" });
     const message = `${t("Join me on SMAJ PI HUB:", { ns: "ui" })} ${invitationUrl}`;
     if (window.Pi?.openShareDialog) {
+      showToast("info", "Opening share dialog…");
       try {
         window.Pi.openShareDialog(title, message);
-        setNotice("Share dialog opened.");
       } catch {
-        setNotice("Sharing is unavailable. Copy the invitation link instead.");
+        showToast("error", "Sharing is unavailable. Copy the invitation link instead.");
       }
       return;
     }
     if (navigator.share) {
+      showToast("info", "Opening share dialog…");
       try {
         await navigator.share({ title, text: message });
-        setNotice("Share dialog opened.");
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setNotice("Sharing is unavailable. Copy the invitation link instead.");
+        showToast("error", "Sharing is unavailable. Copy the invitation link instead.");
       }
       return;
     }
@@ -84,7 +108,6 @@ const ReferralPage = () => {
             <p className="referral-note">This link includes your invite ID. SMAJ PI HUB does not track visits or sign-ups.</p>
           </>
         ) : <p className="referral-note">Not available</p>}
-        <p className="referral-live-notice" aria-live="polite">{notice}</p>
       </section>
 
       <section className="referral-stats-panel" aria-labelledby="referral-stats-title">
@@ -114,6 +137,12 @@ const ReferralPage = () => {
         </div>
         <p>No referral reward program is confirmed by Pi Network or SMAJ PI HUB.</p>
       </section>
+      {toast ? (
+        <div className={`referral-toast ${toast.type}${toast.dismissing ? " is-dismissing" : ""}`} role="status" aria-live="polite" key={toast.id}>
+          {toast.type === "success" ? <CheckCircleRoundedIcon aria-hidden="true" /> : toast.type === "error" ? <ErrorOutlineRoundedIcon aria-hidden="true" /> : <IosShareOutlinedIcon aria-hidden="true" />}
+          <span>{toast.message}</span>
+        </div>
+      ) : null}
     </main>
   );
 };
