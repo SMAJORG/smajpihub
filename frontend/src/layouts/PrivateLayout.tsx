@@ -144,6 +144,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
   const [unreadCount, setUnreadCount] = useState(0);
   const [streamDownloadCount, setStreamDownloadCount] = useState(0);
+  const [communityChromeHidden, setCommunityChromeHidden] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<"light" | "dark">(() => window.localStorage.getItem("smaj_private_theme_mode") === "dark" ? "dark" : "light");
   const [showSignOut, setShowSignOut] = useState(false);
@@ -331,6 +332,71 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const streamDownloadBadgeLabel = streamDownloadCount > 99 ? "99+" : streamDownloadCount;
   const isCommunityFeed = location.pathname === "/community/feed";
   useEffect(() => {
+    if (!isCommunityFeed) {
+      setCommunityChromeHidden(false);
+      return;
+    }
+
+    const privateContent = document.querySelector<HTMLElement>(".community-private-shell .private-content");
+    const feed = document.querySelector<HTMLElement>(".community-private-shell .community-feed");
+    if (!privateContent || !feed) return;
+
+    let animationFrame = 0;
+    const getScrollElement = () => {
+      const overflowY = window.getComputedStyle(privateContent).overflowY;
+      return overflowY === "auto" || overflowY === "scroll"
+        ? privateContent
+        : document.scrollingElement as HTMLElement;
+    };
+    const getScrollPosition = () => {
+      const element = getScrollElement();
+      return element === document.scrollingElement ? window.scrollY : element.scrollTop;
+    };
+    const canScrollFeed = () => {
+      if (!feed.querySelector(".community-post-card")) return false;
+      const element = getScrollElement();
+      return element.scrollHeight > element.clientHeight + 16;
+    };
+    let previousPosition = getScrollPosition();
+
+    const updateChrome = () => {
+      animationFrame = 0;
+      const position = getScrollPosition();
+      if (!canScrollFeed() || position <= 16) {
+        setCommunityChromeHidden(false);
+      } else if (position - previousPosition > 5) {
+        setCommunityChromeHidden(true);
+      } else if (previousPosition - position > 5) {
+        setCommunityChromeHidden(false);
+      }
+      previousPosition = position;
+    };
+    const scheduleUpdate = () => {
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(updateChrome);
+    };
+
+    const scrollElement = getScrollElement();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    scrollElement.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    const mutationObserver = new MutationObserver(scheduleUpdate);
+    mutationObserver.observe(feed, { childList: true, subtree: true });
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleUpdate);
+    resizeObserver?.observe(feed);
+    scheduleUpdate();
+
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      scrollElement.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      mutationObserver.disconnect();
+      resizeObserver?.disconnect();
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, [isCommunityFeed]);
+
+  useEffect(() => {
     if (!isStreamShell) return;
     let active = true;
     const loadDownloadCount = () => {
@@ -351,7 +417,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, [isStreamShell]);
 
   return (
-    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${fullScreen ? "full-screen-page" : ""}`}>
+    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${isCommunityFeed ? `community-private-shell${communityChromeHidden ? " community-chrome-hidden" : ""}` : ""} ${fullScreen ? "full-screen-page" : ""}`}>
       <ServiceLaunchGate />
       {fullScreen ? null : (
         <header className="private-header">
@@ -424,7 +490,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
         )}
         {mobileSidebarOpen && !fullScreen ? <button className="private-overlay" onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu" /> : null}
         <div className="private-content">
-          {backFallback && location.pathname !== "/settings/preferences" ? (
+          {backFallback && location.pathname !== "/settings/preferences" && !isCommunityFeed ? (
             <button
               className="private-route-back"
               type="button"
@@ -442,7 +508,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           </div>
         </div>
       </div>
-      {!fullScreen && !isStreamImmersive && !isConversationOpen ? <nav className="mobile-bottom-nav" aria-label="Mobile private navigation">
+      {!fullScreen && !isStreamImmersive && !isConversationOpen ? <nav className={`mobile-bottom-nav${isCommunityFeed && communityChromeHidden ? " community-nav-hidden" : ""}`} aria-label="Mobile private navigation">
         {(isStreamShell ? [
           { to: "/app/services/stream", label: "Home", icon: <HomeOutlinedIcon /> },
           { to: "/app/services/stream/search", label: "Browse", icon: <SearchOutlinedIcon /> },

@@ -167,48 +167,50 @@ const CommunityPage = () => {
 
   return (
     <main className="private-page community-page">
-      <header className="community-feed-header">
-        <Link
-          className="community-feed-avatar"
-          to={user?.uid ? `/people/${encodeURIComponent(user.uid)}` : "/profile"}
-          aria-label="View your profile"
-        >
-          <UserAvatarFrame name={user?.displayName || user?.username || "Pi user"} image={user?.avatar} frame={user?.activeAvatarFrame} size={42} />
-        </Link>
-        <label className="community-search">
-          <SearchOutlinedIcon aria-hidden="true" />
-          <input
-            type="search"
-            aria-label="Search posts and authors in the community feed"
-            placeholder="Search community"
-            value={searchText}
-            onChange={event => setSearchText(event.target.value)}
-          />
-        </label>
-        <button
-          className="community-header-action"
-          type="button"
-          aria-label={composerOpen ? "Close post composer" : "Create a post"}
-          aria-expanded={composerOpen}
-          aria-controls="community-post-composer"
-          onClick={() => setComposerOpen(open => !open)}
-        >
-          {composerOpen ? <CloseOutlinedIcon /> : <AddOutlinedIcon />}
-        </button>
-        <Link
-          className="community-header-action community-messages-action"
-          to="/messages"
-          aria-label={unreadMessageCount ? `Messages, ${unreadMessageCount} unread conversations` : "Messages"}
-          title="Messages"
-        >
-          <ChatOutlinedIcon />
-          {unreadMessageCount ? <span className="community-message-badge">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span> : null}
-        </Link>
-      </header>
-      <nav className="community-feed-tabs" aria-label="Community feed">
-        <button type="button" className={scope === "all" ? "active" : ""} onClick={() => setScope("all")}>For you</button>
-        <button type="button" className={scope === "following" ? "active" : ""} onClick={() => setScope("following")}>Following</button>
-      </nav>
+      <div className="community-feed-chrome">
+        <header className="community-feed-header">
+          <Link
+            className="community-feed-avatar"
+            to={user?.uid ? `/people/${encodeURIComponent(user.uid)}` : "/profile"}
+            aria-label="View your profile"
+          >
+            <UserAvatarFrame name={user?.displayName || user?.username || "Pi user"} image={user?.avatar} frame={user?.activeAvatarFrame} size={42} />
+          </Link>
+          <label className="community-search">
+            <SearchOutlinedIcon aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Search posts and authors in the community feed"
+              placeholder="Search community"
+              value={searchText}
+              onChange={event => setSearchText(event.target.value)}
+            />
+          </label>
+          <button
+            className="community-header-action"
+            type="button"
+            aria-label={composerOpen ? "Close post composer" : "Create a post"}
+            aria-expanded={composerOpen}
+            aria-controls="community-post-composer"
+            onClick={() => setComposerOpen(open => !open)}
+          >
+            {composerOpen ? <CloseOutlinedIcon /> : <AddOutlinedIcon />}
+          </button>
+          <Link
+            className="community-header-action community-messages-action"
+            to="/messages"
+            aria-label={unreadMessageCount ? `Messages, ${unreadMessageCount} unread conversations` : "Messages"}
+            title="Messages"
+          >
+            <ChatOutlinedIcon />
+            {unreadMessageCount ? <span className="community-message-badge">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span> : null}
+          </Link>
+        </header>
+        <nav className="community-feed-tabs" aria-label="Community feed">
+          <button type="button" className={scope === "all" ? "active" : ""} onClick={() => setScope("all")}>For you</button>
+          <button type="button" className={scope === "following" ? "active" : ""} onClick={() => setScope("following")}>Following</button>
+        </nav>
+      </div>
       {composerOpen ? <form className="community-composer" id="community-post-composer" onSubmit={event => void publish(event)}>
         <label htmlFor="community-post-content">Create a post</label>
         <textarea id="community-post-content" value={content} maxLength={2000} onChange={event => setContent(event.target.value)} placeholder="What would you like to share?" />

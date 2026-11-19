@@ -7,11 +7,56 @@
 }
 
 .community-page {
+  box-sizing: border-box;
   width: 100%;
   max-width: 820px;
   margin-inline: auto;
   gap: 14px;
-  padding-bottom: 20px;
+  padding: 14px 16px 20px;
+}
+
+.community-private-shell .private-header {
+  display: none !important;
+}
+
+.community-private-shell .private-body {
+  height: 100vh;
+  min-height: 100vh;
+}
+
+.community-private-shell .private-content,
+.community-private-shell .private-tab-page {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.community-feed-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+  background: var(--bg);
+  transition: transform 230ms ease, opacity 230ms ease;
+  will-change: transform, opacity;
+}
+
+.community-private-shell.community-chrome-hidden .community-feed-chrome {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.community-private-shell .mobile-bottom-nav {
+  transition: transform 230ms ease, opacity 230ms ease;
+  will-change: transform, opacity;
+}
+
+.community-private-shell .mobile-bottom-nav.community-nav-hidden {
+  transform: translateY(calc(100% + env(safe-area-inset-bottom)));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .community-feed-header {
@@ -742,6 +787,7 @@
 
   .community-page {
     gap: 12px;
+    padding-top: 8px;
   }
 
   .community-feed-header {
@@ -775,5 +821,11 @@
 
   .people-search-actions {
     width: 100%;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .community-private-shell .private-body {
+    height: auto;
   }
 }
