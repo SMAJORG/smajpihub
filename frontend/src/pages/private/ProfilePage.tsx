@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
@@ -237,6 +238,34 @@ type CropFrame = { x: number; y: number; w: number; h: number };
 type CropHandle = "move" | "nw" | "ne" | "se" | "sw";
 type CropState = { target: CropTarget; source: string; frame: CropFrame };
 type AlertState = { type: "success" | "error"; text: string };
+type PickerPosition = { position: "fixed"; top: number; left: number; width: number; maxHeight: number };
+
+const getPickerPosition = (trigger: HTMLElement | null): PickerPosition | null => {
+  if (!trigger) return null;
+  const viewport = window.visualViewport;
+  const viewportTop = viewport?.offsetTop || 0;
+  const viewportLeft = viewport?.offsetLeft || 0;
+  const viewportHeight = viewport?.height || window.innerHeight;
+  const viewportWidth = viewport?.width || window.innerWidth;
+  const bounds = trigger.getBoundingClientRect();
+  const anchorTop = bounds.top + viewportTop;
+  const anchorBottom = bounds.bottom + viewportTop;
+  const spaceAbove = anchorTop - viewportTop - 8;
+  const spaceBelow = viewportTop + viewportHeight - anchorBottom - 8;
+  const openAbove = spaceBelow < 280 && spaceAbove > spaceBelow;
+  const availableHeight = Math.max(80, openAbove ? spaceAbove : spaceBelow);
+  const maxHeight = Math.min(420, availableHeight - 8, Math.max(72, viewportHeight - 16));
+  const width = Math.min(Math.max(bounds.width, 280), Math.max(1, viewportWidth - 24));
+  const left = Math.max(
+    viewportLeft + 12,
+    Math.min(bounds.left + viewportLeft, viewportLeft + viewportWidth - width - 12),
+  );
+  const desiredTop = openAbove
+    ? Math.max(viewportTop + 8, anchorTop - maxHeight - 8)
+    : anchorBottom + 8;
+  const top = Math.max(viewportTop + 8, Math.min(desiredTop, viewportTop + viewportHeight - maxHeight - 8));
+  return { position: "fixed", top, left, width, maxHeight };
+};
 
 const formatJoinDate = (value?: string) => {
   if (!value) return "Not available";
@@ -312,6 +341,10 @@ const ProfilePage = () => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [languageSearch, setLanguageSearch] = useState("");
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [countryPosition, setCountryPosition] = useState<PickerPosition | null>(null);
+  const [languagePosition, setLanguagePosition] = useState<PickerPosition | null>(null);
+  const countryTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const languageTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [crop, setCrop] = useState<CropState | null>(null);
   const cropPreviewRef = useRef<HTMLDivElement | null>(null);
   const cropDragRef = useRef<{ handle: CropHandle; startX: number; startY: number; startFrame: CropFrame } | null>(
@@ -374,6 +407,56 @@ const ProfilePage = () => {
     const timer = window.setTimeout(() => setAlert(null), 3000);
     return () => window.clearTimeout(timer);
   }, [alert]);
+
+  useEffect(() => {
+    if (!countryOpen) return;
+    let frame = 0;
+    const updatePosition = () => {
+      const position = getPickerPosition(countryTriggerRef.current);
+      if (position) setCountryPosition(position);
+    };
+    const schedulePosition = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(updatePosition);
+    };
+    schedulePosition();
+    window.addEventListener("resize", schedulePosition);
+    window.addEventListener("scroll", schedulePosition, true);
+    window.visualViewport?.addEventListener("resize", schedulePosition);
+    window.visualViewport?.addEventListener("scroll", schedulePosition);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", schedulePosition);
+      window.removeEventListener("scroll", schedulePosition, true);
+      window.visualViewport?.removeEventListener("resize", schedulePosition);
+      window.visualViewport?.removeEventListener("scroll", schedulePosition);
+    };
+  }, [countryOpen]);
+
+  useEffect(() => {
+    if (!languageOpen) return;
+    let frame = 0;
+    const updatePosition = () => {
+      const position = getPickerPosition(languageTriggerRef.current);
+      if (position) setLanguagePosition(position);
+    };
+    const schedulePosition = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(updatePosition);
+    };
+    schedulePosition();
+    window.addEventListener("resize", schedulePosition);
+    window.addEventListener("scroll", schedulePosition, true);
+    window.visualViewport?.addEventListener("resize", schedulePosition);
+    window.visualViewport?.addEventListener("scroll", schedulePosition);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", schedulePosition);
+      window.removeEventListener("scroll", schedulePosition, true);
+      window.visualViewport?.removeEventListener("resize", schedulePosition);
+      window.visualViewport?.removeEventListener("scroll", schedulePosition);
+    };
+  }, [languageOpen]);
 
   const filteredCountries = useMemo(() => {
     const query = countrySearch.trim().toLowerCase();
@@ -795,94 +878,52 @@ const ProfilePage = () => {
                 Country
                 <button
                   type="button"
+                  ref={countryTriggerRef}
                   className="country-picker-trigger"
                   aria-haspopup="listbox"
                   aria-expanded={countryOpen}
                   onClick={() => {
-                    setLanguageOpen(false);
-                    setCountryOpen(open => !open);
-                    setCountrySearch("");
+                    if (countryOpen) {
+                      setCountryOpen(false);
+                      setCountryPosition(null);
+                    } else {
+                      setLanguageOpen(false);
+                      setLanguagePosition(null);
+                      setCountryPosition(getPickerPosition(countryTriggerRef.current));
+                      setCountryOpen(true);
+                      setCountrySearch("");
+                    }
                   }}
                 >
                   {selectedCountry ? <FlagIcon code={selectedCountry.code} label={selectedCountry.name} /> : null}
                   <span>{selectedCountry ? selectedCountry.name : form.country || "Choose country"}</span>
                 </button>
-                {countryOpen ? (
-                  <div className="country-picker-panel" role="listbox">
-                    <input
-                      autoFocus
-                      value={countrySearch}
-                      onChange={event => setCountrySearch(event.target.value)}
-                      placeholder="Search country or scroll..."
-                    />
-                    <div>
-                      {filteredCountries.map(country => (
-                        <button
-                          type="button"
-                          key={country.code}
-                          onClick={() => {
-                            setForm({ ...form, country: country.name });
-                            setCountrySearch("");
-                            setCountryOpen(false);
-                            setLanguageOpen(false);
-                          }}
-                        >
-                          <FlagIcon code={country.code} label={country.name} />
-                          <strong>{country.name}</strong>
-                          {priorityCountries.has(country.code) ? <small>High Pi community</small> : null}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
               </div>
               <div className="language-picker-label">
                 Language
                 <button
                   type="button"
+                  ref={languageTriggerRef}
                   className="language-picker-trigger"
                   aria-haspopup="listbox"
                   aria-expanded={languageOpen}
                   onClick={() => {
-                    setCountryOpen(false);
-                    setLanguageOpen(open => !open);
-                    setLanguageSearch("");
+                    if (languageOpen) {
+                      setLanguageOpen(false);
+                      setLanguagePosition(null);
+                    } else {
+                      setCountryOpen(false);
+                      setCountryPosition(null);
+                      setLanguagePosition(getPickerPosition(languageTriggerRef.current));
+                      setLanguageOpen(true);
+                      setLanguageSearch("");
+                    }
                   }}
                 >
                   <FlagIcon code={selectedLanguage.flag} label={selectedLanguage.name} />
                   <strong>{selectedLanguage.name}</strong>
                   <small>{selectedLanguage.native}</small>
                 </button>
-                {languageOpen ? (
-                  <div className="language-picker-panel" role="listbox">
-                    <input
-                      autoFocus
-                      value={languageSearch}
-                      onChange={event => setLanguageSearch(event.target.value)}
-                      placeholder="Search language..."
-                    />
-                    <div>
-                      {filteredLanguages.map(language => (
-                        <button
-                          type="button"
-                          key={language.name}
-                          className={language.name === form.language ? "active" : ""}
-                          onClick={() => {
-                            setForm({ ...form, language: language.name });
-                            setLanguageSearch("");
-                            setLanguageOpen(false);
-                            setCountryOpen(false);
-                          }}
-                        >
-                          <FlagIcon code={language.flag} label={language.name} />
-                          <strong>{language.name}</strong>
-                          <small>{language.native}</small>
-                          {language.name === form.language ? <b>✓</b> : null}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </div>
             <label>
@@ -918,6 +959,69 @@ const ProfilePage = () => {
           </div>
         </form>
       )}
+
+      {countryOpen && countryPosition ? createPortal(
+        <div className="country-picker-panel" role="listbox" style={countryPosition}>
+          <input
+            autoFocus
+            value={countrySearch}
+            onChange={event => setCountrySearch(event.target.value)}
+            placeholder="Search country or scroll..."
+          />
+          <div>
+            {filteredCountries.map(country => (
+              <button
+                type="button"
+                key={country.code}
+                onClick={() => {
+                  setForm({ ...form, country: country.name });
+                  setCountrySearch("");
+                  setCountryOpen(false);
+                  setCountryPosition(null);
+                  setLanguageOpen(false);
+                }}
+              >
+                <FlagIcon code={country.code} label={country.name} />
+                <strong>{country.name}</strong>
+                {priorityCountries.has(country.code) ? <small>High Pi community</small> : null}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+      {languageOpen && languagePosition ? createPortal(
+        <div className="language-picker-panel" role="listbox" style={languagePosition}>
+          <input
+            autoFocus
+            value={languageSearch}
+            onChange={event => setLanguageSearch(event.target.value)}
+            placeholder="Search language..."
+          />
+          <div>
+            {filteredLanguages.map(language => (
+              <button
+                type="button"
+                key={language.name}
+                className={language.name === form.language ? "active" : ""}
+                onClick={() => {
+                  setForm({ ...form, language: language.name });
+                  setLanguageSearch("");
+                  setLanguageOpen(false);
+                  setLanguagePosition(null);
+                  setCountryOpen(false);
+                }}
+              >
+                <FlagIcon code={language.flag} label={language.name} />
+                <strong>{language.name}</strong>
+                <small>{language.native}</small>
+                {language.name === form.language ? <b>✓</b> : null}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body,
+      ) : null}
 
       {crop ? (
         <div className="crop-modal-backdrop">
