@@ -106,7 +106,7 @@ export default defineConfig(({ mode }) => {
 
           if (fs.existsSync(indexPath)) {
             fs.copyFileSync(indexPath, fallbackPath);
-            for (const route of ["signin/android", "signin/callback", "delete-account"]) {
+            for (const route of ["signin/android", "signin/callback", "signin/start", "delete-account"]) {
               const routeDirectory = path.join(distDir, route);
               fs.mkdirSync(routeDirectory, { recursive: true });
               fs.copyFileSync(indexPath, path.join(routeDirectory, "index.html"));
