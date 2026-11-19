@@ -316,9 +316,12 @@ export default function mountMarketplaceEndpoints(router: Router) {
     };
     assertNoBase64Images(product, "product");
     const result = await req.app.locals.productCollection.insertOne(product);
+    const roles = new Set(Array.isArray(user.roles) ? user.roles.filter((entry: unknown): entry is string => typeof entry === "string") : []);
+    if (user.role) roles.add(user.role);
+    roles.add("seller");
     await req.app.locals.userCollection.updateOne(
       { uid: user.uid },
-      { $set: { role: user.role === "admin" ? "admin" : "seller", roles: [user.role === "admin" ? "admin" : "seller"], sellerActive: true } },
+      { $set: { role: user.role === "admin" ? "admin" : "seller", roles: [...roles], sellerActive: true } },
     );
     return res.status(201).json({ product: serialize({ ...product, _id: result.insertedId }) });
   });

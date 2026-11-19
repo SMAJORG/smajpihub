@@ -536,13 +536,32 @@
   width: 15px;
   height: 15px;
 }
-.settings-profile-card > a {
+.settings-profile-card > a:not(.settings-profile-avatar-link) {
   display: grid;
   place-items: center;
   flex: 0 0 36px;
   height: 36px;
   border-radius: 12px;
   color: var(--smaj-primary);
+}
+.settings-profile-card > .settings-profile-avatar-link {
+  display: grid;
+  place-items: center;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+}
+.settings-profile-card .settings-profile-username {
+  width: fit-content;
+  color: var(--settings-muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.settings-profile-card .settings-profile-username:hover,
+.settings-profile-card .settings-profile-username:focus-visible {
+  color: var(--smaj-primary);
+  text-decoration: underline;
 }
 .settings-page.settings-compact .settings-sections {
   gap: 10px;

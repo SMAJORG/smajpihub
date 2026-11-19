@@ -12,7 +12,13 @@ function load(relative, modules, globals = {}) {
   vm.runInNewContext(code, { exports, require: name => modules[name] || {}, Error, console, setTimeout, ...globals });
   return exports;
 }
-const service = load('../../backend/src/services/profileAvatars.ts', { mongodb: { ObjectId } });
+const service = load('../../backend/src/services/profileAvatars.ts', {
+  mongodb: { ObjectId },
+  './avatarFrames': {
+    getEligibleAvatarFramesForUsers: async () => new Map(),
+    resolveAvatarFrame: () => null,
+  },
+});
 function request(users) {
   let queries = 0;
   return { app: { locals: { userCollection: { find: () => { queries++; return { project: () => ({ toArray: async () => users }) }; } } } }, queries: () => queries };
@@ -84,6 +90,7 @@ test('Stream photo events and other-tab changes update the shared account state'
     '../lib/capacitorPiAuth': { isCapacitorNative: () => false },
     '../lib/axiosClient': { getBaseURL: () => '', axiosClient: {} },
     '../lib/sessionCredentials': { SESSION_CHANGED: 'smaj:session-changed', SESSION_ENDED: 'smaj:session-ended' },
+    '../lib/referralAttribution': { captureReferralAttributionFromLocation: () => {} },
   }, { window: {
     localStorage: { getItem: () => JSON.stringify(stored), setItem: (_, value) => { stored = JSON.parse(value); } },
     setInterval: () => 1, clearInterval() {},

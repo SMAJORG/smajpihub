@@ -132,6 +132,9 @@ test(
         await page.getByRole("region", { name: "Account profile" }).innerText(),
         /Alice Example.*@AlicePi.*Not verified/s
       );
+      assert.equal(await page.locator(".settings-profile-avatar-link").getAttribute("href"), "/people/alice");
+      assert.equal(await page.locator(".settings-profile-username").getAttribute("href"), "/people/alice");
+      assert.equal(await page.getByRole("link", { name: "View public profile" }).getAttribute("href"), "/people/alice");
       await page.screenshot({ path: path.join(output, "settings-mobile-light.png"), fullPage: true });
       await group("Account & Identity").click();
     await page.getByRole("button",{name:"Request Real Pi User Verification",exact:true}).click();

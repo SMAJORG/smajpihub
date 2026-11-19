@@ -76,6 +76,12 @@ const toUser = (candidate: Partial<User> | null | undefined, fallback: User): Us
   languagePreferenceSaved: candidate?.languagePreferenceSaved ?? (settingsLanguage ? true : fallback.languagePreferenceSaved ?? false),
   language: settingsLanguage ?? candidate?.language ?? fallback.language ?? candidate?.settings?.language ?? fallback.settings?.language ?? "English",
   sellerActive: candidate?.sellerActive ?? fallback.sellerActive ?? candidate?.role === "seller",
+  publicProfile: candidate?.publicProfile ?? fallback.publicProfile ?? true,
+  allowContact: candidate?.allowContact ?? fallback.allowContact ?? true,
+  openToWork: candidate?.openToWork ?? fallback.openToWork ?? false,
+  activeAvatarFrame: candidate && "activeAvatarFrame" in candidate
+    ? candidate.activeAvatarFrame ?? null
+    : fallback.activeAvatarFrame ?? null,
   role: candidate?.role || fallback.role || "buyer",
   blocked: candidate?.blocked ?? fallback.blocked ?? false,
   settings: candidate?.settings || fallback.settings || { theme: "light", language: "English", notifications: true },
@@ -458,6 +464,16 @@ export const useAuth = () => {
     return updatedUser;
   }, [user]);
 
+  const synchronizeUser = useCallback((candidate: Partial<User>) => {
+    const currentUser = user || getStoredPiUser();
+    if (!currentUser?.uid || candidate.uid !== currentUser.uid) {
+      throw new Error("The updated profile does not match the signed-in account.");
+    }
+    const updatedUser = storeUser(toUser(candidate, currentUser));
+    setUser(updatedUser);
+    return updatedUser;
+  }, [user]);
+
   const updateLanguage = useCallback(async (language: string) => {
     const currentUser = user || getStoredPiUser();
     if (!currentUser?.uid) throw new Error("Sign in before saving your language.");
@@ -536,6 +552,7 @@ export const useAuth = () => {
     refreshPiSession,
     signOut,
     updateProfile,
+    synchronizeUser,
     updateSettings,
     updateLanguage,
     closeSignIn: () => setShowSignIn(false),

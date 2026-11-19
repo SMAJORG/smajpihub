@@ -36,6 +36,7 @@ import {
 } from "../../lib/nativePushNotifications";
 import type { AvatarFrameId } from "../../components/UserAvatarFrame";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
+import type { User } from "../../types/pi";
 
 type SavedSettings = {
   fullName: string;
@@ -146,7 +147,7 @@ const SettingsGroup = ({
 );
 
 const SettingsPage = () => {
-  const { user, updateProfile, updateSettings, signOut } = useAuthContext();
+  const { user, updateProfile, updateSettings, synchronizeUser, signOut } = useAuthContext();
   const identityVerification = useSmajVerification(user?.uid);
   const navigate = useNavigate();
   const saved = useMemo(() => readSavedSettings(), []);
@@ -156,7 +157,9 @@ const SettingsPage = () => {
     email: saved.email || "",
     phone: saved.phone || user?.contactPhone || "",
     location: saved.location || user?.country || "",
-    accountType: saved.accountType || (user?.role === "seller" ? "Seller" : "Buyer"),
+    accountType: saved.accountType || (user?.sellerActive || user?.role === "seller" || user?.roles?.includes("seller")
+      ? user?.role === "buyer" ? "Both" : "Seller"
+      : "Buyer"),
     theme: saved.theme || (window.localStorage.getItem("smaj_private_theme_mode") === "dark" ? "dark" : "light"),
     emailNotifications: saved.emailNotifications ?? user?.settings?.notifications ?? true,
     productNotifications: saved.productNotifications ?? true,
@@ -366,7 +369,7 @@ const SettingsPage = () => {
           language: user?.language || user?.settings?.language || "English",
           sellerActive: form.accountType !== "Buyer",
         }),
-        axiosClient.put<{ settings: SocialSettings }>("/user/social-settings", {
+        axiosClient.put<{ settings: SocialSettings; user?: Partial<User> }>("/user/social-settings", {
           publicProfile: form.publicProfile,
           allowContact: form.allowContact,
           openToWork: form.openToWork,
@@ -374,6 +377,7 @@ const SettingsPage = () => {
         }),
       ]);
       setSocialSettings(socialResponse.data.settings);
+      if (socialResponse.data.user) synchronizeUser(socialResponse.data.user);
       setSavedForm(submitted);
       setMessage("Settings saved.");
     } catch {
@@ -496,16 +500,24 @@ const SettingsPage = () => {
       </header>
 
       <section className="settings-profile-card" aria-label="Account profile">
-        <UserAvatarFrame
+        {user?.uid ? <Link className="settings-profile-avatar-link" to={`/people/${encodeURIComponent(user.uid)}`} aria-label="View public profile">
+          <UserAvatarFrame
+            className="settings-profile-avatar-frame"
+            name={form.fullName || user?.displayName || user?.username || "Pi user"}
+            image={user?.avatar}
+            frame={user?.activeAvatarFrame}
+            size={52}
+          />
+        </Link> : <UserAvatarFrame
           className="settings-profile-avatar-frame"
           name={form.fullName || user?.displayName || user?.username || "Pi user"}
           image={user?.avatar}
           frame={user?.activeAvatarFrame}
           size={52}
-        />
+        />}
         <div>
           <strong>{form.fullName || user?.displayName || user?.username || "Pi user"}</strong>
-          <span>{piAccount}</span>
+          {user?.uid ? <Link className="settings-profile-username" to={`/people/${encodeURIComponent(user.uid)}`}>{piAccount}</Link> : <span>{piAccount}</span>}
           {user?.uid ? <Link className="settings-public-profile-link" to={`/people/${encodeURIComponent(user.uid)}`}>View public profile</Link> : null}
           <small>
             <TrustBadge userId={user?.uid} />

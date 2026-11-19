@@ -15573,6 +15573,55 @@ html[data-private-theme="dark"] .storefront-search input::placeholder {
   gap: 12px;
 }
 
+.profile-avatar-frames-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-avatar-frame-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.profile-avatar-frame-option {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  color: var(--smaj-text);
+  background: var(--smaj-secondary-bg);
+  border: 1px solid var(--smaj-border);
+  border-radius: 16px;
+  text-align: center;
+}
+
+.profile-avatar-frame-option > strong {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.profile-avatar-frame-option > button {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.profile-avatar-frame-option .profile-avatar-frame-unlock {
+  align-self: stretch;
+  color: var(--smaj-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.profile-avatar-frame-current {
+  color: var(--smaj-text-secondary);
+  font-size: 13px;
+}
+
 .profile-media-actions {
   display: flex;
   flex-wrap: wrap;

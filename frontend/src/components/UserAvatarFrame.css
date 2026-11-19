@@ -11,8 +11,8 @@
 
 .user-avatar-frame__picture {
   display: grid;
-  width: calc(100% - 8px);
-  height: calc(100% - 8px);
+  width: 92%;
+  height: 92%;
   overflow: hidden;
   place-items: center;
   border-radius: 50%;
@@ -22,8 +22,8 @@
 }
 
 .user-avatar-frame.has-frame .user-avatar-frame__picture {
-  width: calc(100% - 24px);
-  height: calc(100% - 24px);
+  width: 80%;
+  height: 80%;
 }
 
 .user-avatar-frame__picture img {
@@ -35,7 +35,7 @@
 .user-avatar-frame.has-frame::before {
   position: absolute;
   inset: 0;
-  border: 4px solid var(--user-avatar-frame-color);
+  border: max(3px, calc(var(--user-avatar-size, 72px) * 0.1)) solid var(--user-avatar-frame-color);
   border-radius: 50%;
   content: "";
   pointer-events: none;
@@ -52,9 +52,9 @@
 
 .user-avatar-frame__label text {
   fill: #fff; /* theme-color-exception: white text on fixed colored status frames */
-  font-size: 8.6px;
+  font-size: 7.6px;
   font-weight: 900;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.2px;
   text-anchor: middle;
 }
 

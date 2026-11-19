@@ -263,7 +263,11 @@ export const handleSignIn = async (req: Request, res: Response) => {
       // Keep saved profile, verification, seller state and additional roles intact.
       if (!linked && isConfiguredAdmin && currentUser.role !== "admin") {
         updates.role = "admin";
-        updates.roles = [...new Set([...(Array.isArray(currentUser.roles) ? currentUser.roles : []), "admin"])];
+        updates.roles = [...new Set([
+          ...(Array.isArray(currentUser.roles) ? currentUser.roles.filter((role: unknown): role is string => typeof role === "string") : []),
+          ...(typeof currentUser.role === "string" ? [currentUser.role] : []),
+          "admin",
+        ])];
       }
       await userCollection.updateOne({ _id: currentUser._id }, { $set: updates });
 
@@ -411,7 +415,11 @@ export default function mountUserEndpoints(router: Router) {
     if (currentUser && currentUser.role !== "admin" && isConfiguredAdminUser(currentUser)) {
       await req.app.locals.userCollection.updateOne(
         { uid: currentUser.uid },
-        { $set: { role: "admin", roles: ["admin"], updatedAt: new Date() } },
+        { $set: { role: "admin", roles: [...new Set([
+          ...(Array.isArray(currentUser.roles) ? currentUser.roles.filter((role: unknown): role is string => typeof role === "string") : []),
+          ...(typeof currentUser.role === "string" ? [currentUser.role] : []),
+          "admin",
+        ])], updatedAt: new Date() } },
       );
       currentUser = await req.app.locals.userCollection.findOne({ uid: currentUser.uid });
       if (currentUser) await refreshExistingAuthSession(req, currentUser);
@@ -450,7 +458,7 @@ export default function mountUserEndpoints(router: Router) {
     const language = String(req.body?.language || currentUser.language || currentUser.settings?.language || "English").trim();
     const sellerActive = typeof req.body?.sellerActive === "boolean" ? req.body.sellerActive : Boolean(currentUser.sellerActive || currentUser.role === "seller");
     const requestedRole = req.body?.role;
-    const role = currentUser.role === "admin" ? "admin" : sellerActive ? "seller" : requestedRole === "seller" ? "seller" : "buyer";
+    const role = currentUser.role === "admin" ? "admin" : sellerActive || requestedRole === "seller" ? "seller" : "buyer";
 
     if (displayName.length > 80 || country.length > 80 || contactPhone.length > 40 || bio.length > 500 || language.length > 40 || avatarInput.length > 6_500_000 || coverImageInput.length > 6_500_000 || !["buyer", "seller", "admin"].includes(role)) {
       return res.status(400).json({ error: "bad_request", message: "Profile image or text is too large." });
@@ -470,7 +478,13 @@ export default function mountUserEndpoints(router: Router) {
 
     const nextVerificationLevel = !sellerActive && ["seller_verified", "trusted_seller"].includes(normalizeVerificationLevel(currentUser)) ? "pi_verified" : normalizeVerificationLevel(currentUser);
 
-    const profileUpdates = { displayName, country, contactPhone, avatar, coverImage, bio, language, sellerActive, role, roles: [role], verificationLevel: nextVerificationLevel };
+    const roles = new Set((Array.isArray(currentUser.roles) ? currentUser.roles : []).filter((entry: unknown): entry is string => typeof entry === "string"));
+    if (currentUser.role) roles.add(currentUser.role);
+    if (role === "admin") roles.add("admin");
+    if (sellerActive || role === "seller") roles.add("seller");
+    else roles.delete("seller");
+    roles.add(role);
+    const profileUpdates = { displayName, country, contactPhone, avatar, coverImage, bio, language, sellerActive, role, roles: [...roles], verificationLevel: nextVerificationLevel };
     assertNoBase64Images(profileUpdates, "user");
     await Promise.all([
       userCollection.updateOne(
@@ -504,7 +518,7 @@ export default function mountUserEndpoints(router: Router) {
     const [users, viewer] = await Promise.all([
       req.app.locals.userCollection
       .find({ blocked: { $ne: true }, publicProfile: { $ne: false }, "settings.publicProfile": { $ne: false }, $or: [{ displayName: regex }, { username: regex }, { piUsername: regex }, { country: regex }] })
-      .project({ uid: 1, username: 1, piUsername: 1, displayName: 1, country: 1, avatar: 1, role: 1, sellerActive: 1, openToWork: 1, activeAvatarFrame: 1, allowContact: 1, settings: 1, verificationLevel: 1, verificationStatus: 1 })
+      .project({ uid: 1, username: 1, piUsername: 1, displayName: 1, country: 1, avatar: 1, role: 1, roles: 1, sellerActive: 1, openToWork: 1, activeAvatarFrame: 1, allowContact: 1, settings: 1, verificationLevel: 1, verificationStatus: 1 })
       .limit(24)
       .toArray(),
       resolveCurrentUser(req),
@@ -566,19 +580,19 @@ export default function mountUserEndpoints(router: Router) {
     const userCollection = req.app.locals.userCollection;
     const settingsAreObject = user.settings && Object.prototype.toString.call(user.settings) === "[object Object]";
     const socialFields = { publicProfile, allowContact, openToWork, activeAvatarFrame, socialSettingsUpdatedAt: new Date() };
-    if (settingsAreObject) {
-      await userCollection.updateOne({ uid: user.uid }, {
+    const saved = settingsAreObject
+      ? await userCollection.updateOne({ uid: user.uid }, {
         $set: { ...socialFields, "settings.publicProfile": publicProfile, "settings.allowContact": allowContact },
-      });
-    } else {
-      await userCollection.updateOne({ uid: user.uid, settings: user.settings ?? null }, {
+      })
+      : await userCollection.updateOne({ uid: user.uid, settings: user.settings ?? null }, {
         $set: {
           ...socialFields,
           settings: { theme: "light", notifications: true, publicProfile, allowContact },
         },
       });
-    }
+    if (!saved.matchedCount) return res.status(409).json({ error: "profile_changed", message: "Your profile changed while saving. Reload and retry." });
     const updatedUser = await req.app.locals.userCollection.findOne({ uid: user.uid });
+    if (!updatedUser) return res.status(503).json({ error: "profile_unavailable", message: "Your profile could not be reloaded." });
     await refreshExistingAuthSession(req, updatedUser);
     return res.json({
       settings: { publicProfile, allowContact, openToWork, eligibleFrames, activeAvatarFrame },

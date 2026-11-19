@@ -85,11 +85,16 @@ const requireAdmin = async (req: Request, res: Response) => {
     return null;
   }
   if (configuredAdmin && currentUser.role !== "admin") {
+    const roles = [...new Set([
+      ...(Array.isArray(currentUser.roles) ? currentUser.roles.filter((role: unknown): role is string => typeof role === "string") : []),
+      ...(typeof currentUser.role === "string" ? [currentUser.role] : []),
+      "admin",
+    ])];
     await req.app.locals.userCollection.updateOne(
       { uid: currentUser.uid },
-      { $set: { role: "admin", roles: ["admin"], updatedAt: new Date() } },
+      { $set: { role: "admin", roles, updatedAt: new Date() } },
     );
-    if (req.session.user?.userId) setSessionUser(req, { ...currentUser, role: "admin", roles: ["admin"] });
+    if (req.session.user?.userId) setSessionUser(req, { ...currentUser, role: "admin", roles });
   }
   return currentUser;
 };

@@ -1,13 +1,13 @@
 export const avatarFrameIds = ["ambassador", "open_to_work", "seller", "hiring"] as const;
 export type AvatarFrameId = (typeof avatarFrameIds)[number];
+const hasSellerTools = (user: Record<string, any>) =>
+  user.sellerActive === true || user.role === "seller" || (Array.isArray(user.roles) && user.roles.includes("seller"));
 
 export const getEligibleAvatarFramesForUsers = async (locals: Record<string, any>, users: Record<string, any>[]) => {
   const distinctUsers = [...new Map(users.filter(user => user.uid).map(user => [String(user.uid), user])).values()];
   const uids = distinctUsers.map(user => String(user.uid));
   if (!uids.length) return new Map<string, AvatarFrameId[]>();
-  const sellerUids = distinctUsers
-    .filter(user => user.sellerActive === true && user.role === "seller")
-    .map(user => String(user.uid));
+  const sellerUids = distinctUsers.filter(hasSellerTools).map(user => String(user.uid));
   const [ambassadors, approvedListings, employerCompanies] = await Promise.all([
     locals.ambassadorCollection?.find({ userId: { $in: uids }, status: "approved" }).toArray() || [],
     sellerUids.length
@@ -31,7 +31,7 @@ export const getEligibleAvatarFramesForUsers = async (locals: Record<string, any
     const eligible: AvatarFrameId[] = [];
     if (ambassadorUids.has(uid)) eligible.push("ambassador");
     if (user.openToWork === true) eligible.push("open_to_work");
-    if (user.sellerActive === true && user.role === "seller" && sellerWithListings.has(uid)) eligible.push("seller");
+    if (hasSellerTools(user) && sellerWithListings.has(uid)) eligible.push("seller");
     if (employerUids.has(uid)) eligible.push("hiring");
     return [uid, eligible] as const;
   }));

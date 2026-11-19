@@ -8,7 +8,7 @@ export async function enrichProfileAvatars(req: Request, rows: Record<string, an
   if (!ids.length) return rows;
   const objectIds = ids.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
   const users = await req.app.locals.userCollection.find({ $or: [{ uid: { $in: ids } }, { _id: { $in: objectIds } }] })
-    .project({ uid: 1, avatar: 1, "streamProfile.avatarUrl": 1, role: 1, sellerActive: 1, openToWork: 1, activeAvatarFrame: 1 }).toArray();
+    .project({ uid: 1, avatar: 1, "streamProfile.avatarUrl": 1, role: 1, roles: 1, sellerActive: 1, openToWork: 1, activeAvatarFrame: 1 }).toArray();
   const avatars = new Map<string, string>();
   for (const user of users) {
     const avatar = user.avatar ?? user.streamProfile?.avatarUrl ?? "";

@@ -77,9 +77,15 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   const ambassador = await makeAccount("ambassador");
   const employer = await makeAccount("employer");
   const admin = await makeAccount("admin", { role: "admin" });
+  const multiRoleSeller = await makeAccount("multi-role-seller", {
+    role: "admin", roles: ["admin", "seller", "moderator"], sellerActive: true,
+  });
 
   const listing = await locals.productCollection.insertOne({
     sellerId: seller.uid, title: "Approved item", active: true, hidden: false, approved: true, reviewStatus: "approved",
+  });
+  await locals.productCollection.insertOne({
+    sellerId: multiRoleSeller.uid, title: "Approved role listing", active: true, hidden: false, approved: true, reviewStatus: "approved",
   });
   await locals.ambassadorCollection.insertOne({ userId: ambassador.uid, status: "approved" });
   await locals.jobCompanyCollection.insertOne({
@@ -115,6 +121,35 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(result.response.status, 200);
   assert.deepEqual(result.data.settings.eligibleFrames.sort(), ["open_to_work", "seller"]);
   assert.equal(result.data.settings.activeAvatarFrame, "seller");
+  assert.equal((await locals.userCollection.findOne({ uid: seller.uid })).activeAvatarFrame, "seller");
+  result = await request("PUT", "/user/social-settings", seller.uid, {
+    publicProfile: true, allowContact: true, openToWork: false, activeAvatarFrame: "hiring",
+  });
+  assert.equal(result.response.status, 403, "the server rejects a frame the account has not unlocked");
+  result = await request("PUT", "/user/social-settings", seller.uid, {
+    publicProfile: true, allowContact: true, openToWork: true, activeAvatarFrame: "open_to_work",
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal((await locals.userCollection.findOne({ uid: seller.uid })).activeAvatarFrame, "open_to_work");
+  result = await request("PUT", "/user/social-settings", seller.uid, {
+    publicProfile: true, allowContact: true, openToWork: true, activeAvatarFrame: null,
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal((await locals.userCollection.findOne({ uid: seller.uid })).activeAvatarFrame, null);
+
+  assert.deepEqual(await getEligibleAvatarFrames(locals, multiRoleSeller), ["seller"]);
+  result = await request("PUT", "/user/profile", multiRoleSeller.uid, {
+    displayName: "Multi-role seller", role: "admin", sellerActive: true,
+    country: "NG", contactPhone: "", avatar: "", coverImage: "", bio: "", language: "English",
+  });
+  assert.equal(result.response.status, 200);
+  const savedMultiRoleSeller = await locals.userCollection.findOne({ uid: multiRoleSeller.uid });
+  assert.deepEqual(savedMultiRoleSeller.roles, ["admin", "seller", "moderator"]);
+  result = await request("PUT", "/user/social-settings", multiRoleSeller.uid, {
+    publicProfile: true, allowContact: true, openToWork: false, activeAvatarFrame: "seller",
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal((await locals.userCollection.findOne({ uid: multiRoleSeller.uid })).activeAvatarFrame, "seller");
   await locals.productCollection.deleteOne({ _id: listing.insertedId });
   result = await request("GET", "/user/social-settings", seller.uid);
   assert.equal(result.data.settings.activeAvatarFrame, null);
@@ -132,6 +167,7 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
 
   assert.deepEqual(await getEligibleAvatarFrames(locals, ambassador), ["ambassador"]);
   assert.deepEqual(await getEligibleAvatarFrames(locals, employer), ["hiring"]);
+  assert.equal((await getEligibleAvatarFrames(locals, multiRoleSeller)).includes("seller"), true);
   assert.equal(resolveAvatarFrame({ activeAvatarFrame: "hiring" }, ["hiring"]), "hiring");
   assert.equal(resolveAvatarFrame({ activeAvatarFrame: "seller" }, []), null);
 

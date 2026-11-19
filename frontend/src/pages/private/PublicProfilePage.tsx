@@ -10,7 +10,7 @@ import "./community.css";
 
 const PublicProfilePage = () => {
   const { uid = "" } = useParams();
-  const { user } = useAuthContext();
+  const { user, requireAuth } = useAuthContext();
   const [data, setData] = useState<PublicProfileResponse | null>(null);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +39,10 @@ const PublicProfilePage = () => {
 
   const toggleFollow = async () => {
     if (!data || busy || data.viewer.isSelf) return;
+    if (!user?.uid) {
+      requireAuth();
+      return;
+    }
     setBusy(true);
     setError("");
     try {

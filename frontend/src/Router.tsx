@@ -625,13 +625,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/people/:uid",
-    element: (
-      <ProtectedRoute>
-        <PrivateLayout>
-          <PublicProfilePage />
-        </PrivateLayout>
-      </ProtectedRoute>
-    ),
+    element: <AppLayout><PublicProfilePage /></AppLayout>,
   },
   {
     path: "/profile",

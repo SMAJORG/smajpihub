@@ -32,7 +32,7 @@ export default function UserAvatarFrame({ name, image, frame, size = 72, classNa
       </span>
       {frame ? (
         <svg className="user-avatar-frame__label" viewBox="0 0 100 100" aria-hidden="true">
-          <defs><path id={pathId} d="M 13 61 A 37 37 0 0 0 87 61" /></defs>
+          <defs><path id={pathId} d="M 17 83 A 46.5 46.5 0 0 1 83 83" /></defs>
           <text><textPath href={`#${pathId}`} startOffset="50%">{frameLabels[frame]}</textPath></text>
         </svg>
       ) : null}
