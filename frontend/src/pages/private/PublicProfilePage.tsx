@@ -22,9 +22,14 @@ const PublicProfilePage = () => {
     setError("");
     try {
       const profile = await getPublicProfile(uid);
-      const feed = await getCommunityFeed({ authorId: uid });
       setData(profile);
-      setPosts(feed.posts);
+      try {
+        const feed = await getCommunityFeed({ authorId: uid });
+        setPosts(feed.posts);
+      } catch {
+        setPosts([]);
+        setError("This profile is available, but its posts could not be loaded.");
+      }
     } catch (reason) {
       const status = reason && typeof reason === "object" && "response" in reason
         ? (reason as { response?: { status?: number } }).response?.status

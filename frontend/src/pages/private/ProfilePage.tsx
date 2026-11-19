@@ -12,10 +12,9 @@ import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import TrustBadge from "../../components/TrustBadge";
-import UserAvatarFrame, { type AvatarFrameId } from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { uploadImage } from "../../lib/uploadImage";
-import type { User } from "../../types/pi";
+import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 
 const countryCodes = [
   "AE",
@@ -241,20 +240,6 @@ type CropHandle = "move" | "nw" | "ne" | "se" | "sw";
 type CropState = { target: CropTarget; source: string; frame: CropFrame };
 type AlertState = { type: "success" | "error"; text: string };
 type PickerPosition = { position: "fixed"; top: number; left: number; width: number; maxHeight: number };
-type ProfileSocialSettings = {
-  publicProfile: boolean;
-  allowContact: boolean;
-  openToWork: boolean;
-  eligibleFrames: AvatarFrameId[];
-  activeAvatarFrame: AvatarFrameId | null;
-};
-
-const avatarFrameOptions: Array<{ id: AvatarFrameId; label: string; unlock: string }> = [
-  { id: "ambassador", label: "AMBASSADOR", unlock: "Join the SMAJ Ambassador programme and wait for approval." },
-  { id: "open_to_work", label: "OPEN TO WORK", unlock: "Turn on Open to Work to unlock this frame." },
-  { id: "seller", label: "SELLER", unlock: "Activate seller tools and publish an approved listing." },
-  { id: "hiring", label: "HIRING", unlock: "Verify an employer company in SMAJ Jobs." },
-];
 
 const getPickerPosition = (trigger: HTMLElement | null): PickerPosition | null => {
   if (!trigger) return null;
@@ -346,7 +331,7 @@ const uploadProfileImage = async (image: string, purpose: string) => {
 };
 
 const ProfilePage = () => {
-  const { user, updateProfile, synchronizeUser } = useAuthContext();
+  const { user, updateProfile } = useAuthContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const returnTo = searchParams.get("returnTo");
@@ -368,16 +353,6 @@ const ProfilePage = () => {
   );
   const [saving, setSaving] = useState(false);
   const [sellerSaving, setSellerSaving] = useState(false);
-  const [socialSettings, setSocialSettings] = useState<ProfileSocialSettings>({
-    publicProfile: true,
-    allowContact: true,
-    openToWork: false,
-    eligibleFrames: [],
-    activeAvatarFrame: null,
-  });
-  const [socialSettingsLoading, setSocialSettingsLoading] = useState(true);
-  const [frameSaving, setFrameSaving] = useState(false);
-  const userRoles = user?.roles?.join(",");
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState({
@@ -404,23 +379,6 @@ const ProfilePage = () => {
       sellerActive: Boolean(user.sellerActive || user.role === "seller"),
     });
   }, [user]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    let active = true;
-    setSocialSettingsLoading(true);
-    axiosClient.get<{ settings: ProfileSocialSettings }>("/user/social-settings")
-      .then(({ data }) => {
-        if (active) setSocialSettings(data.settings);
-      })
-      .catch(() => {
-        if (active) setAlert({ type: "error", text: "Avatar frame eligibility could not be loaded." });
-      })
-      .finally(() => {
-        if (active) setSocialSettingsLoading(false);
-      });
-    return () => { active = false; };
-  }, [user?.uid, user?.sellerActive, user?.role, userRoles, user?.openToWork]);
 
   useEffect(() => {
     if (searchParams.get("edit") !== "1") return;
@@ -524,47 +482,6 @@ const ProfilePage = () => {
   const selectedLanguage =
     cleanLanguages.find(language => language.name === form.language || language.native === form.language) ||
     cleanLanguages[0];
-
-  const saveSocialSettings = async (updates: Partial<ProfileSocialSettings>, successMessage: string) => {
-    if (frameSaving || socialSettingsLoading) return;
-    const next = { ...socialSettings, ...updates };
-    setFrameSaving(true);
-    setAlert(null);
-    try {
-      const { data } = await axiosClient.put<{ settings: ProfileSocialSettings; user?: Partial<User> }>(
-        "/user/social-settings",
-        {
-          publicProfile: next.publicProfile,
-          allowContact: next.allowContact,
-          openToWork: next.openToWork,
-          activeAvatarFrame: next.activeAvatarFrame,
-        },
-      );
-      setSocialSettings(data.settings);
-      if (data.user) synchronizeUser(data.user);
-      setAlert({ type: "success", text: successMessage });
-    } catch (error: unknown) {
-      setAlert({
-        type: "error",
-        text: isAxiosError<BackendErrorBody>(error)
-          ? error.response?.data?.message || "Avatar frame settings could not be saved."
-          : error instanceof Error ? error.message : "Avatar frame settings could not be saved.",
-      });
-    } finally {
-      setFrameSaving(false);
-    }
-  };
-
-  const toggleOpenToWork = () => {
-    const openToWork = !socialSettings.openToWork;
-    const activeAvatarFrame = !openToWork && socialSettings.activeAvatarFrame === "open_to_work"
-      ? null
-      : socialSettings.activeAvatarFrame;
-    void saveSocialSettings(
-      { openToWork, activeAvatarFrame },
-      openToWork ? "Open to Work enabled." : "Open to Work disabled.",
-    );
-  };
 
   const beginCrop = (target: CropTarget, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -800,16 +717,21 @@ const ProfilePage = () => {
               <b>{sellerActive ? "Seller enabled" : "Buyer account"}</b>
             </div>
           </div>
-          <div className="real-profile-actions">
-
-            <button className="private-primary-button" type="button" onClick={() => setEditing(true)}>
-              Edit Profile
-            </button>
-            {sellerActive ? (
-              <Link className="private-secondary-button" to="/seller">
-                Seller Dashboard
-              </Link>
-            ) : null}
+          <div className="real-profile-controls">
+            <div className="real-profile-actions">
+              <button className="private-primary-button" type="button" onClick={() => setEditing(true)}>
+                Edit Profile
+              </button>
+              {sellerActive ? (
+                <Link className="private-secondary-button" to="/seller">
+                  Seller Dashboard
+                </Link>
+              ) : null}
+            </div>
+            <Link className="profile-frames-navigation" to="/profile/frames">
+              <span>Avatar Frames</span>
+              <ChevronRightOutlinedIcon aria-hidden="true" />
+            </Link>
           </div>
         </div>
       </section>
@@ -930,71 +852,6 @@ const ProfilePage = () => {
         </>
       ) : (
         <form className="private-form real-profile-form" onSubmit={submit}>
-          <section className="real-profile-card profile-avatar-frames-card">
-            <div className="real-profile-card-head">
-              <BadgeOutlinedIcon />
-              <h2>Avatar Frames</h2>
-            </div>
-            <p>Preview every frame. You can activate one eligible frame at a time.</p>
-            {socialSettingsLoading ? <p role="status">Checking which frames are available…</p> : null}
-            <div className="profile-avatar-frame-grid">
-              {avatarFrameOptions.map(({ id, label, unlock }) => {
-                const eligible = socialSettings.eligibleFrames.includes(id);
-                const selected = socialSettings.activeAvatarFrame === id;
-                return (
-                  <article className="profile-avatar-frame-option" data-frame={id} key={id}>
-                    <UserAvatarFrame
-                      name={name}
-                      image={form.avatar || user?.avatar}
-                      frame={id}
-                      size={76}
-                    />
-                    <strong>{label}</strong>
-                    {eligible ? (
-                      <button
-                        type="button"
-                        className={selected ? "private-secondary-button" : "private-primary-button"}
-                        disabled={frameSaving || socialSettingsLoading}
-                        aria-pressed={selected}
-                        onClick={() => void saveSocialSettings(
-                          { activeAvatarFrame: selected ? null : id },
-                          selected ? "Avatar frame removed." : `${label} frame activated.`,
-                        )}
-                      >
-                        {selected ? "Remove frame" : socialSettings.activeAvatarFrame ? "Switch to frame" : "Activate frame"}
-                      </button>
-                    ) : id === "open_to_work" ? (
-                      <button
-                        type="button"
-                        className="private-secondary-button"
-                        disabled={frameSaving || socialSettingsLoading}
-                        onClick={toggleOpenToWork}
-                      >
-                        {socialSettings.openToWork ? "Turn off Open to Work" : "Turn on Open to Work"}
-                      </button>
-                    ) : (
-                      <p className="profile-avatar-frame-unlock">Locked: {unlock}</p>
-                    )}
-                    {id === "open_to_work" && eligible ? (
-                      <button
-                        type="button"
-                        className="private-secondary-button"
-                        disabled={frameSaving || socialSettingsLoading}
-                        onClick={toggleOpenToWork}
-                      >
-                        Turn off Open to Work
-                      </button>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-            <p className="profile-avatar-frame-current">
-              {socialSettings.activeAvatarFrame
-                ? `Active frame: ${avatarFrameOptions.find(frame => frame.id === socialSettings.activeAvatarFrame)?.label || socialSettings.activeAvatarFrame}`
-                : "No frame selected; your normal avatar is displayed."}
-            </p>
-          </section>
           <section>
             <h2>Personal Information</h2>
             <label>

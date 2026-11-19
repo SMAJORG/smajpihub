@@ -6,6 +6,7 @@ import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
+import { useAuthContext } from "./contexts/AuthContext";
 import HomePage from "./pages/HomePage";
 import MobileOAuthCallbackPage from "./pages/MobileOAuthCallbackPage.tsx";
 import PiOAuthStartPage from "./pages/PiOAuthStartPage.tsx";
@@ -51,6 +52,7 @@ import ProductDetailPage from "./pages/private/ProductDetailPage";
 import AddProductPage from "./pages/private/AddProductPage";
 import OrdersPage from "./pages/private/OrdersPage";
 import ProfilePage from "./pages/private/ProfilePage";
+import ProfileAvatarFramesPage from "./pages/private/ProfileAvatarFramesPage";
 import TokenRewardsPage from "./pages/private/TokenRewardsPage";
 import SettingsPage from "./pages/private/SettingsPage";
 import DeviceSessionsPage from "./pages/private/DeviceSessionsPage";
@@ -272,6 +274,13 @@ const swapRoutes: Array<[string, SwapPageKind]> = [
   ["liquidity", "liquidity"],
   ["confirm", "confirm"],
 ];
+
+const PublicProfileRoute = () => {
+  const { isAuthenticated, isLoading } = useAuthContext();
+  return isLoading || isAuthenticated
+    ? <PrivateLayout><PublicProfilePage /></PrivateLayout>
+    : <AppLayout><PublicProfilePage /></AppLayout>;
+};
 
 export const router = createBrowserRouter([
   ...(import.meta.env.VITE_TESTNET_PAYOUT_TOOLS === "true" ? [
@@ -625,7 +634,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/people/:uid",
-    element: <AppLayout><PublicProfilePage /></AppLayout>,
+    element: <PublicProfileRoute />,
   },
   {
     path: "/profile",
@@ -633,6 +642,16 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <PrivateLayout fullScreen>
           <ProfilePage />
+        </PrivateLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/profile/frames",
+    element: (
+      <ProtectedRoute>
+        <PrivateLayout fullScreen>
+          <ProfileAvatarFramesPage />
         </PrivateLayout>
       </ProtectedRoute>
     ),

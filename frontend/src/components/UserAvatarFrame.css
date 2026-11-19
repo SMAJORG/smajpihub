@@ -11,8 +11,8 @@
 
 .user-avatar-frame__picture {
   display: grid;
-  width: 92%;
-  height: 92%;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   place-items: center;
   border-radius: 50%;
@@ -22,8 +22,8 @@
 }
 
 .user-avatar-frame.has-frame .user-avatar-frame__picture {
-  width: 80%;
-  height: 80%;
+  width: 72%;
+  height: 72%;
 }
 
 .user-avatar-frame__picture img {
@@ -35,7 +35,7 @@
 .user-avatar-frame.has-frame::before {
   position: absolute;
   inset: 0;
-  border: max(3px, calc(var(--user-avatar-size, 72px) * 0.1)) solid var(--user-avatar-frame-color);
+  border: max(4px, calc(var(--user-avatar-size, 72px) * 0.14)) solid var(--user-avatar-frame-color);
   border-radius: 50%;
   content: "";
   pointer-events: none;

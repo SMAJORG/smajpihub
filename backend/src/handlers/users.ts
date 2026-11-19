@@ -551,6 +551,7 @@ export default function mountUserEndpoints(router: Router) {
   });
 
   router.get("/social-settings", async (req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store");
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ error: "unauthorized" });
     const eligibleFrames = await getEligibleAvatarFrames(req.app.locals, user);
@@ -566,6 +567,7 @@ export default function mountUserEndpoints(router: Router) {
   });
 
   router.put("/social-settings", async (req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store");
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ error: "unauthorized" });
     const { publicProfile, allowContact, openToWork, activeAvatarFrame } = req.body || {};

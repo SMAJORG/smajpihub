@@ -57,10 +57,13 @@ const AccountDashboardPage = () => {
   return (
     <main className="private-page account-dashboard-page">
       <section className="account-dashboard-identity">
-        <UserAvatarFrame className="account-dashboard-avatar" name={name} image={user?.avatar} frame={user?.activeAvatarFrame} size={88} />
+        <Link className="account-dashboard-avatar-link" to={`/people/${encodeURIComponent(user?.uid || "")}`} aria-label="View public profile">
+          <UserAvatarFrame className="account-dashboard-avatar" name={name} image={user?.avatar} frame={user?.activeAvatarFrame} size={88} />
+        </Link>
         <div>
           <h1 className="profile-name-line"><span className="profile-name-text">{name}</span><TrustBadge userId={user?.uid} /></h1>
-          <p>@{user?.piUsername || user?.username}</p>
+          <p><Link className="account-dashboard-username" to={`/people/${encodeURIComponent(user?.uid || "")}`}>@{user?.piUsername || user?.username}</Link></p>
+          <Link className="account-dashboard-public-profile" to={`/people/${encodeURIComponent(user?.uid || "")}`}>View public profile</Link>
         </div>
         <Link
           className="profile-package-shortcut"
