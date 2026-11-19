@@ -2,7 +2,7 @@ import HeroBannerAction from "../../components/HeroBannerAction";
 import PiDashboardAd from "../../components/PiDashboardAd";
 import ManagedHomeFeed, { DashboardEventsSection } from "../../components/ManagedHomeFeed";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { Link, NavLink, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Hls from "hls.js";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
@@ -240,7 +240,6 @@ const DiscoveryTabButtons = ({ activeTab, onTabChange, className }: { activeTab:
         {label}
       </button>
     ))}
-    <NavLink to="/community/feed" className={({ isActive }) => isActive ? "active" : ""}>Community</NavLink>
   </nav>
 );
 

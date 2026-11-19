@@ -26,6 +26,7 @@ import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import LiveTvOutlinedIcon from "@mui/icons-material/LiveTvOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
 import NativeAdSlot from "../components/NativeAdSlot";
 import SmajAiFloatingAssistant from "../components/SmajAiFloatingAssistant";
@@ -82,7 +83,7 @@ const mainTabs = [
   { to: "/dashboard", label: "Home", icon: <DashboardOutlinedIcon /> },
   { to: "/app/services", label: "Services", icon: <AppsOutlinedIcon /> },
   { to: "/search", label: "Search", icon: <SearchOutlinedIcon /> },
-  { to: "/messages", label: "Messages", icon: <ChatOutlinedIcon /> },
+  { to: "/community/feed", label: "Community", icon: <GroupsOutlinedIcon /> },
   { to: "/settings", label: "You", icon: <PersonOutlineIcon /> },
 ];
 
@@ -328,6 +329,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const isStreamShell = location.pathname.startsWith("/app/services/stream");
   const isStreamImmersive = location.pathname === "/app/services/stream/search" || /^\/app\/services\/stream\/(?:title|series|watch|live)\/[^/]+$/.test(location.pathname);
   const streamDownloadBadgeLabel = streamDownloadCount > 99 ? "99+" : streamDownloadCount;
+  const isCommunityFeed = location.pathname === "/community/feed";
   useEffect(() => {
     if (!isStreamShell) return;
     let active = true;
@@ -436,7 +438,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           ) : null}
           <div className={`private-tab-page${fullScreen ? " full-screen-tab-page" : ""}`}>
             {children}
-            {!fullScreen ? <NativeAdSlot /> : null}
+            {!fullScreen && !isCommunityFeed ? <NativeAdSlot /> : null}
           </div>
         </div>
       </div>
@@ -460,7 +462,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
           </NavLink>
         ))}
       </nav> : null}
-      {!fullScreen && !isStreamImmersive ? <CommunityFollowPrompt /> : null}
+      {!fullScreen && !isStreamImmersive && !isCommunityFeed ? <CommunityFollowPrompt /> : null}
       {!fullScreen && user?.uid && location.pathname === "/dashboard" ? <SmajAiFloatingAssistant userId={user.uid} /> : null}
       {showProfileReminder && !isStreamImmersive && !fullScreen ? (
         <aside className="profile-verify-reminder" role="alert" aria-live="polite">

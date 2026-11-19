@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import CommunityPostCard from "../../components/CommunityPostCard";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { getCommunityFeed, createCommunityPost, type CommunityMedia, type CommunityPost } from "../../lib/communityApi";
 import { uploadImage } from "../../lib/uploadImage";
@@ -19,13 +24,16 @@ const CommunityPage = () => {
   const { user } = useAuthContext();
   const [params] = useSearchParams();
   const [scope, setScope] = useState<"all" | "following">("all");
+  const [searchText, setSearchText] = useState("");
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [posting, setPosting] = useState(false);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -54,6 +62,55 @@ const CommunityPage = () => {
     if (!target || loading) return;
     document.getElementById(`community-post-${target}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [loading, params, posts]);
+
+  useEffect(() => {
+    const userId = user?.uid;
+    if (!userId) return;
+    let active = true;
+    const refreshUnreadMessages = async () => {
+      try {
+        const headers = { "X-SMAJ-Chat-Owner": userId, "X-SMAJ-Silent": "true" };
+        const [marketplace, jobs] = await Promise.all([
+          axiosClient.get<{ conversations: Array<{ _id: string; unreadBy?: string[] }> }>("/messages", {
+            params: { includePreviews: "0" },
+            headers,
+          }),
+          axiosClient.get<{ conversations: Array<{ _id: string; unreadBy?: string[] }> }>("/messages", {
+            params: { context: "jobs", includePreviews: "0" },
+            headers,
+          }),
+        ]);
+        if (!active) return;
+        const unreadIds = new Set(
+          [...marketplace.data.conversations, ...jobs.data.conversations]
+            .filter(conversation => conversation.unreadBy?.includes(userId))
+            .map(conversation => conversation._id),
+        );
+        setUnreadMessageCount(unreadIds.size);
+      } catch {
+        // Keep the last known count if the inbox is temporarily unavailable.
+      }
+    };
+    void refreshUnreadMessages();
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void refreshUnreadMessages();
+    }, 60_000);
+    window.addEventListener("focus", refreshUnreadMessages);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshUnreadMessages);
+    };
+  }, [user?.uid]);
+
+  const filteredPosts = posts.filter(post => {
+    const search = searchText.trim().toLocaleLowerCase();
+    if (!search) return true;
+    const target = post.originalPost || post;
+    return `${target.content} ${target.author.displayName} ${target.author.username} ${target.author.piUsername}`
+      .toLocaleLowerCase()
+      .includes(search);
+  });
 
   const chooseFiles = (selected: FileList | null) => {
     const next = Array.from(selected || []);
@@ -93,6 +150,7 @@ const CommunityPage = () => {
       setPosts(current => [created, ...current]);
       setContent("");
       setFiles([]);
+      setComposerOpen(false);
       if (fileInput.current) fileInput.current.value = "";
       setNotice("Your post is published.");
     } catch (reason) {
@@ -109,11 +167,49 @@ const CommunityPage = () => {
 
   return (
     <main className="private-page community-page">
-      <header className="community-page-header">
-        <div><p className="private-kicker">SMAJ PI HUB</p><h1>Community</h1><p>Share updates, discover people, and join the conversation.</p></div>
-        <Link className="private-secondary-button" to="/search">Find people</Link>
+      <header className="community-feed-header">
+        <Link
+          className="community-feed-avatar"
+          to={user?.uid ? `/people/${encodeURIComponent(user.uid)}` : "/profile"}
+          aria-label="View your profile"
+        >
+          <UserAvatarFrame name={user?.displayName || user?.username || "Pi user"} image={user?.avatar} frame={user?.activeAvatarFrame} size={42} />
+        </Link>
+        <label className="community-search">
+          <SearchOutlinedIcon aria-hidden="true" />
+          <input
+            type="search"
+            aria-label="Search posts and authors in the community feed"
+            placeholder="Search community"
+            value={searchText}
+            onChange={event => setSearchText(event.target.value)}
+          />
+        </label>
+        <button
+          className="community-header-action"
+          type="button"
+          aria-label={composerOpen ? "Close post composer" : "Create a post"}
+          aria-expanded={composerOpen}
+          aria-controls="community-post-composer"
+          onClick={() => setComposerOpen(open => !open)}
+        >
+          {composerOpen ? <CloseOutlinedIcon /> : <AddOutlinedIcon />}
+        </button>
+        <Link
+          className="community-header-action community-messages-action"
+          to="/messages"
+          aria-label={unreadMessageCount ? `Messages, ${unreadMessageCount} unread conversations` : "Messages"}
+          title="Messages"
+        >
+          <ChatOutlinedIcon />
+          {unreadMessageCount ? <span className="community-message-badge">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span> : null}
+        </Link>
       </header>
-      <form className="community-composer" onSubmit={event => void publish(event)}>
+      <nav className="community-feed-tabs" aria-label="Community feed">
+        <button type="button" className={scope === "all" ? "active" : ""} onClick={() => setScope("all")}>For you</button>
+        <button type="button" className={scope === "following" ? "active" : ""} onClick={() => setScope("following")}>Following</button>
+      </nav>
+      {composerOpen ? <form className="community-composer" id="community-post-composer" onSubmit={event => void publish(event)}>
         <label htmlFor="community-post-content">Create a post</label>
         <textarea id="community-post-content" value={content} maxLength={2000} onChange={event => setContent(event.target.value)} placeholder="What would you like to share?" />
         <div className="community-composer-footer">
@@ -125,17 +221,13 @@ const CommunityPage = () => {
           <button type="submit" className="private-primary-button" disabled={posting || (!content.trim() && !files.length)}>{posting ? "Publishing…" : "Post"}</button>
         </div>
         {files.length ? <ul className="community-selected-files">{files.map((file, index) => <li key={`${file.name}-${index}`}>{file.name}<button type="button" aria-label={`Remove ${file.name}`} onClick={() => setFiles(current => current.filter((_, fileIndex) => fileIndex !== index))}>Remove</button></li>)}</ul> : null}
-      </form>
+      </form> : null}
       {notice ? <p className="community-status" role="status">{notice}</p> : null}
       {error ? <p className="community-error" role="alert">{error}</p> : null}
-      <nav className="community-feed-tabs" aria-label="Community feed">
-        <button type="button" className={scope === "all" ? "active" : ""} onClick={() => setScope("all")}>For everyone</button>
-        <button type="button" className={scope === "following" ? "active" : ""} onClick={() => setScope("following")}>Following</button>
-      </nav>
       <section className="community-feed" aria-label="Community posts" aria-busy={loading}>
         {loading && !posts.length ? <PrivateSkeleton variant="list" count={4} /> : null}
-        {!loading && !error && !posts.length ? <div className="private-state compact"><h2>{scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" ? <Link to="/search">Search people</Link> : null}</div> : null}
-        {posts.map(post => <CommunityPostCard key={post._id} post={post} viewerId={user?.uid} onChange={() => void load()} />)}
+        {!loading && !error && !filteredPosts.length ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
+        {filteredPosts.map(post => <CommunityPostCard key={post._id} post={post} viewerId={user?.uid} onChange={() => void load()} />)}
       </section>
       {hasMore ? <button className="community-load-more" type="button" disabled={loading} onClick={() => void load(page + 1, true)}>{loading ? "Loading…" : "Load more"}</button> : null}
       {!loading && error ? <button className="community-load-more" type="button" onClick={() => void load()}>Retry</button> : null}

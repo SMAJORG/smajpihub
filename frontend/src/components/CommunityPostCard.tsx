@@ -198,8 +198,10 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
       </form> : null}
       {commentsOpen ? <section className="community-comments" aria-label="Comments">
         {comments.map(comment => <article className="community-comment" key={comment._id}>
-          <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.activeAvatarFrame} size={34} />
-          <div><strong>{comment.author.displayName}</strong><p>{comment.content}</p><small>{when(comment.createdAt)}</small></div>
+          <Link to={`/people/${encodeURIComponent(comment.author.uid)}`} aria-label={`View ${comment.author.displayName}'s public profile`}>
+            <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.activeAvatarFrame} size={34} />
+          </Link>
+          <div><Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link><p>{comment.content}</p><small>{when(comment.createdAt)}</small></div>
         </article>)}
         {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
