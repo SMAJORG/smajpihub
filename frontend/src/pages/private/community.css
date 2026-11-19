@@ -101,8 +101,8 @@
   padding: 0 4px;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: #d92d20;
+  color: var(--primary);
+  background: var(--primary-soft);
   border: 2px solid var(--surface);
   border-radius: 999px;
   font-size: 10px;
