@@ -19,6 +19,7 @@ import { minimalSessionUser, resolveCurrentUser } from "../services/auth";
 import { createNotification } from "../services/notifications";
 import { assertNoBase64Images, resolveImageValue } from "../services/imageStorage";
 import { currentDeviceSessionKey, ensureDeviceSession, type DeviceMetadata } from "../services/deviceSessions";
+import { ensureReferralCode, verifyReferralAttribution } from "../services/referrals";
 
 type VerifiedPiUser = {
   uid?: string;
@@ -264,6 +265,14 @@ export const handleSignIn = async (req: Request, res: Response) => {
       const name = new RegExp("^@*" + normalizedUser.username.replace(/^@+/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i");
       const existing = await userCollection.findOne({ $or: [{ username: name }, { piUsername: name }] });
       if (existing) return failure(409, "signin_account_identity_conflict", "Pi authentication succeeded, but the account server could not match this identity to the saved account. No account was created or changed.");
+      const referralAttribution = verifyReferralAttribution(req.body?.referralAttribution);
+      const inviter = referralAttribution
+        ? await userCollection.findOne({
+          referralCode: referralAttribution.code,
+          uid: { $ne: normalizedUser.uid },
+          blocked: { $ne: true },
+        })
+        : null;
       stage = "account_write";
       const role = isConfiguredAdmin ? "admin" : "buyer";
       await userCollection.updateOne({ uid: normalizedUser.uid }, { $setOnInsert: {
@@ -285,12 +294,14 @@ export const handleSignIn = async (req: Request, res: Response) => {
         lastSeenAt: new Date(),
         ...verifiedPiIdentityFields({ uid: verifiedUser.uid!, wallet_address: verifiedUser.wallet_address }),
         accessToken: auth.accessToken,
+        ...(inviter ? { invitedByUid: inviter.uid, invitedAt: new Date() } : {}),
       } }, { upsert: true });
 
       currentUser = await userCollection.findOne({ uid: normalizedUser.uid });
     }
 
     if (!currentUser) return failure(503, "signin_account_unavailable", "The account server could not load your saved profile. Please retry shortly.");
+    currentUser.referralCode = await ensureReferralCode(userCollection, currentUser);
     stage = "session_create";
     await establishAuthSession(req, currentUser, req.body?.device || {});
     stage = "session_issue";

@@ -42,5 +42,8 @@ export interface UserData {
     updatedAt?: string | null,
   },  recentSearches?: string[],
   createdAt: Date,
-  accessToken: string
+  accessToken: string,
+  referralCode?: string,
+  invitedByUid?: string,
+  invitedAt?: Date,
 }

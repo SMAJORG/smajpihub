@@ -308,6 +308,31 @@
   line-height: 1.5;
 }
 
+.referral-history-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.referral-history-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  background: var(--smaj-secondary-bg);
+  border: 1px solid var(--smaj-border);
+  border-radius: 12px;
+}
+
+.referral-history-list time {
+  color: var(--smaj-text-secondary);
+  font-size: 13px;
+  text-align: right;
+}
+
 .account-dashboard-page > .invite-promo {
   margin: 2px 0;
 }

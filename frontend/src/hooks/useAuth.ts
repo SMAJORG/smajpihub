@@ -8,6 +8,11 @@ import type { AuthResult, User } from "../types/pi";
 import { authenticateWithCapacitorPi, isCapacitorNative, type CapacitorPiAuthStage } from "../lib/capacitorPiAuth";
 import { isSoloHostRuntime } from "../lib/soloHost";
 import { authenticateWithSoloHostPi } from "../lib/soloHostPiAuth";
+import {
+  captureReferralAttributionFromLocation,
+  clearReferralAttribution,
+  getReferralAttributionToken,
+} from "../lib/referralAttribution";
 import { clearCachedResponsesForNamespace } from "../lib/offlineCache";
 
 type AuthFeedback = { type: "success" | "error"; message: string };
@@ -200,6 +205,10 @@ export const useAuth = () => {
   }, [authFeedback]);
 
   useEffect(() => {
+    void captureReferralAttributionFromLocation();
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     const checkSession = async () => {
       const startedAt = Date.now();
@@ -290,8 +299,10 @@ export const useAuth = () => {
   const signInUser = useCallback(async (authResult: AuthResult) => {
     if (!getBaseURL()) throw new PiSignInResponseError("The account server address is not configured. Contact the administrator.");
     const device = await getLoginDeviceMetadata();
-    const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult: { accessToken: authResult.accessToken }, sandbox: isPiSandboxMode(), device }, AUTH_REQUEST_CONFIG);
+    const referralAttribution = await getReferralAttributionToken();
+    const response = await axiosClient.post<SignInResponse>("/user/signin", { authResult: { accessToken: authResult.accessToken }, sandbox: isPiSandboxMode(), device, referralAttribution }, AUTH_REQUEST_CONFIG);
     if (!response.data.user?.uid || !response.data.user.username) throw new PiSignInResponseError("The account server did not return a confirmed account. Please retry shortly.");
+    clearReferralAttribution();
     const fallback = authResultUser({ accessToken: authResult.accessToken, user: { uid: response.data.user.uid, username: response.data.user.username } });
     const signedInUser = toUser(response.data.user, { ...fallback, accessToken: response.data.session?.accessToken || fallback.accessToken });
     if (response.data.session) await saveSessionCredentials(response.data.session, response.data.user);

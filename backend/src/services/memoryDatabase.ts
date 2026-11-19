@@ -223,6 +223,7 @@ export const createMemoryCollections = () => ({
   orderDisputeCollection: new MemoryCollection(),
   productCollection: new MemoryCollection(),
   userCollection: new MemoryCollection(),
+  referralVisitCollection: new MemoryCollection(),
   reportCollection: new MemoryCollection(),
   favoriteCollection: new MemoryCollection(),
   reviewCollection: new MemoryCollection(),

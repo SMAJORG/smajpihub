@@ -26,6 +26,7 @@ import { startStorePaymentRecovery } from "./services/storePaymentRecovery";
 import mountPaymentsEndpoints from "./handlers/payments";
 import mountLiveTransactions from "./handlers/transactions";
 import mountUserEndpoints, { handleSignIn } from "./handlers/users";
+import mountReferralEndpoints from "./handlers/referrals";
 
 // We must import typedefs for ts-node-dev to pick them up when they change (even though tsc would supposedly
 // have no problem here)
@@ -291,6 +292,10 @@ userRouter.post("/testnet/wallet-consent", saveTestnetWalletConsent);
 mountUserEndpoints(userRouter);
 app.use("/user", userRouter);
 
+const referralRouter = express.Router();
+mountReferralEndpoints(referralRouter);
+app.use("/referrals", referralRouter);
+
 const marketplaceRouter = express.Router();
 mountMarketplaceEndpoints(marketplaceRouter);
 app.use("/marketplace", marketplaceRouter);
@@ -454,6 +459,7 @@ const start = async () => {
       app.locals.orderDisputeCollection = db.collection("order_disputes");
       app.locals.productCollection = db.collection("products");
       app.locals.userCollection = db.collection("users");
+      app.locals.referralVisitCollection = db.collection("referral_visits");
       app.locals.piIdentityLinkCollection = db.collection("pi_account_identity_links");
       app.locals.piIdentityChallengeCollection = db.collection("pi_identity_challenges");
       await app.locals.piIdentityChallengeCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -545,6 +551,10 @@ const start = async () => {
       ]);
       await Promise.all([
         app.locals.userCollection.createIndex({ uid: 1 }, { unique: true }),
+        app.locals.userCollection.createIndex({ referralCode: 1 }, { unique: true, sparse: true }),
+        app.locals.userCollection.createIndex({ invitedByUid: 1, createdAt: -1 }),
+        app.locals.referralVisitCollection.createIndex({ referralCode: 1, visitorHash: 1 }, { unique: true }),
+        app.locals.referralVisitCollection.createIndex({ referralCode: 1, createdAt: -1 }),
         app.locals.userCollection.createIndex({ piUsername: 1 }),
         app.locals.productCollection.createIndex({
           sellerId: 1,

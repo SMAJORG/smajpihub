@@ -9,14 +9,21 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
+import { axiosClient } from "../../lib/axiosClient";
 import "./ReferralPage.css";
 
 type ReferralToast = { id: number; type: "success" | "info" | "error"; message: string; dismissing: boolean };
+type ReferralData = {
+  referralCode: string;
+  visits: number;
+  successfulSignUps: number;
+  invitations: Array<{ name: string; registeredAt: string | null }>;
+};
 
-const createInvitationUrl = (userId?: string) => {
-  if (!userId) return "";
+const createInvitationUrl = (referralCode?: string) => {
+  if (!referralCode) return "";
   const url = new URL("/", window.location.origin);
-  url.searchParams.set("invite", userId);
+  url.searchParams.set("invite", referralCode);
   return url.toString();
 };
 
@@ -24,9 +31,27 @@ const ReferralPage = () => {
   const { user } = useAuthContext();
   const { t } = useTranslation();
   const [toast, setToast] = useState<ReferralToast | null>(null);
+  const [referralResponse, setReferralResponse] = useState<{
+    uid: string;
+    data?: ReferralData;
+    error?: string;
+  } | null>(null);
   const toastSequence = useRef(0);
-  const invitationUrl = createInvitationUrl(user?.uid);
+  const currentResponse = referralResponse?.uid === user?.uid ? referralResponse : null;
+  const referralData = currentResponse?.data || null;
+  const referralError = currentResponse?.error || "";
+  const invitationUrl = createInvitationUrl(referralData?.referralCode);
   const toastId = toast?.id;
+
+  useEffect(() => {
+    let active = true;
+    const uid = user?.uid;
+    if (!uid) return () => { active = false; };
+    axiosClient.get<ReferralData>("/referrals")
+      .then(({ data }) => { if (active) setReferralResponse({ uid, data }); })
+      .catch(() => { if (active) setReferralResponse({ uid, error: "Referral data is temporarily unavailable. Please try again." }); });
+    return () => { active = false; };
+  }, [user?.uid]);
 
   useEffect(() => {
     if (toastId === undefined) return;
@@ -89,7 +114,7 @@ const ReferralPage = () => {
         <div>
           <p className="private-kicker">SMAJ PI HUB</p>
           <h1>Invite &amp; Earn</h1>
-          <p>Share your invitation link. Tracking is not enabled and rewards are not confirmed.</p>
+          <p>Invite friends and follow their registrations. Rewards are coming soon.</p>
         </div>
       </header>
 
@@ -98,16 +123,16 @@ const ReferralPage = () => {
           <LinkOutlinedIcon />
           <h2 id="referral-link-title">Your invitation link</h2>
         </div>
-        {invitationUrl ? (
+        {referralError ? <p className="referral-note" role="alert">{referralError}</p> : invitationUrl ? (
           <>
             <div className="referral-link-row">
               <input aria-label="Your invitation link" readOnly value={invitationUrl} onFocus={(event) => event.currentTarget.select()} />
               <button type="button" onClick={copyLink}><ContentCopyOutlinedIcon />Copy link</button>
               <button type="button" className="referral-share-button" onClick={shareLink}><IosShareOutlinedIcon />Share</button>
             </div>
-            <p className="referral-note">This link includes your invite ID. SMAJ PI HUB does not track visits or sign-ups.</p>
+            <p className="referral-note">Your invitation code is unique to your account. Registrations are counted only after Pi authentication.</p>
           </>
-        ) : <p className="referral-note">Not available</p>}
+        ) : <p className="referral-note">{referralData ? "Not available" : "Loading your invitation link…"}</p>}
       </section>
 
       <section className="referral-stats-panel" aria-labelledby="referral-stats-title">
@@ -116,10 +141,10 @@ const ReferralPage = () => {
           <h2 id="referral-stats-title">Referral statistics</h2>
         </div>
         <div className="referral-stat-grid">
-          <article><span>Invitations sent</span><strong>—</strong></article>
-          <article><span>Verified sign-ups</span><strong>—</strong></article>
+          <article><span>Unique visits</span><strong>{referralData?.visits ?? "—"}</strong></article>
+          <article><span>Successful registrations</span><strong>{referralData?.successfulSignUps ?? "—"}</strong></article>
         </div>
-        <p className="referral-note">The Pi SDK does not track referrals, and SMAJ PI HUB has no referral tracking system.</p>
+        <p className="referral-note">Visits are deduplicated by invitation link and network address. Registrations are recorded only for new Pi-authenticated accounts.</p>
       </section>
 
       <section className="referral-history-panel" aria-labelledby="referral-history-title">
@@ -127,7 +152,18 @@ const ReferralPage = () => {
           <HistoryOutlinedIcon />
           <h2 id="referral-history-title">Invitation history</h2>
         </div>
-        <p className="referral-empty-state">No verified invitation activity is available.</p>
+        {referralError ? <p className="referral-empty-state" role="alert">{referralError}</p> : referralData?.invitations.length ? (
+          <ul className="referral-history-list">
+            {referralData.invitations.map((invitation, index) => (
+              <li key={`${invitation.registeredAt || "registration"}-${index}`}>
+                <span>{invitation.name}</span>
+                <time dateTime={invitation.registeredAt || undefined}>
+                  {invitation.registeredAt ? new Date(invitation.registeredAt).toLocaleDateString() : "Registration date unavailable"}
+                </time>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="referral-empty-state">{referralData ? "No registrations have been attributed to your invitation yet." : "Loading invitation history…"}</p>}
       </section>
 
       <section className="referral-reward-panel" aria-labelledby="referral-reward-title">
@@ -135,7 +171,7 @@ const ReferralPage = () => {
           <RedeemOutlinedIcon />
           <h2 id="referral-reward-title">Reward status</h2>
         </div>
-        <p>No referral reward program is confirmed by Pi Network or SMAJ PI HUB.</p>
+        <p>Rewards are coming soon. No reward policy has been approved, and no Pi payments are active.</p>
       </section>
       {toast ? (
         <div className={`referral-toast ${toast.type}${toast.dismissing ? " is-dismissing" : ""}`} role="status" aria-live="polite" key={toast.id}>
