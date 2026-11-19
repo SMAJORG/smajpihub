@@ -19,6 +19,11 @@ import { serviceCatalog } from "../../content/serviceCatalog";
 import { axiosClient } from "../../lib/axiosClient";
 import type { Product } from "../../types/marketplace";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
+import TrustBadge from "../../components/TrustBadge";
+import { useAuthContext } from "../../contexts/AuthContext";
+import { toggleCommunityFollow } from "../../lib/communityApi";
+import "./community.css";
 
 const explore = [
   ["Shopping", ShoppingBagOutlinedIcon, "/store"], ["Stream", LiveTvOutlinedIcon, "/app/services/stream"], ["Sports", SportsSoccerOutlinedIcon, "/app/services/sports"], ["Food", RestaurantOutlinedIcon, "/app/services/food"],
@@ -27,7 +32,7 @@ const explore = [
 ] as const;
 const suggestions = ["Mobile payments", "Sports tickets", "Food delivery", "Online shopping", "Find jobs", "Health services", "Movies", "Property rentals"];
 const RECENT_SEARCHES_KEY = "smaj_recent_searches";
-type SearchUser = { uid: string; username?: string; piUsername?: string; displayName: string; country?: string; role?: string; sellerActive?: boolean };
+type SearchUser = { uid: string; username?: string; piUsername?: string; displayName: string; country?: string; role?: string; sellerActive?: boolean; avatar?: string; activeAvatarFrame?: "ambassador" | "open_to_work" | "seller" | "hiring" | null; allowContact?: boolean; following?: boolean };
 type BrowserSpeechRecognition = {
   lang: string;
   interimResults: boolean;
@@ -48,6 +53,7 @@ const readLocalRecentSearches = () => {
 };
 
 const SearchPage = () => {
+  const { user: viewer } = useAuthContext();
   const [params, setParams] = useSearchParams();
   const initialQuery = params.get("q") || "";
   const [input, setInput] = useState(initialQuery);
@@ -57,6 +63,8 @@ const SearchPage = () => {
   const [users, setUsers] = useState<SearchUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [followError, setFollowError] = useState("");
+  const [followBusy, setFollowBusy] = useState<string | null>(null);
 
   useEffect(() => {
     setRecentSearches(readLocalRecentSearches());
@@ -157,6 +165,20 @@ const SearchPage = () => {
     axiosClient.delete("/user/recent-searches").catch(() => undefined);
   };
 
+  const toggleFollow = async (target: SearchUser) => {
+    if (followBusy || target.uid === viewer?.uid) return;
+    setFollowBusy(target.uid);
+    setFollowError("");
+    try {
+      const following = await toggleCommunityFollow(target.uid);
+      setUsers(current => current.map(item => item.uid === target.uid ? { ...item, following } : item));
+    } catch {
+      setFollowError("Follow status could not be changed. Please try again.");
+    } finally {
+      setFollowBusy(null);
+    }
+  };
+
   const startVoiceSearch = () => {
     const speechWindow = window as unknown as { SpeechRecognition?: BrowserSpeechRecognitionConstructor; webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor };
     const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
@@ -183,12 +205,10 @@ const SearchPage = () => {
     const services = serviceCatalog.filter((item) => [item.name, item.description, ...item.items].join(" ").toLowerCase().includes(needle)).map((item) => ({ label:item.name, to:item.live ? "/store" : `/app/services/${item.slug}` }));
     const productResults = products.map((product) => ({ label: product.title, to: `/product/${product._id}` }));
     const sellers = users.filter((user) => user.sellerActive || user.role === "seller").map((user) => ({ label: `${user.displayName}${user.country ? ` - ${user.country}` : ""}`, to: `/seller/${user.uid}` }));
-    const userResults = users.map((user) => ({ label: user.displayName || user.piUsername || user.username || "Pi user", to: `/seller/${user.uid}` }));
     return [
       ["Services", services],
       ["Products", productResults.length ? productResults : [{ label:`Search products for “${query}”`, to:`/store?search=${encodeURIComponent(query)}` }]],
       ["Sellers", sellers],
-      ["Users", userResults],
       ["Help", privateSearchItems.filter((item) => [item.label,...item.keywords].join(" ").toLowerCase().includes(needle)).map(({ label,to }) => ({ label,to }))],
     ] as const;
   }, [products, query, users]);
@@ -200,7 +220,7 @@ const SearchPage = () => {
       <section className="mobile-search-section"><h1>Explore services</h1><div className="mobile-explore-grid">{explore.map(([label,Icon,to]) => <Link to={to} key={label}><span>{label}</span><Icon /></Link>)}</div></section>
       {recentSearches.length ? <section className="mobile-search-section"><div className="mobile-search-result-head"><h2>Recent searches</h2><button type="button" onClick={clearRecentSearches}>Clear All</button></div><div className="mobile-suggestion-grid">{recentSearches.map((item) => <button type="button" key={item} onClick={() => runSearch(item)}><span>{item}</span><SearchOutlinedIcon /></button>)}</div></section> : null}
       <section className="mobile-search-section"><h2>Trending searches</h2><div className="mobile-suggestion-grid">{suggestions.map((item) => <button type="button" key={item} onClick={() => runSearch(item)}><span>{item}</span><SearchOutlinedIcon /></button>)}</div></section>
-    </> : <section className="mobile-search-results"><div className="mobile-search-result-head"><h1>Results for “{query}”</h1><button onClick={() => runSearch("")}>Clear</button></div>{loading ? <PrivateSkeleton variant="search" count={5} /> : error ? <section><h2>Search error</h2><Link to="#">{error}</Link></section> : hasResults ? grouped.map(([group,items]) => items.length ? <section key={group}><h2>{group}</h2>{items.map((item) => <Link key={`${group}-${item.label}`} to={item.to} onClick={() => saveRecentSearch(query)}>{item.label}</Link>)}</section> : null) : <section><h2>No results</h2><Link to="/categories">No results found. Try another keyword or browse categories.</Link></section>}</section>}
+    </> : <section className="mobile-search-results"><div className="mobile-search-result-head"><h1>Results for “{query}”</h1><button onClick={() => runSearch("")}>Clear</button></div>{loading ? <PrivateSkeleton variant="search" count={5} /> : error ? <section><h2>Search error</h2><Link to="#">{error}</Link></section> : hasResults || users.length ? <>{grouped.map(([group,items]) => items.length ? <section key={group}><h2>{group}</h2>{items.map((item) => <Link key={`${group}-${item.label}`} to={item.to} onClick={() => saveRecentSearch(query)}>{item.label}</Link>)}</section> : null)}{users.length ? <section className="people-search-results"><h2>People</h2>{followError ? <p className="community-error" role="alert">{followError}</p> : null}{users.map(person => <article className="people-search-card" key={person.uid}><Link to={`/people/${encodeURIComponent(person.uid)}`} className="people-search-identity" onClick={() => saveRecentSearch(query)}><UserAvatarFrame name={person.displayName} image={person.avatar} frame={person.activeAvatarFrame} size={56} /><span><strong>{person.displayName}<TrustBadge userId={person.uid} /></strong><small>@{person.piUsername || person.username}{person.country ? ` · ${person.country}` : ""}</small></span></Link><div className="people-search-actions"><button type="button" disabled={followBusy === person.uid || person.uid === viewer?.uid} onClick={() => void toggleFollow(person)}>{person.uid === viewer?.uid ? "You" : person.following ? "Following" : "Follow"}</button>{person.uid !== viewer?.uid && person.allowContact ? <Link to={`/messages?${new URLSearchParams({ recipient: person.uid, name: person.displayName, avatar: person.avatar || "" })}`}>Message</Link> : person.uid !== viewer?.uid ? <span>Messages off</span> : null}</div></article>)}</section> : null}</> : <section><h2>No results</h2><Link to="/categories">No results found. Try another keyword or browse categories.</Link></section>}</section>}
     <div className="search-desktop-fallback"><h2>Popular</h2>{privateSearchPopular.map((item) => <Link key={item.label} to={item.to}>{item.label}</Link>)}</div>
   </main>;
 };

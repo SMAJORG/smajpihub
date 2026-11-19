@@ -464,7 +464,7 @@ export const AdminOrdersPage = () => {
   );
 };
 
-type Report = { _id: string; targetType: string; targetId: string; reason: string; details?: string; resolved?: boolean; createdAt: string; source?: "marketplace" | "support" };
+type Report = { _id: string; targetType: string; targetId: string; reason: string; details?: string; resolved?: boolean; createdAt: string; source?: "marketplace" | "community" | "support"; contentStatus?: string };
 export const AdminReportsPage = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState("open");
@@ -481,8 +481,15 @@ export const AdminReportsPage = () => {
     try { await axiosClient.patch(report.source === "support" ? `/admin/support/${report._id}/resolve` : `/admin/reports/${report._id}/resolve`); setMessage("Record resolved."); await load(); }
     catch { setError("Could not resolve this report."); }
   };
+  const moderateCommunityPost = async (report: Report, status: "published" | "removed") => {
+    try {
+      await axiosClient.patch(`/admin/community/posts/${encodeURIComponent(report.targetId)}/moderate`, { status });
+      setMessage(status === "published" ? "Community post restored." : "Community post removed.");
+      await load();
+    } catch { setError("Could not update community post moderation."); }
+  };
   const visible = reports.filter(report => filter === "all" || (filter === "open" && !report.resolved) || (filter === "resolved" && report.resolved) || report.source === filter);
-  return <main className="private-page"><Head title="Reports & support" description="Review marketplace reports and support requests." action={<Link className="private-secondary-button" to="/admin/analytics">Analytics overview</Link>} /><Notice text={message} />{error ? <div className="private-alert error">{error}</div> : null}<section className="admin-filter-bar"><label>Filter<select value={filter} onChange={event => setFilter(event.target.value)}><option value="open">Open</option><option value="all">All</option><option value="marketplace">Marketplace</option><option value="support">Support</option><option value="resolved">Resolved</option></select></label><button type="button" onClick={() => void load()}>Refresh</button></section>{loading ? <PrivateSkeleton variant="list" count={3} /> : !visible.length ? <div className="private-state">No reports match this filter.</div> : <div className="management-list">{visible.map(report => <article className="report-card" key={report.source + report._id}><div><span>{report.source || "marketplace"}</span><h3>{report.reason}</h3><p>{report.details || report.targetId}</p></div><strong>{report.resolved ? "Resolved" : "Open"}</strong>{!report.resolved ? <button onClick={() => void resolve(report)}>Mark resolved</button> : null}</article>)}</div>}</main>;
+  return <main className="private-page"><Head title="Reports & support" description="Review marketplace reports and support requests." action={<Link className="private-secondary-button" to="/admin/analytics">Analytics overview</Link>} /><Notice text={message} />{error ? <div className="private-alert error">{error}</div> : null}<section className="admin-filter-bar"><label>Filter<select value={filter} onChange={event => setFilter(event.target.value)}><option value="open">Open</option><option value="all">All</option><option value="marketplace">Marketplace</option><option value="community">Community</option><option value="support">Support</option><option value="resolved">Resolved</option></select></label><button type="button" onClick={() => void load()}>Refresh</button></section>{loading ? <PrivateSkeleton variant="list" count={3} /> : !visible.length ? <div className="private-state">No reports match this filter.</div> : <div className="management-list">{visible.map(report => <article className="report-card" key={report.source + report._id}><div><span>{report.source || "marketplace"}</span><h3>{report.reason}</h3><p>{report.details || report.targetId}</p>{report.source === "community" ? <small>Post status: {report.contentStatus || "unknown"}</small> : null}</div><strong>{report.resolved ? "Resolved" : "Open"}</strong>{report.source === "community" ? <button onClick={() => void moderateCommunityPost(report, report.contentStatus === "published" ? "removed" : "published")}>{report.contentStatus === "published" ? "Remove post" : "Restore post"}</button> : null}{!report.resolved ? <button onClick={() => void resolve(report)}>Mark resolved</button> : null}</article>)}</div>}</main>;
 };
 
 export const AdminSettingsPage = () => <main className="private-page"><Head title="Admin Settings" description="Administrative preferences use your main SMAJ settings." /><div className="private-state"><p>Theme, language, notifications, and logout are managed in account settings.</p><Link className="private-primary-button" to="/settings">Open Settings</Link></div></main>;

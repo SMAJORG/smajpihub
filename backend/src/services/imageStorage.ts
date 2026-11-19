@@ -85,6 +85,41 @@ export const uploadImageToCloudinary = async (image: string, purpose = "image", 
   };
 };
 
+export const uploadVideoToCloudinary = async (video: string, purpose = "community-post", originalName = "video"): Promise<CloudinaryUpload> => {
+  if (!/^data:video\/(mp4|webm|quicktime);base64,/i.test(video)) {
+    throw Object.assign(new Error("Upload an MP4, WebM, or MOV video."), { statusCode: 400 });
+  }
+  if (video.length > 7_000_000) {
+    throw Object.assign(new Error("Video must be 5 MB or smaller."), { statusCode: 413 });
+  }
+  if (!env.cloudinary_cloud_name || !env.cloudinary_upload_preset) {
+    throw Object.assign(new Error("Cloudinary video upload is not configured."), { statusCode: 503 });
+  }
+  const params = new URLSearchParams();
+  params.set("file", video);
+  params.set("upload_preset", env.cloudinary_upload_preset);
+  params.set("filename_override", sanitizeAssetName(originalName, purpose));
+  params.set("folder", `${env.cloudinary_folder}/${safePurpose(purpose)}`);
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${env.cloudinary_cloud_name}/video/upload`, {
+    method: "POST",
+    body: params,
+  });
+  if (!response.ok) throw new Error(`Cloudinary video upload failed: ${response.status}`);
+  const data = (await response.json()) as CloudinaryResponse;
+  if (!data.secure_url || !data.secure_url.startsWith("https://res.cloudinary.com/")) {
+    throw new Error("Cloudinary did not return a secure video URL");
+  }
+  return {
+    url: data.secure_url,
+    publicId: data.public_id,
+    width: data.width,
+    height: data.height,
+    bytes: data.bytes,
+    format: data.format,
+    storage: "cloudinary",
+  };
+};
+
 export const uploadPdfToCloudinary = async (document: string, purpose = "document", originalName = "document.pdf") => {
   if (!isBase64Pdf(document)) throw Object.assign(new Error("Upload a valid PDF file."), { statusCode: 400 });
   if (document.length > 7_000_000) throw Object.assign(new Error("PDF must be 5 MB or smaller."), { statusCode: 413 });

@@ -17,6 +17,7 @@ import { isAxiosError } from "axios";
 import MarketplaceProductCard from "../../components/MarketplaceProductCard";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import TrustBadge from "../../components/TrustBadge";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { axiosClient } from "../../lib/axiosClient";
 import { countryDisplayName, countryFlag, formatPiAmount, formatUsdAmount } from "../../lib/formatters";
@@ -208,9 +209,7 @@ const ProductDetailPage = () => {
           <p className="product-delivery-line">{sellerFlag ? `${sellerFlag} ` : ""}{product.city || sellerCountry} · {product.shipping?.deliveryTime || "Contact seller for delivery"}</p>
 
           <Link className="seller-info-card" to={`/seller/${product.sellerId}`}>
-            <div className="profile-avatar small">
-              {sellerAvatar ? <img src={sellerAvatar} alt={sellerName} /> : <span>{sellerName.slice(0, 1)}</span>}
-            </div>
+            <UserAvatarFrame className="profile-avatar small" name={sellerName} image={sellerAvatar} frame={seller?.avatarFrame || product.sellerAvatarFrame} size={40} />
             <div className="seller-info-copy">
               <span className="seller-role-label">Seller</span>
               <strong className="seller-name-line">

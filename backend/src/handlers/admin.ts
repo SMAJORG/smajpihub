@@ -802,8 +802,20 @@ export default function mountAdminEndpoints(router: Router) {
       req.app.locals.reportCollection.find({}).sort({ createdAt: -1 }).toArray(),
       req.app.locals.supportCollection.find({}).sort({ createdAt: -1 }).toArray(),
     ]);
+    const communityReports = productReports.filter((report: Record<string, any>) => report.targetType === "community_post");
+    const communityPostIds = [...new Set<string>(communityReports.map((report: Record<string, any>) => String(report.targetId)))]
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    const communityPosts = communityPostIds.length
+      ? await req.app.locals.communityPostCollection.find({ _id: { $in: communityPostIds } }).toArray()
+      : [];
+    const communityPostStatus = new Map(communityPosts.map((post: Record<string, any>) => [String(post._id), post.status]));
     const reports = [
-      ...productReports.map((report: Record<string, any>) => ({ ...serialize(report), source: "marketplace" })),
+      ...productReports.map((report: Record<string, any>) => ({
+        ...serialize(report),
+        source: report.targetType === "community_post" ? "community" : "marketplace",
+        ...(report.targetType === "community_post" ? { contentStatus: communityPostStatus.get(String(report.targetId)) || "deleted" } : {}),
+      })),
       ...supportRequests.map((request: Record<string, any>) => ({
         ...serialize(request),
         targetType: request.source || "support",
@@ -827,6 +839,19 @@ export default function mountAdminEndpoints(router: Router) {
     );
     if (report?.reportedBy) await createNotification(req.app, { userId: report.reportedBy, type: "report_update", title: "Report resolved", message: `Your report about ${report.targetName || report.targetType} was reviewed`, relatedId: req.params.id });
     return res.status(200).json({ message: "Report resolved" });
+  });
+
+  router.patch("/community/posts/:id/moderate", async (req, res) => {
+    if (!ObjectId.isValid(req.params.id) || !["published", "removed"].includes(req.body?.status)) {
+      return res.status(400).json({ error: "bad_request", message: "Choose published or removed for community moderation." });
+    }
+    const post = await req.app.locals.communityPostCollection.findOne({ _id: new ObjectId(req.params.id) });
+    if (!post) return res.status(404).json({ error: "not_found", message: "Community post not found." });
+    await req.app.locals.communityPostCollection.updateOne({ _id: post._id }, {
+      $set: { status: req.body.status, moderatedAt: new Date(), moderatedBy: req.session.user?.userId },
+      $unset: req.body.status === "published" ? { hiddenAt: "", hiddenReason: "" } : {},
+    });
+    return res.status(200).json({ message: req.body.status === "published" ? "Community post restored." : "Community post removed." });
   });
 
   router.patch("/support/:id/resolve", async (req, res) => {

@@ -3,6 +3,7 @@ export type Product = {
   sellerId: string;
   sellerName: string;
   sellerAvatar?: string;
+  sellerAvatarFrame?: "ambassador" | "open_to_work" | "seller" | "hiring" | null;
   piUsername?: string;
   title: string;
   image: string;
@@ -70,7 +71,7 @@ export type ProductShipping = {
 
 export type VerificationLevel = "basic" | "pi_verified" | "seller_verified" | "trusted_seller";
 export type VerificationStatus = "none" | "pending" | "approved" | "rejected";
-export type SellerSummary = { uid: string; username?: string; piUsername?: string; displayName: string; avatar?: string; country?: string; createdAt?: string; verificationLevel?: VerificationLevel; verificationStatus?: VerificationStatus; totalProducts?: number; successfulOrders?: number; averageRating?: number; reviewCount?: number };
+export type SellerSummary = { uid: string; username?: string; piUsername?: string; displayName: string; avatar?: string; avatarFrame?: "ambassador" | "open_to_work" | "seller" | "hiring" | null; country?: string; createdAt?: string; verificationLevel?: VerificationLevel; verificationStatus?: VerificationStatus; totalProducts?: number; successfulOrders?: number; averageRating?: number; reviewCount?: number };
 export type Review = { _id: string; buyerName: string; rating: number; message?: string; createdAt: string };
 export type Conversation = { _id: string; buyerId: string; sellerId: string; productId: string; productTitle: string; productImage?: string; lastMessage?: string; updatedAt: string; unreadBy?: string[]; archived?: boolean; buyerName?: string; sellerName?: string; participantId?: string; participantName?: string; profileImage?: string; verificationLevel?: VerificationLevel; verificationStatus?: VerificationStatus; online?: boolean; presenceExpiresAt?: string; lastSeenAt?: string; typing?: boolean };
 export type ChatMessage = { linkLabels?: { href: string; label: string }[]; welcomeAccountId?: string; welcomeVersion?: number; mediaAvailable?: boolean; clientMessageId?: string; deliveryState?: "pending" | "failed"; productContextExplicit?: boolean; _id: string; conversationId: string; senderId: string; message: string; messageType?: "text" | "voice" | "image" | "document"; productId?: string; productTitle?: string; productImage?: string; audioDataUrl?: string; audioMimeType?: string; audioDurationSeconds?: number; attachmentUrl?: string; attachmentDataUrl?: string; attachmentName?: string; attachmentMimeType?: string; attachmentSize?: number; deletedForEveryone?: boolean; deletedAt?: string; createdAt: string; readAt?: string };

@@ -27,6 +27,7 @@ import mountPaymentsEndpoints from "./handlers/payments";
 import mountLiveTransactions from "./handlers/transactions";
 import mountUserEndpoints, { handleSignIn } from "./handlers/users";
 import mountReferralEndpoints from "./handlers/referrals";
+import mountCommunityEndpoints from "./handlers/community";
 
 // We must import typedefs for ts-node-dev to pick them up when they change (even though tsc would supposedly
 // have no problem here)
@@ -296,6 +297,10 @@ const referralRouter = express.Router();
 mountReferralEndpoints(referralRouter);
 app.use("/referrals", referralRouter);
 
+const communityRouter = express.Router();
+mountCommunityEndpoints(communityRouter);
+app.use("/community", communityRouter);
+
 const marketplaceRouter = express.Router();
 mountMarketplaceEndpoints(marketplaceRouter);
 app.use("/marketplace", marketplaceRouter);
@@ -467,6 +472,10 @@ const start = async () => {
       app.locals.ssoCodeCollection = db.collection("sso_codes");
       await app.locals.ssoCodeCollection.createIndex({expiresAt:1},{expireAfterSeconds:0});
       app.locals.reportCollection = db.collection("reports");
+      app.locals.communityPostCollection = db.collection("community_posts");
+      app.locals.communityLikeCollection = db.collection("community_likes");
+      app.locals.communityCommentCollection = db.collection("community_comments");
+      app.locals.communityFollowCollection = db.collection("community_follows");
       app.locals.favoriteCollection = db.collection("favorites");
       app.locals.reviewCollection = db.collection("reviews");
       app.locals.conversationCollection = db.collection("conversations");
@@ -556,6 +565,21 @@ const start = async () => {
         app.locals.referralVisitCollection.createIndex({ referralCode: 1, visitorHash: 1 }, { unique: true }),
         app.locals.referralVisitCollection.createIndex({ referralCode: 1, createdAt: -1 }),
         app.locals.userCollection.createIndex({ piUsername: 1 }),
+        app.locals.communityPostCollection.createIndex({ status: 1, createdAt: -1 }),
+        app.locals.communityPostCollection.createIndex({ authorId: 1, createdAt: -1 }),
+        app.locals.communityPostCollection.createIndex({ repostOf: 1, status: 1 }),
+        app.locals.communityPostCollection.createIndex(
+          { authorId: 1, repostOf: 1 },
+          { unique: true, partialFilterExpression: { type: "repost", status: "published" } },
+        ),
+        app.locals.communityLikeCollection.createIndex({ postId: 1, userId: 1 }, { unique: true }),
+        app.locals.communityCommentCollection.createIndex({ postId: 1, createdAt: 1 }),
+        app.locals.communityFollowCollection.createIndex({ followerId: 1, followingId: 1 }, { unique: true }),
+        app.locals.communityFollowCollection.createIndex({ followingId: 1, createdAt: -1 }),
+        app.locals.reportCollection.createIndex(
+          { targetType: 1, targetId: 1, reportedBy: 1 },
+          { unique: true, partialFilterExpression: { targetType: "community_post" } },
+        ),
         app.locals.productCollection.createIndex({
           sellerId: 1,
           createdAt: -1,

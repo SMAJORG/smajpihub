@@ -34,6 +34,8 @@ import {
   getNativePushState,
   supportsNativePushNotifications,
 } from "../../lib/nativePushNotifications";
+import type { AvatarFrameId } from "../../components/UserAvatarFrame";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
 
 type SavedSettings = {
   fullName: string;
@@ -48,8 +50,23 @@ type SavedSettings = {
   messageNotifications: boolean;
   publicProfile: boolean;
   allowContact: boolean;
+  openToWork: boolean;
+  activeAvatarFrame: AvatarFrameId | null;
 };
 
+type SocialSettings = {
+  publicProfile: boolean;
+  allowContact: boolean;
+  openToWork: boolean;
+  eligibleFrames: AvatarFrameId[];
+  activeAvatarFrame: AvatarFrameId | null;
+};
+const frameNames: Record<AvatarFrameId, string> = {
+  ambassador: "Ambassador",
+  open_to_work: "Open to Work",
+  seller: "Seller",
+  hiring: "Hiring",
+};
 type VerificationStats = {
   totalProducts: number;
   approvedListings: number;
@@ -146,11 +163,24 @@ const SettingsPage = () => {
     messageNotifications: saved.messageNotifications ?? true,
     publicProfile: saved.publicProfile ?? true,
     allowContact: saved.allowContact ?? true,
+    openToWork: saved.openToWork ?? user?.openToWork ?? false,
+    activeAvatarFrame: saved.activeAvatarFrame ?? null,
   });
   const [savedForm, setSavedForm] = useState(form);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [socialSettings, setSocialSettings] = useState<SocialSettings>({
+    publicProfile: user?.publicProfile !== false,
+    allowContact: user?.allowContact !== false,
+    openToWork: user?.openToWork === true,
+    eligibleFrames: [],
+    activeAvatarFrame: null,
+  });
+  const [socialSettingsLoading, setSocialSettingsLoading] = useState(true);
   const hasChanges = JSON.stringify(form) !== JSON.stringify(savedForm);
+  const eligibleFrameOptions = socialSettings.eligibleFrames.includes("open_to_work") || form.openToWork
+    ? [...new Set([...socialSettings.eligibleFrames, ...(form.openToWork ? ["open_to_work" as const] : [])])]
+    : socialSettings.eligibleFrames;
   const groupProps = (id: string) => ({
     id,
     expanded: expanded === id,
@@ -202,6 +232,38 @@ const SettingsPage = () => {
     }
   };
   const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!user?.uid) return;
+    let active = true;
+    setSocialSettingsLoading(true);
+    axiosClient.get<{ settings: SocialSettings }>("/user/social-settings")
+      .then(({ data }) => {
+        if (!active) return;
+        const remote = data.settings;
+        setSocialSettings(remote);
+        setForm(current => ({
+          ...current,
+          publicProfile: remote.publicProfile,
+          allowContact: remote.allowContact,
+          openToWork: remote.openToWork,
+          activeAvatarFrame: remote.activeAvatarFrame,
+        }));
+        setSavedForm(current => ({
+          ...current,
+          publicProfile: remote.publicProfile,
+          allowContact: remote.allowContact,
+          openToWork: remote.openToWork,
+          activeAvatarFrame: remote.activeAvatarFrame,
+        }));
+      })
+      .catch(() => {
+        if (active) setMessage("Social settings could not be loaded. Try again before saving changes.");
+      })
+      .finally(() => {
+        if (active) setSocialSettingsLoading(false);
+      });
+    return () => { active = false; };
+  }, [user?.uid]);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(true);
   const [pushBusy, setPushBusy] = useState(false);
@@ -287,7 +349,7 @@ const SettingsPage = () => {
     setMessage("");
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
-      await Promise.all([
+      const [, , socialResponse] = await Promise.all([
         updateSettings({
           theme: form.theme,
           language: user?.language || user?.settings?.language || "English",
@@ -304,7 +366,14 @@ const SettingsPage = () => {
           language: user?.language || user?.settings?.language || "English",
           sellerActive: form.accountType !== "Buyer",
         }),
+        axiosClient.put<{ settings: SocialSettings }>("/user/social-settings", {
+          publicProfile: form.publicProfile,
+          allowContact: form.allowContact,
+          openToWork: form.openToWork,
+          activeAvatarFrame: form.activeAvatarFrame,
+        }),
       ]);
+      setSocialSettings(socialResponse.data.settings);
       setSavedForm(submitted);
       setMessage("Settings saved.");
     } catch {
@@ -427,16 +496,17 @@ const SettingsPage = () => {
       </header>
 
       <section className="settings-profile-card" aria-label="Account profile">
-        {user?.avatar ? (
-          <img src={user.avatar} alt="" />
-        ) : (
-          <span className="settings-profile-initial" aria-hidden="true">
-            {(form.fullName || user?.displayName || user?.username || "P").slice(0, 1).toUpperCase()}
-          </span>
-        )}
+        <UserAvatarFrame
+          className="settings-profile-avatar-frame"
+          name={form.fullName || user?.displayName || user?.username || "Pi user"}
+          image={user?.avatar}
+          frame={user?.activeAvatarFrame}
+          size={52}
+        />
         <div>
           <strong>{form.fullName || user?.displayName || user?.username || "Pi user"}</strong>
           <span>{piAccount}</span>
+          {user?.uid ? <Link className="settings-public-profile-link" to={`/people/${encodeURIComponent(user.uid)}`}>View public profile</Link> : null}
           <small>
             <TrustBadge userId={user?.uid} />
             {isSmajVerificationApproved(identityVerification)
@@ -666,6 +736,38 @@ const SettingsPage = () => {
                 onChange={event => setField("allowContact", event.target.checked)}
               />
             </label>
+            <label className="setting-line toggle-line">
+              <span>
+                <strong>Open to Work frame</strong>
+                <small>Show that you are open to work. You can turn this off at any time.</small>
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={form.openToWork}
+                onChange={event => {
+                  const openToWork = event.target.checked;
+                  setField("openToWork", openToWork);
+                  if (!openToWork && form.activeAvatarFrame === "open_to_work") setField("activeAvatarFrame", null);
+                }}
+              />
+            </label>
+            <label className="setting-line">
+              <span>
+                <strong>Active avatar frame</strong>
+                <small>{socialSettingsLoading ? "Checking frame eligibility..." : "Only frames currently eligible for your account can be selected."}</small>
+              </span>
+              <select
+                value={form.activeAvatarFrame || ""}
+                disabled={socialSettingsLoading}
+                onChange={event => setField("activeAvatarFrame", event.target.value ? event.target.value as AvatarFrameId : null)}
+                aria-label="Active avatar frame"
+              >
+                <option value="">No frame</option>
+                {eligibleFrameOptions.map(frame => <option value={frame} key={frame}>{frameNames[frame]}</option>)}
+              </select>
+            </label>
+            {!socialSettingsLoading && !eligibleFrameOptions.length ? <p className="settings-access-note">Ambassador, approved seller, and verified employer frames unlock automatically when eligible. Open to Work is user-controlled.</p> : null}
             <button
               type="button"
               className="private-secondary-button danger"

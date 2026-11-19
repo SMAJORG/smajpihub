@@ -20,6 +20,7 @@ import { createNotification } from "../services/notifications";
 import { assertNoBase64Images, resolveImageValue } from "../services/imageStorage";
 import { currentDeviceSessionKey, ensureDeviceSession, type DeviceMetadata } from "../services/deviceSessions";
 import { ensureReferralCode, verifyReferralAttribution } from "../services/referrals";
+import { avatarFrameIds, getEligibleAvatarFrames, getEligibleAvatarFramesForUsers, resolveAvatarFrame } from "../services/avatarFrames";
 
 type VerifiedPiUser = {
   uid?: string;
@@ -53,7 +54,7 @@ const normalizeVerificationLevel = (user: any) => {
 const publicVerificationLevel = (user: any) => verificationStatus(user) === "approved" && canShowPublicVerification(user) ? normalizeVerificationLevel(user) : "basic";
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const toClientUser = (user: any) => user ? ({
+const toClientUser = (user: any, activeAvatarFrame: ReturnType<typeof resolveAvatarFrame> = null) => user ? ({
   accountEnvironment: freshMainnetAccounts() ? "mainnet" : "legacy",
   uid: user.uid,
   username: user.username,
@@ -67,6 +68,10 @@ const toClientUser = (user: any) => user ? ({
   language: (typeof user.settings?.language === "string" && user.settings.language !== "English" ? user.settings.language : "") || user.language || "English",
   languagePreferenceSaved: Boolean(user.languagePreferenceSaved || user.language || (user.settings?.language && user.settings.language !== "English")),
   sellerActive: Boolean(user.sellerActive || user.role === "seller"),
+  publicProfile: user.publicProfile !== false && user.settings?.publicProfile !== false,
+  allowContact: user.allowContact !== false && user.settings?.allowContact !== false,
+  openToWork: user.openToWork === true,
+  activeAvatarFrame,
   role: user.role,
   roles: user.roles,
   blocked: Boolean(user.blocked),
@@ -78,6 +83,11 @@ const toClientUser = (user: any) => user ? ({
   settings: user.settings || { theme: "light", language: "English", notifications: true },
   createdAt: user.createdAt,
 }) : null;
+const toClientUserWithFrame = async (locals: Record<string, any>, user: any) => {
+  if (!user) return null;
+  const eligibleFrames = await getEligibleAvatarFrames(locals, user);
+  return toClientUser(user, resolveAvatarFrame(user, eligibleFrames));
+};
 
 export const handleLanguagePreference = async (req: Request, res: Response) => {
   try {
@@ -99,7 +109,7 @@ export const handleLanguagePreference = async (req: Request, res: Response) => {
     const updated = await collection.findOne({ uid: user.uid });
     if (!updated) return res.status(503).json({ error: "profile_unavailable" });
     res.setHeader("Cache-Control", "no-store");
-    return res.json({ user: toClientUser(updated) });
+    return res.json({ user: await toClientUserWithFrame(req.app.locals, updated) });
   } catch {
     return res.status(503).json({ error: "language_save_unavailable", message: "Language could not be saved. Please try again." });
   }
@@ -316,7 +326,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
       message: "Your SMAJ PI HUB account was signed in. Review your active devices if this was not you.",
       relatedId: "settings",
     });
-    return res.status(200).json({ message: "User signed in", user: toClientUser(currentUser), session, requestId });
+    return res.status(200).json({ message: "User signed in", user: await toClientUserWithFrame(req.app.locals, currentUser), session, requestId });
   } catch (err) {
     if (err instanceof IdentityLinkError) return failure(err.status, err.code, err.message);
     return failure(503, stage.startsWith("session_") ? "signin_session_unavailable" : "signin_storage_unavailable", stage.startsWith("session_") ? "The account server verified Pi but could not save your login session. Please retry shortly." : "The account server could not read or save your account. Please retry shortly.");
@@ -333,7 +343,7 @@ export default function mountUserEndpoints(router: Router) {
       if (!result) return res.status(401).json({ error: "session_revoked", message: "Please sign in again to establish a new session." });
       await saveSession(req);
       setRefreshCookie(res, result.session.refreshToken, sessionCookieOptions);
-      return res.json({ user: toClientUser(result.user), session: result.session });
+      return res.json({ user: await toClientUserWithFrame(req.app.locals, result.user), session: result.session });
     } catch (error) {
       return res.status(503).json({ error: "authentication_unavailable", message: "Session renewal is temporarily unavailable. Please retry." });
     }
@@ -389,7 +399,7 @@ export default function mountUserEndpoints(router: Router) {
     const session = await issuePersistentSession(req, currentUser);
     await saveSession(req);
     setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
-    return res.status(200).json({ message: "Development user signed in", user: toClientUser(currentUser), session });
+    return res.status(200).json({ message: "Development user signed in", user: await toClientUserWithFrame(req.app.locals, currentUser), session });
   });
 
   // POST /user/signin
@@ -420,7 +430,7 @@ export default function mountUserEndpoints(router: Router) {
         setRefreshCookie(res, session.refreshToken, sessionCookieOptions);
       }
     }
-    return res.status(200).json({ user: toClientUser(currentUser), ...(session ? { session } : {}) });
+    return res.status(200).json({ user: await toClientUserWithFrame(req.app.locals, currentUser), ...(session ? { session } : {}) });
   });
 
   router.put("/profile", async (req: Request, res: Response) => {
@@ -472,7 +482,7 @@ export default function mountUserEndpoints(router: Router) {
 
     const updatedUser = await userCollection.findOne({ uid: currentUser.uid });
     await refreshExistingAuthSession(req, updatedUser);
-    return res.status(200).json({ user: toClientUser(updatedUser) });
+    return res.status(200).json({ user: await toClientUserWithFrame(req.app.locals, updatedUser) });
   });
 
   router.get("/stats", async (req: Request, res: Response) => {
@@ -491,12 +501,89 @@ export default function mountUserEndpoints(router: Router) {
     const query = String(req.query.q || "").trim().slice(0, 80);
     if (!query) return res.status(200).json({ users: [] });
     const regex = { $regex: escapeRegex(query), $options: "i" };
-    const users = await req.app.locals.userCollection
-      .find({ blocked: { $ne: true }, $or: [{ displayName: regex }, { username: regex }, { piUsername: regex }, { country: regex }] })
-      .project({ uid: 1, username: 1, piUsername: 1, displayName: 1, country: 1, role: 1, sellerActive: 1, verificationLevel: 1, verificationStatus: 1 })
-      .limit(12)
-      .toArray();
-    return res.status(200).json({ users: users.map((user: any) => ({ uid: user.uid, username: user.username, piUsername: user.piUsername, displayName: user.displayName || user.username || "Pi user", country: user.country || "", role: user.role || "buyer", sellerActive: Boolean(user.sellerActive || user.role === "seller"), verificationLevel: publicVerificationLevel(user), verificationStatus: verificationStatus(user) })) });
+    const [users, viewer] = await Promise.all([
+      req.app.locals.userCollection
+      .find({ blocked: { $ne: true }, publicProfile: { $ne: false }, "settings.publicProfile": { $ne: false }, $or: [{ displayName: regex }, { username: regex }, { piUsername: regex }, { country: regex }] })
+      .project({ uid: 1, username: 1, piUsername: 1, displayName: 1, country: 1, avatar: 1, role: 1, sellerActive: 1, openToWork: 1, activeAvatarFrame: 1, allowContact: 1, settings: 1, verificationLevel: 1, verificationStatus: 1 })
+      .limit(24)
+      .toArray(),
+      resolveCurrentUser(req),
+    ]);
+    const visibleUsers = users.filter((user: any) => user.settings?.publicProfile !== false);
+    const followedIds = new Set(viewer && visibleUsers.length
+      ? (await req.app.locals.communityFollowCollection.find({ followerId: viewer.uid, followingId: { $in: visibleUsers.map((user: any) => user.uid) } }).toArray()).map((item: any) => item.followingId)
+      : []);
+    const resultUsers = visibleUsers.slice(0, 12);
+    const eligibleFramesByUser = await getEligibleAvatarFramesForUsers(req.app.locals, resultUsers);
+    const results = resultUsers.map((user: any) => {
+      const eligibleFrames = eligibleFramesByUser.get(String(user.uid)) || [];
+      return {
+        uid: user.uid,
+        username: user.username,
+        piUsername: user.piUsername,
+        displayName: user.displayName || user.username || "Pi user",
+        country: user.country || "",
+        avatar: user.avatar || "",
+        role: user.role || "buyer",
+        sellerActive: Boolean(user.sellerActive || user.role === "seller"),
+        activeAvatarFrame: resolveAvatarFrame(user, eligibleFrames),
+        allowContact: user.allowContact !== false && user.settings?.allowContact !== false,
+        following: followedIds.has(user.uid),
+        verificationLevel: publicVerificationLevel(user),
+        verificationStatus: verificationStatus(user),
+      };
+    });
+    return res.status(200).json({ users: results });
+  });
+
+  router.get("/social-settings", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const eligibleFrames = await getEligibleAvatarFrames(req.app.locals, user);
+    return res.json({
+      settings: {
+        publicProfile: user.publicProfile !== false && user.settings?.publicProfile !== false,
+        allowContact: user.allowContact !== false && user.settings?.allowContact !== false,
+        openToWork: user.openToWork === true,
+        eligibleFrames,
+        activeAvatarFrame: resolveAvatarFrame(user, eligibleFrames),
+      },
+    });
+  });
+
+  router.put("/social-settings", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const { publicProfile, allowContact, openToWork, activeAvatarFrame } = req.body || {};
+    if (typeof publicProfile !== "boolean" || typeof allowContact !== "boolean" || typeof openToWork !== "boolean"
+      || (activeAvatarFrame !== null && !avatarFrameIds.includes(activeAvatarFrame))) {
+      return res.status(400).json({ error: "invalid_social_settings", message: "Choose valid profile privacy and avatar frame settings." });
+    }
+    const eligibleFrames = await getEligibleAvatarFrames(req.app.locals, { ...user, openToWork });
+    if (activeAvatarFrame && !eligibleFrames.includes(activeAvatarFrame)) {
+      return res.status(403).json({ error: "frame_not_eligible", message: "That avatar frame is not currently available for your account." });
+    }
+    const userCollection = req.app.locals.userCollection;
+    const settingsAreObject = user.settings && Object.prototype.toString.call(user.settings) === "[object Object]";
+    const socialFields = { publicProfile, allowContact, openToWork, activeAvatarFrame, socialSettingsUpdatedAt: new Date() };
+    if (settingsAreObject) {
+      await userCollection.updateOne({ uid: user.uid }, {
+        $set: { ...socialFields, "settings.publicProfile": publicProfile, "settings.allowContact": allowContact },
+      });
+    } else {
+      await userCollection.updateOne({ uid: user.uid, settings: user.settings ?? null }, {
+        $set: {
+          ...socialFields,
+          settings: { theme: "light", notifications: true, publicProfile, allowContact },
+        },
+      });
+    }
+    const updatedUser = await req.app.locals.userCollection.findOne({ uid: user.uid });
+    await refreshExistingAuthSession(req, updatedUser);
+    return res.json({
+      settings: { publicProfile, allowContact, openToWork, eligibleFrames, activeAvatarFrame },
+      user: toClientUser(updatedUser, resolveAvatarFrame(updatedUser, eligibleFrames)),
+    });
   });
 
   router.get("/recent-searches", async (req: Request, res: Response) => {
@@ -566,7 +653,7 @@ export default function mountUserEndpoints(router: Router) {
     })));
     const updatedUser = await req.app.locals.userCollection.findOne({ uid: currentUser.uid });
     await refreshExistingAuthSession(req, updatedUser);
-    return res.status(200).json({ user: toClientUser(updatedUser), message: "Verification request submitted" });
+    return res.status(200).json({ user: await toClientUserWithFrame(req.app.locals, updatedUser), message: "Verification request submitted" });
   });
 
   router.get("/sessions", async (req: Request, res: Response) => {
@@ -643,7 +730,7 @@ export default function mountUserEndpoints(router: Router) {
     await req.app.locals.userCollection.updateOne({ uid: currentUser.uid }, { $set: { settings } });
     const updatedUser = await req.app.locals.userCollection.findOne({ uid: currentUser.uid });
     await refreshExistingAuthSession(req, updatedUser);
-    return res.status(200).json({ user: toClientUser(updatedUser) });
+    return res.status(200).json({ user: await toClientUserWithFrame(req.app.locals, updatedUser) });
   });
 
   // GET|POST /user/signout

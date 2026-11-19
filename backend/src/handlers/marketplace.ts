@@ -8,6 +8,7 @@ import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
 import env from "../environments";
 import { resolveCurrentUser } from "../services/auth";
+import { getEligibleAvatarFrames, resolveAvatarFrame } from "../services/avatarFrames";
 import { assertNoBase64Images, resolveImageValue } from "../services/imageStorage";
 import { piFromUsdt } from "../services/piPricing";
 import { canTransitionOrder, releaseOrderInventory, timelineEntry } from "../services/orderLifecycle";
@@ -587,6 +588,9 @@ export default function mountMarketplaceEndpoints(router: Router) {
   router.get("/sellers/:id", async (req, res) => {
     const seller = await req.app.locals.userCollection.findOne({ uid: req.params.id });
     if (!seller) return res.status(404).json({ error: "not_found", message: "Seller not found" });
+    const viewer = await resolveCurrentUser(req);
+    if ((seller.publicProfile === false || seller.settings?.publicProfile === false) && viewer?.uid !== seller.uid) return res.status(404).json({ error: "not_found", message: "Seller profile is not available" });
+    const eligibleFrames = await getEligibleAvatarFrames(req.app.locals, seller);
     const page = Math.max(1, Number.parseInt(String(req.query.page || "1"), 10) || 1);
     const limit = Math.min(40, Math.max(1, Number.parseInt(String(req.query.limit || "20"), 10) || 20));
     const search = String(req.query.search || "").trim().slice(0, 80);
@@ -604,7 +608,7 @@ export default function mountMarketplaceEndpoints(router: Router) {
       req.app.locals.productCollection.countDocuments({ sellerId: seller.uid, hidden: { $ne: true }, active: true, approved: true, reviewStatus: "approved" }),
     ]);
     const averageRating = reviews.length ? reviews.reduce((sum: number, review: any) => sum + Number(review.rating), 0) / reviews.length : 0;
-    return res.status(200).json({ seller: { uid: seller.uid, displayName: seller.displayName, piUsername: seller.piUsername, avatar: seller.avatar || "", country: seller.country, verificationLevel: publicVerificationLevel(seller), verificationStatus: verificationStatus(seller), createdAt: seller.createdAt, totalProducts, successfulOrders: completedOrders, averageRating, reviewCount: reviews.length }, products: await publicProducts(req, products), reviews: reviews.map(serialize), pagination: { page, limit, total: filteredProducts, hasMore: page * limit < filteredProducts } });
+    return res.status(200).json({ seller: { uid: seller.uid, displayName: seller.displayName, piUsername: seller.piUsername, avatar: seller.avatar || "", avatarFrame: resolveAvatarFrame(seller, eligibleFrames), country: seller.country, verificationLevel: publicVerificationLevel(seller), verificationStatus: verificationStatus(seller), createdAt: seller.createdAt, totalProducts, successfulOrders: completedOrders, averageRating, reviewCount: reviews.length }, products: await publicProducts(req, products), reviews: reviews.map(serialize), pagination: { page, limit, total: filteredProducts, hasMore: page * limit < filteredProducts } });
   });
 
   router.post("/orders/:id/review", async (req, res) => {

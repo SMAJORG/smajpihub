@@ -16,6 +16,7 @@ import XIcon from "@mui/icons-material/X";
 import YouTubeIcon from "@mui/icons-material/YouTube";
 import { useAuthContext } from "../../contexts/AuthContext";
 import TrustBadge from "../../components/TrustBadge";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
 import InvitePromoCard from "../../components/InvitePromoCard";
 
 const quickLinks = [
@@ -56,9 +57,7 @@ const AccountDashboardPage = () => {
   return (
     <main className="private-page account-dashboard-page">
       <section className="account-dashboard-identity">
-        <div className="account-dashboard-avatar">
-          {user?.avatar ? <img src={user.avatar} alt="" /> : name.slice(0, 1).toUpperCase()}
-        </div>
+        <UserAvatarFrame className="account-dashboard-avatar" name={name} image={user?.avatar} frame={user?.activeAvatarFrame} size={88} />
         <div>
           <h1 className="profile-name-line"><span className="profile-name-text">{name}</span><TrustBadge userId={user?.uid} /></h1>
           <p>@{user?.piUsername || user?.username}</p>

@@ -197,12 +197,23 @@ export class MemoryCollection {
       }
       return new MemoryCursor(documents.length ? [totals] : []);
     }
-    if (!group?._id || group._id !== "$category") return new MemoryCursor([]);
-    const counts = new Map<string, number>();
+    if (typeof group?._id !== "string" || !group._id.startsWith("$")) return new MemoryCursor([]);
+    const field = group._id.slice(1);
+    const grouped = new Map<string, Document>();
     this.documents.filter((document) => matchesQuery(document, match)).forEach((document) => {
-      counts.set(document.category, (counts.get(document.category) || 0) + 1);
+      const rawId = getValue(document, field);
+      const key = String(rawId ?? "null");
+      const value = grouped.get(key) || { _id: rawId };
+      for (const [name, expression] of Object.entries(group) as Array<[string, any]>) {
+        if (name === "_id" || expression?.$sum === undefined) continue;
+        const increment = typeof expression.$sum === "number"
+          ? expression.$sum
+          : Number(getValue(document, String(expression.$sum).replace(/^\$/, ""))) || 0;
+        value[name] = Number(value[name] || 0) + increment;
+      }
+      grouped.set(key, value);
     });
-    return new MemoryCursor([...counts.entries()].map(([_id, count]) => ({ _id, count })));
+    return new MemoryCursor([...grouped.values()]);
   }
 }
 
@@ -225,6 +236,10 @@ export const createMemoryCollections = () => ({
   userCollection: new MemoryCollection(),
   referralVisitCollection: new MemoryCollection(),
   reportCollection: new MemoryCollection(),
+  communityPostCollection: new MemoryCollection(),
+  communityLikeCollection: new MemoryCollection(),
+  communityCommentCollection: new MemoryCollection(),
+  communityFollowCollection: new MemoryCollection(),
   favoriteCollection: new MemoryCollection(),
   reviewCollection: new MemoryCollection(),
   conversationCollection: new MemoryCollection(),

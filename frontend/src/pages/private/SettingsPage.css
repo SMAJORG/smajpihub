@@ -514,6 +514,17 @@
   color: var(--settings-muted);
   overflow-wrap: anywhere;
 }
+.settings-profile-card .settings-public-profile-link {
+  width: fit-content;
+  color: var(--smaj-primary);
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.settings-profile-card .settings-public-profile-link:hover,
+.settings-profile-card .settings-public-profile-link:focus-visible {
+  text-decoration: underline;
+}
 .settings-profile-card > div > small {
   display: flex;
   align-items: center;

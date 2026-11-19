@@ -34,9 +34,11 @@ import VoiceNoteComposer from "../../components/VoiceNoteComposer";
 import ChatAttachmentSheet from "../../components/ChatAttachmentSheet";
 import { VoiceRecordingClock } from "../../lib/voiceRecordingClock";
 import { isFounderWelcomeMessage } from "../../lib/founderWelcome";
+import UserAvatarFrame, { type AvatarFrameId } from "../../components/UserAvatarFrame";
 
 type RichConversation = Conversation & {
   profileImage?: string;
+  avatarFrame?: AvatarFrameId | null;
   online?: boolean;
   displayTime?: string;
 };
@@ -62,9 +64,6 @@ type ImagePreview = {
 
 const getConversationName = (conversation: RichConversation, currentUserId?: string) =>
   conversation.participantName || (conversation.sellerId === currentUserId ? conversation.buyerName : conversation.sellerName) || "SMAJ user";
-
-const getConversationInitial = (conversation: RichConversation, currentUserId?: string) =>
-  getConversationName(conversation, currentUserId).slice(0, 1).toUpperCase();
 
 const getConversationRoleLabel = (conversation: RichConversation, currentUserId?: string) =>
   conversation.sellerId === currentUserId ? "Buyer" : "Seller";
@@ -1264,7 +1263,7 @@ const MessagesPageContent = () => {
                 onTouchEnd={(event) => handleConversationTouchEnd(item, event)}
               >
                 <span className="conversation-avatar">
-                  {item.profileImage ? <img src={item.profileImage} alt="" /> : getConversationInitial(item, user?.uid)}
+                  <UserAvatarFrame name={item.participantName || "Pi user"} image={item.profileImage} frame={item.avatarFrame} size={40} />
                   <i className={isConversationOnline(item) ? "online" : "offline"} />
                 </span>
                 <div>
@@ -1294,7 +1293,7 @@ const MessagesPageContent = () => {
                   </button>
                   <div className="chat-person">
                     <span className="conversation-avatar">
-                      {active.profileImage ? <img src={active.profileImage} alt="" /> : getConversationInitial(active, user?.uid)}
+                      <UserAvatarFrame name={active.participantName || "Pi user"} image={active.profileImage} frame={active.avatarFrame} size={40} />
                       <i className={isConversationOnline(active) ? "online" : "offline"} />
                     </span>
                     <div>
@@ -1419,7 +1418,7 @@ const MessagesPageContent = () => {
                   </button>
                   <div className="chat-person">
                     <span className="conversation-avatar">
-                      {active.profileImage ? <img src={active.profileImage} alt="" /> : getConversationInitial(active, user?.uid)}
+                      <UserAvatarFrame name={active.participantName || "Pi user"} image={active.profileImage} frame={active.avatarFrame} size={40} />
                       <i className={isConversationOnline(active) ? "online" : "offline"} />
                     </span>
                     <div>

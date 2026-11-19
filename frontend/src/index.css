@@ -6140,7 +6140,7 @@ html[data-private-theme="dark"] .environment-badge { color: #ffefb8; background:
     top: 60px;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(4, max-content);
+    grid-template-columns: repeat(5, max-content);
     justify-content: space-around;
     overflow-x: auto;
     color: var(--smaj-text-secondary);
@@ -22822,4 +22822,17 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
   background: transparent;
   border-color: transparent;
   box-shadow: none;
+}
+
+/* Preserve the curved frame label on account and marketplace avatars. */
+.account-dashboard-avatar.user-avatar-frame,
+.storefront-avatar-link,
+.storefront-seller-avatar,
+.product-detail-page .seller-info-card .user-avatar-frame {
+  overflow: visible !important;
+}
+.storefront-avatar-link .user-avatar-frame__label,
+.storefront-seller-avatar .user-avatar-frame__label {
+  width: 100% !important;
+  height: 100% !important;
 }

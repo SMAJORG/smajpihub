@@ -3,6 +3,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
 import { resolveCurrentUser } from "../services/auth";
+import { getEligibleAvatarFramesForUsers, resolveAvatarFrame } from "../services/avatarFrames";
 
 const serialize = (item: Record<string, any>) => ({ ...item, _id: item._id.toString() });
 const lightMessage = (item: Record<string, any>) => {
@@ -124,8 +125,13 @@ const enrichConversations = async (req: any, currentUser: Record<string, any>, c
     ? await req.app.locals.userCollection.find({ uid: { $in: otherUserIds } }).toArray()
     : [];
   const usersById = new Map(users.map((user: Record<string, any>) => [user.uid, user]));
+  const eligibleFramesByUser = await getEligibleAvatarFramesForUsers(req.app.locals, users);
+  const framesById = new Map(users.map((user: Record<string, any>) => [
+    user.uid,
+    resolveAvatarFrame(user, eligibleFramesByUser.get(String(user.uid)) || []),
+  ] as const));
 
-  return conversations.map((conversation) => {
+  return Promise.all(conversations.map(async (conversation) => {
     const otherUserId = conversation.buyerId === currentUser.uid ? conversation.sellerId : conversation.buyerId;
     const otherUser = usersById.get(otherUserId);
     const presence = readUserPresence(otherUser);
@@ -136,22 +142,24 @@ const enrichConversations = async (req: any, currentUser: Record<string, any>, c
       participantId: otherUserId,
       participantName: otherUser?.displayName || otherUser?.username || (conversation.buyerId === currentUser.uid ? conversation.sellerName : conversation.buyerName),
       profileImage: otherUser?.avatar || (conversation.buyerId === currentUser.uid ? conversation.sellerAvatar : conversation.buyerAvatar) || "",
+      avatarFrame: framesById.get(otherUserId) || null,
       verificationLevel: publicVerificationLevel(otherUser),
       verificationStatus: verificationStatus(otherUser),
       ...presence,
       typing: typingMs > 0 && Date.now() - typingMs < TYPING_WINDOW_MS,
       archived: Array.isArray(conversation.archivedBy) && conversation.archivedBy.includes(currentUser.uid),
     };
-  });
+  }));
 };
 
 const directConversation = async (req: any, user: any, recipientId: string, create: boolean) => {
   if (!recipientId || recipientId === user.uid) return null;
   const recipient = await req.app.locals.userCollection.findOne({ uid: recipientId });
-  if (!recipient) return null;
+  if (!recipient || recipient.blocked) return null;
   const pairKey = pairKeyFor(user.uid, recipientId);
   const matches = await req.app.locals.conversationCollection.find({ contextType: { $ne: "jobs" }, $or: [{ pairKey }, { buyerId: user.uid, sellerId: recipientId }, { buyerId: recipientId, sellerId: user.uid }] }).toArray();
   let conversation = await mergePairConversations(req, matches);
+  if (!conversation && (recipient.allowContact === false || recipient.settings?.allowContact === false)) return null;
   if (!conversation && create) {
     const document = { pairKey, buyerId: user.uid, buyerName: user.displayName || user.username, sellerId: recipientId, sellerName: recipient.displayName || recipient.username, participants: [user.uid, recipientId], lastMessage: "", unreadBy: [], createdAt: new Date(), updatedAt: new Date() };
     try {

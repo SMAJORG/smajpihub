@@ -39,6 +39,7 @@ import CommunityFollowPrompt from "../components/CommunityFollowPrompt";
 import { getStreamDownloads, STREAM_DOWNLOADS_CHANGED_EVENT } from "../lib/streamCatalog";
 import ServiceLaunchGate from "../components/ServiceLaunchGate";
 import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
+import UserAvatarFrame from "../components/UserAvatarFrame";
 
 type PrivateLayoutProps = { children: ReactNode; fullScreen?: boolean };
 const SIDEBAR_STORAGE_KEY = "smaj_private_sidebar_collapsed";
@@ -48,6 +49,7 @@ const PROFILE_VERIFY_REMINDER_INTERVAL_MS = 60 * 1000;
 const PROFILE_VERIFY_REMINDER_VISIBLE_MS = 10 * 1000;
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
+  "/community/feed": "Community",
   "/store": "Store",
   "/add-product": "Add Product",
   "/orders": "Orders",
@@ -93,6 +95,7 @@ const backFallbackForPath = (pathname: string) => {
   if (pathname === "/add-product") return "/seller";
   if (pathname === "/cart" || pathname === "/checkout" || pathname === "/payment-method") return "/store";
   if (pathname === "/profile" || pathname === "/app/wallet" || pathname === "/settings/preferences") return "/settings";
+  if (pathname === "/community/feed" || pathname.startsWith("/people/")) return "/dashboard";
   if (pathname === "/saved" || pathname === "/orders" || pathname === "/seller") return "/settings";
   if (pathname === "/notifications" || pathname === "/app/help-center" || pathname === "/app/tutorials" || pathname === "/help") return "/dashboard";
   if (pathname === "/trending" || pathname === "/lifestyle" || pathname === "/categories") return "/dashboard";
@@ -115,7 +118,7 @@ const isRestorablePrivateRoute = (route: string) => {
   try {
     const { pathname } = new URL(route, window.location.origin);
     return [
-      "/dashboard", "/store", "/add-product", "/orders", "/seller", "/profile", "/settings",
+      "/dashboard", "/store", "/add-product", "/orders", "/seller", "/profile", "/settings", "/community/feed", "/people",
       "/search", "/messages", "/notifications", "/saved", "/cart", "/checkout", "/payment-method",
       "/trending", "/lifestyle", "/categories", "/help", "/seller-agreement", "/app/services",
       "/app/help-center", "/app/wallet",
@@ -169,6 +172,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const needsProfileVerificationReminder = Boolean(user?.uid && !hasPublicVerification && !profileReadyForVerification);
   const pageTitle = location.pathname.startsWith("/product/") ? "Product Details"
     : location.pathname.startsWith("/app/services/") ? "Service"
+    : location.pathname.startsWith("/people/") ? "Public Profile"
     : location.pathname.startsWith("/edit-product/") ? "Edit Product"
       : pageTitles[location.pathname] || "SMAJ PI HUB";
 
@@ -373,7 +377,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
             </button>
             <div className="private-header-profile">
               {profileMenuOpen ? <div className="private-profile-menu private-header-profile-menu" style={profileMenuPosition}><Link to="/settings" onClick={() => setProfileMenuOpen(false)}><PersonOutlineIcon />Account</Link><Link to="/app/wallet" onClick={() => setProfileMenuOpen(false)}><AccountBalanceWalletOutlinedIcon />Wallet</Link><Link to="/settings/preferences" onClick={() => setProfileMenuOpen(false)}><SettingsOutlinedIcon />Settings</Link><Link to="/app/help-center" onClick={() => setProfileMenuOpen(false)}><HelpOutlineOutlinedIcon />Help Center</Link><button type="button" className="profile-menu-logout" onClick={() => { setProfileMenuOpen(false); setShowSignOut(true); }}><LogoutIcon />Logout</button></div> : null}
-              <button ref={profileAvatarRef} data-tour="you" type="button" className="private-header-avatar" title="Account" aria-label="Open account menu" aria-expanded={profileMenuOpen} onClick={() => { positionProfileMenu(); setProfileMenuOpen((open) => !open); }}>{user?.avatar ? <img src={user.avatar} alt="" /> : (user?.displayName || user?.username || "U").slice(0, 1).toUpperCase()}</button>
+              <button ref={profileAvatarRef} data-tour="you" type="button" className="private-header-avatar" title="Account" aria-label="Open account menu" aria-expanded={profileMenuOpen} onClick={() => { positionProfileMenu(); setProfileMenuOpen((open) => !open); }}><UserAvatarFrame name={user?.displayName || user?.username || "Pi user"} image={user?.avatar} frame={user?.activeAvatarFrame} size={40} /></button>
             </div>
           </div>
         </header>
@@ -411,7 +415,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
             <div className="private-sidebar-account">
               {profileMenuOpen ? <div className="private-profile-menu"><Link to="/settings" onClick={() => setProfileMenuOpen(false)}><PersonOutlineIcon />Account</Link><Link to="/app/wallet" onClick={() => setProfileMenuOpen(false)}><AccountBalanceWalletOutlinedIcon />Wallet</Link><Link to="/settings/preferences" onClick={() => setProfileMenuOpen(false)}><SettingsOutlinedIcon />Settings</Link><Link to="/app/help-center" onClick={() => setProfileMenuOpen(false)}><HelpOutlineOutlinedIcon />Help Center</Link><button type="button" className="profile-menu-logout" onClick={() => { setProfileMenuOpen(false); setShowSignOut(true); }}><LogoutIcon />Logout</button></div> : null}
               <button type="button" className="private-sidebar-profile" onClick={() => setProfileMenuOpen((open) => !open)} aria-expanded={profileMenuOpen} title={sidebarCollapsed ? (user?.displayName || user?.username) : undefined}>
-                <span className="private-profile-avatar">{user?.avatar ? <img src={user.avatar} alt="" /> : (user?.displayName || user?.username || "U").slice(0, 1).toUpperCase()}</span><span className="private-profile-copy"><strong>{user?.displayName || user?.username}<SmajVerifiedBadge userId={user?.uid} /></strong><small>{user?.role || "buyer"} account</small></span><KeyboardArrowUpIcon className="private-profile-chevron" />
+                <UserAvatarFrame className="private-profile-avatar" name={user?.displayName || user?.username || "Pi user"} image={user?.avatar} frame={user?.activeAvatarFrame} size={48} /><span className="private-profile-copy"><strong>{user?.displayName || user?.username}<SmajVerifiedBadge userId={user?.uid} /></strong><small>{user?.role || "buyer"} account</small></span><KeyboardArrowUpIcon className="private-profile-chevron" />
               </button>
             </div>
           </aside>

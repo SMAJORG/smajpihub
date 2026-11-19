@@ -6,8 +6,8 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import StarHalfIcon from "@mui/icons-material/StarHalf";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import TrustBadge from "./TrustBadge";
+import UserAvatarFrame from "./UserAvatarFrame";
 import type { Product } from "../types/marketplace";
 import {
   countryCode,
@@ -197,14 +197,7 @@ const MarketplaceProductCard = ({
 
           <div className="storefront-seller-block">
             <span className="storefront-seller-avatar">
-              {product.sellerAvatar ? (
-                <img
-                  src={product.sellerAvatar}
-                  alt={product.sellerName || "Seller"}
-                />
-              ) : (
-                <AccountCircleIcon />
-              )}
+              <UserAvatarFrame name={product.sellerName || "Seller"} image={product.sellerAvatar} frame={product.sellerAvatarFrame} size={31} />
             </span>
 
             <span className="storefront-seller-details">

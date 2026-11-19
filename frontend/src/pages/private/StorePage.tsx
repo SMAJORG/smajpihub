@@ -4,6 +4,7 @@ import HeroBannerAction from "../../components/HeroBannerAction";
 import ServiceImage from "../../components/ServiceImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { localizeText } from "../../localization/catalog";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
@@ -428,7 +429,7 @@ const StorePage = () => {
                 {cartQuantity ? <b className="storefront-cart-count">{cartQuantity > 99 ? "99+" : cartQuantity}</b> : null}
               </Link>
               <Link to="/profile" className="storefront-avatar-link" aria-label="Profile">
-                {user?.avatar ? <img src={user.avatar} alt="" /> : <span>{profileName.slice(0, 1).toUpperCase()}</span>}
+                <UserAvatarFrame name={profileName} image={user?.avatar} frame={user?.activeAvatarFrame} size={36} />
               </Link>
             </div>
           </div>

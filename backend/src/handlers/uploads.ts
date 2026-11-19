@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { isBase64Image, resolveImageValue, safePurpose, uploadImageToCloudinary, uploadPdfToCloudinary } from "../services/imageStorage";
+import { isBase64Image, resolveImageValue, safePurpose, uploadImageToCloudinary, uploadPdfToCloudinary, uploadVideoToCloudinary } from "../services/imageStorage";
 import { resolveCurrentUser } from "../services/auth";
 
 export default function mountUploadEndpoints(router: Router) {
@@ -16,8 +16,9 @@ export default function mountUploadEndpoints(router: Router) {
     try {
       const purpose = safePurpose(req.body?.purpose), image = String(req.body?.image || req.body?.dataUrl || "");
       const institutionEvidence = purpose === "institution-authorization";
-      const user = institutionEvidence ? await resolveCurrentUser(req) : null;
-      if (institutionEvidence && !user) return res.status(401).json({ error: "authentication_required" });
+      const protectedPurpose = institutionEvidence || purpose === "community-post";
+      const user = protectedPurpose ? await resolveCurrentUser(req) : null;
+      if (protectedPurpose && !user) return res.status(401).json({ error: "authentication_required" });
       if (institutionEvidence && (!/^data:image\/(png|jpeg|webp);base64,/i.test(image) || Buffer.from(image.split(",")[1] || "", "base64").length > 5 * 1024 * 1024)) return res.status(400).json({ message: "Upload a JPG, PNG, or WebP authorization image up to 5 MB." });
       const upload = await uploadImageValue(image, purpose);
       if (!upload) return res.status(400).json({ error: "bad_request", message: "Upload a valid image file." });
@@ -37,7 +38,9 @@ export default function mountUploadEndpoints(router: Router) {
       const images: string[] = Array.isArray(req.body?.images) ? req.body.images.map((item: unknown) => String(item || "")).filter(Boolean).slice(0, 12) : [];
       if (!images.length) return res.status(400).json({ error: "bad_request", message: "Upload at least one image." });
 
-      const uploads = await Promise.all(images.map((image) => uploadImageValue(image, safePurpose(req.body?.purpose))));
+      const purpose = safePurpose(req.body?.purpose);
+      if (purpose === "community-post" && !await resolveCurrentUser(req)) return res.status(401).json({ error: "authentication_required" });
+      const uploads = await Promise.all(images.map((image) => uploadImageValue(image, purpose)));
       if (uploads.some((upload) => !upload)) return res.status(400).json({ error: "bad_request", message: "Upload valid image files." });
 
       return res.status(201).json({ urls: uploads.map((upload) => upload!.url), uploads });
@@ -47,6 +50,21 @@ export default function mountUploadEndpoints(router: Router) {
       if (err?.statusCode === 503) return res.status(503).json({ error: "upload_unavailable", message: err.message });
       console.error("Image upload failed:", err);
       return res.status(500).json({ error: "upload_failed", message: "Image upload failed." });
+    }
+  });
+
+  router.post("/video", async (req: Request, res: Response) => {
+    try {
+      const user = await resolveCurrentUser(req);
+      if (!user) return res.status(401).json({ error: "authentication_required" });
+      const video = String(req.body?.video || req.body?.dataUrl || "");
+      const name = String(req.body?.name || "community-video").slice(0, 120);
+      const upload = await uploadVideoToCloudinary(video, "community-post", name);
+      return res.status(201).json(upload);
+    } catch (err: any) {
+      if ([400, 413, 503].includes(err?.statusCode)) return res.status(err.statusCode).json({ error: "video_upload_failed", message: err.message });
+      console.error("Video upload failed:", err);
+      return res.status(500).json({ error: "video_upload_failed", message: "Video upload failed." });
     }
   });
   router.post("/document", async (req: Request, res: Response) => {

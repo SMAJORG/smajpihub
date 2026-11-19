@@ -8,6 +8,7 @@ import PrivateSkeleton from "../../components/PrivateSkeleton";
 import TrustBadge from "../../components/TrustBadge";
 import { axiosClient } from "../../lib/axiosClient";
 import { useAddToCartToast } from "../../hooks/useAddToCartToast";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
 import type { Product, Review, SellerSummary } from "../../types/marketplace";
 
 type SellerProfileResponse = {
@@ -67,9 +68,7 @@ const SellerProfilePage = () => {
     <main className="private-page seller-profile-page">
       {cartToast}
       <section className="seller-profile-hero">
-        <div className="profile-avatar seller-profile-avatar">
-          {data.seller.avatar ? <img src={data.seller.avatar} alt="" /> : data.seller.displayName.slice(0, 1).toUpperCase()}
-        </div>
+        <UserAvatarFrame className="profile-avatar seller-profile-avatar" name={data.seller.displayName} image={data.seller.avatar} frame={data.seller.avatarFrame} size={92} />
         <div className="seller-profile-identity">
           <p className="private-kicker">SELLER PROFILE</p>
           <h1 className="profile-name-line">

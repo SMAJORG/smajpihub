@@ -18,6 +18,10 @@ export type AuthResult = {
     language?: string;
     languagePreferenceSaved?: boolean;
     sellerActive?: boolean;
+    publicProfile?: boolean;
+    allowContact?: boolean;
+    openToWork?: boolean;
+    activeAvatarFrame?: "ambassador" | "open_to_work" | "seller" | "hiring" | null;
     blocked?: boolean;
     settings?: {
       theme: "dark" | "light";
