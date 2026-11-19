@@ -4,10 +4,31 @@ const STATE_KEY = "smaj_solohost_pi_oauth_state";
 const POPUP_NAME = "smaj-solohost-pi-signin";
 type OAuthMessage = { source: "smaj-solohost-pi-oauth"; accessToken?: string; state?: string; error?: string };
 
+const getOAuthConfig = () => {
+  const clientId = window.__ENV?.piOAuthClientId?.trim() || import.meta.env.VITE_PI_OAUTH_CLIENT_ID || "";
+  const redirectUri = window.__ENV?.piOAuthRedirectUri?.trim() || import.meta.env.VITE_PI_OAUTH_REDIRECT_URI || "";
+  if (!clientId || !redirectUri) throw new Error("Pi Sign-in requires the original app’s OAuth client ID and registered callback URL. Contact the administrator.");
+  if (new URL(redirectUri).origin !== window.location.origin) throw new Error("The Pi OAuth redirect must use this website origin.");
+  return { clientId, redirectUri };
+};
+
 const randomState = () => {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+};
+
+export const startSoloHostPiSignIn = (state: string) => {
+  const { clientId, redirectUri } = getOAuthConfig();
+  const sdk = window.Pi;
+  if (!sdk?.signIn) throw new Error("Pi Sign-In SDK is unavailable. Refresh the page and try again.");
+  return sdk.signIn({ clientId, redirectUri, scopes: ["username", "wallet_address"], state });
+};
+
+export const reportSoloHostOAuthStartError = (state: string, error: string) => {
+  if (window.opener && window.opener !== window) {
+    window.opener.postMessage({ source: "smaj-solohost-pi-oauth", state, error }, window.location.origin);
+  }
 };
 
 export const completeSoloHostOAuthCallback = () => {
@@ -30,22 +51,12 @@ export const completeSoloHostOAuthCallback = () => {
 };
 
 export const authenticateWithSoloHostPi = async (): Promise<AuthResult> => {
-  const clientId = window.__ENV?.piOAuthClientId?.trim() || import.meta.env.VITE_PI_OAUTH_CLIENT_ID || "";
-  const redirectUri = window.__ENV?.piOAuthRedirectUri?.trim() || import.meta.env.VITE_PI_OAUTH_REDIRECT_URI || "";
-  if (!clientId || !redirectUri) throw new Error("Pi Sign-in requires the original app’s OAuth client ID and registered callback URL. Contact the administrator.");
-  if (new URL(redirectUri).origin !== window.location.origin) throw new Error("The Pi OAuth redirect must use this website origin.");
+  getOAuthConfig();
   const state = randomState();
   sessionStorage.setItem(STATE_KEY, state);
-  const authorizeUrl = new URL("https://accounts.pinet.com/oauth/authorize");
-  authorizeUrl.searchParams.set("response_type", "token");
-  authorizeUrl.searchParams.set("client_id", clientId);
-  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
-  authorizeUrl.searchParams.set("scope", "username wallet_address");
-  authorizeUrl.searchParams.set("state", state);
-  const popup = window.open(authorizeUrl.toString(), POPUP_NAME, "popup,width=520,height=720");
-  if (!popup) throw new Error("Allow pop-ups to continue with Pi Sign-In.");
 
   return new Promise<AuthResult>((resolve, reject) => {
+    let popup: Window | null = null;
     let finished = false;
     let verifying = false;
     const finish = (error?: Error, result?: AuthResult) => {
@@ -55,7 +66,7 @@ export const authenticateWithSoloHostPi = async (): Promise<AuthResult> => {
       window.clearInterval(poll);
       window.removeEventListener("message", onMessage);
       sessionStorage.removeItem(STATE_KEY);
-      if (!popup.closed) popup.close();
+      if (popup && !popup.closed) popup.close();
       if (error) reject(error); else resolve(result!);
     };
     const onMessage = async (event: MessageEvent<OAuthMessage>) => {
@@ -75,7 +86,11 @@ export const authenticateWithSoloHostPi = async (): Promise<AuthResult> => {
       }
     };
     const timeout = window.setTimeout(() => finish(new Error("Pi Sign-In timed out.")), 120_000);
-    const poll = window.setInterval(() => { if (popup.closed && !verifying) finish(new Error("Pi Sign-In was closed before completion.")); }, 500);
+    const poll = window.setInterval(() => { if (popup?.closed && !verifying) finish(new Error("Pi Sign-In was closed before completion.")); }, 500);
     window.addEventListener("message", onMessage);
+    const startUrl = new URL("/signin/start", window.location.origin);
+    startUrl.searchParams.set("state", state);
+    popup = window.open(startUrl.toString(), POPUP_NAME, "popup,width=520,height=720");
+    if (!popup) finish(new Error("Allow pop-ups to continue with Pi Sign-In."));
   });
 };

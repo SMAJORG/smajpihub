@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import MobileOAuthCallbackPage from "./pages/MobileOAuthCallbackPage.tsx";
+import PiOAuthStartPage from "./pages/PiOAuthStartPage.tsx";
 import MobilePiBridgePage from "./pages/MobilePiBridgePage.tsx";
 import EngagementTasksPage from "./pages/EngagementTasksPage.tsx";
 import NotFoundPage from "./pages/NotFoundPage.tsx";
@@ -279,6 +280,10 @@ export const router = createBrowserRouter([
   {
     path: "/signin/android",
     element: <MobilePiBridgePage />,
+  },
+  {
+    path: "/signin/start",
+    element: <PiOAuthStartPage />,
   },
   {
     path: "/signin/callback",
