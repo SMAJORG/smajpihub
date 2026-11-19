@@ -64,8 +64,12 @@ test('shared identity badges and Stream channels follow admin-selected colors on
       await page.waitForFunction(() => document.querySelectorAll('.smaj-verified-badge').length === 0);
       await page.evaluate(() => { window.fixture.verification = { ...window.fixture.verification, expiresAt: null }; window.dispatchEvent(new Event('smaj:verification-changed')); });
       await page.waitForFunction(() => document.querySelectorAll('.smaj-verified-badge').length === 7);
+      const failedRefresh = page.waitForEvent('console', message =>
+        message.type() === 'warning' && message.text().includes('Could not refresh verification status')
+      );
       await page.evaluate(() => { window.fixture.offline = true; window.dispatchEvent(new Event('smaj:verification-changed')); });
-      await page.waitForFunction(() => document.querySelectorAll('.smaj-verified-badge').length === 0);
+      await failedRefresh;
+      assert.equal(await page.locator('.smaj-verified-badge').count(), 7);
       assert.equal(await page.evaluate(() => localStorage.getItem('smaj_public_theme')), theme);
       assert(await page.evaluate(() => window.fixture.batches.every(batch => batch.length <= 100)));
       await page.close();
