@@ -124,6 +124,13 @@ export default defineConfig(({ mode }) => {
     build,
     server: {
       port: parseInt(env.PORT) || 3314,
+      ...(mode === "testnet-local" ? {
+        host: "127.0.0.1",
+        strictPort: true,
+        headers: {
+          "Content-Security-Policy": "frame-ancestors 'self' https://*.pinet.com https://*.minepi.com; connect-src 'self' https://socialchain.app https://api.minepi.com https://smajpihub-testnet-a2u-api.onrender.com ws://127.0.0.1:3314",
+        },
+      } : {}),
     },
   };
 });

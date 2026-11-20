@@ -1,5 +1,8 @@
+import type { AuthResult, PaymentDTO } from "../types/pi";
+
 type PiSdk = NonNullable<Window["Pi"]>;
 const initialized = new WeakMap<PiSdk, Promise<PiSdk>>();
+const pendingAuthentication = new WeakMap<PiSdk, Map<string, Promise<AuthResult>>>();
 export const isPiSandboxMode = () => {
   if (["public", "capacitor"].includes(import.meta.env.MODE)) return false;
   const sandboxReferrer = (() => { try { return new URL(document.referrer).hostname === "sandbox.minepi.com"; } catch { return false; } })();
@@ -15,6 +18,23 @@ export const withPiTimeout = <T>(task: PromiseLike<T>, milliseconds: number, mes
   const timer = window.setTimeout(() => reject(new Error(message)), milliseconds);
   Promise.resolve(task).then(value => { window.clearTimeout(timer); resolve(value); }, error => { window.clearTimeout(timer); reject(error); });
 });
+export const authenticatePiWithTimeout = (scopes: string[], milliseconds: number, onIncompletePaymentFound?: (payment: PaymentDTO) => void): Promise<AuthResult> => {
+  const sdk = window.Pi;
+  if (!sdk) return Promise.reject(new Error("Pi SDK is unavailable."));
+  let requests = pendingAuthentication.get(sdk);
+  if (!requests) { requests = new Map(); pendingAuthentication.set(sdk, requests); }
+  const key = JSON.stringify([...scopes].sort());
+  let request = requests.get(key);
+  if (!request) {
+    request = Promise.resolve().then(() => sdk.authenticate(scopes, onIncompletePaymentFound));
+    requests.set(key, request);
+    const clear = () => { requests.delete(key); };
+    // A timeout cannot cancel Pi's approval dialog. Keep its request until Pi
+    // settles it, so Retry waits for that dialog instead of opening another.
+    void request.then(clear, clear);
+  }
+  return withPiTimeout(request, milliseconds, "PI_AUTH_TIMEOUT");
+};
 export const ensurePiInitialized = (): Promise<PiSdk> => {
   const sdk = window.Pi;
   if (!sdk) return Promise.reject(new Error("Open this page in Pi Browser to continue payment."));

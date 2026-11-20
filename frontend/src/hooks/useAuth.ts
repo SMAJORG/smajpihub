@@ -1,6 +1,6 @@
 import { piSignInErrorMessage, PiSignInResponseError } from "../lib/piSignInErrors";
 import { refreshHubSession, saveSessionCredentials, clearSessionCredentials, SESSION_CHANGED, SESSION_ENDED, type HubSession } from "../lib/sessionCredentials";
-import { ensurePiInitialized, isPiSandboxMode } from "../lib/piSdk";
+import { authenticatePiWithTimeout, ensurePiInitialized, isPiSandboxMode } from "../lib/piSdk";
 import { isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient, getBaseURL } from "../lib/axiosClient";
@@ -33,7 +33,8 @@ type ProfileUpdate = {
 const PI_AUTH_TIMEOUT_MS = 20000;
 const MIN_SESSION_LOADING_MS = 450;
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
-const piAuthScopes = () => isPiSandboxMode() ? ["username", "wallet_address"] : ["username"];
+const testnetPiBrowserOnly = import.meta.env.VITE_TESTNET_PAYOUT_TOOLS === "true";
+const piAuthScopes = () => isPiSandboxMode() || testnetPiBrowserOnly ? ["username", "wallet_address"] : ["username"];
 const AUTH_REQUEST_CONFIG = { withCredentials: true, timeout: 45000, headers: { "X-SMAJ-Silent": "true" } };
 
 
@@ -41,11 +42,9 @@ const onIncompletePaymentFound = () => {
   console.info("Pi incomplete payment handling is disabled.");
 };
 
-const authenticateWithTimeout = (scopes: string[]) =>
-  Promise.race<AuthResult>([
-    window.Pi!.authenticate(scopes, onIncompletePaymentFound),
-    new Promise<AuthResult>((_, reject) => setTimeout(() => reject(new Error("PI_AUTH_TIMEOUT")), PI_AUTH_TIMEOUT_MS)),
-  ]);
+const authenticateWithTimeout = (scopes: string[]) => authenticatePiWithTimeout(
+  scopes, testnetPiBrowserOnly ? 120000 : PI_AUTH_TIMEOUT_MS, onIncompletePaymentFound,
+);
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
@@ -319,6 +318,16 @@ export const useAuth = () => {
 
   const loginWithPi = useCallback(async () => {
     if (loginInProgressRef.current) return false;
+    if (testnetPiBrowserOnly) {
+      const sandboxPreview = window.location.hostname === "sandbox.minepi.com" || (() => {
+        try { return window.self !== window.top && new URL(document.referrer).origin === "https://sandbox.minepi.com"; }
+        catch { return false; }
+      })();
+      if (!/PiBrowser|Pi Browser/i.test(navigator.userAgent) && !sandboxPreview) {
+        setAuthFeedback({ type: "error", message: "Open this Testnet app in Pi Browser, or use its Pi Sandbox preview for localhost testing. Pi authentication is required." });
+        return false;
+      }
+    }
     loginInProgressRef.current = true;
     setIsPiLoginPending(true);
     setPiLoginStage(isCapacitorNative() ? "opening" : null);
@@ -343,7 +352,7 @@ export const useAuth = () => {
         setIsLoading(false);
       }
     }
-    if (isSoloHostRuntime() || (!isCapacitorNative() && !/PiBrowser|Pi Browser/i.test(navigator.userAgent) && window.location.hostname !== "sandbox.minepi.com" && !document.referrer.startsWith("https://sandbox.minepi.com/"))) {
+    if (!testnetPiBrowserOnly && (isSoloHostRuntime() || (!isCapacitorNative() && !/PiBrowser|Pi Browser/i.test(navigator.userAgent) && window.location.hostname !== "sandbox.minepi.com" && !document.referrer.startsWith("https://sandbox.minepi.com/")))) {
       try {
         setAuthFeedback({ type: "success", message: "Opening Pi Sign-In…" });
         const authResult = await authenticateWithSoloHostPi();
@@ -361,7 +370,7 @@ export const useAuth = () => {
       }
     }
     if (!window.Pi) {
-      if (import.meta.env.DEV && getBaseURL()) {
+      if (!testnetPiBrowserOnly && import.meta.env.DEV && getBaseURL()) {
         try {
           const response = await axiosClient.post<SignInResponse>("/user/dev-signin", undefined, AUTH_REQUEST_CONFIG);
           if (response.data.session && response.data.user) await saveSessionCredentials(response.data.session, response.data.user);
