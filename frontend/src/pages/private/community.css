@@ -1467,7 +1467,7 @@
 }
 
 .community-video-preview.portrait {
-  max-width: 520px;
+  width: 100%;
   margin-inline: auto;
   border-radius: 15px;
 }

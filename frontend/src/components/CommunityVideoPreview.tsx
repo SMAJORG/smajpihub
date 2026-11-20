@@ -30,9 +30,11 @@ export default function CommunityVideoPreview({ media, author, content, followin
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  const portrait = Boolean(media.width && media.height && media.height > media.width);
-  const width = media.width || 16;
-  const height = media.height || 9;
+  const portrait = media.width && media.height
+    ? media.height > media.width
+    : true;
+  const width = media.width || (portrait ? 9 : 16);
+  const height = media.height || (portrait ? 16 : 9);
   const poster = media.url
     .replace("/video/upload/", "/video/upload/so_0/")
     .replace(/\.(mp4|webm|mov)(\?.*)?$/i, ".jpg$2");
@@ -95,7 +97,7 @@ export default function CommunityVideoPreview({ media, author, content, followin
     <div
       ref={wrapperRef}
       className={`community-video-preview ${portrait ? "portrait" : "landscape"}${videoReady ? " is-ready" : ""}${videoError ? " has-error" : ""}`}
-      style={{ aspectRatio: `${width} / ${height}` }}
+      style={{ aspectRatio: portrait ? "9 / 16" : `${width} / ${height}` }}
       onClick={onOpen}
     >
       {!videoError ? <video
