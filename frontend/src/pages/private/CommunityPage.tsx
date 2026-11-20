@@ -5,47 +5,25 @@ import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import CommunityFeedPostCard from "../../components/CommunityFeedPostCard";
-import CommunitySkeleton from "../../components/CommunitySkeleton";
 import CommunityVideoViewer, { type CommunityVideoItem } from "../../components/CommunityVideoViewer";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { getCommunityFeed, type CommunityPost } from "../../lib/communityApi";
+import {
+  emptyCommunityFeed,
+  getCachedCommunityFeed,
+  preloadCommunityMedia,
+  readCommunityFeedCache,
+  writeCommunityFeedCache,
+  type CommunityFeedScope,
+  type CommunityFeedSnapshot,
+} from "../../lib/communityFeedCache";
 import { setCommunityVideoViewerOpen } from "../../components/communityVideoPlayback";
 import "./community.css";
 
-type FeedScope = "all" | "following";
-type FeedSnapshot = { posts: CommunityPost[]; hasMore: boolean; page: number; loaded: boolean };
+type FeedScope = CommunityFeedScope;
+type FeedSnapshot = CommunityFeedSnapshot;
 type FeedSnapshots = Record<FeedScope, FeedSnapshot>;
-
-const emptyFeedSnapshot = (): FeedSnapshot => ({ posts: [], hasMore: false, page: 1, loaded: false });
-const feedCacheKey = (uid: string, scope: FeedScope) => `smaj-community-feed-v1:${uid}:${scope}`;
-
-const readFeedCache = (uid: string | undefined, scope: FeedScope): FeedSnapshot | null => {
-  if (!uid || typeof window === "undefined") return null;
-  try {
-    const stored = window.sessionStorage.getItem(feedCacheKey(uid, scope));
-    if (!stored) return null;
-    const value = JSON.parse(stored) as Partial<FeedSnapshot>;
-    if (!Array.isArray(value.posts) || !value.posts.every(post => post && typeof post._id === "string" && Array.isArray(post.media))) return null;
-    return {
-      posts: value.posts,
-      hasMore: value.hasMore === true,
-      page: Number.isInteger(value.page) && Number(value.page) > 0 ? Number(value.page) : 1,
-      loaded: true,
-    };
-  } catch {
-    return null;
-  }
-};
-
-const writeFeedCache = (uid: string | undefined, scope: FeedScope, snapshot: FeedSnapshot) => {
-  if (!uid || typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(feedCacheKey(uid, scope), JSON.stringify(snapshot));
-  } catch {
-    // The in-memory feed remains available when session storage is full or disabled.
-  }
-};
 
 const CommunityPage = () => {
   const { user } = useAuthContext();
@@ -56,14 +34,14 @@ const CommunityPage = () => {
   const [scope, setScope] = useState<FeedScope>("all");
   const [searchText, setSearchText] = useState("");
   const [feeds, setFeeds] = useState<FeedSnapshots>(() => ({
-    all: readFeedCache(user?.uid, "all") || (incomingPublishedPost
+    all: readCommunityFeedCache(user?.uid, "all")?.snapshot || (incomingPublishedPost
       ? { posts: [incomingPublishedPost], hasMore: false, page: 1, loaded: true }
-      : emptyFeedSnapshot()),
-    following: readFeedCache(user?.uid, "following") || emptyFeedSnapshot(),
+      : emptyCommunityFeed()),
+    following: readCommunityFeedCache(user?.uid, "following")?.snapshot || emptyCommunityFeed(),
   }));
   const feedsRef = useRef(feeds);
   const [feedOwner, setFeedOwner] = useState(user?.uid);
-  const activeFeed = feedOwner === user?.uid ? feeds[scope] : emptyFeedSnapshot();
+  const activeFeed = feedOwner === user?.uid ? feeds[scope] : emptyCommunityFeed();
   const posts = activeFeed.posts;
   const hasMore = activeFeed.hasMore;
   const page = activeFeed.page;
@@ -76,6 +54,7 @@ const CommunityPage = () => {
   const [publishedNotice, setPublishedNotice] = useState(Boolean(incomingPublishedPost));
   const [videoViewerIndex, setVideoViewerIndex] = useState<number | null>(null);
   const feedScrollPosition = useRef<{ element: HTMLElement | null; top: number; windowTop: number } | null>(null);
+  const scrollRestore = useRef<{ element: HTMLElement; isRoot: boolean; top: number; pending: boolean } | null>(null);
   const pendingPublishedPost = useRef(incomingPublishedPost || null);
 
   const updateFeed = useCallback((targetScope: FeedScope, update: (snapshot: FeedSnapshot) => FeedSnapshot) => {
@@ -83,15 +62,15 @@ const CommunityPage = () => {
     const nextFeeds = { ...feedsRef.current, [targetScope]: nextFeed };
     feedsRef.current = nextFeeds;
     setFeeds(nextFeeds);
-    writeFeedCache(user?.uid, targetScope, nextFeed);
+    writeCommunityFeedCache(user?.uid, targetScope, nextFeed);
   }, [user?.uid]);
 
   useEffect(() => {
     if (feedOwner === user?.uid) return;
-    const all = readFeedCache(user?.uid, "all") || (pendingPublishedPost.current
+    const all = readCommunityFeedCache(user?.uid, "all")?.snapshot || (pendingPublishedPost.current
       ? { posts: [pendingPublishedPost.current], hasMore: false, page: 1, loaded: true }
-      : emptyFeedSnapshot());
-    const following = readFeedCache(user?.uid, "following") || emptyFeedSnapshot();
+      : emptyCommunityFeed());
+    const following = readCommunityFeedCache(user?.uid, "following")?.snapshot || emptyCommunityFeed();
     const nextFeeds = { all, following };
     feedsRef.current = nextFeeds;
     setFeeds(nextFeeds);
@@ -102,12 +81,14 @@ const CommunityPage = () => {
     setLoading(!activeFeed.loaded);
   }, [scope, feedOwner, activeFeed.loaded]);
 
-  const load = useCallback(async (nextPage = 1, keep = false) => {
+  const load = useCallback(async (nextPage = 1, keep = false, forceRefresh = false) => {
     const existing = feedsRef.current[scope];
     if (!existing.loaded && !existing.posts.length) setLoading(true);
     setFeedError(null);
     try {
-      const result = await getCommunityFeed({ scope, page: nextPage });
+      const result = nextPage === 1
+        ? await getCachedCommunityFeed(user?.uid, scope, forceRefresh)
+        : { ...await getCommunityFeed({ scope, page: nextPage }), page: nextPage, loaded: true };
       const feedPosts = result.posts;
       const pending = pendingPublishedPost.current;
       if (scope === "all" && pending && !feedPosts.some(post => post._id === pending._id)) feedPosts.unshift(pending);
@@ -129,13 +110,65 @@ const CommunityPage = () => {
     } finally {
       if (activeScopeRef.current === scope) setLoading(false);
     }
-  }, [scope, updateFeed]);
-  const refreshFeed = useCallback(() => { void load(); }, [load]);
+  }, [scope, updateFeed, user?.uid]);
+  const refreshFeed = useCallback(() => { void load(1, false, true); }, [load]);
   const dismissPost = useCallback((postId: string) => {
     updateFeed(scope, current => ({ ...current, posts: current.posts.filter(post => post._id !== postId) }));
   }, [scope, updateFeed]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const userId = user?.uid;
+    const feed = document.querySelector<HTMLElement>(".community-private-shell .community-feed");
+    const rootScroller = document.scrollingElement as HTMLElement | null;
+    if (!userId || !feed || !rootScroller) return;
+    let scroller = rootScroller;
+    for (let element = feed.parentElement; element; element = element.parentElement) {
+      const overflowY = window.getComputedStyle(element).overflowY;
+      if ((overflowY === "auto" || overflowY === "scroll")
+        && (element.matches(".private-content") || element.scrollHeight > element.clientHeight + 2)) {
+        scroller = element;
+        break;
+      }
+    }
+    const isRoot = scroller === rootScroller;
+    const key = `smaj-community-scroll-v1:${userId}`;
+    let savedTop = 0;
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(key) || "null") as { top?: number; isRoot?: boolean } | null;
+      if (saved && saved.isRoot === isRoot && Number.isFinite(saved.top)) savedTop = Math.max(0, Number(saved.top));
+    } catch {
+      window.sessionStorage.removeItem(key);
+    }
+    scrollRestore.current = { element: scroller, isRoot, top: savedTop, pending: savedTop > 0 };
+    const persistPosition = () => {
+      const top = isRoot ? window.scrollY || rootScroller.scrollTop : scroller.scrollTop;
+      try {
+        window.sessionStorage.setItem(key, JSON.stringify({ top, isRoot }));
+      } catch {
+        // The feed remains usable when session storage is unavailable.
+      }
+    };
+    const target: Window | HTMLElement = isRoot ? window : scroller;
+    target.addEventListener("scroll", persistPosition, { passive: true });
+    return () => {
+      persistPosition();
+      target.removeEventListener("scroll", persistPosition);
+      scrollRestore.current = null;
+    };
+  }, [user?.uid]);
+  useEffect(() => {
+    const position = scrollRestore.current;
+    if (!activeFeed.loaded || !position?.pending) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (!position.element.isConnected) return;
+      if (position.isRoot) window.scrollTo({ top: position.top });
+      else position.element.scrollTop = position.top;
+      position.pending = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeFeed.loaded, feedOwner, scope]);
+  useEffect(() => { preloadCommunityMedia(posts); }, [posts]);
   useEffect(() => () => setCommunityVideoViewerOpen(false), []);
   useEffect(() => {
     const post = pendingPublishedPost.current;
@@ -305,7 +338,7 @@ const CommunityPage = () => {
       </div>
       {error ? <p className="community-error" role="alert">{error}</p> : null}
       <section className="community-feed" aria-label="Community posts" aria-busy={loading}>
-        {!activeFeed.loaded && !filteredPosts.length && !error ? <CommunitySkeleton variant="feed" count={4} /> : null}
+        {!activeFeed.loaded && !filteredPosts.length && !error ? <p className="community-feed-loading" role="status">Loading community posts…</p> : null}
         {!error && !filteredPosts.length && activeFeed.loaded ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
         {filteredPosts.map(post => <CommunityFeedPostCard
           key={post._id}

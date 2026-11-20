@@ -386,14 +386,23 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       }
       if (!delta) return;
       const direction = delta > 0 ? 1 : -1;
+      if (direction < 0) {
+        accumulatedDelta = Math.min(0, accumulatedDelta) + delta;
+        previousDirection = direction;
+        if (accumulatedDelta <= -3) {
+          setCommunityChromeHidden(false);
+          accumulatedDelta = 0;
+        }
+        return;
+      }
       if (direction !== previousDirection) {
         previousDirection = direction;
         accumulatedDelta = delta;
       } else {
         accumulatedDelta += delta;
       }
-      if (Math.abs(accumulatedDelta) >= 12) {
-        setCommunityChromeHidden(direction > 0);
+      if (accumulatedDelta >= 10) {
+        setCommunityChromeHidden(true);
         accumulatedDelta = 0;
       }
     };

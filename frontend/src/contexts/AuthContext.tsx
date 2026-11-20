@@ -4,6 +4,7 @@ import { useUserPresence } from "../hooks/useUserPresence";
 
 import { useTranslation } from "react-i18next";
 import { persistLanguage, profileLanguageCode } from "../localization/languages";
+import { prefetchCommunityFeeds } from "../lib/communityFeedCache";
 
 type AuthContextType = ReturnType<typeof useAuth>;
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -12,6 +13,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const auth = useAuth();
   useUserPresence(auth.user?.uid);
   const { i18n } = useTranslation();
+  useEffect(() => {
+    if (!auth.user?.uid) return;
+    void prefetchCommunityFeeds(auth.user.uid).catch(() => undefined);
+  }, [auth.user?.uid]);
   useEffect(() => {
     if (!auth.user?.languagePreferenceSaved) return;
     const language = profileLanguageCode(auth.user.language || auth.user.settings?.language || "en");
