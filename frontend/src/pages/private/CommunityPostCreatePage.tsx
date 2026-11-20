@@ -196,6 +196,8 @@ export default function CommunityPostCreatePage() {
   const [scheduledLoading, setScheduledLoading] = useState(false);
   const [scheduledLoaded, setScheduledLoaded] = useState(false);
   const [scheduledError, setScheduledError] = useState("");
+  const [scheduledLoadError, setScheduledLoadError] = useState("");
+  const [scheduledRefresh, setScheduledRefresh] = useState(0);
   const [scheduledTab, setScheduledTab] = useState<"compose" | "scheduled">("compose");
   const [scheduledAt, setScheduledAt] = useState("");
   const [editingScheduleId, setEditingScheduleId] = useState("");
@@ -298,19 +300,28 @@ export default function CommunityPostCreatePage() {
     if (sheet !== "schedule" || scheduledLoaded) return;
     let active = true;
     setScheduledLoading(true);
-    setScheduledError("");
+    setScheduledLoadError("");
     getScheduledCommunityPosts().then(posts => {
-      if (active) setScheduledPosts(posts);
-    }).catch(() => {
-      if (active) setScheduledError("Scheduled posts could not be loaded.");
+      if (active) {
+        setScheduledPosts(posts);
+        setScheduledLoaded(true);
+      }
+    }).catch(reason => {
+      if (active) {
+        const message = reason && typeof reason === "object" && "response" in reason
+          ? (reason as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+        setScheduledLoadError(typeof message === "string" && message.trim()
+          ? message
+          : "Scheduled posts could not be loaded. Check your connection and retry.");
+      }
     }).finally(() => {
       if (active) {
         setScheduledLoading(false);
-        setScheduledLoaded(true);
       }
     });
     return () => { active = false; };
-  }, [scheduledLoaded, sheet]);
+  }, [scheduledLoaded, scheduledRefresh, sheet]);
 
   useLayoutEffect(() => {
     const viewport = window.visualViewport;
@@ -705,8 +716,8 @@ export default function CommunityPostCreatePage() {
           setError("Choose a scheduled time at least one minute in the future.");
           return;
         }
-        await updateScheduledCommunityPost(editingScheduleId, { ...await buildInput(), publishAt: toIso(scheduledAt) });
-        setScheduledPosts(await getScheduledCommunityPosts());
+        const updatedPost = await updateScheduledCommunityPost(editingScheduleId, { ...await buildInput(), publishAt: toIso(scheduledAt) });
+        setScheduledPosts(current => current.map(post => post._id === updatedPost._id ? updatedPost : post));
         restoreComposerDraft();
         setEditingScheduleId("");
         setScheduleEditMode(null);
@@ -764,8 +775,8 @@ export default function CommunityPostCreatePage() {
         const changes = scheduleEditMode === "content"
           ? { ...await buildInput(), publishAt }
           : { publishAt };
-        await updateScheduledCommunityPost(editingScheduleId, changes);
-        setScheduledPosts(await getScheduledCommunityPosts());
+        const updatedPost = await updateScheduledCommunityPost(editingScheduleId, changes);
+        setScheduledPosts(current => current.map(post => post._id === updatedPost._id ? updatedPost : post));
         setEditingScheduleId("");
         if (scheduleEditMode === "content") {
           restoreComposerDraft();
@@ -1009,8 +1020,9 @@ export default function CommunityPostCreatePage() {
               <button type="button" className="community-create-sheet-primary" disabled={!scheduledAt || scheduleBusy || (!editingScheduleId && !validContent) || (scheduleEditMode === "content" && !validContent)} onClick={() => void publishScheduled()}>{scheduleBusy ? "Saving…" : editingScheduleId ? scheduleEditMode === "content" ? "Save scheduled post" : "Update scheduled time" : "Confirm schedule"}</button>
             </> : <>
               {scheduledLoading ? <p role="status">Loading scheduled posts…</p> : null}
-              {scheduledError ? <p className="community-create-error" role="alert">{scheduledError}<button type="button" onClick={() => { setScheduledLoaded(false); setScheduledError(""); }}>Retry</button></p> : null}
-              {scheduledLoaded && !scheduledLoading && !scheduledError && !scheduledPosts.length ? <div className="community-create-scheduled-empty">
+              {scheduledLoadError ? <div className="community-create-schedule-error" role="alert"><p>{scheduledLoadError}</p><button type="button" onClick={() => { setScheduledLoadError(""); setScheduledRefresh(current => current + 1); }}>Retry</button></div> : null}
+              {scheduledError ? <p className="community-create-error" role="alert">{scheduledError}</p> : null}
+              {scheduledLoaded && !scheduledLoading && !scheduledLoadError && !scheduledError && !scheduledPosts.length ? <div className="community-create-scheduled-empty">
                 <span className="community-create-scheduled-empty-illustration" aria-hidden="true"><ScheduleOutlinedIcon /></span>
                 <p>When you schedule a post, it automatically posts at the date and time you choose.</p>
                 <button type="button" className="community-create-schedule-start" onClick={() => setScheduledTab("compose")}>Schedule</button>

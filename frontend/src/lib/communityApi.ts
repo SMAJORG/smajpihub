@@ -131,6 +131,7 @@ export const createCommunityPost = async (input: CommunityPostInput) =>
   (await axiosClient.post<{ post: CommunityPost }>("/community/posts", input, { timeout: 45_000 })).data.post;
 export const getScheduledCommunityPosts = async () => {
   const { data } = await axiosClient.get<{ posts?: CommunityPost[] }>("/community/posts/scheduled", {
+    timeout: 60_000,
     smajSkipResponseCache: true,
   });
   if (!Array.isArray(data.posts)) throw new Error("The scheduled-post response was invalid.");
