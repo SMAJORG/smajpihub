@@ -210,6 +210,9 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(taggedPost.response.status, 201);
   assert.equal(taggedPost.data.post.media[0].altText, "A sample image");
   assert.deepEqual(taggedPost.data.post.media[0].taggedPeople, [viewer.uid]);
+  result = await request("GET", `/community/feed?authorId=${author.uid}`, viewer.uid);
+  const savedMediaPost = result.data.posts.find(post => post._id === taggedPost.data.post._id);
+  assert.equal(savedMediaPost.media[0].url, taggedPost.data.post.media[0].url, "published attachments remain present in the feed response");
   const captionAuthor = await makeAccount("caption-author");
   const captionsVtt = "WEBVTT\n\n00:00:00.000 --> 00:00:02.500\nA spoken caption.";
   result = await request("POST", "/community/posts", captionAuthor.uid, {
@@ -239,6 +242,11 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: "love" });
   assert.equal(result.data.myReaction, "love");
   assert.equal(result.data.reactionCounts.love, 1);
+  assert.equal((await locals.communityLikeCollection.findOne({ postId, userId: viewer.uid })).reaction, "love");
+  result = await request("GET", "/community/feed", viewer.uid);
+  const refreshedReactionPost = result.data.posts.find(post => post._id === postId);
+  assert.equal(refreshedReactionPost.myReaction, "love");
+  assert.equal(refreshedReactionPost.reactionCounts.love, 1);
   result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: "support" });
   assert.equal(result.data.reactionCounts.love, 0);
   assert.equal(result.data.reactionCounts.support, 1);
@@ -247,6 +255,11 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   result = await request("POST", `/community/posts/${postId}/comments`, viewer.uid, { content: "A comment" });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.comment.content, "A comment");
+  const parentCommentId = result.data.comment._id;
+  result = await request("POST", `/community/posts/${postId}/comments`, author.uid, { content: "A reply", parentId: parentCommentId });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.data.comment.parentId, parentCommentId);
+  assert.equal((await locals.communityCommentCollection.find({ postId }).toArray()).length, 2);
 
   result = await request("POST", `/community/posts/${postId}/repost`, viewer.uid);
   assert.equal(result.response.status, 201);

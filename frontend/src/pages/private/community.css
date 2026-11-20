@@ -492,6 +492,11 @@
   border-top: 1px solid var(--border);
 }
 
+.community-comment-thread {
+  display: grid;
+  gap: 8px;
+}
+
 .community-comment {
   display: flex;
   align-items: flex-start;
@@ -539,6 +544,32 @@
   font-size: 12px;
 }
 
+.community-comment-reply {
+  margin-left: clamp(24px, 8vw, 52px);
+}
+
+.community-comment-reply-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+  padding: 2px 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.community-comment-reply-button:hover {
+  color: var(--primary);
+}
+
+.community-comment-reply-button svg {
+  font-size: 14px;
+}
+
 .community-comments form {
   display: flex;
   gap: 8px;
@@ -547,6 +578,12 @@
 
 .community-comments input {
   flex: 1;
+}
+
+.community-comments .community-comment-cancel-reply {
+  color: var(--muted);
+  background: transparent;
+  border-color: var(--border);
 }
 
 .community-load-more {
@@ -1404,6 +1441,28 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
+}
+
+.community-published-toast {
+  --community-publish-toast-text: #fff; /* theme-color-exception: white text on the high-contrast publish confirmation */
+  --community-publish-toast-bg: #2f7d4a; /* theme-color-exception: success confirmation surface */
+  position: fixed;
+  z-index: 1200;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 13px 18px;
+  color: var(--community-publish-toast-text);
+  background: var(--community-publish-toast-bg);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
+  font-weight: 650;
+  animation: community-publish-toast-in 180ms ease-out;
+}
+
+@keyframes community-publish-toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 560px) {

@@ -105,6 +105,7 @@ export type CommunityPostInput = {
 export type CommunityComment = {
   _id: string;
   content: string;
+  parentId?: string | null;
   author: { uid: string; displayName: string; avatar: string; activeAvatarFrame?: AvatarFrameId | null };
   createdAt: string;
 };
@@ -128,7 +129,15 @@ export const getPublicProfile = async (uid: string) =>
 export const getCommunityComments = async (postId: string) =>
   (await axiosClient.get<{ comments: CommunityComment[] }>(`/community/posts/${encodeURIComponent(postId)}/comments`)).data.comments;
 export const createCommunityPost = async (input: CommunityPostInput) =>
-  (await axiosClient.post<{ post: CommunityPost }>("/community/posts", input, { timeout: 45_000 })).data.post;
+  {
+    const { data } = await axiosClient.post<{ post: CommunityPost }>("/community/posts", input, { timeout: 45_000 });
+    const post = data.post;
+    if (!post?._id || !Array.isArray(post.media)) throw new Error("The server did not confirm the saved post and its attachments.");
+    if (post.media.length !== input.media.length || post.media.some((media, index) => media.url !== input.media[index]?.url)) {
+      throw new Error("The post was not confirmed with all uploaded attachments. Your draft is still available to retry.");
+    }
+    return post;
+  };
 export const getScheduledCommunityPosts = async () => {
   const { data } = await axiosClient.get<{ posts?: CommunityPost[] }>("/community/posts/scheduled", {
     timeout: 60_000,
@@ -149,8 +158,8 @@ export const setCommunityReaction = async (postId: string, reaction: CommunityRe
   (await axiosClient.post<{ myReaction: CommunityReaction | null; likeCount: number; reactionCounts: CommunityReactionCounts }>(
     `/community/posts/${encodeURIComponent(postId)}/reaction`, { reaction },
   )).data;
-export const createCommunityComment = async (postId: string, content: string) =>
-  (await axiosClient.post<{ comment: CommunityComment }>(`/community/posts/${encodeURIComponent(postId)}/comments`, { content })).data.comment;
+export const createCommunityComment = async (postId: string, content: string, parentId?: string) =>
+  (await axiosClient.post<{ comment: CommunityComment }>(`/community/posts/${encodeURIComponent(postId)}/comments`, { content, ...(parentId ? { parentId } : {}) })).data.comment;
 export const repostCommunityPost = async (postId: string) =>
   (await axiosClient.post<{ post: CommunityPost }>(`/community/posts/${encodeURIComponent(postId)}/repost`)).data.post;
 export const reportCommunityPost = async (postId: string, reason: string) =>

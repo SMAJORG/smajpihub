@@ -8,6 +8,7 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import RepeatOutlinedIcon from "@mui/icons-material/RepeatOutlined";
+import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
@@ -48,7 +49,27 @@ const reactionOptions: Array<{ type: CommunityReaction; emoji: string; label: st
 const reportReasons = ["Harassment or bullying", "Hate or harmful content", "Spam or scam", "Privacy violation", "Other"];
 const when = (value: string) => {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  return `${Math.floor(days / 365)}y`;
+};
+const errorMessage = (reason: unknown, fallback: string) => {
+  if (reason && typeof reason === "object" && "response" in reason) {
+    const response = (reason as { response?: { status?: number; data?: { message?: string } } }).response;
+    if (response?.data?.message) return response.data.message;
+    if (response?.status) return `${fallback} (HTTP ${response.status}).`;
+  }
+  return fallback;
 };
 
 const linkedText = (text: string): ReactNode[] => text.split(/(https?:\/\/[^\s]+|#[\w]+|@[\w.-]+)/g).map((part, index) => {
@@ -77,6 +98,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
+  const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(reportReasons[0]);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -100,6 +122,17 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
   const chooseReaction = async (type: CommunityReaction) => {
     if (busy) return;
     const next = reaction === type ? null : type;
+    const previousReaction = reaction;
+    const previousCounts = reactionCounts;
+    const previousLikeCount = likeCount;
+    setReaction(next);
+    setReactionCounts(current => {
+      const updated = { ...current };
+      if (previousReaction) updated[previousReaction] = Math.max(0, Number(updated[previousReaction] || 0) - 1);
+      if (next) updated[next] = Number(updated[next] || 0) + 1;
+      return updated;
+    });
+    setLikeCount(current => Math.max(0, current + (next ? 1 : 0) - (previousReaction ? 1 : 0)));
     setBusy(true);
     setError("");
     try {
@@ -109,8 +142,11 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
       setLikeCount(saved.likeCount);
       setReactionMenuOpen(false);
       onChange?.();
-    } catch {
-      setError("Your reaction could not be saved. Please try again.");
+    } catch (reason) {
+      setReaction(previousReaction);
+      setReactionCounts(previousCounts);
+      setLikeCount(previousLikeCount);
+      setError(errorMessage(reason, "Your reaction could not be saved. Check your connection and try again."));
     } finally {
       setBusy(false);
     }
@@ -156,9 +192,10 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     setBusy(true);
     setError("");
     try {
-      const comment = await createCommunityComment(content._id, text);
+      const comment = await createCommunityComment(content._id, text, replyTo?._id);
       setComments(current => [...current, comment]);
       setCommentText("");
+      setReplyTo(null);
       setCommentCount(current => current + 1);
     } catch {
       setError("Comment could not be posted. Please try again.");
@@ -166,6 +203,20 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
       setBusy(false);
     }
   };
+
+  const renderComment = (comment: CommunityComment, isReply = false) => (
+    <article className={`community-comment${isReply ? " community-comment-reply" : ""}`} key={comment._id}>
+      <Link to={`/people/${encodeURIComponent(comment.author.uid)}`} aria-label={`View ${comment.author.displayName}'s public profile`}>
+        <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : comment.author.activeAvatarFrame} size={34} />
+      </Link>
+      <div>
+        <Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link>
+        <p>{comment.content}</p>
+        <small title={new Date(comment.createdAt).toLocaleString()}>{when(comment.createdAt)}</small>
+        {viewerId && content.canComment !== false ? <button type="button" className="community-comment-reply-button" onClick={() => setReplyTo(comment)}><ReplyOutlinedIcon /> Reply</button> : null}
+      </div>
+    </article>
+  );
 
   const followAuthor = async () => {
     if (busy || author.uid === viewerId) return;
@@ -278,7 +329,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
         <div className="community-feed-author-details">
           <Link to={`/people/${encodeURIComponent(author.uid)}`} className="community-feed-author-name">{author.displayName}<TrustBadge userId={author.uid} /></Link>
           {author.headline ? <span className="community-feed-headline">{author.headline}</span> : null}
-          <span className="community-feed-post-meta">{when(content.createdAt || post.createdAt)} · <AudienceIcon audience={content.audience} /></span>
+          <span className="community-feed-post-meta" title={new Date(content.createdAt || post.createdAt).toLocaleString()}>{when(content.createdAt || post.createdAt)} · <AudienceIcon audience={content.audience} /></span>
         </div>
         {author.uid !== viewerId ? <button type="button" className={`community-follow-button${following ? " following" : ""}`} onClick={() => void followAuthor()} disabled={busy}>
           {following ? "Following" : <><AddOutlinedIcon /> Follow</>}
@@ -332,15 +383,15 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
       </div>
       <div className="community-feed-actions">
         <div className="community-reaction-control">
-          <button type="button" className="community-feed-action" aria-pressed={reaction === "like"} disabled={busy} onClick={() => void chooseReaction("like")}><ThumbUpAltOutlinedIcon /> <span>{reaction === "like" ? "Liked" : "Like"} · {likeCount}</span></button>
+          <button type="button" className="community-feed-action" aria-label={`${reaction === "like" ? "Unlike" : "Like"}, ${likeCount}`} aria-pressed={reaction === "like"} disabled={busy} onClick={() => void chooseReaction("like")}><ThumbUpAltOutlinedIcon /> <span>{likeCount}</span></button>
           <button type="button" className="community-reaction-picker-toggle" aria-label="Choose a reaction" aria-expanded={reactionMenuOpen} onClick={() => setReactionMenuOpen(value => !value)}>⌄</button>
           {reactionMenuOpen ? <div className="community-reaction-picker" role="group" aria-label="Reactions">
             {reactionOptions.map(option => <button key={option.type} type="button" aria-label={option.label} aria-pressed={reaction === option.type} onClick={() => void chooseReaction(option.type)}>{option.emoji}</button>)}
           </div> : null}
         </div>
-        <button type="button" className="community-feed-action" disabled={busy || content.canComment === false} onClick={() => void toggleComments()}><ChatBubbleOutlineOutlinedIcon /> <span>{commentCount ? `Comment · ${commentCount}` : "Comment"}</span></button>
-        <button type="button" className="community-feed-action" disabled={busy} onClick={() => void repost()}><RepeatOutlinedIcon /> <span>{repostCount ? `Repost · ${repostCount}` : "Repost"}</span></button>
-        <button type="button" className="community-feed-action" onClick={() => void share()}><ShareOutlinedIcon /> <span>Share</span></button>
+        <button type="button" className="community-feed-action" aria-label={`Comments, ${commentCount}`} disabled={busy || content.canComment === false} onClick={() => void toggleComments()}><ChatBubbleOutlineOutlinedIcon /> <span>{commentCount}</span></button>
+        <button type="button" className="community-feed-action" aria-label={`Repost, ${repostCount}`} disabled={busy} onClick={() => void repost()}><RepeatOutlinedIcon /> <span>{repostCount}</span></button>
+        <button type="button" className="community-feed-action" aria-label="Share" onClick={() => void share()}><ShareOutlinedIcon /></button>
         <div className="community-reaction-summary" aria-label="Reaction counts">
           {reactionOptions.filter(option => Number(counts[option.type] || 0) > 0).map(option => <span key={option.type} title={`${option.label}: ${counts[option.type]}`}><span aria-hidden="true">{option.emoji}</span>{counts[option.type]}</span>)}
         </div>
@@ -352,16 +403,15 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
         <button type="submit" disabled={busy}>Send report</button>
       </form> : null}
       {commentsOpen ? <section className="community-comments" aria-label="Comments">
-        {comments.map(comment => <article className="community-comment" key={comment._id}>
-          <Link to={`/people/${encodeURIComponent(comment.author.uid)}`} aria-label={`View ${comment.author.displayName}'s public profile`}>
-            <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : comment.author.activeAvatarFrame} size={34} />
-          </Link>
-          <div><Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link><p>{comment.content}</p><small>{when(comment.createdAt)}</small></div>
-        </article>)}
+        {comments.filter(comment => !comment.parentId).map(comment => <div className="community-comment-thread" key={comment._id}>
+          {renderComment(comment)}
+          {comments.filter(reply => reply.parentId === comment._id).map(reply => renderComment(reply, true))}
+        </div>)}
         {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
           <label className="visually-hidden" htmlFor={`community-comment-${post._id}`}>Write a comment</label>
-          <input id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder="Write a comment…" />
+          <input id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
+          {replyTo ? <button type="button" className="community-comment-cancel-reply" onClick={() => setReplyTo(null)}>Cancel reply</button> : null}
           <button type="submit" disabled={busy || !commentText.trim()}>Post</button>
         </form>
       </section> : null}

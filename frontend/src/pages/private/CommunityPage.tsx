@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
@@ -14,25 +14,33 @@ import "./community.css";
 
 const CommunityPage = () => {
   const { user } = useAuthContext();
+  const location = useLocation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const incomingPublishedPost = (location.state as { communityPublishedPost?: CommunityPost } | null)?.communityPublishedPost;
   const [scope, setScope] = useState<"all" | "following">("all");
   const [searchText, setSearchText] = useState("");
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [posts, setPosts] = useState<CommunityPost[]>(() => incomingPublishedPost ? [incomingPublishedPost] : []);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [error, setError] = useState("");
+  const [publishedNotice, setPublishedNotice] = useState(Boolean(incomingPublishedPost));
   const [videoViewerIndex, setVideoViewerIndex] = useState<number | null>(null);
   const feedScrollPosition = useRef<{ element: HTMLElement | null; top: number; windowTop: number } | null>(null);
+  const pendingPublishedPost = useRef(incomingPublishedPost || null);
 
   const load = useCallback(async (nextPage = 1, keep = false) => {
     setLoading(true);
     setError("");
     try {
       const result = await getCommunityFeed({ scope, page: nextPage });
-      setPosts(current => keep ? [...current, ...result.posts] : result.posts);
+      const feedPosts = result.posts;
+      const pending = pendingPublishedPost.current;
+      if (scope === "all" && pending && !feedPosts.some(post => post._id === pending._id)) feedPosts.unshift(pending);
+      if (pending && feedPosts.some(post => post._id === pending._id)) pendingPublishedPost.current = null;
+      setPosts(current => keep ? [...current, ...feedPosts.filter(post => !current.some(item => item._id === post._id))] : feedPosts);
       setHasMore(result.hasMore);
       setPage(nextPage);
     } catch (reason) {
@@ -47,6 +55,15 @@ const CommunityPage = () => {
   const refreshFeed = useCallback(() => { void load(); }, [load]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const post = pendingPublishedPost.current;
+    if (!post) return;
+    setPosts(current => [post, ...current.filter(item => item._id !== post._id)]);
+    setPublishedNotice(true);
+    const timer = window.setTimeout(() => setPublishedNotice(false), 4500);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, location.search, navigate]);
   useEffect(() => {
     const target = params.get("post");
     if (!target || loading) return;
@@ -211,6 +228,7 @@ const CommunityPage = () => {
         onClose={closeVideo}
         onChange={refreshFeed}
       /> : null}
+      {publishedNotice ? <div className="community-published-toast" role="status">Post published successfully.</div> : null}
     </main>
   );
 };

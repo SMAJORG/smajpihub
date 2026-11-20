@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useLayoutEffect, type ElementType, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useLayoutEffect, type ElementType, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
@@ -32,6 +32,7 @@ type Sheet = "options" | "settings" | "event" | "celebration" | "job" | "poll" |
 type Person = { uid: string; displayName: string; avatar?: string };
 type CropRatio = "original" | "square" | "portrait" | "landscape";
 type MediaDraft = { file: File; previewUrl: string; altText: string; taggedPeople: string[]; uploadedUrl?: string; captionsVtt?: string };
+type CropRect = { x: number; y: number; width: number; height: number };
 type MediaEditorState = {
   file?: File;
   previewUrl: string;
@@ -40,9 +41,8 @@ type MediaEditorState = {
   localIndex?: number;
   rotation: number;
   cropRatio: CropRatio;
-  zoom: number;
-  altText: string;
-  taggedPeople: Person[];
+  imageSize?: { width: number; height: number };
+  cropRect?: CropRect;
   captionsVtt: string;
 };
 type SavedDraft = { content: string; audience: NonNullable<CommunityPostInput["audience"]>; commentPolicy: NonNullable<CommunityPostInput["commentPolicy"]>; brandPartnership: boolean };
@@ -83,6 +83,20 @@ const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   reader.onerror = () => reject(new Error("Could not read the selected file."));
   reader.readAsDataURL(file);
 });
+const getCropRect = (ratio: CropRatio, width: number, height: number): CropRect => {
+  const requestedRatio = cropRatios[ratio];
+  if (!requestedRatio) return { x: 0, y: 0, width: 1, height: 1 };
+  let cropWidth = width;
+  let cropHeight = height;
+  if (cropWidth / cropHeight > requestedRatio) cropWidth = cropHeight * requestedRatio;
+  else cropHeight = cropWidth / requestedRatio;
+  return {
+    x: (width - cropWidth) / width / 2,
+    y: (height - cropHeight) / height / 2,
+    width: cropWidth / width,
+    height: cropHeight / height,
+  };
+};
 const renderEditedImage = (editor: MediaEditorState) => new Promise<File>((resolve, reject) => {
   const image = new Image();
   image.crossOrigin = "anonymous";
@@ -99,17 +113,11 @@ const renderEditedImage = (editor: MediaEditorState) => new Promise<File>((resol
     rotatedContext.rotate(rotation * Math.PI / 180);
     rotatedContext.drawImage(image, -image.width / 2, -image.height / 2);
 
-    const requestedRatio = cropRatios[editor.cropRatio];
-    let cropWidth = rotatedWidth;
-    let cropHeight = rotatedHeight;
-    if (requestedRatio) {
-      if (cropWidth / cropHeight > requestedRatio) cropWidth = cropHeight * requestedRatio;
-      else cropHeight = cropWidth / requestedRatio;
-    }
-    cropWidth /= editor.zoom;
-    cropHeight /= editor.zoom;
-    const left = (rotatedWidth - cropWidth) / 2;
-    const top = (rotatedHeight - cropHeight) / 2;
+    const crop = editor.cropRect || getCropRect(editor.cropRatio, rotatedWidth, rotatedHeight);
+    const cropWidth = rotatedWidth * crop.width;
+    const cropHeight = rotatedHeight * crop.height;
+    const left = rotatedWidth * crop.x;
+    const top = rotatedHeight * crop.y;
     const output = document.createElement("canvas");
     output.width = Math.max(1, Math.round(cropWidth));
     output.height = Math.max(1, Math.round(cropHeight));
@@ -169,9 +177,6 @@ export default function CommunityPostCreatePage() {
   const [mediaQueue, setMediaQueue] = useState<Array<{ file: File; previewUrl: string }>>([]);
   const [mediaEditorBusy, setMediaEditorBusy] = useState(false);
   const [mediaEditorError, setMediaEditorError] = useState("");
-  const [mediaTagQuery, setMediaTagQuery] = useState("");
-  const [mediaTagResults, setMediaTagResults] = useState<Person[]>([]);
-  const [mediaTagError, setMediaTagError] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [existingDocument, setExistingDocument] = useState<CommunityPost["document"]>();
   const [postType, setPostType] = useState<CommunityPostType>("post");
@@ -206,6 +211,16 @@ export default function CommunityPostCreatePage() {
   const mediaInput = useRef<HTMLInputElement>(null);
   const documentInput = useRef<HTMLInputElement>(null);
   const contentInput = useRef<HTMLTextAreaElement>(null);
+  const mediaEditorStage = useRef<HTMLDivElement>(null);
+  const cropPointers = useRef(new Map<number, { x: number; y: number }>());
+  const cropInteraction = useRef<{
+    mode: "move" | "resize" | "pinch";
+    handle?: string;
+    startX: number;
+    startY: number;
+    rect: CropRect;
+    distance?: number;
+  } | null>(null);
   const composerDraftSnapshot = useRef<ComposerSnapshot | null>(null);
   const previewUrls = useRef(new Set<string>());
   const publishAttempt = useRef<{ id: string; signature: string } | null>(null);
@@ -253,30 +268,6 @@ export default function CommunityPostCreatePage() {
     }, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [collaboratorQuery, collaborators, scheduledCollaboratorIds, user?.uid]);
-
-  useEffect(() => {
-    const query = mediaTagQuery.trim();
-    if (!mediaEditor || query.length < 2) {
-      setMediaTagResults([]);
-      setMediaTagError("");
-      return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void axiosClient.get<{ users: Person[] }>("/users/search", { params: { q: query }, signal: controller.signal })
-        .then(({ data }) => {
-          if (!controller.signal.aborted) {
-            setMediaTagResults(data.users.filter(person =>
-              person.uid !== user?.uid && !mediaEditor.taggedPeople.some(tag => tag.uid === person.uid),
-            ));
-          }
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) setMediaTagError("People could not be searched. Try again.");
-        });
-    }, 250);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [mediaEditor, mediaTagQuery, user?.uid]);
 
   useEffect(() => {
     if (sheet !== "job" || jobsLoaded) return;
@@ -484,9 +475,6 @@ export default function CommunityPostCreatePage() {
         type: first.file.type.startsWith("video/") ? "video" : "image",
         rotation: 0,
         cropRatio: "original",
-        zoom: 1,
-        altText: "",
-        taggedPeople: [],
         captionsVtt: "",
       });
     }
@@ -497,8 +485,6 @@ export default function CommunityPostCreatePage() {
     if (!media) return;
     setMediaQueue([]);
     setMediaEditorError("");
-    setMediaTagQuery("");
-    setMediaTagResults([]);
     setMediaEditor({
       file: media.file,
       previewUrl: media.previewUrl,
@@ -506,9 +492,6 @@ export default function CommunityPostCreatePage() {
       localIndex: index,
       rotation: 0,
       cropRatio: "original",
-      zoom: 1,
-      altText: media.altText,
-      taggedPeople: media.taggedPeople.map(uid => ({ uid, displayName: uid })),
       captionsVtt: media.captionsVtt || "",
     });
   };
@@ -518,18 +501,147 @@ export default function CommunityPostCreatePage() {
     if (!media) return;
     setMediaQueue([]);
     setMediaEditorError("");
-    setMediaTagQuery("");
-    setMediaTagResults([]);
     setMediaEditor({
       previewUrl: media.url,
       type: media.type,
       existingIndex: index,
       rotation: 0,
       cropRatio: "original",
-      zoom: 1,
-      altText: media.altText || "",
-      taggedPeople: (media.taggedPeople || []).map(uid => ({ uid, displayName: uid })),
       captionsVtt: media.captionsVtt || "",
+    });
+  };
+
+  const orientedImageSize = (editor: MediaEditorState) => {
+    const size = editor.imageSize;
+    if (!size) return null;
+    return editor.rotation % 180
+      ? { width: size.height, height: size.width }
+      : size;
+  };
+
+  const beginCropPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!mediaEditor || mediaEditor.type !== "image") return;
+    const stage = mediaEditorStage.current;
+    const size = orientedImageSize(mediaEditor);
+    if (!stage || !size) return;
+    const target = event.target as HTMLElement;
+    const handle = target.closest<HTMLElement>("[data-crop-handle]")?.dataset.cropHandle;
+    const rect = mediaEditor.cropRect || getCropRect(mediaEditor.cropRatio, size.width, size.height);
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cropPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (cropPointers.current.size > 1) {
+      const points = [...cropPointers.current.values()];
+      cropInteraction.current = {
+        mode: "pinch",
+        startX: points[0].x,
+        startY: points[0].y,
+        rect,
+        distance: Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y),
+      };
+      return;
+    }
+    cropInteraction.current = {
+      mode: handle ? "resize" : "move",
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      rect,
+    };
+  };
+
+  const moveCropPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const interaction = cropInteraction.current;
+    const stage = mediaEditorStage.current;
+    if (!mediaEditor || !interaction || !stage) return;
+    cropPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const bounds = stage.getBoundingClientRect();
+    if (interaction.mode === "pinch" && interaction.distance) {
+      const points = [...cropPointers.current.values()];
+      if (points.length < 2) return;
+      const distance = Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y));
+      const scale = interaction.distance / distance;
+      const ratio = cropRatios[mediaEditor.cropRatio] || bounds.width / bounds.height;
+      const normalizedAspect = ratio * bounds.height / bounds.width;
+      const maxWidth = Math.min(1, normalizedAspect);
+      const width = Math.min(maxWidth, Math.max(Math.min(.08, maxWidth), interaction.rect.width * scale));
+      const height = Math.min(1, width / normalizedAspect);
+      const centerX = interaction.rect.x + interaction.rect.width / 2;
+      const centerY = interaction.rect.y + interaction.rect.height / 2;
+      setMediaEditor(current => current ? {
+        ...current,
+        cropRect: {
+          x: Math.max(0, Math.min(1 - width, centerX - width / 2)),
+          y: Math.max(0, Math.min(1 - height, centerY - height / 2)),
+          width,
+          height,
+        },
+      } : current);
+      return;
+    }
+    const dx = (event.clientX - interaction.startX) / bounds.width;
+    const dy = (event.clientY - interaction.startY) / bounds.height;
+    if (interaction.mode === "move") {
+      const x = Math.max(0, Math.min(1 - interaction.rect.width, interaction.rect.x + dx));
+      const y = Math.max(0, Math.min(1 - interaction.rect.height, interaction.rect.y + dy));
+      setMediaEditor(current => current ? { ...current, cropRect: { ...interaction.rect, x, y } } : current);
+      return;
+    }
+    const handle = interaction.handle || "";
+    const left = handle.includes("w");
+    const top = handle.includes("n");
+    const rightX = interaction.rect.x + interaction.rect.width;
+    const bottomY = interaction.rect.y + interaction.rect.height;
+    const ratio = cropRatios[mediaEditor.cropRatio] || bounds.width / bounds.height;
+    const normalizedAspect = ratio * bounds.height / bounds.width;
+    const horizontalWidthDelta = left ? -dx : dx;
+    const verticalWidthDelta = (top ? -dy : dy) * normalizedAspect;
+    const widthDelta = Math.abs(horizontalWidthDelta) >= Math.abs(verticalWidthDelta) ? horizontalWidthDelta : verticalWidthDelta;
+    const maximumWidth = Math.min(left ? rightX : 1 - interaction.rect.x, (top ? bottomY : 1 - interaction.rect.y) * normalizedAspect);
+    const width = Math.max(Math.min(.08, maximumWidth), Math.min(maximumWidth, interaction.rect.width + widthDelta));
+    const height = width / normalizedAspect;
+    const x = left ? rightX - width : interaction.rect.x;
+    const y = top ? bottomY - height : interaction.rect.y;
+    setMediaEditor(current => current ? {
+      ...current,
+      cropRect: {
+        x: Math.max(0, Math.min(1 - width, x)),
+        y: Math.max(0, Math.min(1 - height, y)),
+        width,
+        height,
+      },
+    } : current);
+  };
+
+  const endCropPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    cropPointers.current.delete(event.pointerId);
+    if (cropPointers.current.size < 2) cropInteraction.current = null;
+  };
+
+  const setEditorCropRatio = (ratio: CropRatio) => {
+    setMediaEditor(current => {
+      if (!current) return current;
+      const size = orientedImageSize(current);
+      return {
+        ...current,
+        cropRatio: ratio,
+        ...(size ? { cropRect: getCropRect(ratio, size.width, size.height) } : {}),
+      };
+    });
+  };
+
+  const rotateEditorImage = () => {
+    setMediaEditor(current => {
+      if (!current) return current;
+      const rotation = (current.rotation + 90) % 360;
+      const size = current.imageSize
+        ? rotation % 180 ? { width: current.imageSize.height, height: current.imageSize.width } : current.imageSize
+        : null;
+      return {
+        ...current,
+        rotation,
+        ...(size ? { cropRect: getCropRect(current.cropRatio, size.width, size.height) } : {}),
+      };
     });
   };
 
@@ -540,10 +652,9 @@ export default function CommunityPostCreatePage() {
     mediaQueue.forEach(item => releasePreviewUrl(item.previewUrl));
     setMediaQueue([]);
     setMediaEditor(null);
-    setMediaTagQuery("");
-    setMediaTagResults([]);
-    setMediaTagError("");
     setMediaEditorError("");
+    cropPointers.current.clear();
+    cropInteraction.current = null;
   };
 
   const applyMediaEdit = async () => {
@@ -558,13 +669,17 @@ export default function CommunityPostCreatePage() {
         return;
       }
       const changedImage = mediaEditor.type === "image"
-        && (mediaEditor.rotation !== 0 || mediaEditor.cropRatio !== "original" || mediaEditor.zoom !== 1);
+        && (mediaEditor.rotation !== 0 || mediaEditor.cropRatio !== "original"
+          || Boolean(mediaEditor.cropRect && (mediaEditor.cropRect.x || mediaEditor.cropRect.y || mediaEditor.cropRect.width < 1 || mediaEditor.cropRect.height < 1)));
       const editedFile = changedImage ? await renderEditedImage(mediaEditor) : mediaEditor.file;
       const editedPreview = editedFile && changedImage ? makePreviewUrl(editedFile) : mediaEditor.previewUrl;
+      const previousMedia = mediaEditor.existingIndex !== undefined
+        ? existingMedia[mediaEditor.existingIndex]
+        : mediaEditor.localIndex !== undefined ? mediaFiles[mediaEditor.localIndex] : undefined;
       const metadata = {
-        altText: mediaEditor.altText.trim().slice(0, 500),
-        taggedPeople: [...new Set(mediaEditor.taggedPeople.map(person => person.uid))],
-        captionsVtt: mediaEditor.type === "video" ? mediaEditor.captionsVtt.trim() : undefined,
+        altText: previousMedia?.altText || "",
+        taggedPeople: previousMedia?.taggedPeople || [],
+        ...(mediaEditor.type === "video" && mediaEditor.captionsVtt.trim() ? { captionsVtt: mediaEditor.captionsVtt.trim() } : {}),
       };
 
       if (mediaEditor.existingIndex !== undefined && !changedImage) {
@@ -595,17 +710,14 @@ export default function CommunityPostCreatePage() {
           type: next.file.type.startsWith("video/") ? "video" : "image",
           rotation: 0,
           cropRatio: "original",
-          zoom: 1,
-          altText: "",
-          taggedPeople: [],
           captionsVtt: "",
         });
-        setMediaTagQuery("");
       } else {
         setMediaQueue([]);
         setMediaEditor(null);
-        setMediaTagQuery("");
       }
+      cropPointers.current.clear();
+      cropInteraction.current = null;
     } catch (reason) {
       setMediaEditorError(reason instanceof Error ? reason.message : "The media could not be edited.");
     } finally {
@@ -659,8 +771,17 @@ export default function CommunityPostCreatePage() {
           if (event.total) reportProgress(index, Math.round(event.loaded / event.total * 100));
         },
       });
-      setMediaFiles(current => current.map(item => item.previewUrl === media.previewUrl ? { ...item, uploadedUrl: data.url } : item));
-      return { type: "video", url: data.url, ...metadata };
+      let videoUrl: URL;
+      try {
+        videoUrl = new URL(data.url);
+      } catch {
+        throw new Error("Video storage did not return a saved media URL.");
+      }
+      if (videoUrl.protocol !== "https:" || videoUrl.hostname !== "res.cloudinary.com" || !videoUrl.pathname.includes("/video/upload/")) {
+        throw new Error("Video storage did not return a saved media URL.");
+      }
+      setMediaFiles(current => current.map(item => item.previewUrl === media.previewUrl ? { ...item, uploadedUrl: videoUrl.toString() } : item));
+      return { type: "video", url: videoUrl.toString(), ...metadata };
     }));
     const media: CommunityMedia[] = [...existingMedia, ...uploads];
     let document: CommunityPostInput["document"];
@@ -733,10 +854,10 @@ export default function CommunityPostCreatePage() {
         eventTitle, eventDate, eventLocation, celebration, jobId, pollQuestion, pollOptions, pollExpiry,
       });
       setUploadProgress(null);
-      setNotice("Publishing…");
-      await createCommunityPost({ ...input, clientRequestId: getPublishRequestId(signature) });
+      setNotice("Posting…");
+      const publishedPost = await createCommunityPost({ ...input, clientRequestId: getPublishRequestId(signature) });
       clearDraft();
-      navigate("/community/feed");
+      navigate("/community/feed", { state: { communityPublishedPost: publishedPost } });
     } catch (reason) {
       setNotice("");
       const status = reason && typeof reason === "object" && "response" in reason
@@ -762,7 +883,7 @@ export default function CommunityPostCreatePage() {
   };
 
   const publishScheduled = async () => {
-    if (!scheduledAt || (scheduleEditMode !== "time" && !validContent) || scheduleBusy) return;
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduledAt) || (scheduleEditMode !== "time" && !validContent) || scheduleBusy) return;
     const publishAt = toIso(scheduledAt);
     if (new Date(publishAt).getTime() < Date.now() + 60_000) {
       setScheduledError("Choose a time at least one minute in the future.");
@@ -851,7 +972,7 @@ export default function CommunityPostCreatePage() {
         </div>
         <button type="button" className="community-create-schedule" onClick={() => { setScheduledTab("compose"); if (!scheduleEditMode) { setEditingScheduleId(""); setScheduledAt(""); } setSheet("schedule"); }} aria-label="Schedule post"><ScheduleOutlinedIcon /></button>
         {scheduleEditMode === "time" ? <button type="button" className="community-create-publish" onClick={() => setSheet("schedule")} disabled={!scheduledAt}>Update time</button>
-          : <button type="submit" form="community-post-create-form" className="community-create-publish" disabled={!validContent || posting || (scheduleEditMode === "content" && (!scheduledAt || new Date(toIso(scheduledAt)).getTime() < Date.now() + 60_000))}>{posting ? "Saving…" : scheduleEditMode === "content" ? "Save changes" : "Post"}</button>}
+          : <button type="submit" form="community-post-create-form" className="community-create-publish" disabled={!validContent || posting || (scheduleEditMode === "content" && (!scheduledAt || new Date(toIso(scheduledAt)).getTime() < Date.now() + 60_000))}>{posting ? "Posting…" : scheduleEditMode === "content" ? "Save changes" : "Post"}</button>}
       </header>
       <form id="community-post-create-form" className="community-create-form" onSubmit={event => void publish(event)}>
         <textarea ref={contentInput} id="community-create-content" aria-label="Share your thoughts" value={content} maxLength={2000} onChange={event => setContent(event.target.value)} placeholder="Share your thoughts ..." />
@@ -904,43 +1025,79 @@ export default function CommunityPostCreatePage() {
           <button type="button" onClick={() => void applyMediaEdit()} disabled={mediaEditorBusy}>{mediaEditorBusy ? "Applying…" : "Next"}</button>
         </header>
         <div className="community-media-editor-stage-wrap">
+          {(() => {
+            const size = orientedImageSize(mediaEditor);
+            const ratio = size ? size.width / size.height : 1;
+            const crop = mediaEditor.cropRect || (size ? getCropRect(mediaEditor.cropRatio, size.width, size.height) : null);
+            return (
           <div
-            className={`community-media-editor-stage${mediaEditor.cropRatio === "original" ? " original" : ""}`}
-            style={mediaEditor.cropRatio === "original" ? undefined : { aspectRatio: String(cropRatios[mediaEditor.cropRatio]) }}
+            ref={mediaEditorStage}
+            className="community-media-editor-stage"
+            style={{ aspectRatio: String(ratio) }}
+            onPointerDown={beginCropPointer}
+            onPointerMove={moveCropPointer}
+            onPointerUp={endCropPointer}
+            onPointerCancel={endCropPointer}
           >
             {mediaEditor.type === "video"
               ? <video src={mediaEditor.previewUrl} controls playsInline />
               : <img
                 src={mediaEditor.previewUrl}
                 alt="Selected media preview"
-                style={{ transform: `rotate(${mediaEditor.rotation}deg) scale(${mediaEditor.zoom})` }}
+                onLoad={event => {
+                  const imageSize = { width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight };
+                  const oriented = mediaEditor.rotation % 180
+                    ? { width: imageSize.height, height: imageSize.width }
+                    : imageSize;
+                  setMediaEditor(current => current ? {
+                    ...current,
+                    imageSize,
+                    cropRect: current.cropRect || getCropRect(current.cropRatio, oriented.width, oriented.height),
+                  } : current);
+                }}
+                style={{
+                  width: mediaEditor.rotation % 180 && mediaEditor.imageSize
+                    ? `${mediaEditor.imageSize.width / mediaEditor.imageSize.height * 100}%`
+                    : "100%",
+                  height: mediaEditor.rotation % 180 && mediaEditor.imageSize
+                    ? `${mediaEditor.imageSize.height / mediaEditor.imageSize.width * 100}%`
+                    : "100%",
+                  transform: `translate(-50%, -50%) rotate(${mediaEditor.rotation}deg)`,
+                }}
               />}
+            {mediaEditor.type === "image" && crop ? <div
+              className="community-media-editor-crop-frame"
+              data-crop-frame
+              style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}
+            >
+              <span className="community-media-editor-grid-line horizontal" />
+              <span className="community-media-editor-grid-line vertical" />
+              {(["nw", "ne", "sw", "se"] as const).map(handle => <span
+                key={handle}
+                className={`community-media-editor-crop-handle ${handle}`}
+                data-crop-handle={handle}
+                aria-hidden="true"
+              />)}
+            </div> : null}
           </div>
+            );
+          })()}
         </div>
         <div className="community-media-editor-controls">
           {mediaEditorError ? <p className="community-media-editor-error" role="alert">{mediaEditorError}</p> : null}
           {mediaEditor.type === "image" ? <>
             <div className="community-media-editor-crop" aria-label="Crop image">
               {(["original", "square", "portrait", "landscape"] as const).map(ratio => (
-                <button key={ratio} type="button" className={mediaEditor.cropRatio === ratio ? "active" : ""} onClick={() => setMediaEditor(current => current ? { ...current, cropRatio: ratio } : current)}>
+                <button key={ratio} type="button" className={mediaEditor.cropRatio === ratio ? "active" : ""} onClick={() => setEditorCropRatio(ratio)}>
                   {ratio === "original" ? "Original" : ratio === "square" ? "Square" : ratio === "portrait" ? "4:5" : "16:9"}
                 </button>
               ))}
             </div>
             <div className="community-media-editor-rotate">
-              <button type="button" onClick={() => setMediaEditor(current => current ? { ...current, rotation: (current.rotation + 90) % 360 } : current)}><RotateRightOutlinedIcon /> Rotate</button>
-              <label>Zoom<input type="range" min="1" max="3" step=".1" value={mediaEditor.zoom} onChange={event => setMediaEditor(current => current ? { ...current, zoom: Number(event.target.value) } : current)} /></label>
+              <button type="button" onClick={rotateEditorImage}><RotateRightOutlinedIcon /> Rotate</button>
             </div>
           </> : null}
-          <label className="community-media-editor-alt">ALT text<input value={mediaEditor.altText} maxLength={500} onChange={event => setMediaEditor(current => current ? { ...current, altText: event.target.value } : current)} placeholder="Describe this media for accessibility" /></label>
           {mediaEditor.type === "video" ? <label className="community-media-editor-captions">Closed captions (WebVTT)<textarea value={mediaEditor.captionsVtt} maxLength={20_000} onChange={event => setMediaEditor(current => current ? { ...current, captionsVtt: event.target.value } : current)} placeholder={"WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nCaption text"} /></label> : null}
-          <div className="community-media-editor-tagging">
-            <strong>Tag people</strong>
-            <input value={mediaTagQuery} maxLength={80} onChange={event => { setMediaTagQuery(event.target.value); setMediaTagError(""); }} placeholder="Search public profiles" />
-            {mediaTagError ? <p role="alert">{mediaTagError}</p> : null}
-            {mediaTagResults.length ? <div className="community-media-editor-results">{mediaTagResults.map(person => <button key={person.uid} type="button" onClick={() => { setMediaEditor(current => current ? { ...current, taggedPeople: [...current.taggedPeople, person] } : current); setMediaTagQuery(""); setMediaTagResults([]); }}><span>{person.displayName}</span><b>Add</b></button>)}</div> : null}
-            {mediaEditor.taggedPeople.length ? <div className="community-media-editor-tags">{mediaEditor.taggedPeople.map(person => <span key={person.uid}>{person.displayName}<button type="button" aria-label={`Remove ${person.displayName}`} onClick={() => setMediaEditor(current => current ? { ...current, taggedPeople: current.taggedPeople.filter(tag => tag.uid !== person.uid) } : current)}><CloseOutlinedIcon /></button></span>)}</div> : null}
-          </div>
         </div>
       </section> : null}
 
@@ -1015,9 +1172,16 @@ export default function CommunityPostCreatePage() {
             <div className="community-create-schedule-tabs"><button type="button" className={scheduledTab === "compose" ? "active" : ""} onClick={() => setScheduledTab("compose")}>Schedule post</button><button type="button" className={scheduledTab === "scheduled" ? "active" : ""} onClick={() => setScheduledTab("scheduled")}>Scheduled</button></div>
             {scheduledTab === "compose" ? <>
               {editingScheduleId ? <p>{scheduleEditMode === "content" ? "Edit the post details and publish time." : "Update the publish time for this post."}</p> : null}
-              <label>Date and time<input type="datetime-local" min={toDateTimeInput(new Date(Date.now() + 60_000).toISOString())} value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} /></label>
+              <label>Date<input type="date" min={toDateTimeInput(new Date().toISOString()).split("T")[0]} value={scheduledAt.split("T")[0] || ""} onChange={event => {
+                const time = scheduledAt.split("T")[1] || "09:00";
+                setScheduledAt(event.target.value ? `${event.target.value}T${time}` : "");
+              }} /></label>
+              <label>Time<input type="time" value={scheduledAt.split("T")[1] || ""} onChange={event => {
+                const date = scheduledAt.split("T")[0] || toDateTimeInput(new Date().toISOString()).split("T")[0];
+                setScheduledAt(event.target.value ? `${date}T${event.target.value}` : "");
+              }} /></label>
               {scheduledError ? <p className="community-create-error" role="alert">{scheduledError}</p> : null}
-              <button type="button" className="community-create-sheet-primary" disabled={!scheduledAt || scheduleBusy || (!editingScheduleId && !validContent) || (scheduleEditMode === "content" && !validContent)} onClick={() => void publishScheduled()}>{scheduleBusy ? "Saving…" : editingScheduleId ? scheduleEditMode === "content" ? "Save scheduled post" : "Update scheduled time" : "Confirm schedule"}</button>
+              <button type="button" className="community-create-sheet-primary" disabled={!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduledAt) || scheduleBusy || (!editingScheduleId && !validContent) || (scheduleEditMode === "content" && !validContent)} onClick={() => void publishScheduled()}>{scheduleBusy ? "Saving…" : editingScheduleId ? scheduleEditMode === "content" ? "Save scheduled post" : "Update scheduled time" : "Confirm schedule"}</button>
             </> : <>
               {scheduledLoading ? <p role="status">Loading scheduled posts…</p> : null}
               {scheduledLoadError ? <div className="community-create-schedule-error" role="alert"><p>{scheduledLoadError}</p><button type="button" onClick={() => { setScheduledLoadError(""); setScheduledRefresh(current => current + 1); }}>Retry</button></div> : null}

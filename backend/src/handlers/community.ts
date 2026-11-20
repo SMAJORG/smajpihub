@@ -639,7 +639,7 @@ export default function mountCommunityEndpoints(router: Router) {
     const result = await getPublicPost(req, req.params.id);
     if (!result) return res.status(404).json({ error: "post_unavailable" });
     if (!await canCommentOnPost(req, result.post, result.viewer)) return res.status(403).json({ error: "comments_unavailable" });
-    const comments = await req.app.locals.communityCommentCollection.find({ postId: String(result.post._id), status: "visible" }).sort({ createdAt: 1 }).limit(50).toArray();
+    const comments = await req.app.locals.communityCommentCollection.find({ postId: String(result.post._id), status: "visible" }).sort({ createdAt: 1 }).limit(100).toArray();
     const authors = comments.length
       ? await req.app.locals.userCollection.find({ uid: { $in: [...new Set(comments.map((comment: Record<string, any>) => comment.authorId))] }, blocked: { $ne: true }, publicProfile: { $ne: false } }).toArray()
       : [];
@@ -669,9 +669,21 @@ export default function mountCommunityEndpoints(router: Router) {
     if (!await canCommentOnPost(req, result.post, user)) return res.status(403).json({ error: "comments_unavailable" });
     const content = String(req.body?.content || "").trim();
     if (!content || content.length > MAX_COMMENT_TEXT) return res.status(400).json({ error: "invalid_comment", message: "Comments must contain 1–1,000 characters." });
+    const requestedParentId = String(req.body?.parentId || "").trim();
+    let parentId: string | undefined;
+    if (requestedParentId) {
+      if (!ObjectId.isValid(requestedParentId)) return res.status(400).json({ error: "invalid_reply_target" });
+      const parent = await req.app.locals.communityCommentCollection.findOne({
+        _id: new ObjectId(requestedParentId),
+        postId: String(result.post._id),
+        status: "visible",
+      });
+      if (!parent || parent.parentId) return res.status(400).json({ error: "invalid_reply_target" });
+      parentId = String(parent._id);
+    }
     const recentComments = await req.app.locals.communityCommentCollection.countDocuments({ authorId: user.uid, createdAt: { $gte: new Date(Date.now() - 60_000) } });
     if (recentComments >= 10) return res.status(429).json({ error: "comment_rate_limited", message: "Please wait before posting another comment." });
-    const comment = { postId: String(result.post._id), authorId: user.uid, content, status: "visible", createdAt: new Date() };
+    const comment = { postId: String(result.post._id), authorId: user.uid, ...(parentId ? { parentId } : {}), content, status: "visible", createdAt: new Date() };
     const inserted = await req.app.locals.communityCommentCollection.insertOne(comment);
     await req.app.locals.communityPostCollection.updateOne({ _id: result.post._id }, { $inc: { commentCount: 1 } });
     const eligibleFrames = await getEligibleAvatarFrames(req.app.locals, user);
