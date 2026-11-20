@@ -1,0 +1,370 @@
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
+import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
+import RepeatOutlinedIcon from "@mui/icons-material/RepeatOutlined";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
+import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
+import TrustBadge from "./TrustBadge";
+import CommunityVideoPreview from "./CommunityVideoPreview";
+import {
+  createCommunityComment,
+  deleteCommunityPost,
+  getCommunityComments,
+  reportCommunityPost,
+  repostCommunityPost,
+  setCommunityReaction,
+  toggleCommunityFollow,
+  voteOnCommunityPoll,
+  type CommunityComment,
+  type CommunityMedia,
+  type CommunityPost,
+  type CommunityReaction,
+  type CommunityReactionCounts,
+} from "../lib/communityApi";
+
+type Props = {
+  post: CommunityPost;
+  viewerId?: string;
+  viewerAvatarFrame?: AvatarFrameId | null;
+  onChange?: () => void;
+  onDismiss?: () => void;
+  onOpenVideo?: (post: CommunityPost, media: CommunityMedia) => void;
+};
+
+const reactionOptions: Array<{ type: CommunityReaction; emoji: string; label: string }> = [
+  { type: "like", emoji: "👍", label: "Like" },
+  { type: "love", emoji: "❤️", label: "Love" },
+  { type: "celebrate", emoji: "🎉", label: "Celebrate" },
+  { type: "support", emoji: "🙌", label: "Support" },
+  { type: "insightful", emoji: "💡", label: "Insightful" },
+];
+const reportReasons = ["Harassment or bullying", "Hate or harmful content", "Spam or scam", "Privacy violation", "Other"];
+const when = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+};
+
+const linkedText = (text: string): ReactNode[] => text.split(/(https?:\/\/[^\s]+|#[\w]+|@[\w.-]+)/g).map((part, index) => {
+  if (/^https?:\/\//i.test(part)) return <a key={`${index}-${part}`} href={part} target="_blank" rel="noopener noreferrer">{part}</a>;
+  if (/^[#@]/.test(part)) return <Link key={`${index}-${part}`} to={`/search?q=${encodeURIComponent(part.slice(1))}`}>{part}</Link>;
+  return part;
+});
+
+const AudienceIcon = ({ audience }: { audience?: CommunityPost["audience"] }) => audience === "followers"
+  ? <GroupsOutlinedIcon aria-label="Followers" />
+  : audience === "only_me" ? <LockOutlinedIcon aria-label="Only me" /> : <PublicOutlinedIcon aria-label="Public" />;
+
+export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, onDismiss, onOpenVideo }: Props) {
+  const original = post.originalPost;
+  const content: CommunityPost = original ? { ...post, ...original } : post;
+  const author = content.author || post.author;
+  const [reaction, setReaction] = useState<CommunityReaction | null>(content.myReaction || (content.likedByMe ? "like" : null));
+  const [reactionCounts, setReactionCounts] = useState<CommunityReactionCounts>(content.reactionCounts || { like: content.likeCount || 0 });
+  const [likeCount, setLikeCount] = useState(content.likeCount || 0);
+  const [commentCount, setCommentCount] = useState(content.commentCount || 0);
+  const [repostCount, setRepostCount] = useState(content.repostCount || 0);
+  const [following, setFollowing] = useState(content.isFollowedByMe === true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState<CommunityComment[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState(reportReasons[0]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reactionMenuOpen, setReactionMenuOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [poll, setPoll] = useState(content.poll);
+  const [myVote, setMyVote] = useState(content.myVote || null);
+  const isOwnPost = viewerId === post.authorId;
+
+  useEffect(() => {
+    setReaction(content.myReaction || (content.likedByMe ? "like" : null));
+    setReactionCounts(content.reactionCounts || { like: content.likeCount || 0 });
+    setLikeCount(content.likeCount || 0);
+    setCommentCount(content.commentCount || 0);
+    setRepostCount(content.repostCount || 0);
+    setFollowing(content.isFollowedByMe === true);
+    setPoll(content.poll);
+    setMyVote(content.myVote || null);
+  }, [content.canComment, content.commentCount, content.isFollowedByMe, content.likeCount, content.likedByMe, content.myReaction, content.poll, content.reactionCounts, content.repostCount, content.myVote, post]);
+
+  const chooseReaction = async (type: CommunityReaction) => {
+    if (busy) return;
+    const next = reaction === type ? null : type;
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await setCommunityReaction(content._id, next);
+      setReaction(saved.myReaction);
+      setReactionCounts(saved.reactionCounts);
+      setLikeCount(saved.likeCount);
+      setReactionMenuOpen(false);
+      onChange?.();
+    } catch {
+      setError("Your reaction could not be saved. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleComments = async () => {
+    if (content.canComment === false) return;
+    if (commentsOpen) {
+      setCommentsOpen(false);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      setComments(await getCommunityComments(content._id));
+      setCommentsOpen(true);
+    } catch {
+      setError("Comments could not be loaded. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const vote = async (optionId: string) => {
+    if (busy || myVote || !viewerId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await voteOnCommunityPoll(content._id, optionId);
+      setMyVote(result.myVote);
+      setPoll(current => current ? { ...current, options: result.options } : current);
+    } catch {
+      setError("Your vote could not be saved. The poll may have closed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitComment = async (event: FormEvent) => {
+    event.preventDefault();
+    const text = commentText.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const comment = await createCommunityComment(content._id, text);
+      setComments(current => [...current, comment]);
+      setCommentText("");
+      setCommentCount(current => current + 1);
+    } catch {
+      setError("Comment could not be posted. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const followAuthor = async () => {
+    if (busy || author.uid === viewerId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const next = await toggleCommunityFollow(author.uid);
+      setFollowing(next);
+      onChange?.();
+    } catch {
+      setError("Follow status could not be updated. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const repost = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await repostCommunityPost(content._id);
+      setRepostCount(current => current + 1);
+      setNotice("Reposted to your community feed.");
+      onChange?.();
+    } catch (reason) {
+      setError(reason && typeof reason === "object" && "response" in reason
+        && (reason as { response?: { status?: number } }).response?.status === 409
+        ? "You have already reposted this."
+        : "Could not repost. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const share = async () => {
+    const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(content._id)}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community post", text: content.content, url });
+      else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setNotice("Post link copied.");
+      } else {
+        setError("Sharing is not available in this browser.");
+      }
+    } catch (reason) {
+      if (!(reason instanceof DOMException && reason.name === "AbortError")) setError("Post could not be shared.");
+    }
+  };
+
+  const submitReport = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await reportCommunityPost(content._id, reportReason);
+      setReportOpen(false);
+      setNotice("Report sent for review.");
+    } catch (reason) {
+      setError(reason && typeof reason === "object" && "response" in reason
+        && (reason as { response?: { status?: number } }).response?.status === 409
+        ? "You have already reported this post."
+        : "Report could not be sent. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removePost = async () => {
+    if (busy || !window.confirm("Delete this post? This cannot be undone.")) return;
+    setBusy(true);
+    setError("");
+    try {
+      await deleteCommunityPost(post._id);
+      onDismiss?.();
+      onChange?.();
+    } catch {
+      setError("Post could not be deleted. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dismiss = () => {
+    onDismiss?.();
+  };
+
+  const activityText = post.socialActivity
+    ? post.socialActivity.kind === "likes" ? "likes this"
+      : post.socialActivity.kind === "commented" ? "commented on this"
+        : post.socialActivity.kind === "reposted" ? "reposted this"
+          : "follows this page"
+    : "";
+  const counts = reactionCounts || { like: likeCount };
+
+  return (
+    <article className="community-feed-post" id={`community-post-${post._id}`}>
+      {post.socialActivity ? <div className="community-social-context"><ThumbUpAltOutlinedIcon /> <strong>{post.socialActivity.displayName}</strong> {activityText}</div> : null}
+      {post.type === "repost" ? <p className="community-feed-repost-label">Reposted by <Link to={`/people/${encodeURIComponent(post.author.uid)}`}>{post.author.displayName}</Link></p> : null}
+      <header className="community-feed-post-header">
+        <Link to={`/people/${encodeURIComponent(author.uid)}`} aria-label={`View ${author.displayName}'s public profile`}>
+          <UserAvatarFrame
+            name={author.displayName}
+            image={author.avatar}
+            frame={author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : author.activeAvatarFrame}
+            size={50}
+          />
+        </Link>
+        <div className="community-feed-author-details">
+          <Link to={`/people/${encodeURIComponent(author.uid)}`} className="community-feed-author-name">{author.displayName}<TrustBadge userId={author.uid} /></Link>
+          {author.headline ? <span className="community-feed-headline">{author.headline}</span> : null}
+          <span className="community-feed-post-meta">{when(content.createdAt || post.createdAt)} · <AudienceIcon audience={content.audience} /></span>
+        </div>
+        {author.uid !== viewerId ? <button type="button" className={`community-follow-button${following ? " following" : ""}`} onClick={() => void followAuthor()} disabled={busy}>
+          {following ? "Following" : <><AddOutlinedIcon /> Follow</>}
+        </button> : null}
+        <div className="community-feed-post-menu-wrap">
+          <button type="button" className="community-feed-icon-button" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><MoreVertOutlinedIcon /></button>
+          {menuOpen ? <div className="community-feed-post-menu" role="menu">
+            {isOwnPost ? <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); void removePost(); }}>Delete post</button>
+              : <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); setReportOpen(value => !value); }}>Report post</button>}
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); dismiss(); }}>Dismiss post</button>
+          </div> : null}
+        </div>
+        <button type="button" className="community-feed-icon-button" aria-label="Dismiss post" onClick={dismiss}><CloseOutlinedIcon /></button>
+      </header>
+      {post.type === "repost" && post.content ? <p className="community-feed-repost-note">{post.content}</p> : null}
+      <div className="community-feed-post-body">
+        {content.content ? <p className={content.content.length > 300 && !expanded ? "collapsed" : ""}>{linkedText(expanded ? content.content : content.content.slice(0, 300))}{content.content.length > 300 && !expanded ? "…" : ""}</p> : null}
+        {content.content.length > 300 ? <button type="button" className="community-feed-more" onClick={() => setExpanded(value => !value)}>{expanded ? "less" : "more"}</button> : null}
+        {content.brandPartnership ? <p className="community-post-partnership">Paid partnership</p> : null}
+        {content.event ? <aside className="community-structured-post"><strong>{content.event.title}</strong><span>{when(content.event.startsAt)} · {content.event.location}</span></aside> : null}
+        {content.celebration ? <aside className="community-structured-post"><strong>Celebrating {content.celebration.replaceAll("_", " ")}</strong></aside> : null}
+        {content.job ? <aside className="community-structured-post"><strong>{content.job.title}</strong><span>{content.job.company} · {content.job.location}</span><Link to={`/services/jobs/job/${encodeURIComponent(content.job.id)}`}>View SMAJ Jobs listing</Link></aside> : null}
+        {content.document ? <a className="community-structured-document" href={content.document.url} target="_blank" rel="noopener noreferrer"><span>{content.document.name}</span><span>Open PDF</span></a> : null}
+        {poll ? <section className="community-post-poll" aria-label="Poll">
+          <strong>{poll.question}</strong>
+          {poll.options.map(option => {
+            const totalVotes = poll.options.reduce((total, item) => total + item.votes, 0);
+            const percentage = totalVotes ? Math.round(option.votes / totalVotes * 100) : 0;
+            return <button key={option.id} type="button" disabled={busy || Boolean(myVote) || !viewerId || Boolean(poll.expiresAt && new Date(poll.expiresAt).getTime() <= Date.now())} aria-pressed={myVote === option.id} onClick={() => void vote(option.id)}>
+              <span>{option.label}{myVote ? ` · ${percentage}%` : ""}</span><span>{myVote ? `${option.votes} vote${option.votes === 1 ? "" : "s"}` : "Vote"}</span>
+            </button>;
+          })}
+          <small>{poll.options.reduce((total, option) => total + option.votes, 0)} votes{poll.expiresAt ? ` · ${new Date(poll.expiresAt).getTime() <= Date.now() ? "Poll closed" : `Closes ${when(poll.expiresAt)}`}` : ""}</small>
+        </section> : null}
+        {content.media?.length ? <div className={`community-feed-media${content.media.length > 1 ? " multiple" : ""}`}>
+          {content.media.map((media, index) => media.type === "video"
+            ? <CommunityVideoPreview
+              key={`${media.url}-${index}`}
+              media={media}
+              author={author}
+              content={content.content}
+              following={following}
+              canFollow={author.uid !== viewerId}
+              onOpen={() => onOpenVideo?.(content, media)}
+              onMore={() => setMenuOpen(true)}
+              onDismiss={dismiss}
+              onFollow={() => void followAuthor()}
+            />
+            : <img key={`${media.url}-${index}`} loading="lazy" src={media.url} alt={media.altText || `Community post image ${index + 1}`} />)}
+        </div> : null}
+      </div>
+      <div className="community-feed-actions">
+        <div className="community-reaction-control">
+          <button type="button" className="community-feed-action" aria-pressed={reaction === "like"} disabled={busy} onClick={() => void chooseReaction("like")}><ThumbUpAltOutlinedIcon /> <span>{reaction === "like" ? "Liked" : "Like"} · {likeCount}</span></button>
+          <button type="button" className="community-reaction-picker-toggle" aria-label="Choose a reaction" aria-expanded={reactionMenuOpen} onClick={() => setReactionMenuOpen(value => !value)}>⌄</button>
+          {reactionMenuOpen ? <div className="community-reaction-picker" role="group" aria-label="Reactions">
+            {reactionOptions.map(option => <button key={option.type} type="button" aria-label={option.label} aria-pressed={reaction === option.type} onClick={() => void chooseReaction(option.type)}>{option.emoji}</button>)}
+          </div> : null}
+        </div>
+        <button type="button" className="community-feed-action" disabled={busy || content.canComment === false} onClick={() => void toggleComments()}><ChatBubbleOutlineOutlinedIcon /> <span>{commentCount ? `Comment · ${commentCount}` : "Comment"}</span></button>
+        <button type="button" className="community-feed-action" disabled={busy} onClick={() => void repost()}><RepeatOutlinedIcon /> <span>{repostCount ? `Repost · ${repostCount}` : "Repost"}</span></button>
+        <button type="button" className="community-feed-action" onClick={() => void share()}><ShareOutlinedIcon /> <span>Share</span></button>
+        <div className="community-reaction-summary" aria-label="Reaction counts">
+          {reactionOptions.filter(option => Number(counts[option.type] || 0) > 0).map(option => <span key={option.type} title={`${option.label}: ${counts[option.type]}`}><span aria-hidden="true">{option.emoji}</span>{counts[option.type]}</span>)}
+        </div>
+      </div>
+      {notice ? <p className="community-post-notice" role="status">{notice}</p> : null}
+      {error ? <p className="community-post-error" role="alert">{error}</p> : null}
+      {reportOpen ? <form className="community-report-form" onSubmit={event => void submitReport(event)}>
+        <label>Why are you reporting this post?<select value={reportReason} onChange={event => setReportReason(event.target.value)}>{reportReasons.map(reason => <option key={reason}>{reason}</option>)}</select></label>
+        <button type="submit" disabled={busy}>Send report</button>
+      </form> : null}
+      {commentsOpen ? <section className="community-comments" aria-label="Comments">
+        {comments.map(comment => <article className="community-comment" key={comment._id}>
+          <Link to={`/people/${encodeURIComponent(comment.author.uid)}`} aria-label={`View ${comment.author.displayName}'s public profile`}>
+            <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : comment.author.activeAvatarFrame} size={34} />
+          </Link>
+          <div><Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link><p>{comment.content}</p><small>{when(comment.createdAt)}</small></div>
+        </article>)}
+        {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+        <form onSubmit={event => void submitComment(event)}>
+          <label className="visually-hidden" htmlFor={`community-comment-${post._id}`}>Write a comment</label>
+          <input id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder="Write a comment…" />
+          <button type="submit" disabled={busy || !commentText.trim()}>Post</button>
+        </form>
+      </section> : null}
+    </article>
+  );
+}

@@ -28,6 +28,8 @@ export default function mountUploadEndpoints(router: Router) {
       if (err?.statusCode === 413) return res.status(413).json({ error: "payload_too_large", message: err.message });
       if (err?.statusCode === 400) return res.status(400).json({ error: "bad_request", message: err.message });
       if (err?.statusCode === 503) return res.status(503).json({ error: "upload_unavailable", message: err.message });
+      if (err?.statusCode === 502) return res.status(502).json({ error: "storage_unavailable", message: err.message });
+      if (err?.statusCode === 504) return res.status(504).json({ error: "upload_timeout", message: err.message });
       console.error("Image upload failed:", err);
       return res.status(500).json({ error: "upload_failed", message: "Image upload failed." });
     }
@@ -62,7 +64,7 @@ export default function mountUploadEndpoints(router: Router) {
       const upload = await uploadVideoToCloudinary(video, "community-post", name);
       return res.status(201).json(upload);
     } catch (err: any) {
-      if ([400, 413, 503].includes(err?.statusCode)) return res.status(err.statusCode).json({ error: "video_upload_failed", message: err.message });
+      if ([400, 413, 502, 503, 504].includes(err?.statusCode)) return res.status(err.statusCode).json({ error: "video_upload_failed", message: err.message });
       console.error("Video upload failed:", err);
       return res.status(500).json({ error: "video_upload_failed", message: "Video upload failed." });
     }

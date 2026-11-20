@@ -1,9 +1,10 @@
+import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
 import { Request, Response, Router } from "express";
 import { resolveCurrentUser } from "../services/auth";
 import { getEligibleAvatarFrames, getEligibleAvatarFramesForUsers, resolveAvatarFrame, type AvatarFrameId } from "../services/avatarFrames";
 
-type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[] };
+type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[]; captionsVtt?: string };
 type CommunityAudience = "everyone" | "followers" | "only_me";
 type CommunityCommentPolicy = "everyone" | "followers" | "nobody";
 const MAX_POST_TEXT = 2000;
@@ -54,7 +55,11 @@ const safeMedia = (input: unknown): CommunityMedia[] | null => {
     const rawUrl = String((item as Record<string, unknown>).url || "").trim();
     const altText = String((item as Record<string, unknown>).altText || "").trim();
     const rawTaggedPeople = (item as Record<string, unknown>).taggedPeople ?? [];
+    const captionsVtt = String((item as Record<string, unknown>).captionsVtt || "").trim();
     if (!Array.isArray(rawTaggedPeople) || rawTaggedPeople.length > 10) return null;
+    if (captionsVtt && (type !== "video" || captionsVtt.length > 20_000
+      || !/^WEBVTT(?:\r?\n)/.test(captionsVtt)
+      || !/(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}/.test(captionsVtt))) return null;
     const taggedPeople = [...new Set(rawTaggedPeople.map(uid => String(uid).trim()).filter(Boolean))];
     if (taggedPeople.some(uid => uid.length > 128)) return null;
     try {
@@ -66,6 +71,7 @@ const safeMedia = (input: unknown): CommunityMedia[] | null => {
         url: url.toString(),
         ...(altText ? { altText: altText.slice(0, 500) } : {}),
         ...(taggedPeople.length ? { taggedPeople } : {}),
+        ...(captionsVtt ? { captionsVtt } : {}),
       });
     } catch {
       return null;
@@ -172,6 +178,43 @@ const canCommentOnPost = async (req: Request, post: Record<string, any>, viewer:
   if (policy === "nobody") return false;
   return Boolean(await req.app.locals.communityFollowCollection.findOne({ followerId: viewer.uid, followingId: post.authorId }));
 };
+const saveCommunityReaction = async (
+  locals: Record<string, any>,
+  post: Record<string, any>,
+  userId: string,
+  reaction: string | null,
+) => {
+  const postId = String(post._id);
+  const existing = await locals.communityLikeCollection.findOne({ postId, userId });
+  if (!reaction) {
+    if (existing) await locals.communityLikeCollection.deleteOne({ _id: existing._id });
+  } else if (existing) {
+    await locals.communityLikeCollection.updateOne({ _id: existing._id }, { $set: { reaction, createdAt: new Date() } });
+  } else {
+    try {
+      await locals.communityLikeCollection.insertOne({ postId, userId, reaction, createdAt: new Date() });
+    } catch (error: any) {
+      if (error?.code !== 11000) throw error;
+      await locals.communityLikeCollection.updateOne({ postId, userId }, { $set: { reaction, createdAt: new Date() } });
+    }
+  }
+  const reactions = await locals.communityLikeCollection.find({ postId }).toArray();
+  const reactionCounts: Record<string, number> = { like: 0, love: 0, celebrate: 0, support: 0, insightful: 0 };
+  reactions.forEach((item: Record<string, any>) => {
+    const type = ["like", "love", "celebrate", "support", "insightful"].includes(item.reaction) ? item.reaction : "like";
+    reactionCounts[type] += 1;
+  });
+  await locals.communityPostCollection.updateOne(
+    { _id: post._id },
+    { $set: { likeCount: reactions.length, reactionCounts } },
+  );
+  const saved = await locals.communityLikeCollection.findOne({ postId, userId });
+  return {
+    myReaction: saved ? (["like", "love", "celebrate", "support", "insightful"].includes(saved.reaction) ? saved.reaction : "like") : null,
+    likeCount: reactions.length,
+    reactionCounts,
+  };
+};
 const getPublicPost = async (req: Request, postId: string) => {
   if (!ObjectId.isValid(postId)) return null;
   const post = await req.app.locals.communityPostCollection.findOne({ _id: new ObjectId(postId), status: "published" });
@@ -230,10 +273,11 @@ const listPosts = async (req: Request, res: Response) => {
   const viewer = await resolveCurrentUser(req);
   const page = Math.max(1, Math.min(1000, Number.parseInt(String(req.query.page || "1"), 10) || 1));
   const query: Record<string, any> = { status: "published" };
-  const followedIds = viewer
+  const follows = viewer
     ? (await req.app.locals.communityFollowCollection.find({ followerId: viewer.uid }).limit(500).toArray())
       .map((follow: Record<string, any>) => follow.followingId)
     : [];
+  const followedIds = follows;
   query.$and = [{
     $or: [
       { audience: { $exists: false } },
@@ -248,8 +292,6 @@ const listPosts = async (req: Request, res: Response) => {
     query.authorId = authorId;
   } else if (req.query.scope === "following") {
     if (!viewer) return res.status(401).json({ error: "unauthorized" });
-    const follows = await req.app.locals.communityFollowCollection.find({ followerId: viewer.uid }).limit(500).toArray();
-    const followedIds = follows.map((follow: Record<string, any>) => follow.followingId);
     if (!followedIds.length) return res.json({ posts: [], hasMore: false });
     query.authorId = { $in: followedIds };
   }
@@ -261,19 +303,67 @@ const listPosts = async (req: Request, res: Response) => {
     .map((author: Record<string, any>) => [String(author.uid), author]));
   const visiblePosts = posts.filter((post: Record<string, any>) => authorsById.has(post.authorId));
   const eligibilityByUser = await getEligibleAvatarFramesForUsers(req.app.locals, [...authorsById.values()]);
-  const viewerLikes = viewer && visiblePosts.length
-    ? await req.app.locals.communityLikeCollection.find({ userId: viewer.uid, postId: { $in: visiblePosts.map((post: Record<string, any>) => String(post._id)) } }).toArray()
+  const postIds = visiblePosts.map((post: Record<string, any>) => String(post._id));
+  const [viewerLikes, jobProfiles, recentLikes, recentComments, recentReposts, recentFollows] = await Promise.all([
+    viewer && postIds.length
+      ? req.app.locals.communityLikeCollection.find({ userId: viewer.uid, postId: { $in: postIds } }).toArray()
+      : [],
+    authorIds.length ? req.app.locals.jobProfileCollection.find({ userId: { $in: authorIds } }).toArray() : [],
+    postIds.length ? req.app.locals.communityLikeCollection.find({ postId: { $in: postIds } }).sort({ createdAt: -1 }).limit(150).toArray() : [],
+    postIds.length ? req.app.locals.communityCommentCollection.find({ postId: { $in: postIds }, status: "visible" }).sort({ createdAt: -1 }).limit(150).toArray() : [],
+    postIds.length ? req.app.locals.communityPostCollection.find({ repostOf: { $in: postIds }, status: "published" }).sort({ createdAt: -1 }).limit(150).toArray() : [],
+    authorIds.length ? req.app.locals.communityFollowCollection.find({ followingId: { $in: authorIds } }).sort({ createdAt: -1 }).limit(100).toArray() : [],
+  ]);
+  const likesByPost = new Map<string, Record<string, any>>(viewerLikes.map((like: Record<string, any>) => [like.postId, like]));
+  const profilesByUser = new Map<string, Record<string, any>>(jobProfiles.map((profile: Record<string, any>) => [profile.userId, profile]));
+  const socialByPost = new Map<string, { kind: string; userId: string; createdAt: unknown }>();
+  const addActivity = (postId: string, kind: string, userId: string, createdAt: unknown) => {
+    if (!postIds.includes(postId) || !userId) return;
+    const current = socialByPost.get(postId);
+    if (!current || new Date(createdAt as any).getTime() >= new Date(current.createdAt as any).getTime()) {
+      socialByPost.set(postId, { kind, userId, createdAt });
+    }
+  };
+  recentLikes.forEach((item: Record<string, any>) => addActivity(item.postId, "likes", item.userId, item.createdAt));
+  recentComments.forEach((item: Record<string, any>) => addActivity(item.postId, "commented", item.authorId, item.createdAt));
+  recentReposts.forEach((item: Record<string, any>) => addActivity(item.repostOf, "reposted", item.authorId, item.createdAt));
+  recentFollows.forEach((item: Record<string, any>) => {
+    visiblePosts.filter((post: Record<string, any>) => post.authorId === item.followingId)
+      .forEach((post: Record<string, any>) => addActivity(String(post._id), "follows", item.followerId, item.createdAt));
+  });
+  const activityUserIds = [...new Set([...socialByPost.values()].map(item => item.userId))];
+  const activityUsers = activityUserIds.length
+    ? await req.app.locals.userCollection.find({ uid: { $in: activityUserIds }, blocked: { $ne: true }, publicProfile: { $ne: false }, "settings.publicProfile": { $ne: false } }).toArray()
     : [];
-  const likedIds = new Set(viewerLikes.map((like: Record<string, any>) => like.postId));
+  const activityUsersById = new Map<string, Record<string, any>>(activityUsers.filter(isPublic).map((person: Record<string, any>) => [person.uid, person]));
   const output = await Promise.all(visiblePosts.map(async (post: Record<string, any>) => {
     const author = authorsById.get(post.authorId)!;
-    const identity = await publicIdentity(req.app.locals, author, eligibilityByUser.get(String(author.uid)));
+    const jobProfile = profilesByUser.get(String(author.uid));
+    const identity = {
+      ...await publicIdentity(req.app.locals, author, eligibilityByUser.get(String(author.uid))),
+      headline: String(jobProfile?.headline || jobProfile?.jobTitle || "").slice(0, 160),
+    };
     let originalPost: Record<string, any> | null = null;
     if (post.repostOf && ObjectId.isValid(post.repostOf)) {
       const original = await req.app.locals.communityPostCollection.findOne({ _id: new ObjectId(post.repostOf), status: "published" });
       const originalAuthor = original && await req.app.locals.userCollection.findOne({ uid: original.authorId, blocked: { $ne: true } });
       if (!original || !isPublic(originalAuthor) || !await canViewPost(req, original, viewer)) return null;
-      originalPost = { ...serialize(original), author: await publicIdentity(req.app.locals, originalAuthor) };
+      const originalJobProfile = await req.app.locals.jobProfileCollection.findOne({ userId: originalAuthor.uid });
+      const originalViewerReaction = viewer
+        ? await req.app.locals.communityLikeCollection.findOne({ postId: String(original._id), userId: viewer.uid })
+        : null;
+      originalPost = {
+        ...serialize(original),
+        author: {
+          ...await publicIdentity(req.app.locals, originalAuthor),
+          headline: String(originalJobProfile?.headline || originalJobProfile?.jobTitle || "").slice(0, 160),
+        },
+        likedByMe: Boolean(originalViewerReaction),
+        myReaction: originalViewerReaction ? originalViewerReaction.reaction || "like" : null,
+        reactionCounts: original.reactionCounts || { like: Number(original.likeCount || 0) },
+        isFollowedByMe: followedIds.includes(original.authorId),
+        canComment: await canCommentOnPost(req, original, viewer),
+      };
       if (original.poll) {
         const votes = await req.app.locals.communityPollVoteCollection.find({ postId: String(original._id) }).toArray();
         originalPost.poll = {
@@ -303,7 +393,17 @@ const listPosts = async (req: Request, res: Response) => {
       ...serialize(post),
       author: identity,
       originalPost,
-      likedByMe: likedIds.has(String(post._id)),
+      likedByMe: likesByPost.has(String(post._id)),
+      myReaction: likesByPost.has(String(post._id)) ? likesByPost.get(String(post._id))!.reaction || "like" : null,
+      reactionCounts: post.reactionCounts || { like: Number(post.likeCount || 0) },
+      isFollowedByMe: followedIds.includes(String(originalPost?.authorId || post.authorId)),
+      socialActivity: (() => {
+        const activity = socialByPost.get(String(post._id));
+        const person = activity && activityUsersById.get(activity.userId);
+        return activity && person
+          ? { kind: activity.kind, displayName: displayName(person) }
+          : null;
+      })(),
       ...(poll ? { poll, myVote } : {}),
       canComment: await canCommentOnPost(req, post, viewer),
     };
@@ -373,6 +473,20 @@ export default function mountCommunityEndpoints(router: Router) {
     if (publishAt && (!Number.isFinite(publishAt.getTime()) || publishAt.getTime() < Date.now() + 60_000 || publishAt.getTime() > Date.now() + 365 * 86_400_000)) {
       return res.status(400).json({ error: "invalid_schedule", message: "Choose a publish time between one minute and one year from now." });
     }
+    const clientRequestId = String(req.body?.clientRequestId || "").trim();
+    if (clientRequestId && !/^[a-zA-Z0-9._:-]{8,100}$/.test(clientRequestId)) {
+      return res.status(400).json({ error: "invalid_request_id" });
+    }
+    const requestHash = clientRequestId
+      ? createHash("sha256").update(JSON.stringify({ fields, publishAt: publishAt?.toISOString() || null })).digest("hex")
+      : "";
+    if (clientRequestId) {
+      const previous = await req.app.locals.communityPostCollection.findOne({ authorId: user.uid, clientRequestId });
+      if (previous) {
+        if (previous.requestHash !== requestHash) return res.status(409).json({ error: "idempotency_conflict", message: "This post changed after an uncertain publish attempt. Submit it again to publish the updated version." });
+        return res.status(200).json({ post: { ...serialize(previous), author: await publicIdentity(req.app.locals, user), likedByMe: false } });
+      }
+    }
     const recentPosts = await req.app.locals.communityPostCollection.countDocuments({ authorId: user.uid, createdAt: { $gte: new Date(Date.now() - 60_000) } });
     if (recentPosts >= 3) return res.status(429).json({ error: "posting_rate_limited", message: "Please wait before publishing another post." });
     const now = new Date();
@@ -380,6 +494,7 @@ export default function mountCommunityEndpoints(router: Router) {
       ...fields,
       ...(job ? { job: { id: job.slug, title: job.title, company: job.company, location: job.location } } : {}),
       authorId: user.uid,
+      ...(clientRequestId ? { clientRequestId, requestHash } : {}),
       type: "post",
       status: publishAt ? "scheduled" : "published",
       ...(publishAt ? { publishAt } : {}),
@@ -389,7 +504,16 @@ export default function mountCommunityEndpoints(router: Router) {
       createdAt: now,
       updatedAt: now,
     };
-    const result = await req.app.locals.communityPostCollection.insertOne(post);
+    let result;
+    try {
+      result = await req.app.locals.communityPostCollection.insertOne(post);
+    } catch (error: any) {
+      if (error?.code !== 11000 || !clientRequestId) throw error;
+      const previous = await req.app.locals.communityPostCollection.findOne({ authorId: user.uid, clientRequestId });
+      if (!previous) throw error;
+      if (previous.requestHash !== requestHash) return res.status(409).json({ error: "idempotency_conflict", message: "This post changed after an uncertain publish attempt. Submit it again to publish the updated version." });
+      return res.status(200).json({ post: { ...serialize(previous), author: await publicIdentity(req.app.locals, user), likedByMe: false } });
+    }
     return res.status(201).json({ post: { ...post, _id: String(result.insertedId), author: await publicIdentity(req.app.locals, user), likedByMe: false } });
   });
 
@@ -494,24 +618,21 @@ export default function mountCommunityEndpoints(router: Router) {
     if (!result) return res.status(404).json({ error: "post_unavailable" });
     const postId = String(result.post._id);
     const existing = await req.app.locals.communityLikeCollection.findOne({ postId, userId: user.uid });
-    if (existing) {
-      const deleted = await req.app.locals.communityLikeCollection.deleteOne({ _id: existing._id });
-      if (deleted.deletedCount) {
-        await req.app.locals.communityPostCollection.updateOne({ _id: result.post._id }, { $inc: { likeCount: -1 } });
-      }
-      const updatedPost = await req.app.locals.communityPostCollection.findOne({ _id: result.post._id });
-      return res.json({ liked: false, likeCount: Math.max(0, Number(updatedPost?.likeCount || 0)) });
+    const saved = await saveCommunityReaction(req.app.locals, result.post, user.uid, existing?.reaction === "like" || (existing && !existing.reaction) ? null : "like");
+    return res.json({ liked: saved.myReaction === "like", likeCount: saved.likeCount });
+  });
+
+  router.post("/posts/:id/reaction", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const result = await getPublicPost(req, req.params.id);
+    if (!result) return res.status(404).json({ error: "post_unavailable" });
+    const requested = req.body?.reaction;
+    if (requested !== null && !["like", "love", "celebrate", "support", "insightful"].includes(String(requested))) {
+      return res.status(400).json({ error: "invalid_reaction" });
     }
-    let liked = false;
-    try {
-      await req.app.locals.communityLikeCollection.insertOne({ postId, userId: user.uid, createdAt: new Date() });
-      await req.app.locals.communityPostCollection.updateOne({ _id: result.post._id }, { $inc: { likeCount: 1 } });
-      liked = true;
-    } catch (error: any) {
-      if (error?.code !== 11000) throw error;
-    }
-    const updatedPost = await req.app.locals.communityPostCollection.findOne({ _id: result.post._id });
-    return res.json({ liked: liked || Boolean(await req.app.locals.communityLikeCollection.findOne({ postId, userId: user.uid })), likeCount: Number(updatedPost?.likeCount || 0) });
+    const saved = await saveCommunityReaction(req.app.locals, result.post, user.uid, requested === null ? null : String(requested));
+    return res.json(saved);
   });
 
   router.get("/posts/:id/comments", async (req: Request, res: Response) => {

@@ -184,6 +184,15 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   const created = await request("POST", "/community/posts", author.uid, { content: "A public community post", media: [] });
   assert.equal(created.response.status, 201);
   const postId = created.data.post._id;
+  const retryAuthor = await makeAccount("retry-author");
+  const retryInput = { content: "Retry-safe post", media: [], clientRequestId: "publish-attempt-1234" };
+  const firstAttempt = await request("POST", "/community/posts", retryAuthor.uid, retryInput);
+  const retryAttempt = await request("POST", "/community/posts", retryAuthor.uid, retryInput);
+  assert.equal(firstAttempt.response.status, 201);
+  assert.equal(retryAttempt.response.status, 200);
+  assert.equal(retryAttempt.data.post._id, firstAttempt.data.post._id);
+  result = await request("POST", "/community/posts", retryAuthor.uid, { ...retryInput, content: "Changed after retry" });
+  assert.equal(result.response.status, 409);
   result = await request("POST", "/community/posts", author.uid, {
     content: "Invalid media",
     media: [{ type: "image", url: "https://res.cloudinary.com/example/video/upload/sample.mp4" }],
@@ -201,6 +210,19 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(taggedPost.response.status, 201);
   assert.equal(taggedPost.data.post.media[0].altText, "A sample image");
   assert.deepEqual(taggedPost.data.post.media[0].taggedPeople, [viewer.uid]);
+  const captionAuthor = await makeAccount("caption-author");
+  const captionsVtt = "WEBVTT\n\n00:00:00.000 --> 00:00:02.500\nA spoken caption.";
+  result = await request("POST", "/community/posts", captionAuthor.uid, {
+    content: "Captioned video",
+    media: [{ type: "video", url: "https://res.cloudinary.com/demo/video/upload/sample.mp4", captionsVtt }],
+  });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.data.post.media[0].captionsVtt, captionsVtt);
+  result = await request("POST", "/community/posts", captionAuthor.uid, {
+    content: "Invalid captions",
+    media: [{ type: "video", url: "https://res.cloudinary.com/demo/video/upload/sample.mp4", captionsVtt: "not a webvtt file" }],
+  });
+  assert.equal(result.response.status, 400);
   result = await request("POST", "/community/posts", author.uid, {
     content: "Invalid tag",
     media: [{
@@ -214,6 +236,14 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.deepEqual(result.data, { liked: true, likeCount: 1 });
   result = await request("POST", `/community/posts/${postId}/like`, viewer.uid);
   assert.deepEqual(result.data, { liked: false, likeCount: 0 });
+  result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: "love" });
+  assert.equal(result.data.myReaction, "love");
+  assert.equal(result.data.reactionCounts.love, 1);
+  result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: "support" });
+  assert.equal(result.data.reactionCounts.love, 0);
+  assert.equal(result.data.reactionCounts.support, 1);
+  result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: null });
+  assert.equal(result.data.likeCount, 0);
   result = await request("POST", `/community/posts/${postId}/comments`, viewer.uid, { content: "A comment" });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.comment.content, "A comment");
@@ -237,6 +267,11 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(result.response.status, 200);
   result = await request("GET", "/community/feed", viewer.uid);
   assert.ok(result.data.posts.some(post => post._id === postId));
+  const activePost = result.data.posts.find(post => post._id === postId);
+  assert.equal(activePost.myReaction, null);
+  assert.equal(activePost.reactionCounts.like, 0);
+  assert.equal(activePost.socialActivity.kind, "reposted");
+  assert.equal(activePost.socialActivity.displayName, viewer.displayName);
 
   const privacyAuthor = await makeAccount("privacy-author");
   const limitedPost = await request("POST", "/community/posts", privacyAuthor.uid, {

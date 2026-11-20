@@ -355,11 +355,16 @@ axiosClient.interceptors.response.use(
 
     const suppressGlobalFeedback =
       String((config?.headers as Record<string, unknown> | undefined)?.["X-SMAJ-Silent"] || "") === "true";
+    const isMediaUpload = /^\/uploads\/(?:image|video|document)$/.test(normalizeApiPath(config?.url));
     if (typeof window !== "undefined" && !suppressGlobalFeedback) {
       const backendMessage = error?.response?.data?.message;
       const message =
         typeof backendMessage === "string" && backendMessage.trim()
           ? backendMessage
+          : isMediaUpload && error?.code === "ECONNABORTED"
+            ? "Media upload timed out. Your draft is saved; check your connection and retry."
+            : isMediaUpload && !error?.response
+              ? "Media storage could not be reached. Your draft is saved; check your connection and retry."
           : status === 401
             ? "Your session has expired. Please sign in again."
             : status === 403

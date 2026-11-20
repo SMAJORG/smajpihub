@@ -575,6 +575,10 @@ const start = async () => {
         app.locals.communityPostCollection.createIndex({ status: 1, createdAt: -1 }),
         app.locals.communityPostCollection.createIndex({ status: 1, publishAt: 1 }),
         app.locals.communityPostCollection.createIndex({ authorId: 1, createdAt: -1 }),
+        app.locals.communityPostCollection.createIndex(
+          { authorId: 1, clientRequestId: 1 },
+          { unique: true, partialFilterExpression: { clientRequestId: { $type: "string" } } },
+        ),
         app.locals.communityPostCollection.createIndex({ repostOf: 1, status: 1 }),
         app.locals.communityPostCollection.createIndex(
           { authorId: 1, repostOf: 1 },

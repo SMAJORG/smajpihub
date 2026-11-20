@@ -3,10 +3,20 @@ import { isAxiosError } from "axios";
 
 const isInlineImage = (value: string) => value.startsWith("data:image/");
 
-export const uploadImage = async (image: string, purpose: string) => {
+type UploadOptions = {
+  timeout?: number;
+  onProgress?: (percent: number) => void;
+};
+
+export const uploadImage = async (image: string, purpose: string, options: UploadOptions = {}) => {
   if (!image || !isInlineImage(image)) return image;
   try {
-    const { data } = await axiosClient.post<{ url: string }>("/uploads/image", { image, purpose });
+    const { data } = await axiosClient.post<{ url: string }>("/uploads/image", { image, purpose }, {
+      timeout: options.timeout ?? 20_000,
+      onUploadProgress: event => {
+        if (event.total) options.onProgress?.(Math.round(event.loaded / event.total * 100));
+      },
+    });
     return data.url;
   } catch (err: unknown) {
     if (isAxiosError<{ message?: string }>(err)) {

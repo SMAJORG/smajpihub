@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
-import CommunityPostCard from "../../components/CommunityPostCard";
+import CommunityFeedPostCard from "../../components/CommunityFeedPostCard";
+import CommunityVideoViewer, { type CommunityVideoItem } from "../../components/CommunityVideoViewer";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
@@ -23,6 +24,8 @@ const CommunityPage = () => {
   const [page, setPage] = useState(1);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [error, setError] = useState("");
+  const [videoViewerIndex, setVideoViewerIndex] = useState<number | null>(null);
+  const feedScrollPosition = useRef<{ element: HTMLElement | null; top: number; windowTop: number } | null>(null);
 
   const load = useCallback(async (nextPage = 1, keep = false) => {
     setLoading(true);
@@ -41,6 +44,7 @@ const CommunityPage = () => {
       setLoading(false);
     }
   }, [scope]);
+  const refreshFeed = useCallback(() => { void load(); }, [load]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -106,14 +110,39 @@ const CommunityPage = () => {
     };
   }, [user?.uid]);
 
-  const filteredPosts = posts.filter(post => {
+  const filteredPosts = useMemo(() => posts.filter(post => {
     const search = searchText.trim().toLocaleLowerCase();
     if (!search) return true;
     const target = post.originalPost || post;
     return `${target.content} ${target.author.displayName} ${target.author.username} ${target.author.piUsername}`
       .toLocaleLowerCase()
       .includes(search);
-  });
+  }), [posts, searchText]);
+  const videoItems = useMemo<CommunityVideoItem[]>(() => filteredPosts.flatMap(post => {
+    const target = post.originalPost ? { ...post, ...post.originalPost } as CommunityPost : post;
+    return target.media.filter(media => media.type === "video").map(media => ({
+      post: target,
+      media,
+      author: target.author,
+      content: target.content,
+    }));
+  }), [filteredPosts]);
+  const openVideo = useCallback((post: CommunityPost, media: { url: string }) => {
+    const index = videoItems.findIndex(item => item.post._id === post._id && item.media.url === media.url);
+    if (index < 0) return;
+    const element = document.querySelector<HTMLElement>(".community-private-shell .private-body");
+    feedScrollPosition.current = { element, top: element?.scrollTop || 0, windowTop: window.scrollY };
+    setVideoViewerIndex(index);
+  }, [videoItems]);
+  const closeVideo = useCallback(() => {
+    setVideoViewerIndex(null);
+    requestAnimationFrame(() => {
+      const position = feedScrollPosition.current;
+      if (!position) return;
+      if (position.element) position.element.scrollTop = position.top;
+      window.scrollTo({ top: position.windowTop });
+    });
+  }, []);
 
   return (
     <main className="private-page community-page">
@@ -163,10 +192,25 @@ const CommunityPage = () => {
       <section className="community-feed" aria-label="Community posts" aria-busy={loading}>
         {loading && !posts.length ? <PrivateSkeleton variant="list" count={4} /> : null}
         {!loading && !error && !filteredPosts.length ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
-        {filteredPosts.map(post => <CommunityPostCard key={post._id} post={post} viewerId={user?.uid} viewerAvatarFrame={user?.activeAvatarFrame} onChange={() => void load()} />)}
+        {filteredPosts.map(post => <CommunityFeedPostCard
+          key={post._id}
+          post={post}
+          viewerId={user?.uid}
+          viewerAvatarFrame={user?.activeAvatarFrame}
+          onChange={refreshFeed}
+          onDismiss={() => setPosts(current => current.filter(item => item._id !== post._id))}
+          onOpenVideo={openVideo}
+        />)}
       </section>
       {hasMore ? <button className="community-load-more" type="button" disabled={loading} onClick={() => void load(page + 1, true)}>{loading ? "Loading…" : "Load more"}</button> : null}
       {!loading && error ? <button className="community-load-more" type="button" onClick={() => void load()}>Retry</button> : null}
+      {videoViewerIndex !== null ? <CommunityVideoViewer
+        items={videoItems}
+        index={videoViewerIndex}
+        viewerId={user?.uid}
+        onClose={closeVideo}
+        onChange={refreshFeed}
+      /> : null}
     </main>
   );
 };

@@ -31,7 +31,7 @@ import "./communityPostCreate.css";
 type Sheet = "options" | "settings" | "event" | "celebration" | "job" | "poll" | "media" | "document" | "schedule" | null;
 type Person = { uid: string; displayName: string; avatar?: string };
 type CropRatio = "original" | "square" | "portrait" | "landscape";
-type MediaDraft = { file: File; previewUrl: string; altText: string; taggedPeople: string[] };
+type MediaDraft = { file: File; previewUrl: string; altText: string; taggedPeople: string[]; uploadedUrl?: string; captionsVtt?: string };
 type MediaEditorState = {
   file?: File;
   previewUrl: string;
@@ -43,6 +43,7 @@ type MediaEditorState = {
   zoom: number;
   altText: string;
   taggedPeople: Person[];
+  captionsVtt: string;
 };
 type SavedDraft = { content: string; audience: NonNullable<CommunityPostInput["audience"]>; commentPolicy: NonNullable<CommunityPostInput["commentPolicy"]>; brandPartnership: boolean };
 type ComposerSnapshot = {
@@ -75,6 +76,7 @@ const postTypes: Array<{ type: CommunityPostType; label: string; icon: ElementTy
   { type: "document", label: "Document", icon: InsertDriveFileOutlinedIcon },
 ];
 const draftKey = (uid: string) => `smaj-community-post-draft-v1:${uid}`;
+const publishAttemptKey = (uid: string) => `smaj-community-post-attempt-v1:${uid}`;
 const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result || ""));
@@ -187,6 +189,7 @@ export default function CommunityPostCreatePage() {
   const [pollExpiry, setPollExpiry] = useState("");
   const [sheet, setSheet] = useState<Sheet>(null);
   const [posting, setPosting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [scheduledPosts, setScheduledPosts] = useState<CommunityPost[]>([]);
@@ -203,6 +206,7 @@ export default function CommunityPostCreatePage() {
   const contentInput = useRef<HTMLTextAreaElement>(null);
   const composerDraftSnapshot = useRef<ComposerSnapshot | null>(null);
   const previewUrls = useRef(new Set<string>());
+  const publishAttempt = useRef<{ id: string; signature: string } | null>(null);
 
   const makePreviewUrl = (file: File) => {
     const url = URL.createObjectURL(file);
@@ -342,6 +346,28 @@ export default function CommunityPostCreatePage() {
               : Boolean(documentFile || existingDocument);
   const audienceLabel = audience === "everyone" ? "Anyone" : audience === "followers" ? "Followers" : "Only me";
 
+  const getPublishRequestId = (signature: string) => {
+    if (!publishAttempt.current && user?.uid) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(publishAttemptKey(user.uid)) || "null") as { id?: string; signature?: string } | null;
+        if (saved?.id && saved.signature) publishAttempt.current = { id: saved.id, signature: saved.signature };
+      } catch {
+        publishAttempt.current = null;
+      }
+    }
+    if (publishAttempt.current?.signature === signature) return publishAttempt.current.id;
+    const id = crypto.randomUUID();
+    publishAttempt.current = { id, signature };
+    if (user?.uid) {
+      try {
+        localStorage.setItem(publishAttemptKey(user.uid), JSON.stringify(publishAttempt.current));
+      } catch {
+        setError("The publish retry could not be saved locally. Keep this page open if publishing fails.");
+      }
+    }
+    return id;
+  };
+
   const captureComposerDraft = (): ComposerSnapshot => ({
     content,
     audience,
@@ -450,6 +476,7 @@ export default function CommunityPostCreatePage() {
         zoom: 1,
         altText: "",
         taggedPeople: [],
+        captionsVtt: "",
       });
     }
   };
@@ -471,6 +498,7 @@ export default function CommunityPostCreatePage() {
       zoom: 1,
       altText: media.altText,
       taggedPeople: media.taggedPeople.map(uid => ({ uid, displayName: uid })),
+      captionsVtt: media.captionsVtt || "",
     });
   };
 
@@ -490,6 +518,7 @@ export default function CommunityPostCreatePage() {
       zoom: 1,
       altText: media.altText || "",
       taggedPeople: (media.taggedPeople || []).map(uid => ({ uid, displayName: uid })),
+      captionsVtt: media.captionsVtt || "",
     });
   };
 
@@ -511,6 +540,12 @@ export default function CommunityPostCreatePage() {
     setMediaEditorBusy(true);
     setMediaEditorError("");
     try {
+      const captionsVtt = mediaEditor.captionsVtt.trim();
+      if (captionsVtt && (!/^WEBVTT(?:\r?\n)/.test(captionsVtt)
+        || !/(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}/.test(captionsVtt))) {
+        setMediaEditorError("Captions must use WebVTT format and include at least one timestamped cue.");
+        return;
+      }
       const changedImage = mediaEditor.type === "image"
         && (mediaEditor.rotation !== 0 || mediaEditor.cropRatio !== "original" || mediaEditor.zoom !== 1);
       const editedFile = changedImage ? await renderEditedImage(mediaEditor) : mediaEditor.file;
@@ -518,6 +553,7 @@ export default function CommunityPostCreatePage() {
       const metadata = {
         altText: mediaEditor.altText.trim().slice(0, 500),
         taggedPeople: [...new Set(mediaEditor.taggedPeople.map(person => person.uid))],
+        captionsVtt: mediaEditor.type === "video" ? mediaEditor.captionsVtt.trim() : undefined,
       };
 
       if (mediaEditor.existingIndex !== undefined && !changedImage) {
@@ -551,6 +587,7 @@ export default function CommunityPostCreatePage() {
           zoom: 1,
           altText: "",
           taggedPeople: [],
+          captionsVtt: "",
         });
         setMediaTagQuery("");
       } else {
@@ -577,21 +614,56 @@ export default function CommunityPostCreatePage() {
     setError("");
   };
 
-  const buildInput = async (): Promise<Omit<CommunityPostInput, "publishAt">> => {
-    const uploads: CommunityMedia[] = await Promise.all(mediaFiles.map(async (media): Promise<CommunityMedia> => {
-      const dataUrl = await fileToDataUrl(media.file);
-      const metadata = { altText: media.altText, taggedPeople: media.taggedPeople };
-      if (media.file.type.startsWith("image/")) {
-        return { type: "image", url: await uploadImage(dataUrl, "community-post"), ...metadata };
+  const buildInput = async (onProgress?: (percent: number) => void): Promise<Omit<CommunityPostInput, "publishAt" | "clientRequestId">> => {
+    const weights = [...mediaFiles.map(media => media.file.size), ...(postType === "document" && documentFile ? [documentFile.size] : [])];
+    const progress = weights.map(() => 0);
+    const reportProgress = (index: number, percent: number) => {
+      progress[index] = percent;
+      const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+      if (totalWeight) onProgress?.(Math.round(progress.reduce((sum, value, item) => sum + value * weights[item], 0) / totalWeight));
+    };
+    const uploads: CommunityMedia[] = await Promise.all(mediaFiles.map(async (media, index): Promise<CommunityMedia> => {
+      const metadata = {
+        altText: media.altText,
+        taggedPeople: media.taggedPeople,
+        ...(media.captionsVtt?.trim() ? { captionsVtt: media.captionsVtt.trim() } : {}),
+      };
+      if (media.uploadedUrl) {
+        reportProgress(index, 100);
+        return { type: media.file.type.startsWith("image/") ? "image" : "video", url: media.uploadedUrl, ...metadata };
       }
-      const { data } = await axiosClient.post<{ url: string }>("/uploads/video", { video: dataUrl, name: media.file.name });
+      const dataUrl = await fileToDataUrl(media.file);
+      if (media.file.type.startsWith("image/")) {
+        const url = await uploadImage(dataUrl, "community-post", { timeout: 120_000, onProgress: percent => reportProgress(index, percent) });
+        setMediaFiles(current => current.map(item => item.previewUrl === media.previewUrl ? { ...item, uploadedUrl: url } : item));
+        return {
+          type: "image",
+          url,
+          ...metadata,
+        };
+      }
+      const { data } = await axiosClient.post<{ url: string }>("/uploads/video", { video: dataUrl, name: media.file.name }, {
+        timeout: 120_000,
+        onUploadProgress: event => {
+          if (event.total) reportProgress(index, Math.round(event.loaded / event.total * 100));
+        },
+      });
+      setMediaFiles(current => current.map(item => item.previewUrl === media.previewUrl ? { ...item, uploadedUrl: data.url } : item));
       return { type: "video", url: data.url, ...metadata };
     }));
     const media: CommunityMedia[] = [...existingMedia, ...uploads];
     let document: CommunityPostInput["document"];
     if (postType === "document" && documentFile) {
       const dataUrl = await fileToDataUrl(documentFile);
-      const { data } = await axiosClient.post<{ url: string }>("/uploads/document", { document: dataUrl, name: documentFile.name, purpose: "community-post" });
+      const documentIndex = mediaFiles.length;
+      reportProgress(documentIndex, 0);
+      const { data } = await axiosClient.post<{ url: string }>("/uploads/document", { document: dataUrl, name: documentFile.name, purpose: "community-post" }, {
+        timeout: 120_000,
+        onUploadProgress: event => {
+          if (event.total) reportProgress(documentIndex, Math.round(event.loaded / event.total * 100));
+        },
+      });
+      reportProgress(documentIndex, 100);
       document = { name: documentFile.name, url: data.url };
     } else if (postType === "document") {
       document = existingDocument;
@@ -613,13 +685,18 @@ export default function CommunityPostCreatePage() {
   };
 
   const clearDraft = () => {
-    if (user?.uid) localStorage.removeItem(draftKey(user.uid));
+    if (user?.uid) {
+      localStorage.removeItem(draftKey(user.uid));
+      localStorage.removeItem(publishAttemptKey(user.uid));
+    }
+    publishAttempt.current = null;
   };
 
   const publish = async (event: FormEvent) => {
     event.preventDefault();
     if (!validContent || posting) return;
     setPosting(true);
+    setUploadProgress(mediaFiles.length || (postType === "document" && documentFile) ? 0 : null);
     setError("");
     setNotice("");
     try {
@@ -636,18 +713,40 @@ export default function CommunityPostCreatePage() {
         setNotice("Scheduled post updated.");
         return;
       }
-      await createCommunityPost(await buildInput());
+      const input = await buildInput(setUploadProgress);
+      const signature = JSON.stringify({
+        content, audience, commentPolicy, brandPartnership, postType, collaborators: [...scheduledCollaboratorIds, ...collaborators.map(person => person.uid)].sort(),
+        media: mediaFiles.map(({ file, altText, taggedPeople, captionsVtt }) => [file.name, file.type, file.size, file.lastModified, altText, [...taggedPeople].sort(), captionsVtt]),
+        existingMedia: existingMedia.map(({ url, altText, taggedPeople, captionsVtt }) => [url, altText, [...(taggedPeople || [])].sort(), captionsVtt]),
+        document: documentFile ? [documentFile.name, documentFile.size, documentFile.lastModified] : existingDocument?.url,
+        eventTitle, eventDate, eventLocation, celebration, jobId, pollQuestion, pollOptions, pollExpiry,
+      });
+      setUploadProgress(null);
+      setNotice("Publishing…");
+      await createCommunityPost({ ...input, clientRequestId: getPublishRequestId(signature) });
       clearDraft();
       navigate("/community/feed");
     } catch (reason) {
+      setNotice("");
       const status = reason && typeof reason === "object" && "response" in reason
         ? (reason as { response?: { status?: number } }).response?.status
         : undefined;
+      const responseMessage = reason && typeof reason === "object" && "response" in reason
+        ? (reason as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined;
+      const requestCode = reason && typeof reason === "object" && "code" in reason
+        ? String((reason as { code?: string }).code || "")
+        : "";
+      const reasonMessage = reason instanceof Error ? reason.message : "";
       setError(status === 429 ? "Please wait a moment before publishing another post."
         : scheduleEditMode === "content" ? "The scheduled post could not be updated. Your original draft is still saved."
-          : "Your post could not be published. Your draft is still saved.");
+          : responseMessage
+            || (requestCode === "ECONNABORTED" ? "Media upload timed out. Your draft is still saved; check your connection and retry."
+              : ["Network Error", "ERR_NETWORK"].includes(reasonMessage) ? "Media storage could not be reached. Your draft is still saved; check your connection and retry."
+                : reasonMessage || "Your post could not be published. Your draft is still saved."));
     } finally {
       setPosting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -675,7 +774,15 @@ export default function CommunityPostCreatePage() {
         setScheduleEditMode(null);
         setSheet(null);
       } else {
-        await createCommunityPost({ ...await buildInput(), publishAt });
+        const input = await buildInput();
+        const signature = JSON.stringify({
+          content, audience, commentPolicy, brandPartnership, postType, collaborators: [...scheduledCollaboratorIds, ...collaborators.map(person => person.uid)].sort(),
+          media: mediaFiles.map(({ file, altText, taggedPeople, captionsVtt }) => [file.name, file.type, file.size, file.lastModified, altText, [...taggedPeople].sort(), captionsVtt]),
+          existingMedia: existingMedia.map(({ url, altText, taggedPeople, captionsVtt }) => [url, altText, [...(taggedPeople || [])].sort(), captionsVtt]),
+          document: documentFile ? [documentFile.name, documentFile.size, documentFile.lastModified] : existingDocument?.url,
+          eventTitle, eventDate, eventLocation, celebration, jobId, pollQuestion, pollOptions, pollExpiry, publishAt,
+        });
+        await createCommunityPost({ ...input, publishAt, clientRequestId: getPublishRequestId(signature) });
         clearDraft();
         navigate("/community/feed");
       }
@@ -762,6 +869,10 @@ export default function CommunityPostCreatePage() {
         {postType === "celebration" && celebration ? <p className="community-create-summary">Celebrating: {celebration.replaceAll("_", " ")}</p> : null}
         {postType === "job" && jobId ? <p className="community-create-summary">Job: {selectedJob ? `${selectedJob.title} · ${selectedJob.company}` : jobId}</p> : null}
         {postType === "poll" && validPoll ? <p className="community-create-summary">Poll: {pollQuestion} · {pollOptions.filter(option => option.trim()).length} choices</p> : null}
+        {uploadProgress !== null ? <div className="community-create-upload-progress">
+          <span>Uploading media · {uploadProgress}%</span>
+          <progress aria-label="Media upload progress" max={100} value={uploadProgress} />
+        </div> : null}
         {error ? <p className="community-create-error" role="alert">{error}</p> : null}
         {notice ? <p className="community-create-notice" role="status">{notice}</p> : null}
       </form>
@@ -811,6 +922,7 @@ export default function CommunityPostCreatePage() {
             </div>
           </> : null}
           <label className="community-media-editor-alt">ALT text<input value={mediaEditor.altText} maxLength={500} onChange={event => setMediaEditor(current => current ? { ...current, altText: event.target.value } : current)} placeholder="Describe this media for accessibility" /></label>
+          {mediaEditor.type === "video" ? <label className="community-media-editor-captions">Closed captions (WebVTT)<textarea value={mediaEditor.captionsVtt} maxLength={20_000} onChange={event => setMediaEditor(current => current ? { ...current, captionsVtt: event.target.value } : current)} placeholder={"WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nCaption text"} /></label> : null}
           <div className="community-media-editor-tagging">
             <strong>Tag people</strong>
             <input value={mediaTagQuery} maxLength={80} onChange={event => { setMediaTagQuery(event.target.value); setMediaTagError(""); }} placeholder="Search public profiles" />

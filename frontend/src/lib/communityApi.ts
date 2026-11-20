@@ -6,6 +6,7 @@ export type CommunityIdentity = {
   username: string;
   piUsername: string;
   displayName: string;
+  headline?: string;
   country: string;
   bio: string;
   avatar: string;
@@ -19,13 +20,15 @@ export type CommunityIdentity = {
   allowContact: boolean;
   createdAt: string | null;
 };
-export type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[] };
+export type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[]; captionsVtt?: string };
 export type CommunityPoll = {
   question: string;
   options: Array<{ id: string; label: string; votes: number }>;
   expiresAt: string | null;
 };
 export type CommunityPostType = "post" | "media" | "event" | "celebration" | "job" | "poll" | "document";
+export type CommunityReaction = "like" | "love" | "celebrate" | "support" | "insightful";
+export type CommunityReactionCounts = Partial<Record<CommunityReaction, number>>;
 export type CommunityPost = {
   _id: string;
   authorId: string;
@@ -36,6 +39,7 @@ export type CommunityPost = {
   originalPost?: {
     _id: string;
     author: CommunityIdentity;
+    authorId?: string;
     content: string;
     media: CommunityMedia[];
     createdAt: string;
@@ -49,10 +53,20 @@ export type CommunityPost = {
     celebration?: string;
     job?: CommunityPost["job"];
     document?: CommunityPost["document"];
+    reactionCounts?: CommunityReactionCounts;
+    likeCount?: number;
+    commentCount?: number;
+    repostCount?: number;
+    likedByMe?: boolean;
+    myReaction?: CommunityReaction | null;
+    isFollowedByMe?: boolean;
+    canComment?: boolean;
   } | null;
   author: CommunityIdentity;
   likedByMe: boolean;
+  myReaction?: CommunityReaction | null;
   likeCount: number;
+  reactionCounts?: CommunityReactionCounts;
   commentCount: number;
   repostCount: number;
   createdAt: string;
@@ -64,6 +78,8 @@ export type CommunityPost = {
   poll?: CommunityPoll;
   myVote?: string | null;
   canComment?: boolean;
+  isFollowedByMe?: boolean;
+  socialActivity?: { kind: "likes" | "commented" | "reposted" | "follows"; displayName: string } | null;
   event?: { title: string; startsAt: string; location: string };
   celebration?: string;
   job?: { id: string; title: string; company: string; location: string };
@@ -84,6 +100,7 @@ export type CommunityPostInput = {
   jobId?: string;
   document?: { name: string; url: string };
   publishAt?: string;
+  clientRequestId?: string;
 };
 export type CommunityComment = {
   _id: string;
@@ -111,7 +128,7 @@ export const getPublicProfile = async (uid: string) =>
 export const getCommunityComments = async (postId: string) =>
   (await axiosClient.get<{ comments: CommunityComment[] }>(`/community/posts/${encodeURIComponent(postId)}/comments`)).data.comments;
 export const createCommunityPost = async (input: CommunityPostInput) =>
-  (await axiosClient.post<{ post: CommunityPost }>("/community/posts", input)).data.post;
+  (await axiosClient.post<{ post: CommunityPost }>("/community/posts", input, { timeout: 45_000 })).data.post;
 export const getScheduledCommunityPosts = async () => {
   const { data } = await axiosClient.get<{ posts?: CommunityPost[] }>("/community/posts/scheduled", {
     smajSkipResponseCache: true,
@@ -127,6 +144,10 @@ export const voteOnCommunityPoll = async (postId: string, optionId: string) =>
   (await axiosClient.post<{ myVote: string; options: CommunityPoll["options"] }>(`/community/posts/${encodeURIComponent(postId)}/poll/vote`, { optionId })).data;
 export const toggleCommunityLike = async (postId: string) =>
   (await axiosClient.post<{ liked: boolean; likeCount: number }>(`/community/posts/${encodeURIComponent(postId)}/like`)).data;
+export const setCommunityReaction = async (postId: string, reaction: CommunityReaction | null) =>
+  (await axiosClient.post<{ myReaction: CommunityReaction | null; likeCount: number; reactionCounts: CommunityReactionCounts }>(
+    `/community/posts/${encodeURIComponent(postId)}/reaction`, { reaction },
+  )).data;
 export const createCommunityComment = async (postId: string, content: string) =>
   (await axiosClient.post<{ comment: CommunityComment }>(`/community/posts/${encodeURIComponent(postId)}/comments`, { content })).data.comment;
 export const repostCommunityPost = async (postId: string) =>
