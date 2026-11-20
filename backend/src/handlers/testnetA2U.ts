@@ -2,16 +2,17 @@ import { payoutPage, testnetDashboard, testnetRecipients } from "../services/tes
 import { Request, Response } from "express";
 import env from "../environments";
 import { resolveHubAccessUser } from "../services/persistentSessions";
+import { resolveTestnetAdmin } from "../services/testnetAdminAuth";
 import { testnetA2UPreflight } from "../services/testnetA2UPreflight";
 import { makeTestnetSdk, PayoutError, sendTestnetPayout, verifyTestnetRecipient, reconcileTestnetPayout } from "../services/testnetA2U";
 import { payoutApproval, validPayoutApproval, requireTestnetPayoutDeployment } from "../services/testnetA2USafety";
 
 async function requirePayoutAdmin(req: Request, res: Response) {
   res.setHeader("Cache-Control", "no-store");
-  const token = req.get("authorization")?.match(/^Bearer (hub_access\.[^\s]+)$/i)?.[1];
+  const token = req.get("authorization")?.match(/^Bearer ((?:hub_access|testnet_admin)\.[^\s]+)$/i)?.[1];
   if (!token) { res.status(401).json({ code: "admin_session_required", message: "Your admin session needs renewal. Sign out and sign in again; no token copying is needed." }); return null; }
   // Validate this credential directly, independently of the shared cookie/session cache.
-  const admin = await resolveHubAccessUser(req, token);
+  const admin = token.startsWith("testnet_admin.") ? await resolveTestnetAdmin(req, token) : await resolveHubAccessUser(req, token);
   if (!admin) { res.status(401).json({ code: "admin_session_expired", message: "Your admin session expired or was revoked. Sign in again." }); return null; }
   const configuredAdmin = [admin.username, admin.piUsername].some(value => env.admin_pi_usernames.includes(String(value || "").trim().replace(/^@+/, "").toLowerCase()));
   if (admin.role !== "admin" && !configuredAdmin) { res.status(403).json({ code: "admin_required", message: "This signed-in account is not an authorized SMAJ administrator." }); return null; }

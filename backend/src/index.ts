@@ -234,6 +234,7 @@ app.use((req, res, next) => {
 
 app.use(async (req, res, next) => {
   const bearer = (req.get("authorization") || "").replace(/^Bearer\s+/i, "") || req.get("x-smaj-access-token") || "";
+  if (["/admin/testnet/auth/login", "/admin/testnet/auth/logout"].includes(req.path) || (req.path.startsWith("/admin/testnet/") && bearer.startsWith("testnet_admin."))) return next();
   if (isHubAccessToken(bearer) || ["/user/signin", "/signin", "/user/dev-signin", "/user/refresh", "/user/signout"].includes(req.path)) return next();
   const uid = req.session.user?.uid;
   if (!uid || !req.session.deviceSessionId || !app.locals.deviceSessionCollection) return next();
@@ -510,6 +511,10 @@ const start = async () => {
       app.locals.jobDisputeCollection = db.collection("job_disputes");
       app.locals.sessionCollection = db.collection("user_sessions");
       app.locals.testnetA2UCollection = db.collection("testnet_a2u_payments", { writeConcern: { w: "majority", j: true } });
+      if (commerceMode() === "testnet-development" && process.env.PI_NETWORK === "Pi Testnet") {
+        app.locals.testnetAdminAuthCollection = db.collection("testnet_admin_sessions", { writeConcern: { w: "majority", j: true } });
+        await app.locals.testnetAdminAuthCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+      }
       app.locals.transportBookingCollection =
         db.collection("transport_bookings");
       app.locals.transportDriverCollection = db.collection("transport_drivers");

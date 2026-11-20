@@ -38,7 +38,7 @@ jobs:
         run: npm run build --prefix backend
 
       - name: Verify Mainnet migration, account ownership and payment isolation
-        run: node --test backend/tests/freshMainnet.test.cjs backend/tests/mainnetMigration.test.cjs backend/tests/piAccountIdentity.test.cjs backend/tests/piIdentityLinks.test.cjs backend/tests/auditPiAccounts.test.cjs backend/tests/walletActivity.test.cjs backend/tests/p0Integrity.test.cjs backend/tests/institutions.test.cjs backend/tests/testnetA2U.test.cjs backend/tests/persistentSessions.test.cjs backend/tests/streamDownloadEligibility.test.cjs
+        run: node --test backend/tests/freshMainnet.test.cjs backend/tests/mainnetMigration.test.cjs backend/tests/piAccountIdentity.test.cjs backend/tests/piIdentityLinks.test.cjs backend/tests/auditPiAccounts.test.cjs backend/tests/walletActivity.test.cjs backend/tests/p0Integrity.test.cjs backend/tests/institutions.test.cjs backend/tests/testnetA2U.test.cjs backend/tests/testnetAdminAuth.test.cjs backend/tests/persistentSessions.test.cjs backend/tests/streamDownloadEligibility.test.cjs
 
       - name: Install frontend dependencies
         run: npm ci --prefix frontend

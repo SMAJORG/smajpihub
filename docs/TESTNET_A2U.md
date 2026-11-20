@@ -10,6 +10,32 @@ No payout records were found in the existing qualification collections during th
 
 ## Safety and approval
 
+### Separate Testnet administrator sign-in
+
+The Testnet build's `/admin/testnet-payouts` route provides a server-verified username/password login independent of Pi SDK and Pi domain verification. It uses the same configured administrator name already authorized by `ADMIN_PI_USERNAMES`. It neither creates nor modifies a Pi/Hub user account. Its audit identity is explicitly `testnet-admin:<username>`, not a Pi UID.
+
+On the isolated Testnet API service only, configure:
+
+```dotenv
+PI_TESTNET_ADMIN_AUTH_ENABLED=true
+PI_TESTNET_ADMIN_USERNAME=smalaajimi36
+PI_TESTNET_ADMIN_PASSWORD_HASH=GENERATE_LOCALLY_DO_NOT_USE_THIS_PLACEHOLDER
+```
+
+Keep the existing `ADMIN_PI_USERNAMES` list; the selected username must be in that list. Generate a random password and matching scrypt hash in your private terminal:
+
+```sh
+node backend/scripts/create-testnet-admin-credentials.cjs
+```
+
+Store the displayed password in your password manager. Enter only the generated `PI_TESTNET_ADMIN_PASSWORD_HASH` value directly in Render's backend Environment page. Do not put it in `VITE_*` variables, source, screenshots, or chat. Save and deploy the backend. No OAuth client ID or callback is needed for this administrator login. Keep these settings absent or disabled on Mainnet.
+
+Login requires `PI_NETWORK=Pi Testnet`, `PI_COMMERCE_MODE=testnet-development`, a persistent isolated `*_testnet_a2u` database, and an enabled administrator-auth flag. It remains usable while payout sending is disabled. To inspect the wallet or send through the existing payout handlers, also enable `PI_TESTNET_PAYOUTS_ENABLED=true` after configuring the existing Testnet app wallet credentials. `PI_PAYMENTS_ENABLED=false` continues to disable unrelated user-to-app checkout.
+
+Only a hash of the random session token is stored in `testnet_admin_sessions`. Sessions expire after 30 minutes, are revocable on logout, and become invalid when credentials, the administrator allowlist, or the deployment's network configuration changes. The browser keeps the token only in memory and requires another login after reload. Login attempts are limited to 10 per 15-minute window in persistent storage shared across replicas; this limit also applies to incorrect usernames. This narrow session is accepted only by the Testnet payout endpoints, never by the normal Hub user or general administrator authentication paths. Account roles and production accounts are unchanged.
+
+This administrator login does not waive recipient consent or Pi payment checks. Recipients must still have verified identities and wallet-sharing evidence in the isolated Testnet database. Sender wallet funding, Testnet API-key validity, the SDK submit/complete sequence, and matching ledger proof remain required. A login or a dashboard view never sends a payment.
+
 - Only the official pinned `pi-backend@0.1.3` SDK creates/submits/completes payments. Amount is fixed at **0.01 Test-Pi**. Five recipients total means **0.05 Test-Pi plus network fees**, preserving the sender's reserve.
 - Payouts require `PI_NETWORK=Pi Testnet`, `PI_COMMERCE_MODE=testnet-development`, no fresh-Mainnet account mode, an explicit enable flag, and a separate database ending in `_testnet_a2u`. The production `smajpihub` database is rejected.
 - Every recipient authenticates through the **existing paired Testnet app**, shares `wallet_address`, and is verified server-side with Pi `/v2/me`. No username matching, copied Mainnet UID, manually supplied wallet, original-profile update or account migration is involved. Qualification users and wallet evidence live only in the isolated Testnet database.

@@ -14,7 +14,7 @@
     "accounts:audit-pi": "node build/scripts/auditPiAccounts.js",
     "backup:mainnet": "node scripts/backup-mainnet-cutover.cjs",
     "test:mainnet": "npm run build && node --test tests/mainnetMigration.test.cjs",
-    "test:testnet-a2u": "npm run build && node --test tests/testnetA2U.test.cjs",
+    "test:testnet-a2u": "npm run build && node --test tests/testnetA2U.test.cjs tests/testnetAdminAuth.test.cjs",
     "test:transactions": "node --test tests/liveTransactions.test.cjs",
     "test:i18n": "node --test tests/translations.test.cjs",
     "test:validation": "ts-node ./src/tests/storageValidation.test.ts",

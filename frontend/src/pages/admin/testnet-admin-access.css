@@ -1,0 +1,29 @@
+.testnet-admin-access {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  --smaj-card: var(--surface);
+  --smaj-text: var(--text);
+  --smaj-text-secondary: var(--muted);
+  --smaj-border: var(--border);
+  --smaj-background: var(--bg);
+  --smaj-secondary-bg: var(--soft-bg);
+}
+.testnet-admin-access > header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.testnet-admin-access > header div { display: grid; gap: 4px; }
+.testnet-admin-access > header span, .testnet-admin-note, .testnet-admin-identity { color: var(--muted); }
+.testnet-admin-login { max-width: 480px; margin: 48px auto; padding: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-soft); }
+.testnet-admin-login h1 { font-size: 24px; }
+.testnet-admin-login p { line-height: 1.6; }
+.testnet-admin-login form, .testnet-admin-login label { display: grid; gap: 10px; }
+.testnet-admin-login form { gap: 20px; }
+.testnet-admin-login input { width: 100%; min-width: 0; padding: 12px; border-radius: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); font: inherit; }
+.testnet-admin-access > header button, .testnet-admin-login button { padding: 12px 16px; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: var(--primary-soft); color: var(--text); font: inherit; cursor: pointer; }
+.testnet-admin-access > header button:hover, .testnet-admin-login button:hover { background: var(--soft-bg); }
+.testnet-admin-access button:focus-visible, .testnet-admin-login input:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.testnet-admin-access button:disabled, .testnet-admin-login input:disabled { opacity: .6; cursor: not-allowed; }
+.testnet-admin-login [role=alert] { padding: 12px; background: var(--soft-bg); border: 1px solid var(--border); border-radius: 8px; }
+.testnet-admin-note { font-size: 13px; margin-top: 24px; }
+.testnet-admin-identity { margin: 16px 24px; }
+.testnet-admin-access .testnet-payouts { max-width: 1200px; margin: auto; padding: 24px; }
+@media (max-width: 540px) { .testnet-admin-login { margin: 24px 16px; padding: 20px; } .testnet-admin-access .testnet-payouts { padding: 16px; } }

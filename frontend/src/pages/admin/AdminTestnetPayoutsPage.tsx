@@ -1,4 +1,5 @@
 import TestnetWalletConsent from "../../components/TestnetWalletConsent";
+import type { AxiosInstance } from "axios";
 import { getBaseURL } from "../../lib/axiosClient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { payoutErrorMessage as messageFor } from "./testnetPayoutErrors";
@@ -13,7 +14,7 @@ type Check = { checksPassed: boolean; recipientWalletAddress: string; senderWall
 const options = { timeout: 90000, smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true" } };
 const amount = (value: number | null) => value === null ? "Unavailable" : `${value.toLocaleString(undefined, { maximumFractionDigits: 7 })} Test-Pi`;
 
-export default function AdminTestnetPayoutsPage() {
+export default function AdminTestnetPayoutsPage({ client = axiosClient, showWalletConsent = true }: { client?: AxiosInstance; showWalletConsent?: boolean } = {}) {
   const [data, setData] = useState<Snapshot | null>(null), [recipients, setRecipients] = useState<Recipient[]>([]);
   const [page, setPage] = useState(1), [recipientPage, setRecipientPage] = useState(1), [moreRecipients, setMoreRecipients] = useState(false);
   const [search, setSearch] = useState(""), [query, setQuery] = useState("");
@@ -25,21 +26,21 @@ export default function AdminTestnetPayoutsPage() {
   const dialog = useRef<HTMLDialogElement>(null), inFlight = useRef(false), selectionVersion = useRef(0), recipientRequestVersion = useRef(0);
   const load = useCallback(async () => {
     setLoading(true);
-    try { const response = await axiosClient.get<Snapshot>("/admin/testnet/a2u/dashboard", { ...options, params: { page } }); if (!response.data.wallet || !Array.isArray(response.data.records)) throw new Error("The payout API returned an unexpected response. Check the deployed API address."); setData(response.data); }
+    try { const response = await client.get<Snapshot>("/admin/testnet/a2u/dashboard", { ...options, params: { page } }); if (!response.data.wallet || !Array.isArray(response.data.records)) throw new Error("The payout API returned an unexpected response. Check the deployed API address."); setData(response.data); }
     catch (error) { setError(messageFor(error)); setData(null); }
     finally { setLoading(false); }
-  }, [page]);
+  }, [page, client]);
   const loadRecipients = useCallback(async () => {
     const version = ++recipientRequestVersion.current;
     setUsersLoading(true); setRecipientError(""); setRecipientInfo(""); setDiagnostics({});
     try {
-      const response = await axiosClient.get<{ recipients: Recipient[]; hasMore: boolean; message?: string; diagnostics?: Record<string, number> }>("/admin/testnet/a2u/recipients", { ...options, params: { page: recipientPage, search: query } });
+      const response = await client.get<{ recipients: Recipient[]; hasMore: boolean; message?: string; diagnostics?: Record<string, number> }>("/admin/testnet/a2u/recipients", { ...options, params: { page: recipientPage, search: query } });
       if (version !== recipientRequestVersion.current) return;
       if (!Array.isArray(response.data.recipients)) throw new Error("The recipient API returned an unexpected response. Check the deployed API address.");
       setRecipients(response.data.recipients); setMoreRecipients(response.data.hasMore); setRecipientInfo(response.data.message || ""); setDiagnostics(response.data.diagnostics || {});
     } catch (error) { if (version === recipientRequestVersion.current) { setRecipientError(messageFor(error)); setRecipients([]); setMoreRecipients(false); } }
     finally { if (version === recipientRequestVersion.current) setUsersLoading(false); }
-  }, [recipientPage, query]);
+  }, [recipientPage, query, client]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadRecipients(); }, [loadRecipients]);
   useEffect(() => { if (dialogOpen) dialog.current?.showModal(); else dialog.current?.close(); }, [dialogOpen]);
@@ -47,7 +48,7 @@ export default function AdminTestnetPayoutsPage() {
     const version = ++selectionVersion.current;
     setSelected(recipient); setCheck(null); setChecking(true); setError(""); setNotice("");
     try {
-      const response = await axiosClient.get<Check>("/admin/testnet/a2u/preflight", { ...options, params: { uid: recipient.uid } });
+      const response = await client.get<Check>("/admin/testnet/a2u/preflight", { ...options, params: { uid: recipient.uid } });
       if (version === selectionVersion.current) setCheck(response.data);
     } catch (error) { if (version === selectionVersion.current) setError(messageFor(error)); }
     finally { if (version === selectionVersion.current) setChecking(false); }
@@ -56,7 +57,7 @@ export default function AdminTestnetPayoutsPage() {
     if (inFlight.current || !selected || !check?.checksPassed || !confirmedWallet) return;
     inFlight.current = true; setSending(true); setError("");
     try {
-      const response = await axiosClient.post<{ payout: Payment }>("/admin/testnet/a2u", { uid: selected.uid, recipientWalletAddress: check.recipientWalletAddress, senderWalletAddress: check.senderWalletAddress, approved: true, approvalToken: check.approvalToken }, options);
+      const response = await client.post<{ payout: Payment }>("/admin/testnet/a2u", { uid: selected.uid, recipientWalletAddress: check.recipientWalletAddress, senderWalletAddress: check.senderWalletAddress, approved: true, approvalToken: check.approvalToken }, options);
       if (response.data.payout.status !== "completed") throw new Error("Completion not confirmed");
       setNotice(`0.01 Test-Pi sent successfully. Payment ID: ${response.data.payout.paymentId}`);
     } catch (error) { setError(`${messageFor(error)} Do not resend an uncertain payment; check its recorded status.`); }
@@ -70,7 +71,7 @@ export default function AdminTestnetPayoutsPage() {
     if (inFlight.current) return;
     inFlight.current = true; setSending(true); setError(""); setNotice("");
     try {
-      const response = await axiosClient.post<{ payout: Payment; paymentSent: boolean }>("/admin/testnet/a2u/reconcile", { uid }, options);
+      const response = await client.post<{ payout: Payment; paymentSent: boolean }>("/admin/testnet/a2u/reconcile", { uid }, options);
       if (response.data.payout.status !== "completed" || response.data.paymentSent !== false) throw new Error("Verification not confirmed");
       setNotice("Existing Testnet transfer verified. No payment was sent or resent.");
     } catch (error) { setError(messageFor(error)); }
@@ -85,7 +86,7 @@ export default function AdminTestnetPayoutsPage() {
       <section className="tp-summary" aria-label="Wallet and payment progress"><article className="ea-card tp-card"><h2>Testnet app wallet</h2><span className="tp-badge">{data.walletLocked ? "Reconciliation required" : data.wallet.ready ? "Wallet checks passed" : "Not ready"}</span><p>{data.wallet.message}</p><dl><dt>Configured wallet address</dt><dd className="tp-address">{data.wallet.address || "Not configured"}</dd><dt>Pi app API</dt><dd>{data.wallet.apiKeyAccepted ? "Accepted" : data.wallet.apiStatus ? `HTTP ${data.wallet.apiStatus} — check the Testnet API key and permissions` : "Not verified"}</dd><dt>Balance</dt><dd>{amount(data.wallet.balance)}</dd><dt>Available after reserve</dt><dd>{amount(data.wallet.spendable)}</dd></dl><p className="tp-hint">{data.appWalletConnection}</p>{data.backendRevision && <p className="tp-hint">Backend revision: {data.backendRevision.slice(0, 7)}</p>}</article>
       <article className="ea-card tp-card"><h2>Five-wallet goal</h2><strong className="tp-progress-count">{Math.min(5, data.successfulUniqueWallets)} / 5</strong><progress aria-label="Successful unique wallet payments" value={Math.min(5, data.successfulUniqueWallets)} max={5} /><p>{data.successfulUniqueWallets} unique wallets have received a verified successful payment.</p><p className="tp-hint">Each wallet counts once. Pending or failed payments do not count.</p></article></section>
     </>}
-    <TestnetWalletConsent disabled={sending} onSaved={() => { setSelected(null); setCheck(null); void loadRecipients(); }} />
+    {showWalletConsent && <TestnetWalletConsent disabled={sending} onSaved={() => { setSelected(null); setCheck(null); void loadRecipients(); }} />}
     <section className="ea-card tp-card"><h2>Select a recipient</h2><p>Only server-verified Pi identity and wallet sharing can enable a payout. Ask recipients to open /testnet-wallet through this Testnet app to verify consent. Readiness is checked before sending.</p>
       <form className="tp-search" onSubmit={event => { event.preventDefault(); ++selectionVersion.current; setSelected(null); setCheck(null); setRecipientPage(1); setQuery(search); }}><label>Find a user<input value={search} maxLength={80} onChange={event => setSearch(event.target.value)} placeholder="Pi username, UID or verified wallet address" /></label><button className="ea-button" disabled={sending}>Search</button></form>
       {recipientError && <p className="tp-alert" role="alert">{recipientError}</p>}

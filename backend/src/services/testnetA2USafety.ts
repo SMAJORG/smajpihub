@@ -2,11 +2,14 @@ import { createHmac, timingSafeEqual } from "crypto";
 import env from "../environments";
 import { testnetGet } from "./testnetA2UWallet";
 
-export function requireTestnetPayoutDeployment() {
+export function requireIsolatedTestnetDeployment() {
   if (process.env.PI_NETWORK !== "Pi Testnet" || process.env.PI_COMMERCE_MODE !== "testnet-development" || process.env.PI_MAINNET_ACCOUNT_MODE === "fresh") throw new Error("Payouts require an isolated Testnet development backend; Mainnet is never supported.");
-  if (process.env.PI_TESTNET_PAYOUTS_ENABLED !== "true") throw new Error("Testnet payouts are disabled. Enable only on the isolated Testnet backend after reviewing the app wallet.");
   const isolated = process.env.PI_TESTNET_PAYOUT_DATABASE_NAME;
   if (!isolated || isolated === "smajpihub" || isolated !== env.mongo_db_name || !isolated.endsWith("_testnet_a2u")) throw new Error("Configure a separate *_testnet_a2u database, matching MONGODB_DATABASE_NAME and PI_TESTNET_PAYOUT_DATABASE_NAME. Production data must not be used.");
+}
+export function requireTestnetPayoutDeployment() {
+  requireIsolatedTestnetDeployment();
+  if (process.env.PI_TESTNET_PAYOUTS_ENABLED !== "true") throw new Error("Testnet payouts are disabled. Enable only on the isolated Testnet backend after reviewing the app wallet.");
 }
 export type ApprovedPayout = { recipientUid: string; recipientWalletAddress: string; senderWalletAddress: string };
 const signature = (body: string) => createHmac("sha256", env.session_secret).update("testnet-a2u-approval:" + body).digest();

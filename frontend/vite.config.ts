@@ -63,6 +63,15 @@ export default defineConfig(({ mode }) => {
         },
       },
       {
+        name: "testnet-admin-entry",
+        closeBundle() {
+          if (mode !== "production" || env.VITE_TESTNET_PAYOUT_TOOLS !== "true") return;
+          const directory = path.resolve(rootDir, "dist/admin/testnet-payouts");
+          fs.mkdirSync(directory, { recursive: true });
+          fs.copyFileSync(path.resolve(rootDir, "dist/index.html"), path.join(directory, "index.html"));
+        },
+      },
+      {
         name: "app-version-manifest",
         generateBundle() {
           this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ version: appVersion, buildId: appBuildId, details: "The latest SMAJ PI HUB build includes the newest fixes and improvements." }) });

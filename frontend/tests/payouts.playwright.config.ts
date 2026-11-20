@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 export default defineConfig({
-  testDir: '.', testMatch: 'payouts.browser.spec.ts', workers: 1, timeout: 120000,
+  testDir: '.', testMatch: ['payouts.browser.spec.ts', 'testnetAdminAccess.browser.spec.ts'], workers: 1, timeout: 120000,
   reporter: 'list',
   use: { baseURL: 'http://127.0.0.1:4186', channel: process.platform === 'win32' ? 'msedge' : undefined, headless: true },
   webServer: {
