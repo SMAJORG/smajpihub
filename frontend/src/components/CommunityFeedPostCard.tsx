@@ -24,6 +24,7 @@ import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import CommunityVideoPreview from "./CommunityVideoPreview";
+import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
   deleteCommunityPost,
@@ -176,12 +177,9 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const [repostCount, setRepostCount] = useState(content.repostCount || 0);
   const [following, setFollowing] = useState(content.isFollowedByMe === true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
-  const [commentsLoadError, setCommentsLoadError] = useState("");
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
@@ -266,19 +264,19 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
     });
     setLikeCount(current => Math.max(0, current + (next ? 1 : 0) - (previousReaction ? 1 : 0)));
     setBusy(true);
-    setError("");
     try {
       const saved = await setCommunityReaction(content._id, next);
       setReaction(saved.myReaction);
       setReactionCounts(saved.reactionCounts);
       setLikeCount(saved.likeCount);
       setReactionMenuOpen(false);
+      showFeedback(next ? (next === "like" ? "Post liked." : "Reaction added.") : "Reaction removed.", "success");
       onChange?.();
     } catch (reason) {
       setReaction(previousReaction);
       setReactionCounts(previousCounts);
       setLikeCount(previousLikeCount);
-      setError(errorMessage(reason, "Your reaction could not be saved. Check your connection and try again."));
+      showFeedback(errorMessage(reason, "Your reaction could not be saved. Check your connection and try again."), "error");
     } finally {
       setBusy(false);
     }
@@ -321,14 +319,12 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
     }
     setCommentsOpen(true);
     setCommentsLoading(true);
-    setCommentsLoadError("");
     setBusy(true);
-    setError("");
     try {
       setComments(await getCommunityComments(content._id));
       setCommentsLoaded(true);
     } catch {
-      setCommentsLoadError("Comments could not be loaded. Please try again.");
+      showFeedback("Comments could not be loaded. Please try again.", "error");
     } finally {
       setCommentsLoading(false);
       setBusy(false);
@@ -338,13 +334,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const vote = async (optionId: string) => {
     if (busy || myVote || !viewerId) return;
     setBusy(true);
-    setError("");
     try {
       const result = await voteOnCommunityPoll(content._id, optionId);
       setMyVote(result.myVote);
       setPoll(current => current ? { ...current, options: result.options } : current);
+      showFeedback("Your vote was submitted.", "success");
     } catch {
-      setError("Your vote could not be saved. The poll may have closed.");
+      showFeedback("Your vote could not be saved. The poll may have closed.", "error");
     } finally {
       setBusy(false);
     }
@@ -355,17 +351,16 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
     const text = commentText.trim();
     if (!text || busy) return;
     setBusy(true);
-    setError("");
     try {
       const comment = await createCommunityComment(content._id, text, replyTo?._id);
       setComments(current => [...current, comment]);
       setCommentsLoaded(true);
-      setCommentsLoadError("");
       setCommentText("");
       setReplyTo(null);
       setCommentCount(current => current + 1);
+      showFeedback("Comment posted.", "success");
     } catch {
-      setError("Comment could not be posted. Please try again.");
+      showFeedback("Comment could not be posted. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -391,13 +386,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const followAuthor = async () => {
     if (busy || author.uid === viewerId) return;
     setBusy(true);
-    setError("");
     try {
       const next = await toggleCommunityFollow(author.uid);
       setFollowing(next);
+      showFeedback(next ? `You are now following ${author.displayName}.` : `You unfollowed ${author.displayName}.`, "success");
       onChange?.();
     } catch {
-      setError("Follow status could not be updated. Please try again.");
+      showFeedback("Follow status could not be updated. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -406,12 +401,12 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const unfollowAuthor = async () => {
     if (busy || !following) return;
     setBusy(true);
-    setError("");
     try {
       setFollowing(await setCommunityFollow(author.uid, false));
+      showFeedback(`You unfollowed ${author.displayName}.`, "success");
       onChange?.();
     } catch {
-      setError("Follow status could not be updated. Please try again.");
+      showFeedback("Follow status could not be updated. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -420,14 +415,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const toggleSavedPost = async () => {
     if (busy) return;
     setBusy(true);
-    setError("");
     try {
       const nextSaved = await setCommunityPostSaved(post._id, !saved);
       setSaved(nextSaved);
-      setNotice(nextSaved ? "Post saved." : "Post removed from saved posts.");
+      showFeedback(nextSaved ? "Post saved." : "Post removed from saved posts.", "success");
       onChange?.();
     } catch {
-      setError("Post could not be saved. Please try again.");
+      showFeedback("Post could not be saved. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -436,13 +430,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const hideAuthorPosts = async () => {
     if (busy) return;
     setBusy(true);
-    setError("");
     try {
       await hideCommunityAuthor(author.uid);
       onDismiss?.(post._id);
       onChange?.();
+      showFeedback(`Posts by ${author.displayName} are hidden.`, "success");
     } catch {
-      setError("Posts by this user could not be hidden. Please try again.");
+      showFeedback("Posts by this user could not be hidden. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -451,13 +445,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const markNotInterested = async () => {
     if (busy) return;
     setBusy(true);
-    setError("");
     try {
       await markCommunityPostNotInterested(post._id);
       onDismiss?.(post._id);
       onChange?.();
+      showFeedback("This post was removed from your feed.", "success");
     } catch {
-      setError("This post could not be removed from your feed. Please try again.");
+      showFeedback("This post could not be removed from your feed. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -466,18 +460,16 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const repost = async () => {
     if (busy) return;
     setBusy(true);
-    setError("");
-    setNotice("");
     try {
       await repostCommunityPost(content._id);
       setRepostCount(current => current + 1);
-      setNotice("Reposted to your community feed.");
+      showFeedback("Reposted to your community feed.", "success");
       onChange?.();
     } catch (reason) {
-      setError(reason && typeof reason === "object" && "response" in reason
+      showFeedback(reason && typeof reason === "object" && "response" in reason
         && (reason as { response?: { status?: number } }).response?.status === 409
         ? "You have already reposted this."
-        : "Could not repost. Please try again.");
+        : "Could not repost. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -488,7 +480,6 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
     const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(post._id)}`;
     let copied = false;
     setBusy(true);
-    setError("");
     try {
       try {
         if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community post", text: post.content || content.content, url });
@@ -496,18 +487,18 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           await navigator.clipboard.writeText(url);
           copied = true;
         } else {
-          setError("Sharing is not available in this browser.");
+          showFeedback("Sharing is not available in this browser.", "error");
           return;
         }
       } catch (reason) {
-        if (!(reason instanceof DOMException && reason.name === "AbortError")) setError("Post could not be shared.");
+        if (!(reason instanceof DOMException && reason.name === "AbortError")) showFeedback("Post could not be shared.", "error");
         return;
       }
       try {
         await recordCommunityPostShare(post._id);
-        setNotice(copied ? "Post link copied." : "Post shared.");
+        showFeedback(copied ? "Post link copied." : "Post shared.", "success");
       } catch {
-        setError("The post was shared, but the share could not be recorded.");
+        showFeedback("The post was shared, but the share could not be recorded.", "warning");
       }
     } finally {
       setBusy(false);
@@ -518,14 +509,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
     event.preventDefault();
     if (busy) return;
     setBusy(true);
-    setError("");
     try {
       await updateCommunityPost(post._id, editText);
       setEditOpen(false);
-      setNotice("Post updated.");
+      showFeedback("Post updated.", "success");
       onChange?.();
     } catch (reason) {
-      setError(errorMessage(reason, "Post could not be updated. Please try again."));
+      showFeedback(errorMessage(reason, "Post could not be updated. Please try again."), "error");
     } finally {
       setBusy(false);
     }
@@ -534,16 +524,15 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const submitReport = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    setError("");
     try {
       await reportCommunityPost(content._id, reportReason);
       setReportOpen(false);
-      setNotice("Report sent for review.");
+      showFeedback("Report sent for review.", "success");
     } catch (reason) {
-      setError(reason && typeof reason === "object" && "response" in reason
+      showFeedback(reason && typeof reason === "object" && "response" in reason
         && (reason as { response?: { status?: number } }).response?.status === 409
         ? "You have already reported this post."
-        : "Report could not be sent. Please try again.");
+        : "Report could not be sent. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -552,13 +541,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const removePost = async () => {
     if (busy || !window.confirm("Delete this post? This cannot be undone.")) return;
     setBusy(true);
-    setError("");
     try {
       await deleteCommunityPost(post._id);
       onDismiss?.(post._id);
       onChange?.();
+      showFeedback("Post deleted.", "success");
     } catch {
-      setError("Post could not be deleted. Please try again.");
+      showFeedback("Post could not be deleted. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -573,28 +562,43 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           : "follows this page"
     : "";
   const counts = reactionCounts || { like: likeCount };
+  const isRepostedVideo = post.type === "repost" && Boolean(content.media?.some(media => media.type === "video"));
+  const repostAttribution = post.type === "repost" ? (
+    <div className="community-feed-repost-label">
+      <Link
+        className="community-feed-repost-avatar"
+        to={`/people/${encodeURIComponent(post.author.uid)}`}
+        aria-label={`View ${post.author.displayName}'s public profile`}
+      >
+        <UserAvatarFrame name={post.author.displayName} image={post.author.avatar} frame={post.author.activeAvatarFrame} size={30} />
+      </Link>
+      <span><Link to={`/people/${encodeURIComponent(post.author.uid)}`}>{post.author.displayName}</Link> reposted this</span>
+    </div>
+  ) : null;
 
   return (
     <article className="community-feed-post" id={`community-post-${post._id}`}>
       {post.socialActivity ? <div className="community-social-context"><ThumbUpAltOutlinedIcon /> <strong>{post.socialActivity.displayName}</strong> {activityText}</div> : null}
-      {post.type === "repost" ? <p className="community-feed-repost-label">Reposted by <Link to={`/people/${encodeURIComponent(post.author.uid)}`}>{post.author.displayName}</Link></p> : null}
+      {post.type === "repost" && !isRepostedVideo ? repostAttribution : null}
       <header className="community-feed-post-header">
-        <Link to={`/people/${encodeURIComponent(author.uid)}`} aria-label={`View ${author.displayName}'s public profile`}>
-          <UserAvatarFrame
-            name={author.displayName}
-            image={author.avatar}
-            frame={author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : author.activeAvatarFrame}
-            size={50}
-          />
-        </Link>
-        <div className="community-feed-author-details">
-          <Link to={`/people/${encodeURIComponent(author.uid)}`} className="community-feed-author-name">{author.displayName}<TrustBadge userId={author.uid} /></Link>
-          {author.headline ? <span className="community-feed-headline">{author.headline}</span> : null}
-          <span className="community-feed-post-meta" title={new Date(content.createdAt || post.createdAt).toLocaleString()}>{when(content.createdAt || post.createdAt)} · <AudienceIcon audience={content.audience} /></span>
-        </div>
-        {author.uid !== viewerId ? <button type="button" className={`community-follow-button${following ? " following" : ""}`} onClick={() => void followAuthor()} disabled={busy}>
-          {following ? "Following" : <><AddOutlinedIcon /> Follow</>}
-        </button> : null}
+        {isRepostedVideo ? repostAttribution : <>
+          <Link to={`/people/${encodeURIComponent(author.uid)}`} aria-label={`View ${author.displayName}'s public profile`}>
+            <UserAvatarFrame
+              name={author.displayName}
+              image={author.avatar}
+              frame={author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : author.activeAvatarFrame}
+              size={50}
+            />
+          </Link>
+          <div className="community-feed-author-details">
+            <Link to={`/people/${encodeURIComponent(author.uid)}`} className="community-feed-author-name">{author.displayName}<TrustBadge userId={author.uid} /></Link>
+            {author.headline ? <span className="community-feed-headline">{author.headline}</span> : null}
+            <span className="community-feed-post-meta" title={new Date(content.createdAt || post.createdAt).toLocaleString()}>{when(content.createdAt || post.createdAt)} · <AudienceIcon audience={content.audience} /></span>
+          </div>
+          {author.uid !== viewerId ? <button type="button" className={`community-follow-button${following ? " following" : ""}`} onClick={() => void followAuthor()} disabled={busy}>
+            {following ? "Following" : <><AddOutlinedIcon /> Follow</>}
+          </button> : null}
+        </>}
         <div className="community-feed-post-menu-wrap">
           <button type="button" className="community-feed-icon-button" aria-label="Post options" aria-expanded={menuOpen && !menuClosing} onClick={() => menuOpen ? closeOptionsMenu() : openOptionsMenu()}><MoreVertOutlinedIcon /></button>
         </div>
@@ -663,8 +667,6 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           {reactionOptions.filter(option => Number(counts[option.type] || 0) > 0).map(option => <span key={option.type} title={`${option.label}: ${counts[option.type]}`}><span aria-hidden="true">{option.emoji}</span>{counts[option.type]}</span>)}
         </div>
       </div>
-      {notice ? <p className="community-post-notice" role="status">{notice}</p> : null}
-      {error ? <p className="community-post-error" role="alert">{error}</p> : null}
       {reportOpen ? <form className="community-report-form" onSubmit={event => void submitReport(event)}>
         <label>Why are you reporting this post?<select value={reportReason} onChange={event => setReportReason(event.target.value)}>{reportReasons.map(reason => <option key={reason}>{reason}</option>)}</select></label>
         <button type="submit" disabled={busy}>Send report</button>
@@ -675,8 +677,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           {renderComment(comment)}
           {comments.filter(reply => reply.parentId === comment._id).map(reply => renderComment(reply, true))}
         </div>)}
-        {commentsLoadError ? <p className="community-post-error" role="alert">{commentsLoadError}</p> : null}
-        {commentsLoaded && !commentsLoadError && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+        {commentsLoaded && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
           <input aria-label={replyTo ? `Reply to ${replyTo.author.displayName}` : "Write a comment"} id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
           {replyTo ? <button type="button" className="community-comment-cancel-reply" onClick={() => setReplyTo(null)}>Cancel reply</button> : null}

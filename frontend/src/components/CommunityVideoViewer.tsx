@@ -25,6 +25,7 @@ import {
   type CommunityReaction,
 } from "../lib/communityApi";
 import { claimCommunityVideo, releaseCommunityVideo } from "./communityVideoPlayback";
+import { showFeedback } from "../lib/feedback";
 
 export type CommunityVideoItem = {
   post: CommunityPost;
@@ -54,11 +55,9 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const [commentCount, setCommentCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
-  const [commentsLoadError, setCommentsLoadError] = useState("");
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
@@ -108,10 +107,8 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     setCommentsOpen(false);
     setCommentsLoading(false);
     setCommentsLoaded(false);
-    setCommentsLoadError("");
     setComments([]);
     setReplyTo(null);
-    setError("");
   }, [current]);
 
   const move = (offset: number) => setActiveIndex(value => Math.max(0, Math.min(items.length - 1, value + offset)));
@@ -119,15 +116,15 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const toggleReaction = async () => {
     if (!current || busy) return;
     setBusy(true);
-    setError("");
     try {
       const next = reaction === "like" ? null : "like";
       const result = await setCommunityReaction(current.post._id, next);
       setReaction(result.myReaction);
       setLikeCount(result.likeCount);
       dirty.current = true;
+      showFeedback(result.myReaction ? "Post liked." : "Like removed.", "success");
     } catch {
-      setError("Reaction could not be saved.");
+      showFeedback("Reaction could not be saved.", "error");
     } finally {
       setBusy(false);
     }
@@ -141,13 +138,12 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     }
     setCommentsOpen(true);
     setCommentsLoading(true);
-    setCommentsLoadError("");
     setBusy(true);
     try {
       setComments(await getCommunityComments(current.post._id));
       setCommentsLoaded(true);
     } catch {
-      setCommentsLoadError("Comments could not be loaded.");
+      showFeedback("Comments could not be loaded.", "error");
     } finally {
       setCommentsLoading(false);
       setBusy(false);
@@ -162,13 +158,13 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
       const comment = await createCommunityComment(current.post._id, commentText.trim(), replyTo?._id);
       setComments(value => [...value, comment]);
       setCommentsLoaded(true);
-      setCommentsLoadError("");
       setCommentText("");
       setReplyTo(null);
       setCommentCount(value => value + 1);
       dirty.current = true;
+      showFeedback(replyTo ? "Reply posted." : "Comment posted.", "success");
     } catch {
-      setError("Comment could not be posted.");
+      showFeedback("Comment could not be posted.", "error");
     } finally {
       setBusy(false);
     }
@@ -181,8 +177,9 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
       await repostCommunityPost(current.post._id);
       setRepostCount(value => value + 1);
       dirty.current = true;
+      showFeedback("Reposted to your community feed.", "success");
     } catch {
-      setError("This post could not be reposted.");
+      showFeedback("This post could not be reposted.", "error");
     } finally {
       setBusy(false);
     }
@@ -192,11 +189,15 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     if (!current) return;
     const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(current.post._id)}`;
     try {
-      if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community video", text: current.content, url });
-      else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
-      else setError("Sharing is not available in this browser.");
+      if (navigator.share) {
+        await navigator.share({ title: "SMAJ PI HUB community video", text: current.content, url });
+        showFeedback("Video shared.", "success");
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        showFeedback("Video link copied.", "success");
+      } else showFeedback("Sharing is not available in this browser.", "error");
     } catch (reason) {
-      if (!(reason instanceof DOMException && reason.name === "AbortError")) setError("Video could not be shared.");
+      if (!(reason instanceof DOMException && reason.name === "AbortError")) showFeedback("Video could not be shared.", "error");
     }
   };
 
@@ -265,7 +266,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
         }}
         onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
         onEnded={() => move(1)}
-        onError={() => setError("This video could not be loaded.")}
+        onError={() => showFeedback("This video could not be loaded.", "error")}
       >{current.media.captionsVtt ? <CommunityCaptionTrack vtt={current.media.captionsVtt} onLoad={() => {
         setCaptionsAvailable(true);
         if (captionsEnabled) setCaptionMode(true);
@@ -312,8 +313,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
             {renderComment(comment)}
             {comments.filter(reply => reply.parentId === comment._id).map(reply => renderComment(reply, true))}
           </div>)}
-          {commentsLoadError ? <p className="community-post-error" role="alert">{commentsLoadError}</p> : null}
-          {commentsLoaded && !commentsLoadError && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+          {commentsLoaded && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         </div>
         <form onSubmit={event => void submitComment(event)}>
           <input aria-label={replyTo ? `Reply to ${replyTo.author.displayName}` : "Write a comment"} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
@@ -321,7 +321,6 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
           <button type="submit" className="community-video-comment-send" aria-label="Send comment" disabled={busy || !commentText.trim()}><SendOutlinedIcon /></button>
         </form>
       </section> : null}
-      {error ? <p className="community-video-viewer-error" role="status">{error}</p> : null}
     </div>
   );
 }

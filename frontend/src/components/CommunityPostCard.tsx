@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
+import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
   deleteCommunityPost,
@@ -28,12 +29,9 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const [commentCount, setCommentCount] = useState(post.commentCount || 0);
   const [repostCount, setRepostCount] = useState(post.repostCount || 0);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
-  const [commentsLoadError, setCommentsLoadError] = useState("");
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
@@ -56,13 +54,13 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const toggleLike = async () => {
     if (busy) return;
     setBusy(true);
-    setError("");
     try {
       const result = await toggleCommunityLike(post._id);
       setLiked(result.liked);
       setLikeCount(result.likeCount);
+      showFeedback(result.liked ? "Post liked." : "Like removed.", "success");
     } catch {
-      setError("Like could not be saved. Please try again.");
+      showFeedback("Like could not be saved. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -76,14 +74,12 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
     }
     setCommentsOpen(true);
     setCommentsLoading(true);
-    setCommentsLoadError("");
     setBusy(true);
-    setError("");
     try {
       setComments(await getCommunityComments(post._id));
       setCommentsLoaded(true);
     } catch {
-      setCommentsLoadError("Comments could not be loaded. Please try again.");
+      showFeedback("Comments could not be loaded. Please try again.", "error");
     } finally {
       setCommentsLoading(false);
       setBusy(false);
@@ -93,13 +89,13 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const vote = async (optionId: string) => {
     if (busy || myVote || !viewerId) return;
     setBusy(true);
-    setError("");
     try {
       const result = await voteOnCommunityPoll(original?.poll ? original._id : post._id, optionId);
       setMyVote(result.myVote);
       setPoll(current => current ? { ...current, options: result.options } : current);
+      showFeedback("Your vote was submitted.", "success");
     } catch {
-      setError("Your vote could not be saved. The poll may have closed.");
+      showFeedback("Your vote could not be saved. The poll may have closed.", "error");
     } finally {
       setBusy(false);
     }
@@ -110,16 +106,15 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
     const text = commentText.trim();
     if (!text || busy) return;
     setBusy(true);
-    setError("");
     try {
       const comment = await createCommunityComment(post._id, text);
       setComments(current => [...current, comment]);
       setCommentsLoaded(true);
-      setCommentsLoadError("");
       setCommentText("");
       setCommentCount(current => current + 1);
+      showFeedback("Comment posted.", "success");
     } catch {
-      setError("Comment could not be posted. Please try again.");
+      showFeedback("Comment could not be posted. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -128,18 +123,16 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const repost = async () => {
     if (busy) return;
     setBusy(true);
-    setError("");
-    setNotice("");
     try {
       await repostCommunityPost(post._id);
       setRepostCount(current => current + 1);
-      setNotice("Reposted to your community feed.");
+      showFeedback("Reposted to your community feed.", "success");
       onChange?.();
     } catch (reason) {
-      setError(reason && typeof reason === "object" && "response" in reason
+      showFeedback(reason && typeof reason === "object" && "response" in reason
         && (reason as { response?: { status?: number } }).response?.status === 409
         ? "You have already reposted this."
-        : "Could not repost. Please try again.");
+        : "Could not repost. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -151,28 +144,27 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
       if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community post", text: content.content, url });
       else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
-        setNotice("Post link copied.");
+        showFeedback("Post link copied.", "success");
       } else {
-        setError("Sharing is not available in this browser.");
+        showFeedback("Sharing is not available in this browser.", "error");
       }
     } catch (reason) {
-      if (!(reason instanceof DOMException && reason.name === "AbortError")) setError("Post could not be shared.");
+      if (!(reason instanceof DOMException && reason.name === "AbortError")) showFeedback("Post could not be shared.", "error");
     }
   };
 
   const submitReport = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    setError("");
     try {
       await reportCommunityPost(post._id, reportReason);
       setReportOpen(false);
-      setNotice("Report sent for review.");
+      showFeedback("Report sent for review.", "success");
     } catch (reason) {
-      setError(reason && typeof reason === "object" && "response" in reason
+      showFeedback(reason && typeof reason === "object" && "response" in reason
         && (reason as { response?: { status?: number } }).response?.status === 409
         ? "You have already reported this post."
-        : "Report could not be sent. Please try again.");
+        : "Report could not be sent. Please try again.", "error");
     } finally {
       setBusy(false);
     }
@@ -181,12 +173,12 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const removePost = async () => {
     if (busy || !window.confirm("Delete this post? This cannot be undone.")) return;
     setBusy(true);
-    setError("");
     try {
       await deleteCommunityPost(post._id);
       onChange?.();
+      showFeedback("Post deleted.", "success");
     } catch {
-      setError("Post could not be deleted. Please try again.");
+      showFeedback("Post could not be deleted. Please try again.", "error");
       setBusy(false);
     }
   };
@@ -242,8 +234,6 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
         <button type="button" disabled={busy} onClick={() => void repost()}>Repost</button>
         <button type="button" onClick={() => void share()}>Share</button>
       </div>
-      {notice ? <p className="community-post-notice" role="status">{notice}</p> : null}
-      {error ? <p className="community-post-error" role="alert">{error}</p> : null}
       {reportOpen ? <form className="community-report-form" onSubmit={event => void submitReport(event)}>
         <label>Why are you reporting this post?<select value={reportReason} onChange={event => setReportReason(event.target.value)}>{reportReasons.map(reason => <option key={reason}>{reason}</option>)}</select></label>
         <button type="submit" disabled={busy}>Send report</button>
@@ -261,8 +251,7 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
           </Link>
           <div><Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link><p>{comment.content}</p><small>{when(comment.createdAt)}</small></div>
         </article>)}
-        {commentsLoadError ? <p className="community-post-error" role="alert">{commentsLoadError}</p> : null}
-        {commentsLoaded && !commentsLoadError && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+        {commentsLoaded && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
           <label className="visually-hidden" htmlFor={`community-comment-${post._id}`}>Write a comment</label>
           <input id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder="Write a comment…" />

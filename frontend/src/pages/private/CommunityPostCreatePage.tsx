@@ -12,6 +12,7 @@ import PermMediaOutlinedIcon from "@mui/icons-material/PermMediaOutlined";
 import RotateRightOutlinedIcon from "@mui/icons-material/RotateRightOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
+import { showFeedback } from "../../lib/feedback";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { uploadImage } from "../../lib/uploadImage";
@@ -193,13 +194,11 @@ export default function CommunityPostCreatePage() {
   const [scheduledCollaboratorIds, setScheduledCollaboratorIds] = useState<string[]>([]);
   const [collaboratorQuery, setCollaboratorQuery] = useState("");
   const [collaboratorResults, setCollaboratorResults] = useState<Person[]>([]);
-  const [collaboratorError, setCollaboratorError] = useState("");
   const [mediaFiles, setMediaFiles] = useState<MediaDraft[]>([]);
   const [existingMedia, setExistingMedia] = useState<CommunityMedia[]>([]);
   const [mediaEditor, setMediaEditor] = useState<MediaEditorState | null>(null);
   const [mediaQueue, setMediaQueue] = useState<Array<{ file: File; previewUrl: string }>>([]);
   const [mediaEditorBusy, setMediaEditorBusy] = useState(false);
-  const [mediaEditorError, setMediaEditorError] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [existingDocument, setExistingDocument] = useState<CommunityPost["document"]>();
   const [postType, setPostType] = useState<CommunityPostType>("post");
@@ -218,12 +217,9 @@ export default function CommunityPostCreatePage() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [posting, setPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [scheduledPosts, setScheduledPosts] = useState<CommunityPost[]>([]);
   const [scheduledLoading, setScheduledLoading] = useState(false);
   const [scheduledLoaded, setScheduledLoaded] = useState(false);
-  const [scheduledError, setScheduledError] = useState("");
   const [scheduledLoadError, setScheduledLoadError] = useState("");
   const [scheduledRefresh, setScheduledRefresh] = useState(0);
   const [scheduledTab, setScheduledTab] = useState<"compose" | "scheduled">("compose");
@@ -268,7 +264,7 @@ export default function CommunityPostCreatePage() {
     try {
       localStorage.setItem(draftKey(user.uid), JSON.stringify({ content, audience, commentPolicy, brandPartnership }));
     } catch {
-      setError("Draft storage is unavailable. Keep this page open until you post.");
+      showFeedback("Draft storage is unavailable. Keep this page open until you post.", "error");
     }
   }, [audience, brandPartnership, commentPolicy, content, scheduleEditMode, user?.uid]);
 
@@ -276,7 +272,6 @@ export default function CommunityPostCreatePage() {
     const query = collaboratorQuery.trim();
     if (query.length < 2) {
       setCollaboratorResults([]);
-      setCollaboratorError("");
       return;
     }
     const controller = new AbortController();
@@ -286,7 +281,7 @@ export default function CommunityPostCreatePage() {
           if (!controller.signal.aborted) setCollaboratorResults(data.users.filter(person => person.uid !== user?.uid && !collaborators.some(item => item.uid === person.uid) && !scheduledCollaboratorIds.includes(person.uid)));
         })
         .catch(() => {
-          if (!controller.signal.aborted) setCollaboratorError("People could not be searched. Try again.");
+          if (!controller.signal.aborted) showFeedback("People could not be searched. Try again.", "error");
         });
     }, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
@@ -300,7 +295,10 @@ export default function CommunityPostCreatePage() {
     getJobs({ page: 1, pageSize: 50 }).then(result => {
       if (active) setJobs(result.jobs);
     }).catch(() => {
-      if (active) setJobsError("Active SMAJ Jobs listings could not be loaded.");
+      if (active) {
+        setJobsError("Active SMAJ Jobs listings could not be loaded.");
+        showFeedback("Active SMAJ Jobs listings could not be loaded.", "error");
+      }
     }).finally(() => {
       if (active) {
         setJobsLoading(false);
@@ -325,9 +323,11 @@ export default function CommunityPostCreatePage() {
         const message = reason && typeof reason === "object" && "response" in reason
           ? (reason as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-        setScheduledLoadError(typeof message === "string" && message.trim()
+        const errorMessage = typeof message === "string" && message.trim()
           ? message
-          : "Scheduled posts could not be loaded. Check your connection and retry.");
+          : "Scheduled posts could not be loaded. Check your connection and retry.";
+        setScheduledLoadError(errorMessage);
+        showFeedback(errorMessage, "error");
       }
     }).finally(() => {
       if (active) {
@@ -387,7 +387,7 @@ export default function CommunityPostCreatePage() {
       try {
         localStorage.setItem(publishAttemptKey(user.uid), JSON.stringify(publishAttempt.current));
       } catch {
-        setError("The publish retry could not be saved locally. Keep this page open if publishing fails.");
+        showFeedback("The publish retry could not be saved locally. Keep this page open if publishing fails.", "warning");
       }
     }
     return id;
@@ -465,21 +465,18 @@ export default function CommunityPostCreatePage() {
     setEditingScheduleId(post._id);
     setScheduleEditMode("content");
     setSheet(null);
-    setError("");
-    setNotice("");
   };
 
   const selectPostType = (type: CommunityPostType) => {
     setPostType(type);
     setSheet(type === "media" ? "media" : type === "document" ? "document" : type === "event" ? "event" : type === "celebration" ? "celebration" : type === "job" ? "job" : type === "poll" ? "poll" : null);
-    setError("");
   };
 
   const chooseMedia = (list: FileList | null) => {
     const files = Array.from(list || []);
     if (mediaFiles.length + existingMedia.length + files.length > 4 || files.some(file => !["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "video/quicktime"].includes(file.type))
       || files.some(file => file.size > (file.type.startsWith("video/") ? 5 : 4) * 1024 * 1024)) {
-      setError("Choose up to four photos (4 MB each) or MP4, WebM, or MOV videos (5 MB each).");
+      showFeedback("Choose up to four photos (4 MB each) or MP4, WebM, or MOV videos (5 MB each).", "error");
       return;
     }
     const queue = files.map(file => ({
@@ -487,10 +484,8 @@ export default function CommunityPostCreatePage() {
       previewUrl: makePreviewUrl(file),
     }));
     setSheet(null);
-    setError("");
     if (queue.length) {
       const [first, ...rest] = queue;
-      setMediaEditorError("");
       setMediaQueue(rest);
       setMediaEditor({
         file: first.file,
@@ -507,7 +502,6 @@ export default function CommunityPostCreatePage() {
     const media = mediaFiles[index];
     if (!media) return;
     setMediaQueue([]);
-    setMediaEditorError("");
     setMediaEditor({
       file: media.file,
       previewUrl: media.previewUrl,
@@ -523,7 +517,6 @@ export default function CommunityPostCreatePage() {
     const media = existingMedia[index];
     if (!media) return;
     setMediaQueue([]);
-    setMediaEditorError("");
     setMediaEditor({
       previewUrl: media.url,
       type: media.type,
@@ -675,7 +668,6 @@ export default function CommunityPostCreatePage() {
     mediaQueue.forEach(item => releasePreviewUrl(item.previewUrl));
     setMediaQueue([]);
     setMediaEditor(null);
-    setMediaEditorError("");
     cropPointers.current.clear();
     cropInteraction.current = null;
   };
@@ -683,12 +675,11 @@ export default function CommunityPostCreatePage() {
   const applyMediaEdit = async () => {
     if (!mediaEditor || mediaEditorBusy) return;
     setMediaEditorBusy(true);
-    setMediaEditorError("");
     try {
       const captionsVtt = mediaEditor.captionsVtt.trim();
       if (captionsVtt && (!/^WEBVTT(?:\r?\n)/.test(captionsVtt)
         || !/(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}/.test(captionsVtt))) {
-        setMediaEditorError("Captions must use WebVTT format and include at least one timestamped cue.");
+        showFeedback("Captions must use WebVTT format and include at least one timestamped cue.", "error");
         return;
       }
       const changedImage = mediaEditor.type === "image"
@@ -726,7 +717,6 @@ export default function CommunityPostCreatePage() {
       const [next, ...remaining] = mediaQueue;
       if (next) {
         setMediaQueue(remaining);
-        setMediaEditorError("");
         setMediaEditor({
           file: next.file,
           previewUrl: next.previewUrl,
@@ -742,7 +732,7 @@ export default function CommunityPostCreatePage() {
       cropPointers.current.clear();
       cropInteraction.current = null;
     } catch (reason) {
-      setMediaEditorError(reason instanceof Error ? reason.message : "The media could not be edited.");
+      showFeedback(reason instanceof Error ? reason.message : "The media could not be edited.", "error");
     } finally {
       setMediaEditorBusy(false);
     }
@@ -751,13 +741,12 @@ export default function CommunityPostCreatePage() {
   const chooseDocument = (file?: File) => {
     if (!file) return;
     if (file.type !== "application/pdf" || file.size > 5 * 1024 * 1024) {
-      setError("Choose a PDF document up to 5 MB.");
+      showFeedback("Choose a PDF document up to 5 MB.", "error");
       return;
     }
     setDocumentFile(file);
     setExistingDocument(undefined);
     setSheet(null);
-    setError("");
   };
 
   const buildInput = async (onProgress?: (percent: number) => void): Promise<Omit<CommunityPostInput, "publishAt" | "clientRequestId">> => {
@@ -857,12 +846,10 @@ export default function CommunityPostCreatePage() {
     if (!validContent || posting) return;
     setPosting(true);
     setUploadProgress(mediaFiles.length || (postType === "document" && documentFile) ? 0 : null);
-    setError("");
-    setNotice("");
     try {
       if (editingScheduleId && scheduleEditMode === "content") {
         if (!scheduledAt || new Date(toIso(scheduledAt)).getTime() < Date.now() + 60_000) {
-          setError("Choose a scheduled time at least one minute in the future.");
+          showFeedback("Choose a scheduled time at least one minute in the future.", "warning");
           return;
         }
         const updatedPost = await updateScheduledCommunityPost(editingScheduleId, { ...await buildInput(), publishAt: toIso(scheduledAt) });
@@ -870,7 +857,7 @@ export default function CommunityPostCreatePage() {
         restoreComposerDraft();
         setEditingScheduleId("");
         setScheduleEditMode(null);
-        setNotice("Scheduled post updated.");
+        showFeedback("Scheduled post updated.", "success");
         return;
       }
       const input = await buildInput(setUploadProgress);
@@ -882,12 +869,10 @@ export default function CommunityPostCreatePage() {
         eventTitle, eventDate, eventLocation, celebration, jobId, pollQuestion, pollOptions, pollExpiry,
       });
       setUploadProgress(null);
-      setNotice("Posting…");
       const publishedPost = await createCommunityPost({ ...input, clientRequestId: getPublishRequestId(signature) });
       clearDraft();
       navigate("/community/feed", { state: { communityPublishedPost: publishedPost } });
     } catch (reason) {
-      setNotice("");
       const status = reason && typeof reason === "object" && "response" in reason
         ? (reason as { response?: { status?: number } }).response?.status
         : undefined;
@@ -898,12 +883,12 @@ export default function CommunityPostCreatePage() {
         ? String((reason as { code?: string }).code || "")
         : "";
       const reasonMessage = reason instanceof Error ? reason.message : "";
-      setError(status === 429 ? "Please wait a moment before publishing another post."
+      showFeedback(status === 429 ? "Please wait a moment before publishing another post."
         : scheduleEditMode === "content" ? "The scheduled post could not be updated. Your original draft is still saved."
           : responseMessage
             || (requestCode === "ECONNABORTED" ? "Media upload timed out. Your draft is still saved; check your connection and retry."
               : ["Network Error", "ERR_NETWORK"].includes(reasonMessage) ? "Media storage could not be reached. Your draft is still saved; check your connection and retry."
-                : reasonMessage || "Your post could not be published. Your draft is still saved."));
+                : reasonMessage || "Your post could not be published. Your draft is still saved."), "error");
     } finally {
       setPosting(false);
       setUploadProgress(null);
@@ -914,11 +899,10 @@ export default function CommunityPostCreatePage() {
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduledAt) || (scheduleEditMode !== "time" && !validContent) || scheduleBusy) return;
     const publishAt = toIso(scheduledAt);
     if (new Date(publishAt).getTime() < Date.now() + 60_000) {
-      setScheduledError("Choose a time at least one minute in the future.");
+      showFeedback("Choose a time at least one minute in the future.", "warning");
       return;
     }
     setScheduleBusy(true);
-    setScheduledError("");
     try {
       if (editingScheduleId) {
         const changes = scheduleEditMode === "content"
@@ -929,7 +913,7 @@ export default function CommunityPostCreatePage() {
         setEditingScheduleId("");
         if (scheduleEditMode === "content") {
           restoreComposerDraft();
-          setNotice("Scheduled post updated.");
+          showFeedback("Scheduled post updated.", "success");
         }
         setScheduleEditMode(null);
         setSheet(null);
@@ -944,10 +928,12 @@ export default function CommunityPostCreatePage() {
         });
         await createCommunityPost({ ...input, publishAt, clientRequestId: getPublishRequestId(signature) });
         clearDraft();
+        showFeedback("Post scheduled successfully.", "success");
         navigate("/community/feed");
       }
     } catch {
-      setScheduledError("The scheduled post could not be saved.");
+      const message = "The scheduled post could not be saved.";
+      showFeedback(message, "error");
     } finally {
       setScheduleBusy(false);
     }
@@ -963,17 +949,18 @@ export default function CommunityPostCreatePage() {
   const cancelScheduled = async (post: CommunityPost) => {
     if (!window.confirm("Cancel this scheduled post?")) return;
     setScheduleBusy(true);
-    setScheduledError("");
     try {
       await cancelScheduledCommunityPost(post._id);
       setScheduledPosts(current => current.filter(item => item._id !== post._id));
+      showFeedback("Scheduled post cancelled.", "success");
       if (editingScheduleId === post._id) {
         if (scheduleEditMode === "content") restoreComposerDraft();
         setEditingScheduleId("");
         setScheduleEditMode(null);
       }
     } catch {
-      setScheduledError("The scheduled post could not be cancelled.");
+      const message = "The scheduled post could not be cancelled.";
+      showFeedback(message, "error");
     } finally {
       setScheduleBusy(false);
     }
@@ -981,13 +968,12 @@ export default function CommunityPostCreatePage() {
 
   const addCollaborator = (person: Person) => {
     if (collaborators.length + scheduledCollaboratorIds.length >= 5) {
-      setCollaboratorError("You can add up to five collaborators.");
+      showFeedback("You can add up to five collaborators.", "warning");
       return;
     }
     setCollaborators(current => [...current, person]);
     setCollaboratorQuery("");
     setCollaboratorResults([]);
-    setCollaboratorError("");
   };
 
   return (
@@ -1033,8 +1019,6 @@ export default function CommunityPostCreatePage() {
           <span>Uploading media · {uploadProgress}%</span>
           <progress aria-label="Media upload progress" max={100} value={uploadProgress} />
         </div> : null}
-        {error ? <p className="community-create-error" role="alert">{error}</p> : null}
-        {notice ? <p className="community-create-notice" role="status">{notice}</p> : null}
       </form>
       <footer className="community-create-toolbar">
         <span aria-live="polite">{content.length}/2000</span>
@@ -1112,7 +1096,6 @@ export default function CommunityPostCreatePage() {
           })()}
         </div>
         <div className="community-media-editor-controls">
-          {mediaEditorError ? <p className="community-media-editor-error" role="alert">{mediaEditorError}</p> : null}
           {mediaEditor.type === "image" ? <>
             <div className="community-media-editor-crop" aria-label="Crop image">
               {(["original", "square", "portrait", "landscape"] as const).map(ratio => (
@@ -1164,7 +1147,7 @@ export default function CommunityPostCreatePage() {
           {sheet === "job" ? <>
             <h2>Share a SMAJ Jobs listing</h2>
             {jobsLoading ? <p role="status">Loading active jobs…</p> : null}
-            {jobsError ? <p className="community-create-error" role="alert">{jobsError}<button type="button" onClick={() => { setJobsLoaded(false); setJobsError(""); }}>Retry</button></p> : null}
+            {jobsError ? <button type="button" className="community-create-retry" onClick={() => { setJobsLoaded(false); setJobsError(""); }}>Retry loading jobs</button> : null}
             <div className="community-create-job-list">
               {jobs.map(job => <button key={job.id} type="button" className={jobId === job.id ? "selected" : ""} onClick={() => setJobId(job.id)}><strong>{job.title}</strong><span>{job.company} · {job.location}</span></button>)}
             </div>
@@ -1186,7 +1169,6 @@ export default function CommunityPostCreatePage() {
             <label>Who can see your post?<select value={audience} onChange={event => setAudience(event.target.value as SavedDraft["audience"])}><option value="everyone">Anyone</option><option value="followers">Followers</option><option value="only_me">Only me</option></select></label>
             <label>Who can comment on your post?<select value={commentPolicy} onChange={event => setCommentPolicy(event.target.value as SavedDraft["commentPolicy"])}><option value="everyone">Anyone</option><option value="followers">Followers</option><option value="nobody">No one</option></select></label>
             <label>Add collaborators<input value={collaboratorQuery} maxLength={80} onChange={event => setCollaboratorQuery(event.target.value)} placeholder="Search public profiles" /></label>
-            {collaboratorError ? <p className="community-create-error" role="alert">{collaboratorError}</p> : null}
             {collaboratorResults.length ? <div className="community-create-people">{collaboratorResults.map(person => <button key={person.uid} type="button" onClick={() => addCollaborator(person)}><UserAvatarFrame name={person.displayName} image={person.avatar} size={34} /><span>{person.displayName}</span><b>Add</b></button>)}</div> : null}
             {collaborators.length || scheduledCollaboratorIds.length ? <div className="community-create-collaborator-list">
               {scheduledCollaboratorIds.map(uid => <span key={uid}>{uid}<button type="button" aria-label={`Remove collaborator ${uid}`} onClick={() => setScheduledCollaboratorIds(current => current.filter(item => item !== uid))}><CloseOutlinedIcon /></button></span>)}
@@ -1208,13 +1190,11 @@ export default function CommunityPostCreatePage() {
                 const date = scheduledAt.split("T")[0] || toDateTimeInput(new Date().toISOString()).split("T")[0];
                 setScheduledAt(event.target.value ? `${date}T${event.target.value}` : "");
               }} /></label>
-              {scheduledError ? <p className="community-create-error" role="alert">{scheduledError}</p> : null}
               <button type="button" className="community-create-sheet-primary" disabled={!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduledAt) || scheduleBusy || (!editingScheduleId && !validContent) || (scheduleEditMode === "content" && !validContent)} onClick={() => void publishScheduled()}>{scheduleBusy ? "Saving…" : editingScheduleId ? scheduleEditMode === "content" ? "Save scheduled post" : "Update scheduled time" : "Confirm schedule"}</button>
             </> : <>
               {scheduledLoading ? <p role="status">Loading scheduled posts…</p> : null}
-              {scheduledLoadError ? <div className="community-create-schedule-error" role="alert"><p>{scheduledLoadError}</p><button type="button" onClick={() => { setScheduledLoadError(""); setScheduledRefresh(current => current + 1); }}>Retry</button></div> : null}
-              {scheduledError ? <p className="community-create-error" role="alert">{scheduledError}</p> : null}
-              {scheduledLoaded && !scheduledLoading && !scheduledLoadError && !scheduledError && !scheduledPosts.length ? <div className="community-create-scheduled-empty">
+              {scheduledLoadError ? <button type="button" className="community-create-retry" onClick={() => { setScheduledLoadError(""); setScheduledRefresh(current => current + 1); }}>Retry loading scheduled posts</button> : null}
+              {scheduledLoaded && !scheduledLoading && !scheduledLoadError && !scheduledPosts.length ? <div className="community-create-scheduled-empty">
                 <span className="community-create-scheduled-empty-illustration" aria-hidden="true"><ScheduleOutlinedIcon /></span>
                 <p>When you schedule a post, it automatically posts at the date and time you choose.</p>
                 <button type="button" className="community-create-schedule-start" onClick={() => setScheduledTab("compose")}>Schedule</button>

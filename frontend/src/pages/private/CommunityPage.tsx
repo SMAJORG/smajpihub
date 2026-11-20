@@ -19,6 +19,7 @@ import {
   type CommunityFeedSnapshot,
 } from "../../lib/communityFeedCache";
 import { setCommunityVideoViewerOpen } from "../../components/communityVideoPlayback";
+import { showFeedback } from "../../lib/feedback";
 import "./community.css";
 
 type FeedScope = CommunityFeedScope;
@@ -51,7 +52,6 @@ const CommunityPage = () => {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [feedError, setFeedError] = useState<{ scope: FeedScope; message: string } | null>(null);
   const error = feedError?.scope === scope ? feedError.message : "";
-  const [publishedNotice, setPublishedNotice] = useState(Boolean(incomingPublishedPost));
   const [videoViewerIndex, setVideoViewerIndex] = useState<number | null>(null);
   const feedScrollPosition = useRef<{ element: HTMLElement | null; top: number; windowTop: number } | null>(null);
   const scrollRestore = useRef<{ element: HTMLElement; isRoot: boolean; top: number; pending: boolean } | null>(null);
@@ -106,6 +106,7 @@ const CommunityPage = () => {
           ? "Sign in to view the community feed."
           : "Community posts could not be loaded. Please try again.";
         setFeedError({ scope, message });
+        showFeedback(message, "error");
       }
     } finally {
       if (activeScopeRef.current === scope) setLoading(false);
@@ -178,10 +179,8 @@ const CommunityPage = () => {
       posts: [post, ...current.posts.filter(item => item._id !== post._id)],
       loaded: true,
     }));
-    setPublishedNotice(true);
-    const timer = window.setTimeout(() => setPublishedNotice(false), 4500);
+    showFeedback("Post published successfully.", "success");
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-    return () => window.clearTimeout(timer);
   }, [location.pathname, location.search, navigate, updateFeed]);
   useEffect(() => {
     const target = params.get("post");
@@ -336,7 +335,6 @@ const CommunityPage = () => {
           <button type="button" className={scope === "following" ? "active" : ""} onClick={() => setScope("following")}>Following</button>
         </nav>
       </div>
-      {error ? <p className="community-error" role="alert">{error}</p> : null}
       <section className="community-feed" aria-label="Community posts" aria-busy={loading}>
         {!activeFeed.loaded && !filteredPosts.length && !error ? <p className="community-feed-loading" role="status">Loading community posts…</p> : null}
         {!error && !filteredPosts.length && activeFeed.loaded ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
@@ -359,7 +357,6 @@ const CommunityPage = () => {
         onClose={closeVideo}
         onChange={refreshFeed}
       /> : null}
-      {publishedNotice ? <div className="community-published-toast" role="status">Post published successfully.</div> : null}
     </main>
   );
 };

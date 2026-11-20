@@ -368,7 +368,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     const canScrollVertically = (element: HTMLElement) => {
       const overflowY = window.getComputedStyle(element).overflowY;
       if (overflowY !== "auto" && overflowY !== "scroll") return false;
-      return element.matches(".private-content") || element.scrollHeight > element.clientHeight + 2;
+      return element.scrollHeight > element.clientHeight + 2;
     };
     let scroller = rootScroller;
     for (let element = feed.parentElement; element; element = element.parentElement) {
@@ -401,12 +401,9 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       if (!delta) return;
       const direction = delta > 0 ? 1 : -1;
       if (direction < 0) {
-        accumulatedDelta = Math.min(0, accumulatedDelta) + delta;
+        setCommunityChromeHidden(false);
+        accumulatedDelta = 0;
         previousDirection = direction;
-        if (accumulatedDelta <= -3) {
-          setCommunityChromeHidden(false);
-          accumulatedDelta = 0;
-        }
         return;
       }
       if (direction !== previousDirection) {

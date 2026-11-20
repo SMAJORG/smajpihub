@@ -5,7 +5,6 @@
   --community-media-editor-muted: rgb(255 255 255 / 52%); /* theme-color-exception: muted text on the fixed dark media editor */
   --community-media-editor-border: rgb(255 255 255 / 22%); /* theme-color-exception: borders on the fixed dark media editor */
   --community-media-editor-grid: rgb(255 255 255 / 62%); /* theme-color-exception: crop guides over selected media */
-  --community-media-editor-error: #ff9a9a; /* theme-color-exception: error contrast on the fixed dark media editor */
   --community-media-overlay-bg: rgb(20 20 24 / 76%); /* theme-color-exception: translucent controls over user media */
   --community-media-overlay-text: #fff; /* theme-color-exception: control icons over user media */
   position: relative;
@@ -266,16 +265,6 @@
   margin: 8px 0;
   color: var(--muted);
   font-size: 14px;
-}
-
-.community-create-error {
-  color: #d33b4b;
-  font-size: 13px;
-}
-
-.community-create-notice {
-  color: #168552;
-  font-size: 13px;
 }
 
 .community-create-upload-progress {
@@ -555,23 +544,7 @@
   font-weight: 750;
 }
 
-.community-create-schedule-error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-}
-
-.community-create-schedule-error p {
-  margin: 0;
-  color: var(--accent);
-}
-
-.community-create-schedule-error button {
+.community-create-retry {
   flex: 0 0 auto;
   padding: 6px 10px;
   color: var(--primary);
@@ -863,12 +836,6 @@
 
 .community-media-editor-captions textarea::placeholder {
   color: var(--community-media-editor-muted);
-}
-
-.community-media-editor-error {
-  margin: 0;
-  color: var(--community-media-editor-error);
-  font-size: 13px;
 }
 
 .community-create-sheet-close {
