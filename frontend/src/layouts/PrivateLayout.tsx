@@ -342,54 +342,70 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     if (!privateContent || !feed) return;
 
     let animationFrame = 0;
-    const getScrollElement = () => {
-      const overflowY = window.getComputedStyle(privateContent).overflowY;
-      return overflowY === "auto" || overflowY === "scroll"
-        ? privateContent
-        : document.scrollingElement as HTMLElement;
+    const rootScroller = document.scrollingElement as HTMLElement | null;
+    if (!rootScroller) return;
+    let activeScroller = rootScroller;
+    let previousPosition = rootScroller.scrollTop;
+    let lastScrollTarget: EventTarget | null = null;
+    const isScrollable = (element: HTMLElement) => {
+      const overflowY = window.getComputedStyle(element).overflowY;
+      return (overflowY === "auto" || overflowY === "scroll") && element.scrollHeight > element.clientHeight + 2;
     };
-    const getScrollPosition = () => {
-      const element = getScrollElement();
-      return element === document.scrollingElement ? window.scrollY : element.scrollTop;
+    const nearestFeedScroller = () => {
+      for (let element = feed.parentElement; element; element = element.parentElement) {
+        if (isScrollable(element)) return element;
+      }
+      return rootScroller;
     };
-    const canScrollFeed = () => {
-      if (!feed.querySelector(".community-post-card")) return false;
-      const element = getScrollElement();
-      return element.scrollHeight > element.clientHeight + 16;
+    const getScrollPosition = (element: HTMLElement) => element === rootScroller
+      ? window.scrollY || rootScroller.scrollTop
+      : element.scrollTop;
+    const resolveScrollTarget = (eventTarget?: EventTarget | null) => {
+      if (eventTarget === window || eventTarget === document || eventTarget === document.documentElement) return rootScroller;
+      if (eventTarget instanceof HTMLElement && isScrollable(eventTarget)) return eventTarget;
+      return nearestFeedScroller();
     };
-    let previousPosition = getScrollPosition();
+    const canScrollFeed = (element: HTMLElement) => feed.querySelector(".community-feed-post")
+      && element.scrollHeight > element.clientHeight + 2;
 
     const updateChrome = () => {
       animationFrame = 0;
-      const position = getScrollPosition();
-      if (!canScrollFeed() || position <= 16) {
+      const nextScroller = resolveScrollTarget(lastScrollTarget);
+      if (nextScroller !== activeScroller) {
+        activeScroller = nextScroller;
+        previousPosition = getScrollPosition(activeScroller);
+      }
+      const position = getScrollPosition(activeScroller);
+      if (!canScrollFeed(activeScroller) || position <= 8) {
         setCommunityChromeHidden(false);
-      } else if (position - previousPosition > 5) {
+      } else if (position > previousPosition) {
         setCommunityChromeHidden(true);
-      } else if (previousPosition - position > 5) {
+      } else if (position < previousPosition) {
         setCommunityChromeHidden(false);
       }
       previousPosition = position;
     };
-    const scheduleUpdate = () => {
+    const scheduleUpdate = (event?: Event) => {
+      if (event?.type === "scroll") lastScrollTarget = event.target;
       if (!animationFrame) animationFrame = window.requestAnimationFrame(updateChrome);
     };
 
-    const scrollElement = getScrollElement();
+    document.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
     window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    scrollElement.addEventListener("scroll", scheduleUpdate, { passive: true });
     window.addEventListener("resize", scheduleUpdate);
+    window.visualViewport?.addEventListener("resize", scheduleUpdate);
 
-    const mutationObserver = new MutationObserver(scheduleUpdate);
+    const mutationObserver = new MutationObserver(() => scheduleUpdate());
     mutationObserver.observe(feed, { childList: true, subtree: true });
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleUpdate);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => scheduleUpdate());
     resizeObserver?.observe(feed);
     scheduleUpdate();
 
     return () => {
+      document.removeEventListener("scroll", scheduleUpdate, true);
       window.removeEventListener("scroll", scheduleUpdate);
-      scrollElement.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);
+      window.visualViewport?.removeEventListener("resize", scheduleUpdate);
       mutationObserver.disconnect();
       resizeObserver?.disconnect();
       if (animationFrame) window.cancelAnimationFrame(animationFrame);

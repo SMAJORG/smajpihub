@@ -37,13 +37,17 @@
   z-index: 20;
   display: grid;
   gap: 14px;
+  max-height: 180px;
+  overflow: hidden;
   padding-top: env(safe-area-inset-top, 0px);
   background: var(--bg);
-  transition: transform 230ms ease, opacity 230ms ease;
+  transition: max-height 230ms ease, padding-top 230ms ease, transform 230ms ease, opacity 230ms ease;
   will-change: transform, opacity;
 }
 
 .community-private-shell.community-chrome-hidden .community-feed-chrome {
+  max-height: 0;
+  padding-top: 0;
   transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
