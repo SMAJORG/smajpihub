@@ -88,11 +88,44 @@ const errorMessage = (reason: unknown, fallback: string) => {
   return fallback;
 };
 
-const linkedText = (text: string): ReactNode[] => text.split(/(https?:\/\/[^\s]+|#[\w]+|@[\w.-]+)/g).map((part, index) => {
-  if (/^https?:\/\//i.test(part)) return <a key={`${index}-${part}`} href={part} target="_blank" rel="noopener noreferrer">{part}</a>;
-  if (/^[#@]/.test(part)) return <Link key={`${index}-${part}`} to={`/search?q=${encodeURIComponent(part.slice(1))}`}>{part}</Link>;
-  return part;
-});
+const linkPattern = /(https?:\/\/[^\s<>"']+|(?:www\.)?(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+[a-z]{2,}(?::\d{1,5})?(?:[/?#][^\s<>"']*)?|#[\w]+|@[\w.-]+)/gi;
+const trimLinkPunctuation = (value: string) => {
+  let end = value.length;
+  while (end > 0 && /[.,!?;:]/.test(value[end - 1])) end--;
+  for (const [closing, opening] of [[")", "("], ["]", "["], ["}", "{"]]) {
+    while (end > 0 && value[end - 1] === closing
+      && value.slice(0, end).split(closing).length > value.slice(0, end).split(opening).length) end--;
+  }
+  return value.slice(0, end);
+};
+const linkedText = (text: string, visibleLength = text.length): ReactNode[] => {
+  const limit = Math.min(text.length, visibleLength);
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  let index = 0;
+  linkPattern.lastIndex = 0;
+  for (let match = linkPattern.exec(text); match && match.index < limit; match = linkPattern.exec(text)) {
+    const raw = match[0];
+    const start = match.index;
+    const visibleEnd = Math.min(start + raw.length, limit);
+    if (start > cursor) nodes.push(text.slice(cursor, start));
+    if (raw.startsWith("#") || raw.startsWith("@")) {
+      const visibleToken = text.slice(start, visibleEnd);
+      nodes.push(<Link key={`${index}-${start}`} to={`/search?q=${encodeURIComponent(raw.slice(1))}`}>{visibleToken}</Link>);
+    } else {
+      const destination = trimLinkPunctuation(raw);
+      const href = /^https?:\/\//i.test(destination) ? destination : `https://${destination}`;
+      const linkEnd = Math.min(visibleEnd, start + destination.length);
+      nodes.push(<a key={`${index}-${start}`} href={href} target="_blank" rel="noopener noreferrer">{text.slice(start, linkEnd)}</a>);
+      if (linkEnd < visibleEnd) nodes.push(text.slice(linkEnd, visibleEnd));
+    }
+    cursor = visibleEnd;
+    index++;
+    linkPattern.lastIndex = start + raw.length;
+  }
+  if (cursor < limit) nodes.push(text.slice(cursor, limit));
+  return nodes;
+};
 
 const AudienceIcon = ({ audience }: { audience?: CommunityPost["audience"] }) => audience === "followers"
   ? <GroupsOutlinedIcon aria-label="Followers" />
@@ -569,7 +602,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
       </header>
       {post.type === "repost" && post.content ? <p className="community-feed-repost-note">{post.content}</p> : null}
       <div className="community-feed-post-body">
-        {content.content ? <p className={content.content.length > 300 && !expanded ? "collapsed" : ""}>{linkedText(expanded ? content.content : content.content.slice(0, 300))}{content.content.length > 300 && !expanded ? "…" : ""}</p> : null}
+        {content.content ? <p className={content.content.length > 300 && !expanded ? "collapsed" : ""}>{linkedText(content.content, expanded ? content.content.length : 300)}{content.content.length > 300 && !expanded ? "…" : ""}</p> : null}
         {content.content.length > 300 ? <button type="button" className="community-feed-more" onClick={() => setExpanded(value => !value)}>{expanded ? "less" : "more"}</button> : null}
         {content.brandPartnership ? <p className="community-post-partnership">Paid partnership</p> : null}
         {content.event ? <aside className="community-structured-post"><strong>{content.event.title}</strong><span>{when(content.event.startsAt)} · {content.event.location}</span></aside> : null}
@@ -593,7 +626,6 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
               key={`${media.url}-${index}`}
               media={media}
               author={author}
-              content={content.content}
               following={following}
               canFollow={author.uid !== viewerId}
               onOpen={() => onOpenVideo?.(content, media)}
@@ -661,20 +693,11 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           className={`community-post-options-sheet${menuClosing ? " is-closing" : ""}`}
           role="dialog"
           aria-modal="true"
-          aria-label={`Post options for ${menuAuthor.displayName}`}
+          aria-label="Post options"
           onTouchStart={beginMenuSwipe}
           onTouchEnd={finishMenuSwipe}
         >
           <div className="community-post-options-handle" aria-hidden="true" />
-          <div className="community-post-options-heading">
-            <UserAvatarFrame
-              name={menuAuthor.displayName}
-              image={menuAuthor.avatar}
-              frame={menuAuthor.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : menuAuthor.activeAvatarFrame}
-              size={38}
-            />
-            <strong>{menuAuthor.displayName}</strong>
-          </div>
           <div className="community-post-options-list">
             {isOwnPost ? <>
               <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => {

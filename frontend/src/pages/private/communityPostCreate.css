@@ -117,10 +117,15 @@
   border: 0;
   outline: 0;
   color: var(--text);
-  background: transparent;
+  background: transparent !important;
   font: inherit;
   font-size: clamp(18px, 3vw, 22px);
   line-height: 1.55;
+}
+
+.community-create-form > textarea:focus,
+.community-create-form > textarea:active {
+  background: transparent !important;
 }
 
 .community-create-form > textarea::placeholder {

@@ -1191,25 +1191,8 @@
   background: var(--border);
 }
 
-.community-post-options-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  padding: 2px 2px 13px;
-  border-bottom: 1px solid var(--border);
-  font-size: 15px;
-}
-
-.community-post-options-heading strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .community-post-options-list {
   display: grid;
-  padding-top: 7px;
 }
 
 .community-post-options-list button {
@@ -1487,7 +1470,6 @@
 }
 
 .community-video-author-overlay,
-.community-video-description,
 .community-video-controls {
   position: absolute;
   z-index: 1;
@@ -1550,20 +1532,6 @@
 
 .community-video-author-overlay small {
   font-size: 11px;
-}
-
-.community-video-description {
-  right: 0;
-  bottom: 0;
-  left: 0;
-  max-height: 34%;
-  margin: 0;
-  padding: 30px 12px 56px;
-  overflow: hidden;
-  color: var(--community-video-overlay-text);
-  background: linear-gradient(0deg, var(--community-video-scrim-bottom), transparent);
-  line-height: 1.4;
-  text-shadow: 0 1px 4px var(--community-video-text-shadow);
 }
 
 .community-video-controls {

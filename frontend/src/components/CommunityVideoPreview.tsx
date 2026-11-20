@@ -12,7 +12,6 @@ import { claimCommunityVideo, communityVideoReleaseEvent, releaseCommunityVideo 
 type Props = {
   media: CommunityMedia;
   author: CommunityIdentity;
-  content: string;
   following: boolean;
   canFollow: boolean;
   onOpen: () => void;
@@ -21,7 +20,7 @@ type Props = {
   onFollow: () => void;
 };
 
-export default function CommunityVideoPreview({ media, author, content, following, canFollow, onOpen, onMore, onDismiss, onFollow }: Props) {
+export default function CommunityVideoPreview({ media, author, following, canFollow, onOpen, onMore, onDismiss, onFollow }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(() => typeof IntersectionObserver === "undefined");
@@ -131,7 +130,6 @@ export default function CommunityVideoPreview({ media, author, content, followin
           <button type="button" aria-label="Dismiss video post" onClick={event => { event.stopPropagation(); onDismiss(); }}><CloseOutlinedIcon /></button>
         </div>
       </div> : null}
-      {portrait && content ? <p className="community-video-description">{content.length > 180 ? `${content.slice(0, 180).trimEnd()}…` : content}</p> : null}
       <div className="community-video-controls" onClick={event => event.stopPropagation()}>
         <button type="button" aria-label={muted ? "Unmute video" : "Mute video"} onClick={() => {
           const video = videoRef.current;
