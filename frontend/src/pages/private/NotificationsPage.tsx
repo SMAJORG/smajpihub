@@ -8,10 +8,14 @@ import PrivateSkeleton from "../../components/PrivateSkeleton";
 import PullToRefresh from "../../components/PullToRefresh";
 import { showFeedback } from "../../lib/feedback";
 
-const tabs = ["All", "Orders", "Messages", "Payments", "Security", "Updates"];
+const tabs = ["All", "Community", "Jobs", "Orders", "Messages", "Payments", "Security", "Updates"];
 
 const category = (type: string) =>
-  type.includes("message")
+  type.startsWith("community_")
+    ? "Community"
+    : type.startsWith("jobs_")
+      ? "Jobs"
+      : type.includes("message")
     ? "Messages"
     : type.includes("paid") || type.includes("payment")
       ? "Payments"
@@ -86,7 +90,7 @@ const NotificationsPage = () => {
     }
     setItems((all) => all.map((entry) => (entry._id === item._id ? { ...entry, read: true } : entry)));
     refreshNotificationBadge();
-    const target =
+    const fallbackTarget =
       item.relatedId === "messages" || item.type.includes("message")
         ? "/messages"
         : item.relatedId && (item.type.includes("order") || item.type.includes("payment"))
@@ -98,6 +102,15 @@ const NotificationsPage = () => {
           : item.relatedId === "dashboard"
             ? "/dashboard"
             : "/orders";
+    let target = fallbackTarget;
+    if (item.actionUrl && item.actionUrl.startsWith("/") && !item.actionUrl.startsWith("//")) {
+      try {
+        const parsed = new URL(item.actionUrl, window.location.origin);
+        if (parsed.origin === window.location.origin) target = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      } catch {
+        // Ignore invalid persisted action URLs and use the existing fallback.
+      }
+    }
     navigate(target);
   };
 
@@ -145,16 +158,16 @@ const NotificationsPage = () => {
           visible.map((item) => (
             <article key={item._id} className={item.read ? "" : "unread"}>
               <button className="notification-open" onClick={() => void open(item)}>
-                {item.image ? (
-                  <img src={item.image} alt="" />
+                {item.actor?.avatar || item.image ? (
+                  <img src={item.actor?.avatar || item.image} alt="" />
                 ) : (
                   <span className={`notification-type ${category(item.type).toLowerCase()}`}>
                     {category(item.type).slice(0, 1)}
                   </span>
                 )}
                 <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.message}</p>
+                  <strong>{item.actor?.displayName && item.action ? `${item.actor.displayName} ${item.action}` : item.actor?.displayName ? `${item.actor.displayName} ${item.title}` : item.title}</strong>
+                  <p>{item.actor?.displayName && item.action ? item.title : item.message}</p>
                   <small>{new Date(item.createdAt).toLocaleString()}</small>
                 </div>
                 {!item.read ? <i className="notification-unread-dot" /> : null}

@@ -123,7 +123,7 @@ export default function CommunityVideoPreview({ media, author, following, canFol
       {portrait ? <div className="community-video-author-overlay">
         <UserAvatarFrame name={author.displayName} image={author.avatar} frame={author.activeAvatarFrame} size={34} />
         <span><strong>{author.displayName}</strong>{author.headline ? <small>{author.headline}</small> : null}
-          {following ? <small>Following</small> : canFollow ? <button type="button" className="community-video-follow" onClick={event => { event.stopPropagation(); onFollow(); }}>+ Follow</button> : null}
+          {following ? <small className="community-video-following">Following</small> : canFollow ? <button type="button" className="community-video-follow" onClick={event => { event.stopPropagation(); onFollow(); }}>+ Follow</button> : null}
         </span>
         <div className="community-video-author-actions">
           <button type="button" aria-label="Video post options" onClick={event => { event.stopPropagation(); onMore(); }}><MoreVertOutlinedIcon /></button>

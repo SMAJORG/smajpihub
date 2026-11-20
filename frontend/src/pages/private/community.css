@@ -1510,10 +1510,11 @@
   cursor: pointer;
 }
 
-.community-video-follow {
+.community-video-follow,
+.community-video-following {
   width: fit-content;
   padding: 0;
-  color: var(--community-video-overlay-text);
+  color: #FFFFFF !important;
   background: transparent;
   border: 0;
   font: inherit;

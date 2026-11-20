@@ -3,10 +3,39 @@ import { ObjectId } from "mongodb";
 import { resolveCurrentUser } from "../services/auth";
 import { getVapidPublicKey, nativePushConfigured, pushConfigured } from "../services/pushNotifications";
 import { currentDeviceSessionKey } from "../services/deviceSessions";
+import { publishUserNotificationState, subscribeToUserNotifications } from "../services/notificationEvents";
 
 const serialize = (item: Record<string, any>) => ({ ...item, _id: item._id.toString() });
 
 export default function mountNotificationEndpoints(router: Router) {
+  router.get("/stream", async (req, res) => {
+    const currentUser = await resolveCurrentUser(req);
+    if (!currentUser) return res.status(401).end();
+    res.status(200).set({
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.flushHeaders();
+    res.write(": connected\n\n");
+    const unsubscribe = subscribeToUserNotifications(currentUser.uid, res);
+    const heartbeat = setInterval(() => {
+      if (!res.destroyed && !res.writableEnded) res.write(": heartbeat\n\n");
+    }, 25_000);
+    res.on("close", () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
+  });
+
+  router.get("/unread-count", async (req, res) => {
+    const currentUser = await resolveCurrentUser(req);
+    if (!currentUser) return res.status(200).json({ unreadCount: 0 });
+    const unreadCount = await req.app.locals.notificationCollection.countDocuments({ userId: currentUser.uid, read: false });
+    return res.status(200).json({ unreadCount });
+  });
+
   router.get("/push/config", (_req, res) => res.json({ configured: pushConfigured(), publicKey: getVapidPublicKey() }));
 
   router.get("/push/native/status", async (req, res) => {
@@ -83,6 +112,7 @@ export default function mountNotificationEndpoints(router: Router) {
       return res.status(200).json({ message: "Notifications marked as read" });
     }
     await req.app.locals.notificationCollection.updateMany({ userId: currentUser.uid, read: false }, { $set: { read: true } });
+    publishUserNotificationState(currentUser.uid, 0);
     return res.status(200).json({ message: "Notifications marked as read" });
   });
 
@@ -93,6 +123,8 @@ export default function mountNotificationEndpoints(router: Router) {
       return res.status(200).json({ message: "Notification marked as read" });
     }
     await req.app.locals.notificationCollection.updateOne({ _id: new ObjectId(req.params.id), userId: currentUser.uid }, { $set: { read: true } });
+    const unreadCount = await req.app.locals.notificationCollection.countDocuments({ userId: currentUser.uid, read: false });
+    publishUserNotificationState(currentUser.uid, unreadCount);
     return res.status(200).json({ message: "Notification marked as read" });
   });
 
@@ -103,6 +135,8 @@ export default function mountNotificationEndpoints(router: Router) {
       return res.status(200).json({ message: "Notification deleted" });
     }
     await req.app.locals.notificationCollection.deleteOne({ _id: new ObjectId(req.params.id), userId: currentUser.uid });
+    const unreadCount = await req.app.locals.notificationCollection.countDocuments({ userId: currentUser.uid, read: false });
+    publishUserNotificationState(currentUser.uid, unreadCount);
     return res.status(200).json({ message: "Notification deleted" });
   });
 }

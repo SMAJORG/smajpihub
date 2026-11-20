@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { Request, Response, Router } from "express";
 import { resolveCurrentUser } from "../services/auth";
 import { getEligibleAvatarFrames, getEligibleAvatarFramesForUsers, resolveAvatarFrame, type AvatarFrameId } from "../services/avatarFrames";
+import { createNotification } from "../services/notifications";
 
 type CommunityMedia = { type: "image" | "video"; url: string; width?: number; height?: number; altText?: string; taggedPeople?: string[]; captionsVtt?: string };
 type CommunityAudience = "everyone" | "followers" | "only_me";
@@ -19,6 +20,22 @@ const noStore = (_req: Request, res: Response, next: () => void) => {
 const isPublic = (user: Record<string, any> | null | undefined) =>
   Boolean(user && user.blocked !== true && user.publicProfile !== false && user.settings?.publicProfile !== false);
 const displayName = (user: Record<string, any>) => String(user.displayName || user.username || "Pi user").slice(0, 80);
+const mentionedUsers = async (locals: Record<string, any>, content: string, excludedUserId: string) => {
+  const handles = [...new Set([...content.matchAll(/(?:^|\s)@([\w.-]{1,64})/g)].map(match => match[1].toLowerCase()))];
+  if (!handles.length) return [];
+  const matches = handles.flatMap(handle => {
+    const escaped = handle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const expression = new RegExp(`^${escaped}$`, "i");
+    return [{ username: expression }, { piUsername: expression }];
+  });
+  return locals.userCollection.find({
+    $or: matches,
+    uid: { $ne: excludedUserId },
+    blocked: { $ne: true },
+    publicProfile: { $ne: false },
+    "settings.publicProfile": { $ne: false },
+  }).toArray();
+};
 const publicIdentity = async (locals: Record<string, any>, user: Record<string, any>, frameEligibility?: AvatarFrameId[]) => {
   const eligibleFrames = frameEligibility || await getEligibleAvatarFrames(locals, user);
   const verificationStatus = ["none", "pending", "approved", "rejected"].includes(user.verificationStatus)
@@ -495,11 +512,26 @@ export default function mountCommunityEndpoints(router: Router) {
     }
     if (existing && shouldFollow) return res.json({ following: true });
     if (!existing && !shouldFollow) return res.json({ following: false });
+    let created = false;
+    let followId = "";
     try {
-      await req.app.locals.communityFollowCollection.insertOne({ followerId: viewer.uid, followingId: target.uid, createdAt: new Date() });
+      const inserted = await req.app.locals.communityFollowCollection.insertOne({ followerId: viewer.uid, followingId: target.uid, createdAt: new Date() });
+      followId = String(inserted.insertedId);
+      created = true;
     } catch (error: any) {
       if (error?.code !== 11000) throw error;
     }
+    if (created) await createNotification(req.app, {
+      userId: target.uid,
+      actorId: viewer.uid,
+      type: "community_follow",
+      title: "New follower",
+      action: "started following you.",
+      message: `${displayName(viewer)} started following you.`,
+      relatedId: viewer.uid,
+      actionUrl: `/people/${encodeURIComponent(viewer.uid)}`,
+      dedupeKey: `community:follow:${followId}`,
+    });
     return res.status(201).json({ following: true });
   });
 
@@ -610,6 +642,21 @@ export default function mountCommunityEndpoints(router: Router) {
       if (previous.requestHash !== requestHash) return res.status(409).json({ error: "idempotency_conflict", message: "This post changed after an uncertain publish attempt. Submit it again to publish the updated version." });
       return res.status(200).json({ post: { ...serialize(previous), author: await publicIdentity(req.app.locals, user), likedByMe: false } });
     }
+    if (post.status === "published") {
+      const postId = String(result.insertedId);
+      const mentioned = await mentionedUsers(req.app.locals, post.content, user.uid);
+      await Promise.all(mentioned.map((target: Record<string, any>) => createNotification(req.app, {
+        userId: target.uid,
+        actorId: user.uid,
+        type: "community_mention",
+        title: "You were mentioned",
+        action: "mentioned you in a post.",
+        message: `${displayName(user)} mentioned you in a post.`,
+        relatedId: postId,
+        actionUrl: `/community/feed?post=${encodeURIComponent(postId)}`,
+        dedupeKey: `community:mention:post:${postId}:${target.uid}`,
+      })));
+    }
     return res.status(201).json({ post: { ...post, _id: String(result.insertedId), author: await publicIdentity(req.app.locals, user), likedByMe: false } });
   });
 
@@ -715,6 +762,17 @@ export default function mountCommunityEndpoints(router: Router) {
     const postId = String(result.post._id);
     const existing = await req.app.locals.communityLikeCollection.findOne({ postId, userId: user.uid });
     const saved = await saveCommunityReaction(req.app.locals, result.post, user.uid, existing?.reaction === "like" || (existing && !existing.reaction) ? null : "like");
+    if (!existing && saved.myReaction) await createNotification(req.app, {
+      userId: result.post.authorId,
+      actorId: user.uid,
+      type: "community_reaction",
+      title: "Post reaction",
+      action: "liked your post.",
+      message: `${displayName(user)} liked your post.`,
+      relatedId: postId,
+      actionUrl: `/community/feed?post=${encodeURIComponent(postId)}`,
+      dedupeKey: `community:reaction:${postId}:${user.uid}`,
+    });
     return res.json({ liked: saved.myReaction === "like", likeCount: saved.likeCount });
   });
 
@@ -727,7 +785,20 @@ export default function mountCommunityEndpoints(router: Router) {
     if (requested !== null && !["like", "love", "celebrate", "support", "insightful"].includes(String(requested))) {
       return res.status(400).json({ error: "invalid_reaction" });
     }
+    const postId = String(result.post._id);
+    const existing = await req.app.locals.communityLikeCollection.findOne({ postId, userId: user.uid });
     const saved = await saveCommunityReaction(req.app.locals, result.post, user.uid, requested === null ? null : String(requested));
+    if (!existing && saved.myReaction) await createNotification(req.app, {
+      userId: result.post.authorId,
+      actorId: user.uid,
+      type: "community_reaction",
+      title: "Post reaction",
+      action: "liked your post.",
+      message: `${displayName(user)} liked your post.`,
+      relatedId: postId,
+      actionUrl: `/community/feed?post=${encodeURIComponent(postId)}`,
+      dedupeKey: `community:reaction:${postId}:${user.uid}`,
+    });
     return res.json(saved);
   });
 
@@ -782,6 +853,33 @@ export default function mountCommunityEndpoints(router: Router) {
     const comment = { postId: String(result.post._id), authorId: user.uid, ...(parentId ? { parentId } : {}), content, status: "visible", createdAt: new Date() };
     const inserted = await req.app.locals.communityCommentCollection.insertOne(comment);
     await req.app.locals.communityPostCollection.updateOne({ _id: result.post._id }, { $inc: { commentCount: 1 } });
+    const postId = String(result.post._id);
+    const recipientId = parentId
+      ? String((await req.app.locals.communityCommentCollection.findOne({ _id: new ObjectId(parentId) }))?.authorId || "")
+      : String(result.post.authorId);
+    if (recipientId) await createNotification(req.app, {
+      userId: recipientId,
+      actorId: user.uid,
+      type: parentId ? "community_reply" : "community_comment",
+      title: parentId ? "New reply" : "New comment",
+      action: parentId ? "replied to your comment." : "commented on your post.",
+      message: `${displayName(user)} ${parentId ? "replied to your comment." : "commented on your post."}`,
+      relatedId: postId,
+      actionUrl: `/community/feed?post=${encodeURIComponent(postId)}&comment=${encodeURIComponent(String(inserted.insertedId))}`,
+      dedupeKey: `community:comment:${String(inserted.insertedId)}`,
+    });
+    const mentioned = await mentionedUsers(req.app.locals, content, user.uid);
+    await Promise.all(mentioned.map((target: Record<string, any>) => createNotification(req.app, {
+      userId: target.uid,
+      actorId: user.uid,
+      type: "community_mention",
+      title: "You were mentioned",
+      action: "mentioned you in a comment.",
+      message: `${displayName(user)} mentioned you in a comment.`,
+      relatedId: postId,
+      actionUrl: `/community/feed?post=${encodeURIComponent(postId)}&comment=${encodeURIComponent(String(inserted.insertedId))}`,
+      dedupeKey: `community:mention:comment:${String(inserted.insertedId)}:${target.uid}`,
+    })));
     const eligibleFrames = await getEligibleAvatarFrames(req.app.locals, user);
     return res.status(201).json({ comment: { ...comment, _id: String(inserted.insertedId), author: { uid: user.uid, displayName: displayName(user), avatar: user.avatar || "", activeAvatarFrame: resolveAvatarFrame(user, eligibleFrames) } } });
   });
@@ -814,6 +912,17 @@ export default function mountCommunityEndpoints(router: Router) {
       throw error;
     }
     await req.app.locals.communityPostCollection.updateOne({ _id: originalResult.post._id }, { $inc: { repostCount: 1 } });
+    await createNotification(req.app, {
+      userId: originalResult.post.authorId,
+      actorId: user.uid,
+      type: "community_repost",
+      title: "Post reposted",
+      action: "reposted your post.",
+      message: `${displayName(user)} reposted your post.`,
+      relatedId: originalId,
+      actionUrl: `/community/feed?post=${encodeURIComponent(originalId)}`,
+      dedupeKey: `community:repost:${String(inserted.insertedId)}`,
+    });
     return res.status(201).json({ post: { ...repost, _id: String(inserted.insertedId), author: await publicIdentity(req.app.locals, user), originalPost: { ...serialize(originalResult.post), author: await publicIdentity(req.app.locals, originalResult.author) } } });
   });
 

@@ -30,7 +30,7 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
 import NativeAdSlot from "../components/NativeAdSlot";
 import SmajAiFloatingAssistant from "../components/SmajAiFloatingAssistant";
-import { axiosClient } from "../lib/axiosClient";
+import { axiosClient, getBaseURL } from "../lib/axiosClient";
 import ConfirmSignOutModal from "../components/ConfirmSignOutModal";
 import WelcomeTour from "../components/WelcomeTour";
 import logoImage from "/logo.png";
@@ -224,7 +224,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, []);
 
   const loadUnreadCount = useCallback(() => {
-    axiosClient.get("/notifications").then(({ data }) => setUnreadCount(data.unreadCount || 0)).catch(() => undefined);
+    axiosClient.get<{ unreadCount?: number }>("/notifications/unread-count").then(({ data }) => setUnreadCount(data.unreadCount || 0)).catch(() => undefined);
   }, []);
 
 
@@ -233,6 +233,18 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, [loadUnreadCount, location.pathname]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    const stream = new EventSource(`${getBaseURL().replace(/\/+$/, "")}/notifications/stream`, { withCredentials: true });
+    const onNotification = (event: MessageEvent<string>) => {
+      try {
+        const data = JSON.parse(event.data) as { unreadCount?: number };
+        if (typeof data.unreadCount === "number") setUnreadCount(data.unreadCount);
+        window.dispatchEvent(new Event("smaj:notifications-refresh"));
+      } catch {
+        loadUnreadCount();
+      }
+    };
+    stream.addEventListener("notification", onNotification as EventListener);
     let resumeTimer = 0;
     const onRefresh = () => {
       if (!document.hidden) loadUnreadCount();
@@ -241,18 +253,20 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       window.clearTimeout(resumeTimer);
       if (!document.hidden) resumeTimer = window.setTimeout(loadUnreadCount, 300);
     };
-    const timer = window.setInterval(onRefresh, 60_000);
+    const timer = window.setInterval(onRefresh, 15_000);
     window.addEventListener("smaj:notifications-refresh", onRefresh);
     window.addEventListener("smaj:native-push", onRefresh);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.clearInterval(timer);
       window.clearTimeout(resumeTimer);
+      stream.close();
+      stream.removeEventListener("notification", onNotification as EventListener);
       window.removeEventListener("smaj:notifications-refresh", onRefresh);
       window.removeEventListener("smaj:native-push", onRefresh);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [loadUnreadCount]);
+  }, [loadUnreadCount, user?.uid]);
 
   useEffect(() => { document.body.style.overflow = mobileSidebarOpen ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [mobileSidebarOpen]);
   const toggleSidebar = () => {

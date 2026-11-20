@@ -655,6 +655,10 @@ const start = async () => {
           userId: 1,
           createdAt: -1,
         }),
+        app.locals.notificationCollection.createIndex(
+          { userId: 1, dedupeKey: 1 },
+          { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } },
+        ),
         app.locals.pushSubscriptionCollection.createIndex(
           { endpoint: 1 },
           { unique: true },

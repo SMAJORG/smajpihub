@@ -413,10 +413,13 @@ export default function mountAiDelegationEndpoints(router: Router) {
               : null;
             if (employer) await createNotification(req.app, {
               userId: employer.uid,
+              actorId: user.uid,
               type: "jobs_new_application",
               title: "New application received",
               message: `${profileSnapshot.title || user.displayName || user.username || "A candidate"} applied for ${job.title}.`,
               relatedId: String(insertion.upsertedId),
+              actionUrl: "/services/jobs/employer",
+              dedupeKey: `jobs:application:${String(insertion.upsertedId)}`,
             });
           }
         }
