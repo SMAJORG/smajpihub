@@ -19,7 +19,7 @@ export type CommunityIdentity = {
   allowContact: boolean;
   createdAt: string | null;
 };
-export type CommunityMedia = { type: "image" | "video"; url: string };
+export type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[] };
 export type CommunityPoll = {
   question: string;
   options: Array<{ id: string; label: string; votes: number }>;
@@ -112,8 +112,13 @@ export const getCommunityComments = async (postId: string) =>
   (await axiosClient.get<{ comments: CommunityComment[] }>(`/community/posts/${encodeURIComponent(postId)}/comments`)).data.comments;
 export const createCommunityPost = async (input: CommunityPostInput) =>
   (await axiosClient.post<{ post: CommunityPost }>("/community/posts", input)).data.post;
-export const getScheduledCommunityPosts = async () =>
-  (await axiosClient.get<{ posts: CommunityPost[] }>("/community/posts/scheduled")).data.posts;
+export const getScheduledCommunityPosts = async () => {
+  const { data } = await axiosClient.get<{ posts?: CommunityPost[] }>("/community/posts/scheduled", {
+    smajSkipResponseCache: true,
+  });
+  if (!Array.isArray(data.posts)) throw new Error("The scheduled-post response was invalid.");
+  return data.posts;
+};
 export const updateScheduledCommunityPost = async (id: string, input: Partial<CommunityPostInput>) =>
   (await axiosClient.patch<{ post: CommunityPost }>(`/community/posts/${encodeURIComponent(id)}/schedule`, input)).data.post;
 export const cancelScheduledCommunityPost = async (id: string) =>

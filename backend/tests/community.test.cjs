@@ -189,6 +189,27 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
     media: [{ type: "image", url: "https://res.cloudinary.com/example/video/upload/sample.mp4" }],
   });
   assert.equal(result.response.status, 400);
+  const taggedPost = await request("POST", "/community/posts", author.uid, {
+    content: "Tagged image",
+    media: [{
+      type: "image",
+      url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+      altText: "A sample image",
+      taggedPeople: [viewer.uid],
+    }],
+  });
+  assert.equal(taggedPost.response.status, 201);
+  assert.equal(taggedPost.data.post.media[0].altText, "A sample image");
+  assert.deepEqual(taggedPost.data.post.media[0].taggedPeople, [viewer.uid]);
+  result = await request("POST", "/community/posts", author.uid, {
+    content: "Invalid tag",
+    media: [{
+      type: "image",
+      url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+      taggedPeople: ["not-a-public-user"],
+    }],
+  });
+  assert.equal(result.response.status, 400);
   result = await request("POST", `/community/posts/${postId}/like`, viewer.uid);
   assert.deepEqual(result.data, { liked: true, likeCount: 1 });
   result = await request("POST", `/community/posts/${postId}/like`, viewer.uid);
@@ -267,6 +288,9 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(result.response.status, 400);
 
   const scheduler = await makeAccount("scheduler");
+  result = await request("GET", "/community/posts/scheduled", scheduler.uid);
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(result.data.posts, []);
   const publishAt = new Date(Date.now() + 120_000).toISOString();
   const scheduled = await request("POST", "/community/posts", scheduler.uid, {
     content: "Scheduled community post", media: [], publishAt,

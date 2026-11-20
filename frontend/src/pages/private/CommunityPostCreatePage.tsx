@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState, useLayoutEffect, type ElementType
 import { useNavigate } from "react-router-dom";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import CelebrationOutlinedIcon from "@mui/icons-material/CelebrationOutlined";
 import WorkOutlineOutlinedIcon from "@mui/icons-material/WorkOutlineOutlined";
 import PollOutlinedIcon from "@mui/icons-material/PollOutlined";
 import PermMediaOutlinedIcon from "@mui/icons-material/PermMediaOutlined";
+import RotateRightOutlinedIcon from "@mui/icons-material/RotateRightOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
@@ -28,6 +30,20 @@ import "./communityPostCreate.css";
 
 type Sheet = "options" | "settings" | "event" | "celebration" | "job" | "poll" | "media" | "document" | "schedule" | null;
 type Person = { uid: string; displayName: string; avatar?: string };
+type CropRatio = "original" | "square" | "portrait" | "landscape";
+type MediaDraft = { file: File; previewUrl: string; altText: string; taggedPeople: string[] };
+type MediaEditorState = {
+  file?: File;
+  previewUrl: string;
+  type: CommunityMedia["type"];
+  existingIndex?: number;
+  localIndex?: number;
+  rotation: number;
+  cropRatio: CropRatio;
+  zoom: number;
+  altText: string;
+  taggedPeople: Person[];
+};
 type SavedDraft = { content: string; audience: NonNullable<CommunityPostInput["audience"]>; commentPolicy: NonNullable<CommunityPostInput["commentPolicy"]>; brandPartnership: boolean };
 type ComposerSnapshot = {
   content: string;
@@ -36,7 +52,7 @@ type ComposerSnapshot = {
   brandPartnership: boolean;
   collaborators: Person[];
   scheduledCollaboratorIds: string[];
-  mediaFiles: File[];
+  mediaFiles: MediaDraft[];
   existingMedia: CommunityMedia[];
   documentFile: File | null;
   existingDocument: CommunityPost["document"];
@@ -65,6 +81,49 @@ const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   reader.onerror = () => reject(new Error("Could not read the selected file."));
   reader.readAsDataURL(file);
 });
+const renderEditedImage = (editor: MediaEditorState) => new Promise<File>((resolve, reject) => {
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.onload = () => {
+    const rotation = ((editor.rotation % 360) + 360) % 360;
+    const rotated = document.createElement("canvas");
+    const rotatedWidth = rotation % 180 ? image.height : image.width;
+    const rotatedHeight = rotation % 180 ? image.width : image.height;
+    rotated.width = rotatedWidth;
+    rotated.height = rotatedHeight;
+    const rotatedContext = rotated.getContext("2d");
+    if (!rotatedContext) return reject(new Error("Image editing is unavailable in this browser."));
+    rotatedContext.translate(rotatedWidth / 2, rotatedHeight / 2);
+    rotatedContext.rotate(rotation * Math.PI / 180);
+    rotatedContext.drawImage(image, -image.width / 2, -image.height / 2);
+
+    const requestedRatio = cropRatios[editor.cropRatio];
+    let cropWidth = rotatedWidth;
+    let cropHeight = rotatedHeight;
+    if (requestedRatio) {
+      if (cropWidth / cropHeight > requestedRatio) cropWidth = cropHeight * requestedRatio;
+      else cropHeight = cropWidth / requestedRatio;
+    }
+    cropWidth /= editor.zoom;
+    cropHeight /= editor.zoom;
+    const left = (rotatedWidth - cropWidth) / 2;
+    const top = (rotatedHeight - cropHeight) / 2;
+    const output = document.createElement("canvas");
+    output.width = Math.max(1, Math.round(cropWidth));
+    output.height = Math.max(1, Math.round(cropHeight));
+    const context = output.getContext("2d");
+    if (!context) return reject(new Error("Image editing is unavailable in this browser."));
+    context.drawImage(rotated, left, top, cropWidth, cropHeight, 0, 0, output.width, output.height);
+    const mimeType = editor.file?.type || "image/jpeg";
+    output.toBlob(blob => {
+      if (!blob) return reject(new Error("The edited image could not be created."));
+      const name = editor.file?.name || "community-image.jpg";
+      resolve(new File([blob], name, { type: blob.type || mimeType, lastModified: Date.now() }));
+    }, mimeType, .92);
+  };
+  image.onerror = () => reject(new Error("This image could not be opened for editing."));
+  image.src = editor.previewUrl;
+});
 const toDateTimeInput = (value: string) => {
   if (!value) return "";
   const date = new Date(value);
@@ -72,6 +131,7 @@ const toDateTimeInput = (value: string) => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 const toIso = (value: string) => value ? new Date(value).toISOString() : "";
+const cropRatios: Record<CropRatio, number | null> = { original: null, square: 1, portrait: 4 / 5, landscape: 16 / 9 };
 const defaultDraft = (): SavedDraft => ({ content: "", audience: "everyone", commentPolicy: "everyone", brandPartnership: false });
 const readDraft = (uid?: string): SavedDraft => {
   if (!uid) return defaultDraft();
@@ -101,8 +161,15 @@ export default function CommunityPostCreatePage() {
   const [collaboratorQuery, setCollaboratorQuery] = useState("");
   const [collaboratorResults, setCollaboratorResults] = useState<Person[]>([]);
   const [collaboratorError, setCollaboratorError] = useState("");
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<MediaDraft[]>([]);
   const [existingMedia, setExistingMedia] = useState<CommunityMedia[]>([]);
+  const [mediaEditor, setMediaEditor] = useState<MediaEditorState | null>(null);
+  const [mediaQueue, setMediaQueue] = useState<Array<{ file: File; previewUrl: string }>>([]);
+  const [mediaEditorBusy, setMediaEditorBusy] = useState(false);
+  const [mediaEditorError, setMediaEditorError] = useState("");
+  const [mediaTagQuery, setMediaTagQuery] = useState("");
+  const [mediaTagResults, setMediaTagResults] = useState<Person[]>([]);
+  const [mediaTagError, setMediaTagError] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [existingDocument, setExistingDocument] = useState<CommunityPost["document"]>();
   const [postType, setPostType] = useState<CommunityPostType>("post");
@@ -133,7 +200,24 @@ export default function CommunityPostCreatePage() {
   const [scheduleBusy, setScheduleBusy] = useState(false);
   const mediaInput = useRef<HTMLInputElement>(null);
   const documentInput = useRef<HTMLInputElement>(null);
+  const contentInput = useRef<HTMLTextAreaElement>(null);
   const composerDraftSnapshot = useRef<ComposerSnapshot | null>(null);
+  const previewUrls = useRef(new Set<string>());
+
+  const makePreviewUrl = (file: File) => {
+    const url = URL.createObjectURL(file);
+    previewUrls.current.add(url);
+    return url;
+  };
+  const releasePreviewUrl = (url: string) => {
+    if (!previewUrls.current.delete(url)) return;
+    URL.revokeObjectURL(url);
+  };
+
+  useEffect(() => () => {
+    previewUrls.current.forEach(url => URL.revokeObjectURL(url));
+    previewUrls.current.clear();
+  }, []);
 
   useEffect(() => {
     if (!user?.uid || composerDraftSnapshot.current) return;
@@ -163,6 +247,30 @@ export default function CommunityPostCreatePage() {
     }, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [collaboratorQuery, collaborators, scheduledCollaboratorIds, user?.uid]);
+
+  useEffect(() => {
+    const query = mediaTagQuery.trim();
+    if (!mediaEditor || query.length < 2) {
+      setMediaTagResults([]);
+      setMediaTagError("");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void axiosClient.get<{ users: Person[] }>("/users/search", { params: { q: query }, signal: controller.signal })
+        .then(({ data }) => {
+          if (!controller.signal.aborted) {
+            setMediaTagResults(data.users.filter(person =>
+              person.uid !== user?.uid && !mediaEditor.taggedPeople.some(tag => tag.uid === person.uid),
+            ));
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setMediaTagError("People could not be searched. Try again.");
+        });
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [mediaEditor, mediaTagQuery, user?.uid]);
 
   useEffect(() => {
     if (sheet !== "job" || jobsLoaded) return;
@@ -215,11 +323,18 @@ export default function CommunityPostCreatePage() {
     };
   }, []);
 
+  useLayoutEffect(() => {
+    const textarea = contentInput.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [content]);
+
   const selectedJob = jobs.find(job => job.id === jobId);
   const validPoll = pollQuestion.trim().length > 0 && pollOptions.filter(option => option.trim()).length >= 2;
   const hasTextOrMedia = Boolean(content.trim() || mediaFiles.length || existingMedia.length);
   const validContent = postType === "post" ? hasTextOrMedia
-    : postType === "media" ? Boolean(mediaFiles.length)
+    : postType === "media" ? Boolean(mediaFiles.length || existingMedia.length)
       : postType === "event" ? Boolean(eventTitle.trim() && eventDate && eventLocation.trim())
         : postType === "celebration" ? Boolean(celebration)
           : postType === "job" ? Boolean(jobId)
@@ -311,15 +426,143 @@ export default function CommunityPostCreatePage() {
 
   const chooseMedia = (list: FileList | null) => {
     const files = Array.from(list || []);
-    if (files.length > 4 || files.some(file => !["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "video/quicktime"].includes(file.type))
+    if (mediaFiles.length + existingMedia.length + files.length > 4 || files.some(file => !["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "video/quicktime"].includes(file.type))
       || files.some(file => file.size > (file.type.startsWith("video/") ? 5 : 4) * 1024 * 1024)) {
       setError("Choose up to four photos (4 MB each) or MP4, WebM, or MOV videos (5 MB each).");
       return;
     }
-    setMediaFiles(files);
-    setExistingMedia([]);
+    const queue = files.map(file => ({
+      file,
+      previewUrl: makePreviewUrl(file),
+    }));
     setSheet(null);
     setError("");
+    if (queue.length) {
+      const [first, ...rest] = queue;
+      setMediaEditorError("");
+      setMediaQueue(rest);
+      setMediaEditor({
+        file: first.file,
+        previewUrl: first.previewUrl,
+        type: first.file.type.startsWith("video/") ? "video" : "image",
+        rotation: 0,
+        cropRatio: "original",
+        zoom: 1,
+        altText: "",
+        taggedPeople: [],
+      });
+    }
+  };
+
+  const beginLocalMediaEdit = (index: number) => {
+    const media = mediaFiles[index];
+    if (!media) return;
+    setMediaQueue([]);
+    setMediaEditorError("");
+    setMediaTagQuery("");
+    setMediaTagResults([]);
+    setMediaEditor({
+      file: media.file,
+      previewUrl: media.previewUrl,
+      type: media.file.type.startsWith("video/") ? "video" : "image",
+      localIndex: index,
+      rotation: 0,
+      cropRatio: "original",
+      zoom: 1,
+      altText: media.altText,
+      taggedPeople: media.taggedPeople.map(uid => ({ uid, displayName: uid })),
+    });
+  };
+
+  const beginExistingMediaEdit = (index: number) => {
+    const media = existingMedia[index];
+    if (!media) return;
+    setMediaQueue([]);
+    setMediaEditorError("");
+    setMediaTagQuery("");
+    setMediaTagResults([]);
+    setMediaEditor({
+      previewUrl: media.url,
+      type: media.type,
+      existingIndex: index,
+      rotation: 0,
+      cropRatio: "original",
+      zoom: 1,
+      altText: media.altText || "",
+      taggedPeople: (media.taggedPeople || []).map(uid => ({ uid, displayName: uid })),
+    });
+  };
+
+  const cancelMediaEdit = () => {
+    if (mediaEditor && mediaEditor.localIndex === undefined && mediaEditor.existingIndex === undefined) {
+      releasePreviewUrl(mediaEditor.previewUrl);
+    }
+    mediaQueue.forEach(item => releasePreviewUrl(item.previewUrl));
+    setMediaQueue([]);
+    setMediaEditor(null);
+    setMediaTagQuery("");
+    setMediaTagResults([]);
+    setMediaTagError("");
+    setMediaEditorError("");
+  };
+
+  const applyMediaEdit = async () => {
+    if (!mediaEditor || mediaEditorBusy) return;
+    setMediaEditorBusy(true);
+    setMediaEditorError("");
+    try {
+      const changedImage = mediaEditor.type === "image"
+        && (mediaEditor.rotation !== 0 || mediaEditor.cropRatio !== "original" || mediaEditor.zoom !== 1);
+      const editedFile = changedImage ? await renderEditedImage(mediaEditor) : mediaEditor.file;
+      const editedPreview = editedFile && changedImage ? makePreviewUrl(editedFile) : mediaEditor.previewUrl;
+      const metadata = {
+        altText: mediaEditor.altText.trim().slice(0, 500),
+        taggedPeople: [...new Set(mediaEditor.taggedPeople.map(person => person.uid))],
+      };
+
+      if (mediaEditor.existingIndex !== undefined && !changedImage) {
+        setExistingMedia(current => current.map((media, index) =>
+          index === mediaEditor.existingIndex ? { ...media, ...metadata } : media,
+        ));
+      } else if (editedFile) {
+        const draft: MediaDraft = { file: editedFile, previewUrl: editedPreview, ...metadata };
+        if (mediaEditor.existingIndex !== undefined) {
+          setExistingMedia(current => current.filter((_, index) => index !== mediaEditor.existingIndex));
+          setMediaFiles(current => [...current, draft]);
+        } else if (mediaEditor.localIndex !== undefined) {
+          setMediaFiles(current => current.map((media, index) => index === mediaEditor.localIndex ? draft : media));
+          if (editedPreview !== mediaEditor.previewUrl) releasePreviewUrl(mediaEditor.previewUrl);
+        } else {
+          setMediaFiles(current => [...current, draft]);
+          if (editedPreview !== mediaEditor.previewUrl) releasePreviewUrl(mediaEditor.previewUrl);
+        }
+      }
+
+      const [next, ...remaining] = mediaQueue;
+      if (next) {
+        setMediaQueue(remaining);
+        setMediaEditorError("");
+        setMediaEditor({
+          file: next.file,
+          previewUrl: next.previewUrl,
+          type: next.file.type.startsWith("video/") ? "video" : "image",
+          rotation: 0,
+          cropRatio: "original",
+          zoom: 1,
+          altText: "",
+          taggedPeople: [],
+        });
+        setMediaTagQuery("");
+      } else {
+        setMediaQueue([]);
+        setMediaEditor(null);
+        setMediaTagQuery("");
+      }
+    } catch (reason) {
+      setMediaEditorError(reason instanceof Error ? reason.message : "The media could not be edited.");
+    } finally {
+      setMediaEditorBusy(false);
+    }
   };
 
   const chooseDocument = (file?: File) => {
@@ -335,11 +578,14 @@ export default function CommunityPostCreatePage() {
   };
 
   const buildInput = async (): Promise<Omit<CommunityPostInput, "publishAt">> => {
-    const uploads: CommunityMedia[] = await Promise.all(mediaFiles.map(async (file): Promise<CommunityMedia> => {
-      const dataUrl = await fileToDataUrl(file);
-      if (file.type.startsWith("image/")) return { type: "image", url: await uploadImage(dataUrl, "community-post") };
-      const { data } = await axiosClient.post<{ url: string }>("/uploads/video", { video: dataUrl, name: file.name });
-      return { type: "video", url: data.url };
+    const uploads: CommunityMedia[] = await Promise.all(mediaFiles.map(async (media): Promise<CommunityMedia> => {
+      const dataUrl = await fileToDataUrl(media.file);
+      const metadata = { altText: media.altText, taggedPeople: media.taggedPeople };
+      if (media.file.type.startsWith("image/")) {
+        return { type: "image", url: await uploadImage(dataUrl, "community-post"), ...metadata };
+      }
+      const { data } = await axiosClient.post<{ url: string }>("/uploads/video", { video: dataUrl, name: media.file.name });
+      return { type: "video", url: data.url, ...metadata };
     }));
     const media: CommunityMedia[] = [...existingMedia, ...uploads];
     let document: CommunityPostInput["document"];
@@ -483,20 +729,33 @@ export default function CommunityPostCreatePage() {
         <button type="button" className="community-create-close" onClick={() => navigate("/community/feed")} aria-label="Close post composer"><CloseOutlinedIcon /></button>
         <UserAvatarFrame name={user?.displayName || user?.username || "Pi user"} image={user?.avatar} frame={user?.activeAvatarFrame} size={42} />
         <div className="community-create-identity">
-          <strong>{user?.displayName || user?.username || "Your profile"}</strong>
           <button type="button" className="community-create-audience" onClick={() => setSheet("settings")}>{audienceLabel} <span aria-hidden="true">⌄</span></button>
-          <button type="button" className="community-create-collaborators" onClick={() => setSheet("settings")}>Add collaborators{collaborators.length + scheduledCollaboratorIds.length ? ` · ${collaborators.length + scheduledCollaboratorIds.length}` : ""}</button>
         </div>
         <button type="button" className="community-create-schedule" onClick={() => { setScheduledTab("compose"); if (!scheduleEditMode) { setEditingScheduleId(""); setScheduledAt(""); } setSheet("schedule"); }} aria-label="Schedule post"><ScheduleOutlinedIcon /></button>
         {scheduleEditMode === "time" ? <button type="button" className="community-create-publish" onClick={() => setSheet("schedule")} disabled={!scheduledAt}>Update time</button>
           : <button type="submit" form="community-post-create-form" className="community-create-publish" disabled={!validContent || posting || (scheduleEditMode === "content" && (!scheduledAt || new Date(toIso(scheduledAt)).getTime() < Date.now() + 60_000))}>{posting ? "Saving…" : scheduleEditMode === "content" ? "Save changes" : "Post"}</button>}
       </header>
       <form id="community-post-create-form" className="community-create-form" onSubmit={event => void publish(event)}>
-        <label className="visually-hidden" htmlFor="community-create-content">Share your thoughts</label>
-        <textarea id="community-create-content" value={content} maxLength={2000} onChange={event => setContent(event.target.value)} placeholder="Share your thoughts ..." />
-        {existingMedia.length || mediaFiles.length ? <div className="community-create-attachments">
-          {existingMedia.map((media, index) => <span key={`existing-${media.url}`}>{media.type === "video" ? "Video" : "Photo"} {index + 1}<button type="button" aria-label={`Remove existing media ${index + 1}`} onClick={() => setExistingMedia(current => current.filter((_, itemIndex) => itemIndex !== index))}><CloseOutlinedIcon /></button></span>)}
-          {mediaFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" aria-label={`Remove ${file.name}`} onClick={() => setMediaFiles(current => current.filter((_, fileIndex) => fileIndex !== index))}><CloseOutlinedIcon /></button></span>)}
+        <textarea ref={contentInput} id="community-create-content" aria-label="Share your thoughts" value={content} maxLength={2000} onChange={event => setContent(event.target.value)} placeholder="Share your thoughts ..." />
+        {existingMedia.length || mediaFiles.length ? <div className="community-create-media-grid">
+          {existingMedia.map((media, index) => <article className="community-create-media-card" key={`existing-${media.url}`}>
+            {media.type === "video"
+              ? <video src={media.url} controls playsInline preload="metadata" />
+              : <img src={media.url} alt={media.altText || ""} />}
+            <div className="community-create-media-actions">
+              <button type="button" aria-label={`Edit media ${index + 1}`} onClick={() => beginExistingMediaEdit(index)}><EditOutlinedIcon /></button>
+              <button type="button" aria-label={`Remove media ${index + 1}`} onClick={() => setExistingMedia(current => current.filter((_, itemIndex) => itemIndex !== index))}><CloseOutlinedIcon /></button>
+            </div>
+          </article>)}
+          {mediaFiles.map((media, index) => <article className="community-create-media-card" key={`${media.file.name}-${index}`}>
+            {media.file.type.startsWith("video/")
+              ? <video src={media.previewUrl} controls playsInline preload="metadata" />
+              : <img src={media.previewUrl} alt={media.altText || ""} />}
+            <div className="community-create-media-actions">
+              <button type="button" aria-label={`Edit ${media.file.name}`} onClick={() => beginLocalMediaEdit(index)}><EditOutlinedIcon /></button>
+              <button type="button" aria-label={`Remove ${media.file.name}`} onClick={() => { releasePreviewUrl(media.previewUrl); setMediaFiles(current => current.filter((_, fileIndex) => fileIndex !== index)); }}><CloseOutlinedIcon /></button>
+            </div>
+          </article>)}
         </div> : null}
         {documentFile || existingDocument ? <div className="community-create-attachments"><span>{documentFile?.name || existingDocument?.name}<button type="button" aria-label="Remove document" onClick={() => { setDocumentFile(null); setExistingDocument(undefined); }}><CloseOutlinedIcon /></button></span></div> : null}
         {postType === "event" && eventTitle ? <p className="community-create-summary">Event: {eventTitle}{eventDate ? ` · ${new Date(eventDate).toLocaleString()}` : ""}{eventLocation ? ` · ${eventLocation}` : ""}</p> : null}
@@ -516,6 +775,51 @@ export default function CommunityPostCreatePage() {
 
       <input ref={mediaInput} hidden type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" multiple onChange={event => { chooseMedia(event.target.files); event.currentTarget.value = ""; }} />
       <input ref={documentInput} hidden type="file" accept="application/pdf,.pdf" onChange={event => { chooseDocument(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+
+      {mediaEditor ? <section className="community-media-editor" role="dialog" aria-modal="true" aria-label="Edit media">
+        <header className="community-media-editor-header">
+          <button type="button" onClick={cancelMediaEdit} disabled={mediaEditorBusy}>Cancel</button>
+          <button type="button" onClick={() => void applyMediaEdit()} disabled={mediaEditorBusy}>{mediaEditorBusy ? "Applying…" : "Next"}</button>
+        </header>
+        <div className="community-media-editor-stage-wrap">
+          <div
+            className={`community-media-editor-stage${mediaEditor.cropRatio === "original" ? " original" : ""}`}
+            style={mediaEditor.cropRatio === "original" ? undefined : { aspectRatio: String(cropRatios[mediaEditor.cropRatio]) }}
+          >
+            {mediaEditor.type === "video"
+              ? <video src={mediaEditor.previewUrl} controls playsInline />
+              : <img
+                src={mediaEditor.previewUrl}
+                alt="Selected media preview"
+                style={{ transform: `rotate(${mediaEditor.rotation}deg) scale(${mediaEditor.zoom})` }}
+              />}
+          </div>
+        </div>
+        <div className="community-media-editor-controls">
+          {mediaEditorError ? <p className="community-media-editor-error" role="alert">{mediaEditorError}</p> : null}
+          {mediaEditor.type === "image" ? <>
+            <div className="community-media-editor-crop" aria-label="Crop image">
+              {(["original", "square", "portrait", "landscape"] as const).map(ratio => (
+                <button key={ratio} type="button" className={mediaEditor.cropRatio === ratio ? "active" : ""} onClick={() => setMediaEditor(current => current ? { ...current, cropRatio: ratio } : current)}>
+                  {ratio === "original" ? "Original" : ratio === "square" ? "Square" : ratio === "portrait" ? "4:5" : "16:9"}
+                </button>
+              ))}
+            </div>
+            <div className="community-media-editor-rotate">
+              <button type="button" onClick={() => setMediaEditor(current => current ? { ...current, rotation: (current.rotation + 90) % 360 } : current)}><RotateRightOutlinedIcon /> Rotate</button>
+              <label>Zoom<input type="range" min="1" max="3" step=".1" value={mediaEditor.zoom} onChange={event => setMediaEditor(current => current ? { ...current, zoom: Number(event.target.value) } : current)} /></label>
+            </div>
+          </> : null}
+          <label className="community-media-editor-alt">ALT text<input value={mediaEditor.altText} maxLength={500} onChange={event => setMediaEditor(current => current ? { ...current, altText: event.target.value } : current)} placeholder="Describe this media for accessibility" /></label>
+          <div className="community-media-editor-tagging">
+            <strong>Tag people</strong>
+            <input value={mediaTagQuery} maxLength={80} onChange={event => { setMediaTagQuery(event.target.value); setMediaTagError(""); }} placeholder="Search public profiles" />
+            {mediaTagError ? <p role="alert">{mediaTagError}</p> : null}
+            {mediaTagResults.length ? <div className="community-media-editor-results">{mediaTagResults.map(person => <button key={person.uid} type="button" onClick={() => { setMediaEditor(current => current ? { ...current, taggedPeople: [...current.taggedPeople, person] } : current); setMediaTagQuery(""); setMediaTagResults([]); }}><span>{person.displayName}</span><b>Add</b></button>)}</div> : null}
+            {mediaEditor.taggedPeople.length ? <div className="community-media-editor-tags">{mediaEditor.taggedPeople.map(person => <span key={person.uid}>{person.displayName}<button type="button" aria-label={`Remove ${person.displayName}`} onClick={() => setMediaEditor(current => current ? { ...current, taggedPeople: current.taggedPeople.filter(tag => tag.uid !== person.uid) } : current)}><CloseOutlinedIcon /></button></span>)}</div> : null}
+          </div>
+        </div>
+      </section> : null}
 
       {sheet ? <div className="community-create-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSheet(null); }}>
         <section className="community-create-sheet" role="dialog" aria-modal="true" aria-label={sheet === "options" ? "Add to your post" : sheet === "settings" ? "Post settings" : sheet === "schedule" ? "Schedule post" : `Add ${sheet}`} onMouseDown={event => event.stopPropagation()}>
@@ -594,7 +898,11 @@ export default function CommunityPostCreatePage() {
             </> : <>
               {scheduledLoading ? <p role="status">Loading scheduled posts…</p> : null}
               {scheduledError ? <p className="community-create-error" role="alert">{scheduledError}<button type="button" onClick={() => { setScheduledLoaded(false); setScheduledError(""); }}>Retry</button></p> : null}
-              {!scheduledLoading && !scheduledPosts.length ? <p>No scheduled posts.</p> : null}
+              {scheduledLoaded && !scheduledLoading && !scheduledError && !scheduledPosts.length ? <div className="community-create-scheduled-empty">
+                <span className="community-create-scheduled-empty-illustration" aria-hidden="true"><ScheduleOutlinedIcon /></span>
+                <p>When you schedule a post, it automatically posts at the date and time you choose.</p>
+                <button type="button" className="community-create-schedule-start" onClick={() => setScheduledTab("compose")}>Schedule</button>
+              </div> : null}
               <div className="community-create-scheduled-list">{scheduledPosts.map(post => <article key={post._id}><strong>{post.content || post.event?.title || post.poll?.question || post.job?.title || post.document?.name || "Scheduled community post"}</strong><time>{new Date(post.publishAt || "").toLocaleString()}</time><div><button type="button" disabled={scheduleEditMode === "content"} onClick={() => editScheduledContent(post)}>Edit post</button><button type="button" disabled={scheduleEditMode === "content"} onClick={() => editScheduledTime(post)}>Edit time</button><button type="button" disabled={scheduleBusy} onClick={() => void cancelScheduled(post)}>Cancel</button></div></article>)}</div>
             </>}
           </> : null}

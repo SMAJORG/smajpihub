@@ -222,7 +222,7 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
         {content.media?.length ? <div className={`community-post-media${content.media.length > 1 ? " multiple" : ""}`}>
           {content.media.map((media, index) => media.type === "video"
             ? <video key={`${media.url}-${index}`} controls preload="metadata" src={media.url} />
-            : <img key={`${media.url}-${index}`} loading="lazy" src={media.url} alt={`Community post image ${index + 1}`} />)}
+            : <img key={`${media.url}-${index}`} loading="lazy" src={media.url} alt={media.altText || `Community post image ${index + 1}`} />)}
         </div> : null}
       </div>
       <div className="community-post-counts"><span>{likeCount} likes</span><span>{commentCount} comments</span><span>{repostCount} reposts</span></div>

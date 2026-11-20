@@ -3,7 +3,7 @@ import { Request, Response, Router } from "express";
 import { resolveCurrentUser } from "../services/auth";
 import { getEligibleAvatarFrames, getEligibleAvatarFramesForUsers, resolveAvatarFrame, type AvatarFrameId } from "../services/avatarFrames";
 
-type CommunityMedia = { type: "image" | "video"; url: string };
+type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[] };
 type CommunityAudience = "everyone" | "followers" | "only_me";
 type CommunityCommentPolicy = "everyone" | "followers" | "nobody";
 const MAX_POST_TEXT = 2000;
@@ -52,16 +52,37 @@ const safeMedia = (input: unknown): CommunityMedia[] | null => {
     if (!item || typeof item !== "object") return null;
     const type = (item as Record<string, unknown>).type;
     const rawUrl = String((item as Record<string, unknown>).url || "").trim();
+    const altText = String((item as Record<string, unknown>).altText || "").trim();
+    const rawTaggedPeople = (item as Record<string, unknown>).taggedPeople ?? [];
+    if (!Array.isArray(rawTaggedPeople) || rawTaggedPeople.length > 10) return null;
+    const taggedPeople = [...new Set(rawTaggedPeople.map(uid => String(uid).trim()).filter(Boolean))];
+    if (taggedPeople.some(uid => uid.length > 128)) return null;
     try {
       const url = new URL(rawUrl);
       if (url.protocol !== "https:" || url.hostname !== "res.cloudinary.com" || !["image", "video"].includes(String(type))
         || !url.pathname.includes(`/${type}/upload/`)) return null;
-      media.push({ type: type as CommunityMedia["type"], url: url.toString() });
+      media.push({
+        type: type as CommunityMedia["type"],
+        url: url.toString(),
+        ...(altText ? { altText: altText.slice(0, 500) } : {}),
+        ...(taggedPeople.length ? { taggedPeople } : {}),
+      });
     } catch {
       return null;
     }
   }
   return media;
+};
+const validMediaTags = async (locals: Record<string, any>, media: CommunityMedia[]) => {
+  const taggedPeople = [...new Set(media.flatMap(item => item.taggedPeople || []))];
+  if (!taggedPeople.length) return true;
+  const users = await locals.userCollection.find({
+    uid: { $in: taggedPeople },
+    blocked: { $ne: true },
+    publicProfile: { $ne: false },
+    "settings.publicProfile": { $ne: false },
+  }).toArray();
+  return users.length === taggedPeople.length;
 };
 const safeDocument = (input: unknown) => {
   if (!input || typeof input !== "object") return null;
@@ -302,7 +323,9 @@ export default function mountCommunityEndpoints(router: Router) {
   router.get("/posts/scheduled", async (req: Request, res: Response) => {
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ error: "unauthorized" });
-    const posts = await req.app.locals.communityPostCollection.find({ authorId: user.uid, status: "scheduled" }).sort({ publishAt: 1 }).limit(100).toArray();
+    const collection = req.app.locals.communityPostCollection;
+    if (!collection) return res.status(503).json({ error: "community_storage_unavailable" });
+    const posts = await collection.find({ authorId: user.uid, status: "scheduled" }).sort({ publishAt: 1 }).limit(100).toArray();
     return res.json({ posts: posts.map(serialize) });
   });
 
@@ -331,6 +354,7 @@ export default function mountCommunityEndpoints(router: Router) {
     if (user.blocked) return res.status(403).json({ error: "account_unavailable" });
     const fields = parsePostInput(req.body || {});
     if (!fields) return res.status(400).json({ error: "invalid_post", message: "Check the post content, options, audience and attachments." });
+    if (!(await validMediaTags(req.app.locals, fields.media))) return res.status(400).json({ error: "invalid_media_tags" });
     const collaborators = fields.collaboratorIds.length
       ? await req.app.locals.userCollection.find({ uid: { $in: fields.collaboratorIds }, blocked: { $ne: true }, publicProfile: { $ne: false }, "settings.publicProfile": { $ne: false } }).toArray()
       : [];
@@ -390,6 +414,7 @@ export default function mountCommunityEndpoints(router: Router) {
         postType: req.body?.postType || post.postType || "post",
       });
       if (!fields) return res.status(400).json({ error: "invalid_post", message: "Check the post content, options, audience and attachments." });
+      if (!(await validMediaTags(req.app.locals, fields.media))) return res.status(400).json({ error: "invalid_media_tags" });
       const collaborators = fields.collaboratorIds.length
         ? await req.app.locals.userCollection.find({ uid: { $in: fields.collaboratorIds }, blocked: { $ne: true }, publicProfile: { $ne: false }, "settings.publicProfile": { $ne: false } }).toArray()
         : [];
