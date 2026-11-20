@@ -4,7 +4,6 @@ const sender = 'G' + 'B'.repeat(55), recipient = 'G' + 'A'.repeat(55);
 
 for (const theme of ['light', 'dark']) test(`isolated admin sign-in, payment confirmation and logout in ${theme}`, async ({ page }) => {
   await page.setViewportSize({ width: theme === 'light' ? 390 : 1280, height: 900 });
-  await page.addInitScript(value => document.documentElement.setAttribute('data-theme', value), theme);
   let sent = 0, logins = 0;
   await page.route('**/admin/testnet/auth/login', async route => {
     logins++;
@@ -28,6 +27,9 @@ for (const theme of ['light', 'dark']) test(`isolated admin sign-in, payment con
     await route.fulfill({ json: data });
   });
   await page.goto('/tests/payouts.html?standalone=1');
+  await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  expect(await page.locator('.testnet-admin-access').evaluate(el => getComputedStyle(el).backgroundColor)).toBe(theme === 'dark' ? 'rgb(7, 17, 31)' : 'rgb(255, 255, 255)');
   await expect(page.getByRole('heading', { name: 'Testnet administrator sign-in' })).toBeVisible();
   await page.getByLabel('Administrator username').fill('existing-admin');
   await page.getByLabel('Password', { exact: true }).fill('fixture-only-password');
