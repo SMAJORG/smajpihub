@@ -592,7 +592,14 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
             ? <CommunityVideoPreview
               key={`${media.url}-${index}`}
               media={media}
+              author={author}
+              content={content.content}
+              following={following}
+              canFollow={author.uid !== viewerId}
               onOpen={() => onOpenVideo?.(content, media)}
+              onMore={openOptionsMenu}
+              onDismiss={dismiss}
+              onFollow={() => void followAuthor()}
             />
             : <CommunityFeedImage key={`${media.url}-${index}`} media={media} index={index} />)}
         </div> : null}

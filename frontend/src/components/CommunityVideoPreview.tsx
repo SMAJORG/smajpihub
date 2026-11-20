@@ -2,16 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
 import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
 import ClosedCaptionOutlinedIcon from "@mui/icons-material/ClosedCaptionOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
+import UserAvatarFrame from "./UserAvatarFrame";
 import CommunityCaptionTrack from "./CommunityCaptionTrack";
-import type { CommunityMedia } from "../lib/communityApi";
+import type { CommunityIdentity, CommunityMedia } from "../lib/communityApi";
 import { claimCommunityVideo, communityVideoReleaseEvent, releaseCommunityVideo } from "./communityVideoPlayback";
 
 type Props = {
   media: CommunityMedia;
+  author: CommunityIdentity;
+  content: string;
+  following: boolean;
+  canFollow: boolean;
   onOpen: () => void;
+  onMore: () => void;
+  onDismiss: () => void;
+  onFollow: () => void;
 };
 
-export default function CommunityVideoPreview({ media, onOpen }: Props) {
+export default function CommunityVideoPreview({ media, author, content, following, canFollow, onOpen, onMore, onDismiss, onFollow }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(() => typeof IntersectionObserver === "undefined");
@@ -20,6 +30,7 @@ export default function CommunityVideoPreview({ media, onOpen }: Props) {
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const portrait = Boolean(media.width && media.height && media.height > media.width);
   const width = media.width || 16;
   const height = media.height || 9;
   const poster = media.url
@@ -83,7 +94,7 @@ export default function CommunityVideoPreview({ media, onOpen }: Props) {
   return (
     <div
       ref={wrapperRef}
-      className={`community-video-preview${videoReady ? " is-ready" : ""}${videoError ? " has-error" : ""}`}
+      className={`community-video-preview ${portrait ? "portrait" : "landscape"}${videoReady ? " is-ready" : ""}${videoError ? " has-error" : ""}`}
       style={{ aspectRatio: `${width} / ${height}` }}
       onClick={onOpen}
     >
@@ -108,6 +119,17 @@ export default function CommunityVideoPreview({ media, onOpen }: Props) {
         setCaptionsAvailable(true);
         if (captionsEnabled) setCaptionTrack(true);
       }} /> : null}</video> : <div className="community-video-fallback">This video could not be loaded.</div>}
+      {portrait ? <div className="community-video-author-overlay">
+        <UserAvatarFrame name={author.displayName} image={author.avatar} frame={author.activeAvatarFrame} size={34} />
+        <span><strong>{author.displayName}</strong>{author.headline ? <small>{author.headline}</small> : null}
+          {following ? <small>Following</small> : canFollow ? <button type="button" className="community-video-follow" onClick={event => { event.stopPropagation(); onFollow(); }}>+ Follow</button> : null}
+        </span>
+        <div className="community-video-author-actions">
+          <button type="button" aria-label="Video post options" onClick={event => { event.stopPropagation(); onMore(); }}><MoreVertOutlinedIcon /></button>
+          <button type="button" aria-label="Dismiss video post" onClick={event => { event.stopPropagation(); onDismiss(); }}><CloseOutlinedIcon /></button>
+        </div>
+      </div> : null}
+      {portrait && content ? <p className="community-video-description">{content.length > 180 ? `${content.slice(0, 180).trimEnd()}…` : content}</p> : null}
       <div className="community-video-controls" onClick={event => event.stopPropagation()}>
         <button type="button" aria-label={muted ? "Unmute video" : "Mute video"} onClick={() => {
           const video = videoRef.current;
