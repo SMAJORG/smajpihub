@@ -69,6 +69,8 @@ export type CommunityPost = {
   reactionCounts?: CommunityReactionCounts;
   commentCount: number;
   repostCount: number;
+  shareCount?: number;
+  savedByMe?: boolean;
   createdAt: string;
   postType?: CommunityPostType;
   audience?: "everyone" | "followers" | "only_me";
@@ -166,5 +168,17 @@ export const reportCommunityPost = async (postId: string, reason: string) =>
   axiosClient.post(`/community/posts/${encodeURIComponent(postId)}/report`, { reason });
 export const deleteCommunityPost = async (postId: string) =>
   axiosClient.delete(`/community/posts/${encodeURIComponent(postId)}`);
+export const updateCommunityPost = async (postId: string, content: string) =>
+  (await axiosClient.patch<{ post: CommunityPost }>(`/community/posts/${encodeURIComponent(postId)}`, { content })).data.post;
+export const setCommunityPostSaved = async (postId: string, saved: boolean) =>
+  (await axiosClient.post<{ saved: boolean }>(`/community/posts/${encodeURIComponent(postId)}/save`, { saved })).data.saved;
+export const hideCommunityAuthor = async (uid: string) =>
+  axiosClient.post(`/community/authors/${encodeURIComponent(uid)}/hide`);
+export const markCommunityPostNotInterested = async (postId: string) =>
+  axiosClient.post(`/community/posts/${encodeURIComponent(postId)}/not-interested`);
+export const recordCommunityPostShare = async (postId: string) =>
+  (await axiosClient.post<{ shareCount: number }>(`/community/posts/${encodeURIComponent(postId)}/share`)).data.shareCount;
 export const toggleCommunityFollow = async (uid: string) =>
   (await axiosClient.post<{ following: boolean }>(`/community/follow/${encodeURIComponent(uid)}`)).data.following;
+export const setCommunityFollow = async (uid: string, following: boolean) =>
+  (await axiosClient.post<{ following: boolean }>(`/community/follow/${encodeURIComponent(uid)}`, { following })).data.following;

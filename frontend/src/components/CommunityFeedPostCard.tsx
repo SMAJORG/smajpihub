@@ -1,17 +1,25 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from "react";
 import { Link } from "react-router-dom";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import BookmarkBorderOutlinedIcon from "@mui/icons-material/BookmarkBorderOutlined";
+import BookmarkOutlinedIcon from "@mui/icons-material/BookmarkOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
+import PersonRemoveOutlinedIcon from "@mui/icons-material/PersonRemoveOutlined";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import RepeatOutlinedIcon from "@mui/icons-material/RepeatOutlined";
 import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import ThumbDownAltOutlinedIcon from "@mui/icons-material/ThumbDownAltOutlined";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
@@ -20,10 +28,16 @@ import {
   createCommunityComment,
   deleteCommunityPost,
   getCommunityComments,
+  hideCommunityAuthor,
+  markCommunityPostNotInterested,
+  recordCommunityPostShare,
   reportCommunityPost,
   repostCommunityPost,
   setCommunityReaction,
+  setCommunityFollow,
+  setCommunityPostSaved,
   toggleCommunityFollow,
+  updateCommunityPost,
   voteOnCommunityPoll,
   type CommunityComment,
   type CommunityMedia,
@@ -107,16 +121,24 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(reportReasons[0]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuClosing, setMenuClosing] = useState(false);
+  const [saved, setSaved] = useState(post.savedByMe === true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editText, setEditText] = useState("");
   const [reactionMenuOpen, setReactionMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [poll, setPoll] = useState(content.poll);
   const [myVote, setMyVote] = useState(content.myVote || null);
   const reactionPressTimer = useRef<number | null>(null);
+  const menuCloseTimer = useRef<number | null>(null);
+  const menuTouchStartY = useRef<number | null>(null);
   const longPressOpenedReactions = useRef(false);
   const isOwnPost = viewerId === post.authorId;
+  const menuAuthor = isOwnPost ? post.author : author;
 
   useEffect(() => () => {
     if (reactionPressTimer.current !== null) window.clearTimeout(reactionPressTimer.current);
+    if (menuCloseTimer.current !== null) window.clearTimeout(menuCloseTimer.current);
   }, []);
 
   useEffect(() => {
@@ -126,9 +148,41 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     setCommentCount(content.commentCount || 0);
     setRepostCount(content.repostCount || 0);
     setFollowing(content.isFollowedByMe === true);
+    setSaved(post.savedByMe === true);
     setPoll(content.poll);
     setMyVote(content.myVote || null);
   }, [content.canComment, content.commentCount, content.isFollowedByMe, content.likeCount, content.likedByMe, content.myReaction, content.poll, content.reactionCounts, content.repostCount, content.myVote, post]);
+
+  const openOptionsMenu = () => {
+    if (menuCloseTimer.current !== null) {
+      window.clearTimeout(menuCloseTimer.current);
+      menuCloseTimer.current = null;
+    }
+    setMenuClosing(false);
+    setMenuOpen(true);
+  };
+  const closeOptionsMenu = (afterClose?: () => void) => {
+    if (!menuOpen) {
+      afterClose?.();
+      return;
+    }
+    if (menuCloseTimer.current !== null) window.clearTimeout(menuCloseTimer.current);
+    setMenuClosing(true);
+    menuCloseTimer.current = window.setTimeout(() => {
+      menuCloseTimer.current = null;
+      setMenuOpen(false);
+      setMenuClosing(false);
+      afterClose?.();
+    }, 180);
+  };
+  const beginMenuSwipe = (event: ReactTouchEvent<HTMLDivElement>) => {
+    menuTouchStartY.current = event.touches[0]?.clientY ?? null;
+  };
+  const finishMenuSwipe = (event: ReactTouchEvent<HTMLDivElement>) => {
+    const start = menuTouchStartY.current;
+    menuTouchStartY.current = null;
+    if (start !== null && (event.changedTouches[0]?.clientY ?? start) - start > 70) closeOptionsMenu();
+  };
 
   const chooseReaction = async (type: CommunityReaction) => {
     if (busy) return;
@@ -282,6 +336,66 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     }
   };
 
+  const unfollowAuthor = async () => {
+    if (busy || !following) return;
+    setBusy(true);
+    setError("");
+    try {
+      setFollowing(await setCommunityFollow(author.uid, false));
+      onChange?.();
+    } catch {
+      setError("Follow status could not be updated. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleSavedPost = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const nextSaved = await setCommunityPostSaved(post._id, !saved);
+      setSaved(nextSaved);
+      setNotice(nextSaved ? "Post saved." : "Post removed from saved posts.");
+      onChange?.();
+    } catch {
+      setError("Post could not be saved. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const hideAuthorPosts = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await hideCommunityAuthor(author.uid);
+      onDismiss?.();
+      onChange?.();
+    } catch {
+      setError("Posts by this user could not be hidden. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markNotInterested = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await markCommunityPostNotInterested(post._id);
+      onDismiss?.();
+      onChange?.();
+    } catch {
+      setError("This post could not be removed from your feed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const repost = async () => {
     if (busy) return;
     setBusy(true);
@@ -303,17 +417,50 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
   };
 
   const share = async () => {
-    const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(content._id)}`;
+    if (busy) return;
+    const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(post._id)}`;
+    let copied = false;
+    setBusy(true);
+    setError("");
     try {
-      if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community post", text: content.content, url });
-      else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        setNotice("Post link copied.");
-      } else {
-        setError("Sharing is not available in this browser.");
+      try {
+        if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community post", text: post.content || content.content, url });
+        else if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(url);
+          copied = true;
+        } else {
+          setError("Sharing is not available in this browser.");
+          return;
+        }
+      } catch (reason) {
+        if (!(reason instanceof DOMException && reason.name === "AbortError")) setError("Post could not be shared.");
+        return;
       }
+      try {
+        await recordCommunityPostShare(post._id);
+        setNotice(copied ? "Post link copied." : "Post shared.");
+      } catch {
+        setError("The post was shared, but the share could not be recorded.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitPostEdit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await updateCommunityPost(post._id, editText);
+      setEditOpen(false);
+      setNotice("Post updated.");
+      onChange?.();
     } catch (reason) {
-      if (!(reason instanceof DOMException && reason.name === "AbortError")) setError("Post could not be shared.");
+      setError(errorMessage(reason, "Post could not be updated. Please try again."));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -384,12 +531,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
           {following ? "Following" : <><AddOutlinedIcon /> Follow</>}
         </button> : null}
         <div className="community-feed-post-menu-wrap">
-          <button type="button" className="community-feed-icon-button" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><MoreVertOutlinedIcon /></button>
-          {menuOpen ? <div className="community-feed-post-menu" role="menu">
-            {isOwnPost ? <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); void removePost(); }}>Delete post</button>
-              : <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); setReportOpen(value => !value); }}>Report post</button>}
-            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); dismiss(); }}>Dismiss post</button>
-          </div> : null}
+          <button type="button" className="community-feed-icon-button" aria-label="Post options" aria-expanded={menuOpen && !menuClosing} onClick={() => menuOpen ? closeOptionsMenu() : openOptionsMenu()}><MoreVertOutlinedIcon /></button>
         </div>
         <button type="button" className="community-feed-icon-button" aria-label="Dismiss post" onClick={dismiss}><CloseOutlinedIcon /></button>
       </header>
@@ -423,7 +565,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
               following={following}
               canFollow={author.uid !== viewerId}
               onOpen={() => onOpenVideo?.(content, media)}
-              onMore={() => setMenuOpen(true)}
+              onMore={openOptionsMenu}
               onDismiss={dismiss}
               onFollow={() => void followAuthor()}
             />
@@ -477,6 +619,70 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
           <button type="submit" className="community-comment-send" aria-label="Send comment" disabled={busy || !commentText.trim()}><SendOutlinedIcon /></button>
         </form>
       </section> : null}
+      {menuOpen ? <div
+        className={`community-post-options-backdrop${menuClosing ? " is-closing" : ""}`}
+        onClick={event => {
+          if (event.target === event.currentTarget) closeOptionsMenu();
+        }}
+      >
+        <section
+          className={`community-post-options-sheet${menuClosing ? " is-closing" : ""}`}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Post options for ${menuAuthor.displayName}`}
+          onTouchStart={beginMenuSwipe}
+          onTouchEnd={finishMenuSwipe}
+        >
+          <div className="community-post-options-handle" aria-hidden="true" />
+          <div className="community-post-options-heading">
+            <UserAvatarFrame
+              name={menuAuthor.displayName}
+              image={menuAuthor.avatar}
+              frame={menuAuthor.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : menuAuthor.activeAvatarFrame}
+              size={38}
+            />
+            <strong>{menuAuthor.displayName}</strong>
+          </div>
+          <div className="community-post-options-list">
+            {isOwnPost ? <>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => {
+                setEditText(post.content || "");
+                setEditOpen(true);
+              })}><EditOutlinedIcon /> <span>Edit post</span></button>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void removePost())}><DeleteOutlineOutlinedIcon /> <span>Delete post</span></button>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void toggleSavedPost())}>
+                {saved ? <BookmarkOutlinedIcon /> : <BookmarkBorderOutlinedIcon />}
+                <span>{saved ? "Remove from saved posts" : "Save post"}</span>
+              </button>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void share())}><ShareOutlinedIcon /> <span>Share via</span></button>
+            </> : <>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void toggleSavedPost())}>
+                {saved ? <BookmarkOutlinedIcon /> : <BookmarkBorderOutlinedIcon />}
+                <span>{saved ? "Remove from saved posts" : "Save post"}</span>
+              </button>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void share())}><ShareOutlinedIcon /> <span>Share via</span></button>
+              {following ? <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void unfollowAuthor())}><PersonRemoveOutlinedIcon /> <span>Unfollow</span></button> : null}
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void hideAuthorPosts())}><VisibilityOffOutlinedIcon /> <span>Hide posts by {menuAuthor.displayName}</span></button>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void markNotInterested())}><ThumbDownAltOutlinedIcon /> <span>Not interested</span></button>
+              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => setReportOpen(true))}><FlagOutlinedIcon /> <span>Report post</span></button>
+            </>}
+          </div>
+        </section>
+      </div> : null}
+      {editOpen ? <div className="community-post-edit-backdrop" onClick={event => {
+        if (event.target === event.currentTarget) setEditOpen(false);
+      }}>
+        <form className="community-post-edit-sheet" onSubmit={event => void submitPostEdit(event)}>
+          <div className="community-post-options-handle" aria-hidden="true" />
+          <h2>Edit post</h2>
+          <textarea aria-label="Post text" value={editText} onChange={event => setEditText(event.target.value)} maxLength={2000} rows={6} />
+          <div className="community-post-edit-footer">
+            <span>{editText.length}/2000</span>
+            <button type="button" onClick={() => setEditOpen(false)} disabled={busy}>Cancel</button>
+            <button type="submit" disabled={busy || editText === (post.content || "")}>Save</button>
+          </div>
+        </form>
+      </div> : null}
     </article>
   );
 }

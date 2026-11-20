@@ -378,6 +378,54 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(automatic.response.status, 201);
   assert.equal(await publishDueCommunityPosts(app, new Date(Date.now() + 180_000)), 1);
   assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(automatic.data.post._id) })).status, "published");
+
+  const menuAuthor = await makeAccount("menu-author");
+  const menuViewer = await makeAccount("menu-viewer");
+  const menuPost = await request("POST", "/community/posts", menuAuthor.uid, {
+    content: "Menu actions post",
+    media: [{ type: "image", url: "https://res.cloudinary.com/demo/image/upload/menu.jpg" }],
+  });
+  const menuPostId = menuPost.data.post._id;
+  result = await request("POST", `/community/follow/${menuAuthor.uid}`, menuViewer.uid, { following: true });
+  assert.equal(result.data.following, true);
+  result = await request("POST", `/community/follow/${menuAuthor.uid}`, menuViewer.uid, { following: false });
+  assert.equal(result.data.following, false);
+  result = await request("POST", `/community/posts/${menuPostId}/save`, menuViewer.uid, { saved: true });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.saved, true);
+  result = await request("GET", "/community/feed", menuViewer.uid);
+  assert.equal(result.data.posts.find(post => post._id === menuPostId).savedByMe, true);
+  result = await request("POST", `/community/posts/${menuPostId}/save`, menuViewer.uid, { saved: false });
+  assert.equal(result.data.saved, false);
+  assert.equal(await locals.communityPreferenceCollection.countDocuments({
+    userId: menuViewer.uid, kind: "saved_post", targetId: menuPostId,
+  }), 0);
+
+  result = await request("POST", `/community/posts/${menuPostId}/share`, menuViewer.uid);
+  assert.equal(result.data.shareCount, 1);
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(menuPostId) })).shareCount, 1);
+
+  result = await request("PATCH", `/community/posts/${menuPostId}`, menuAuthor.uid, { content: "Edited menu actions post" });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.post.content, "Edited menu actions post");
+  assert.equal(result.data.post.media[0].url, menuPost.data.post.media[0].url);
+  result = await request("PATCH", `/community/posts/${menuPostId}`, menuViewer.uid, { content: "Unauthorized edit" });
+  assert.equal(result.response.status, 404);
+
+  const anotherMenuPost = await request("POST", "/community/posts", menuAuthor.uid, { content: "Not interested post", media: [] });
+  result = await request("POST", `/community/posts/${anotherMenuPost.data.post._id}/not-interested`, menuViewer.uid);
+  assert.equal(result.response.status, 200);
+  result = await request("GET", "/community/feed", menuViewer.uid);
+  assert.ok(!result.data.posts.some(post => post._id === anotherMenuPost.data.post._id));
+  result = await request("GET", `/community/feed?authorId=${menuAuthor.uid}`, menuViewer.uid);
+  assert.ok(result.data.posts.some(post => post._id === anotherMenuPost.data.post._id), "profile feeds remain unaffected by feed-only preferences");
+
+  result = await request("POST", `/community/authors/${menuAuthor.uid}/hide`, menuViewer.uid);
+  assert.equal(result.data.hidden, true);
+  result = await request("GET", "/community/feed", menuViewer.uid);
+  assert.ok(!result.data.posts.some(post => post.authorId === menuAuthor.uid));
+  result = await request("POST", `/community/authors/${menuViewer.uid}/hide`, menuViewer.uid);
+  assert.equal(result.response.status, 400);
 });
 
 after(async () => {

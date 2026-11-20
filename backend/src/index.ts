@@ -478,6 +478,7 @@ const start = async () => {
       app.locals.communityLikeCollection = db.collection("community_likes");
       app.locals.communityCommentCollection = db.collection("community_comments");
       app.locals.communityFollowCollection = db.collection("community_follows");
+      app.locals.communityPreferenceCollection = db.collection("community_preferences");
       app.locals.communityPollVoteCollection = db.collection("community_poll_votes");
       app.locals.favoriteCollection = db.collection("favorites");
       app.locals.reviewCollection = db.collection("reviews");
@@ -588,6 +589,7 @@ const start = async () => {
         app.locals.communityCommentCollection.createIndex({ postId: 1, createdAt: 1 }),
         app.locals.communityFollowCollection.createIndex({ followerId: 1, followingId: 1 }, { unique: true }),
         app.locals.communityFollowCollection.createIndex({ followingId: 1, createdAt: -1 }),
+        app.locals.communityPreferenceCollection.createIndex({ userId: 1, kind: 1, targetId: 1 }, { unique: true }),
         app.locals.communityPollVoteCollection.createIndex({ postId: 1, userId: 1 }, { unique: true }),
         app.locals.reportCollection.createIndex(
           { targetType: 1, targetId: 1, reportedBy: 1 },

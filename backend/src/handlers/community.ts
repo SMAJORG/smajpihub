@@ -11,6 +11,7 @@ const MAX_POST_TEXT = 2000;
 const MAX_COMMENT_TEXT = 1000;
 const pageSize = 20;
 const allowedPostTypes = new Set(["post", "media", "event", "celebration", "job", "poll", "document"]);
+type CommunityPreferenceKind = "saved_post" | "hidden_author" | "not_interested_post";
 const noStore = (_req: Request, res: Response, next: () => void) => {
   res.setHeader("Cache-Control", "no-store");
   next();
@@ -163,6 +164,26 @@ const parsePostInput = (body: Record<string, any>) => {
   };
 };
 const serialize = (record: Record<string, any>) => ({ ...record, _id: String(record._id) });
+const setCommunityPreference = async (
+  locals: Record<string, any>,
+  userId: string,
+  kind: CommunityPreferenceKind,
+  targetId: string,
+  enabled: boolean,
+) => {
+  const query = { userId, kind, targetId };
+  if (!enabled) {
+    await locals.communityPreferenceCollection.deleteOne(query);
+    return;
+  }
+  try {
+    await locals.communityPreferenceCollection.updateOne(query, {
+      $setOnInsert: { ...query, createdAt: new Date() },
+    }, { upsert: true });
+  } catch (error: any) {
+    if (error?.code !== 11000) throw error;
+  }
+};
 const canViewPost = async (req: Request, post: Record<string, any>, viewer: Record<string, any> | null) => {
   if (post.authorId === viewer?.uid) return true;
   if ((post.audience || "everyone") === "everyone") return true;
@@ -273,6 +294,18 @@ const listPosts = async (req: Request, res: Response) => {
   const viewer = await resolveCurrentUser(req);
   const page = Math.max(1, Math.min(1000, Number.parseInt(String(req.query.page || "1"), 10) || 1));
   const query: Record<string, any> = { status: "published" };
+  const viewerPreferences = viewer
+    ? await req.app.locals.communityPreferenceCollection.find({ userId: viewer.uid }).toArray()
+    : [];
+  const hiddenAuthorIds = viewerPreferences
+    .filter((item: Record<string, any>) => item.kind === "hidden_author")
+    .map((item: Record<string, any>) => item.targetId);
+  const notInterestedPostIds = viewerPreferences
+    .filter((item: Record<string, any>) => item.kind === "not_interested_post" && ObjectId.isValid(item.targetId))
+    .map((item: Record<string, any>) => new ObjectId(item.targetId));
+  const savedPostIds = new Set(viewerPreferences
+    .filter((item: Record<string, any>) => item.kind === "saved_post")
+    .map((item: Record<string, any>) => item.targetId));
   const follows = viewer
     ? (await req.app.locals.communityFollowCollection.find({ followerId: viewer.uid }).limit(500).toArray())
       .map((follow: Record<string, any>) => follow.followingId)
@@ -290,10 +323,19 @@ const listPosts = async (req: Request, res: Response) => {
     const author = await req.app.locals.userCollection.findOne({ uid: authorId, blocked: { $ne: true } });
     if (!isPublic(author) && viewer?.uid !== authorId) return res.status(404).json({ error: "profile_unavailable" });
     query.authorId = authorId;
-  } else if (req.query.scope === "following") {
-    if (!viewer) return res.status(401).json({ error: "unauthorized" });
-    if (!followedIds.length) return res.json({ posts: [], hasMore: false });
-    query.authorId = { $in: followedIds };
+  } else {
+    if (req.query.scope === "following") {
+      if (!viewer) return res.status(401).json({ error: "unauthorized" });
+      if (!followedIds.length) return res.json({ posts: [], hasMore: false });
+      query.authorId = { $in: followedIds };
+    }
+    if (hiddenAuthorIds.length) {
+      query.authorId = {
+        ...(query.authorId && typeof query.authorId === "object" ? query.authorId : {}),
+        $nin: hiddenAuthorIds,
+      };
+    }
+    if (notInterestedPostIds.length) query._id = { $nin: notInterestedPostIds };
   }
   const posts = await req.app.locals.communityPostCollection.find(query).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).toArray();
   const authorIds = [...new Set(posts.map((post: Record<string, any>) => post.authorId))];
@@ -393,6 +435,7 @@ const listPosts = async (req: Request, res: Response) => {
       ...serialize(post),
       author: identity,
       originalPost,
+      savedByMe: savedPostIds.has(String(post._id)),
       likedByMe: likesByPost.has(String(post._id)),
       myReaction: likesByPost.has(String(post._id)) ? likesByPost.get(String(post._id))!.reaction || "like" : null,
       reactionCounts: post.reactionCounts || { like: Number(post.likeCount || 0) },
@@ -436,16 +479,60 @@ export default function mountCommunityEndpoints(router: Router) {
     const target = await req.app.locals.userCollection.findOne({ uid: req.params.uid, blocked: { $ne: true } });
     if (!isPublic(target)) return res.status(404).json({ error: "profile_unavailable" });
     const existing = await req.app.locals.communityFollowCollection.findOne({ followerId: viewer.uid, followingId: target.uid });
-    if (existing) {
+    const shouldFollow = typeof req.body?.following === "boolean" ? req.body.following : !existing;
+    if (existing && !shouldFollow) {
       await req.app.locals.communityFollowCollection.deleteOne({ _id: existing._id });
       return res.json({ following: false });
     }
+    if (existing && shouldFollow) return res.json({ following: true });
+    if (!existing && !shouldFollow) return res.json({ following: false });
     try {
       await req.app.locals.communityFollowCollection.insertOne({ followerId: viewer.uid, followingId: target.uid, createdAt: new Date() });
     } catch (error: any) {
       if (error?.code !== 11000) throw error;
     }
     return res.status(201).json({ following: true });
+  });
+
+  router.post("/authors/:uid/hide", async (req: Request, res: Response) => {
+    const viewer = await resolveCurrentUser(req);
+    if (!viewer) return res.status(401).json({ error: "unauthorized" });
+    if (!req.params.uid || req.params.uid === viewer.uid) return res.status(400).json({ error: "invalid_author" });
+    const target = await req.app.locals.userCollection.findOne({ uid: req.params.uid, blocked: { $ne: true } });
+    if (!isPublic(target)) return res.status(404).json({ error: "profile_unavailable" });
+    await setCommunityPreference(req.app.locals, viewer.uid, "hidden_author", target.uid, true);
+    return res.json({ hidden: true });
+  });
+
+  router.post("/posts/:id/save", async (req: Request, res: Response) => {
+    const viewer = await resolveCurrentUser(req);
+    if (!viewer) return res.status(401).json({ error: "unauthorized" });
+    if (typeof req.body?.saved !== "boolean") return res.status(400).json({ error: "invalid_saved_state" });
+    const result = await getPublicPost(req, req.params.id);
+    if (!result || !await canViewPost(req, result.post, viewer)) return res.status(404).json({ error: "post_unavailable" });
+    await setCommunityPreference(req.app.locals, viewer.uid, "saved_post", String(result.post._id), req.body.saved);
+    return res.json({ saved: req.body.saved });
+  });
+
+  router.post("/posts/:id/not-interested", async (req: Request, res: Response) => {
+    const viewer = await resolveCurrentUser(req);
+    if (!viewer) return res.status(401).json({ error: "unauthorized" });
+    const result = await getPublicPost(req, req.params.id);
+    if (!result || !await canViewPost(req, result.post, viewer)) return res.status(404).json({ error: "post_unavailable" });
+    await setCommunityPreference(req.app.locals, viewer.uid, "not_interested_post", String(result.post._id), true);
+    return res.json({ dismissed: true });
+  });
+
+  router.post("/posts/:id/share", async (req: Request, res: Response) => {
+    const viewer = await resolveCurrentUser(req);
+    if (!viewer) return res.status(401).json({ error: "unauthorized" });
+    const result = await getPublicPost(req, req.params.id);
+    if (!result || !await canViewPost(req, result.post, viewer)) return res.status(404).json({ error: "post_unavailable" });
+    await req.app.locals.communityPostCollection.updateOne(
+      { _id: result.post._id, status: "published" },
+      { $inc: { shareCount: 1 } },
+    );
+    return res.json({ shareCount: Number(result.post.shareCount || 0) + 1 });
   });
 
   router.post("/posts", async (req: Request, res: Response) => {
@@ -754,6 +841,29 @@ export default function mountCommunityEndpoints(router: Router) {
       await req.app.locals.communityPostCollection.updateOne({ _id: result.post._id, status: "published" }, { $set: { status: "hidden", hiddenAt: new Date(), hiddenReason: "report_threshold" } });
     }
     return res.status(201).json({ reported: true });
+  });
+
+  router.patch("/posts/:id", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    if (!ObjectId.isValid(req.params.id)) return res.status(404).json({ error: "post_unavailable" });
+    const post = await req.app.locals.communityPostCollection.findOne({
+      _id: new ObjectId(req.params.id),
+      authorId: user.uid,
+      status: "published",
+    });
+    if (!post) return res.status(404).json({ error: "post_unavailable" });
+    const content = String(req.body?.content ?? "").trim();
+    const hasStructuredContent = Boolean(post.media?.length || post.poll || post.event || post.document || post.job || post.celebration);
+    if (content.length > MAX_POST_TEXT || (!content && !hasStructuredContent)) {
+      return res.status(400).json({ error: "invalid_post_content", message: "Add text or keep existing post content." });
+    }
+    const updatedAt = new Date();
+    await req.app.locals.communityPostCollection.updateOne(
+      { _id: post._id, authorId: user.uid, status: "published" },
+      { $set: { content, updatedAt } },
+    );
+    return res.json({ post: serialize({ ...post, content, updatedAt }) });
   });
 
   router.delete("/posts/:id", async (req: Request, res: Response) => {
