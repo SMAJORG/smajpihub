@@ -9,6 +9,7 @@ import {
   reportCommunityPost,
   repostCommunityPost,
   toggleCommunityLike,
+  voteOnCommunityPoll,
   type CommunityComment,
   type CommunityPost,
 } from "../lib/communityApi";
@@ -33,8 +34,10 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
   const [commentText, setCommentText] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(reportReasons[0]);
+  const [poll, setPoll] = useState(post.originalPost?.poll || post.poll);
+  const [myVote, setMyVote] = useState(post.originalPost?.myVote || post.myVote || null);
   const original = post.originalPost;
-  const content = original || post;
+  const content: CommunityPost = original ? { ...post, ...original } : post;
   const author = content.author || post.author;
 
   useEffect(() => {
@@ -42,6 +45,8 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
     setLikeCount(post.likeCount || 0);
     setCommentCount(post.commentCount || 0);
     setRepostCount(post.repostCount || 0);
+    setPoll(post.originalPost?.poll || post.poll);
+    setMyVote(post.originalPost?.myVote || post.myVote || null);
   }, [post]);
 
   const toggleLike = async () => {
@@ -60,6 +65,7 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
   };
 
   const toggleComments = async () => {
+    if (post.canComment === false) return;
     if (commentsOpen) {
       setCommentsOpen(false);
       return;
@@ -71,6 +77,21 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
       setCommentsOpen(true);
     } catch {
       setError("Comments could not be loaded. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const vote = async (optionId: string) => {
+    if (busy || myVote || !viewerId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await voteOnCommunityPoll(original?.poll ? original._id : post._id, optionId);
+      setMyVote(result.myVote);
+      setPoll(current => current ? { ...current, options: result.options } : current);
+    } catch {
+      setError("Your vote could not be saved. The poll may have closed.");
     } finally {
       setBusy(false);
     }
@@ -177,6 +198,22 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
       {post.type === "repost" && post.content ? <p className="community-repost-note">{post.content}</p> : null}
       <div className="community-post-body">
         {content.content ? <p>{content.content}</p> : null}
+        {content.brandPartnership ? <p className="community-post-partnership">Paid partnership</p> : null}
+        {content.event ? <aside className="community-structured-post"><strong>{content.event.title}</strong><span>{when(content.event.startsAt)} · {content.event.location}</span></aside> : null}
+        {content.celebration ? <aside className="community-structured-post"><strong>Celebrating {content.celebration.replaceAll("_", " ")}</strong></aside> : null}
+        {content.job ? <aside className="community-structured-post"><strong>{content.job.title}</strong><span>{content.job.company} · {content.job.location}</span><Link to={`/services/jobs/job/${encodeURIComponent(content.job.id)}`}>View SMAJ Jobs listing</Link></aside> : null}
+        {content.document ? <a className="community-structured-document" href={content.document.url} target="_blank" rel="noopener noreferrer"><span>{content.document.name}</span><span>Open PDF</span></a> : null}
+        {poll ? <section className="community-post-poll" aria-label="Poll">
+          <strong>{poll.question}</strong>
+          {poll.options.map(option => {
+            const totalVotes = poll.options.reduce((total, item) => total + item.votes, 0);
+            const percentage = totalVotes ? Math.round(option.votes / totalVotes * 100) : 0;
+            return <button key={option.id} type="button" disabled={busy || Boolean(myVote) || !viewerId || Boolean(poll.expiresAt && new Date(poll.expiresAt).getTime() <= Date.now())} aria-pressed={myVote === option.id} onClick={() => void vote(option.id)}>
+              <span>{option.label}{myVote ? ` · ${percentage}%` : ""}</span><span>{myVote ? `${option.votes} vote${option.votes === 1 ? "" : "s"}` : "Vote"}</span>
+            </button>;
+          })}
+          <small>{poll.options.reduce((total, option) => total + option.votes, 0)} votes{poll.expiresAt ? ` · ${new Date(poll.expiresAt).getTime() <= Date.now() ? "Poll closed" : `Closes ${when(poll.expiresAt)}`}` : ""}</small>
+        </section> : null}
         {content.media?.length ? <div className={`community-post-media${content.media.length > 1 ? " multiple" : ""}`}>
           {content.media.map((media, index) => media.type === "video"
             ? <video key={`${media.url}-${index}`} controls preload="metadata" src={media.url} />
@@ -186,7 +223,7 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
       <div className="community-post-counts"><span>{likeCount} likes</span><span>{commentCount} comments</span><span>{repostCount} reposts</span></div>
       <div className="community-post-actions">
         <button type="button" aria-pressed={liked} disabled={busy} onClick={() => void toggleLike()}>{liked ? "Liked" : "Like"}</button>
-        <button type="button" disabled={busy} onClick={() => void toggleComments()}>{commentsOpen ? "Hide comments" : "Comment"}</button>
+        <button type="button" disabled={busy || post.canComment === false} onClick={() => void toggleComments()}>{post.canComment === false ? "Comments restricted" : commentsOpen ? "Hide comments" : "Comment"}</button>
         <button type="button" disabled={busy} onClick={() => void repost()}>Repost</button>
         <button type="button" onClick={() => void share()}>Share</button>
       </div>

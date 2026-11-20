@@ -4,9 +4,12 @@ import { resolveCurrentUser } from "../services/auth";
 import { getEligibleAvatarFrames, getEligibleAvatarFramesForUsers, resolveAvatarFrame, type AvatarFrameId } from "../services/avatarFrames";
 
 type CommunityMedia = { type: "image" | "video"; url: string };
+type CommunityAudience = "everyone" | "followers" | "only_me";
+type CommunityCommentPolicy = "everyone" | "followers" | "nobody";
 const MAX_POST_TEXT = 2000;
 const MAX_COMMENT_TEXT = 1000;
 const pageSize = 20;
+const allowedPostTypes = new Set(["post", "media", "event", "celebration", "job", "poll", "document"]);
 const noStore = (_req: Request, res: Response, next: () => void) => {
   res.setHeader("Cache-Control", "no-store");
   next();
@@ -60,14 +63,102 @@ const safeMedia = (input: unknown): CommunityMedia[] | null => {
   }
   return media;
 };
+const safeDocument = (input: unknown) => {
+  if (!input || typeof input !== "object") return null;
+  const document = input as Record<string, unknown>;
+  const name = String(document.name || "").trim().replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-").slice(0, 120);
+  const rawUrl = String(document.url || "").trim();
+  try {
+    const url = new URL(rawUrl);
+    if (!name || url.protocol !== "https:" || url.hostname !== "res.cloudinary.com" || !url.pathname.includes("/raw/upload/")) return null;
+    return { name, url: url.toString() };
+  } catch {
+    return null;
+  }
+};
+const safePoll = (input: unknown) => {
+  if (!input || typeof input !== "object") return null;
+  const poll = input as Record<string, unknown>;
+  const question = String(poll.question || "").trim();
+  const options = Array.isArray(poll.options)
+    ? poll.options.map((option, index) => ({ id: `option-${index + 1}`, label: String(option || "").trim().slice(0, 100) }))
+    : [];
+  const expiresAt = poll.expiresAt ? new Date(String(poll.expiresAt)) : null;
+  if (!question || question.length > 240 || options.length < 2 || options.length > 6
+    || options.some(option => !option.label) || new Set(options.map(option => option.label.toLowerCase())).size !== options.length
+    || (expiresAt && (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now() || expiresAt.getTime() > Date.now() + 30 * 86_400_000))) return null;
+  return { question, options: options.map(option => ({ ...option, votes: 0 })), expiresAt: expiresAt?.toISOString() || null };
+};
+const safeEvent = (input: unknown) => {
+  if (!input || typeof input !== "object") return null;
+  const event = input as Record<string, unknown>;
+  const title = String(event.title || "").trim();
+  const startsAt = new Date(String(event.startsAt || ""));
+  const location = String(event.location || "").trim().slice(0, 160);
+  if (!title || title.length > 120 || !Number.isFinite(startsAt.getTime()) || startsAt.getTime() <= Date.now() || !location) return null;
+  return { title, startsAt: startsAt.toISOString(), location };
+};
+const parsePostInput = (body: Record<string, any>) => {
+  const content = String(body.content || "").trim();
+  const media = safeMedia(body.media ?? []);
+  const postType = String(body.postType || (media?.length ? "media" : "post"));
+  const audience = String(body.audience || "everyone");
+  const commentPolicy = String(body.commentPolicy || "everyone");
+  const collaborators = Array.isArray(body.collaborators)
+    ? [...new Set(body.collaborators.map((uid: unknown) => String(uid).slice(0, 128)).filter(Boolean))]
+    : [];
+  const poll = postType === "poll" ? safePoll(body.poll) : null;
+  const event = postType === "event" ? safeEvent(body.event) : null;
+  const document = postType === "document" ? safeDocument(body.document) : null;
+  const jobId = postType === "job" ? String(body.jobId || "").slice(0, 128) : "";
+  const celebration = postType === "celebration" ? String(body.celebration || "").trim().slice(0, 80) : "";
+  const brandPartnership = body.brandPartnership === true;
+  if (!allowedPostTypes.has(postType) || !["everyone", "followers", "only_me"].includes(audience)
+    || !["everyone", "followers", "nobody"].includes(commentPolicy) || collaborators.length > 5
+    || content.length > MAX_POST_TEXT || !media
+    || (!content && !media.length && !poll && !event && !document && !jobId && !celebration)
+    || (postType === "poll" && !poll) || (postType === "event" && !event)
+    || (postType === "document" && !document) || (postType === "job" && !jobId)
+    || (postType === "celebration" && !celebration)) return null;
+  return {
+    content,
+    media,
+    postType,
+    audience: audience as CommunityAudience,
+    commentPolicy: commentPolicy as CommunityCommentPolicy,
+    collaboratorIds: collaborators,
+    brandPartnership,
+    ...(poll ? { poll } : {}),
+    ...(event ? { event } : {}),
+    ...(document ? { document } : {}),
+    ...(jobId ? { jobId } : {}),
+    ...(celebration ? { celebration } : {}),
+  };
+};
 const serialize = (record: Record<string, any>) => ({ ...record, _id: String(record._id) });
+const canViewPost = async (req: Request, post: Record<string, any>, viewer: Record<string, any> | null) => {
+  if (post.authorId === viewer?.uid) return true;
+  if ((post.audience || "everyone") === "everyone") return true;
+  if (!viewer || post.audience === "only_me") return false;
+  if (post.audience !== "followers") return false;
+  return Boolean(await req.app.locals.communityFollowCollection.findOne({ followerId: viewer.uid, followingId: post.authorId }));
+};
+const canCommentOnPost = async (req: Request, post: Record<string, any>, viewer: Record<string, any> | null) => {
+  if (!viewer) return false;
+  if (post.authorId === viewer.uid) return true;
+  const policy = post.commentPolicy || "everyone";
+  if (policy === "everyone") return true;
+  if (policy === "nobody") return false;
+  return Boolean(await req.app.locals.communityFollowCollection.findOne({ followerId: viewer.uid, followingId: post.authorId }));
+};
 const getPublicPost = async (req: Request, postId: string) => {
   if (!ObjectId.isValid(postId)) return null;
   const post = await req.app.locals.communityPostCollection.findOne({ _id: new ObjectId(postId), status: "published" });
   if (!post) return null;
   const author = await req.app.locals.userCollection.findOne({ uid: post.authorId });
   const viewer = await resolveCurrentUser(req);
-  return isPublic(author) || Boolean(author && viewer?.uid === author.uid) ? { post, author } : null;
+  return (isPublic(author) || Boolean(author && viewer?.uid === author.uid))
+    && await canViewPost(req, post, viewer) ? { post, author, viewer } : null;
 };
 
 const userProfile = async (req: Request, res: Response) => {
@@ -118,6 +209,17 @@ const listPosts = async (req: Request, res: Response) => {
   const viewer = await resolveCurrentUser(req);
   const page = Math.max(1, Math.min(1000, Number.parseInt(String(req.query.page || "1"), 10) || 1));
   const query: Record<string, any> = { status: "published" };
+  const followedIds = viewer
+    ? (await req.app.locals.communityFollowCollection.find({ followerId: viewer.uid }).limit(500).toArray())
+      .map((follow: Record<string, any>) => follow.followingId)
+    : [];
+  query.$and = [{
+    $or: [
+      { audience: { $exists: false } },
+      { audience: "everyone" },
+      ...(viewer ? [{ authorId: viewer.uid }, { audience: "followers", authorId: { $in: followedIds } }] : []),
+    ],
+  }];
   const authorId = typeof req.query.authorId === "string" ? req.query.authorId.slice(0, 128) : "";
   if (authorId) {
     const author = await req.app.locals.userCollection.findOne({ uid: authorId, blocked: { $ne: true } });
@@ -145,25 +247,51 @@ const listPosts = async (req: Request, res: Response) => {
   const output = await Promise.all(visiblePosts.map(async (post: Record<string, any>) => {
     const author = authorsById.get(post.authorId)!;
     const identity = await publicIdentity(req.app.locals, author, eligibilityByUser.get(String(author.uid)));
-    let originalPost = null;
+    let originalPost: Record<string, any> | null = null;
     if (post.repostOf && ObjectId.isValid(post.repostOf)) {
       const original = await req.app.locals.communityPostCollection.findOne({ _id: new ObjectId(post.repostOf), status: "published" });
       const originalAuthor = original && await req.app.locals.userCollection.findOne({ uid: original.authorId, blocked: { $ne: true } });
-      if (!original || !isPublic(originalAuthor)) return null;
+      if (!original || !isPublic(originalAuthor) || !await canViewPost(req, original, viewer)) return null;
       originalPost = { ...serialize(original), author: await publicIdentity(req.app.locals, originalAuthor) };
+      if (original.poll) {
+        const votes = await req.app.locals.communityPollVoteCollection.find({ postId: String(original._id) }).toArray();
+        originalPost.poll = {
+          ...original.poll,
+          options: original.poll.options.map((option: Record<string, any>) => ({
+            ...option,
+            votes: votes.filter((vote: Record<string, any>) => vote.optionId === option.id).length,
+          })),
+        };
+        originalPost.myVote = votes.find((vote: Record<string, any>) => vote.userId === viewer?.uid)?.optionId || null;
+      }
+    }
+    let poll = post.poll;
+    let myVote: string | null = null;
+    if (poll && req.app.locals.communityPollVoteCollection) {
+      const votes = await req.app.locals.communityPollVoteCollection.find({ postId: String(post._id) }).toArray();
+      poll = {
+        ...poll,
+        options: poll.options.map((option: Record<string, any>) => ({
+          ...option,
+          votes: votes.filter((vote: Record<string, any>) => vote.optionId === option.id).length,
+        })),
+      };
+      myVote = votes.find((vote: Record<string, any>) => vote.userId === viewer?.uid)?.optionId || null;
     }
     return {
       ...serialize(post),
       author: identity,
       originalPost,
       likedByMe: likedIds.has(String(post._id)),
+      ...(poll ? { poll, myVote } : {}),
+      canComment: await canCommentOnPost(req, post, viewer),
     };
   }));
   return res.json({ posts: output.filter(Boolean), hasMore: posts.length === pageSize });
 };
 
 export default function mountCommunityEndpoints(router: Router) {
-  for (const method of ["get", "post", "delete"] as const) {
+  for (const method of ["get", "post", "patch", "delete"] as const) {
     const register = router[method].bind(router) as any;
     (router as any)[method] = (path: string, handler: any) => register(path, (req: Request, res: Response, next: (error?: unknown) => void) =>
       Promise.resolve(handler(req, res, next)).catch(next));
@@ -171,6 +299,12 @@ export default function mountCommunityEndpoints(router: Router) {
   router.use(noStore);
   router.get("/profiles/:uid", userProfile);
   router.get("/feed", listPosts);
+  router.get("/posts/scheduled", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const posts = await req.app.locals.communityPostCollection.find({ authorId: user.uid, status: "scheduled" }).sort({ publishAt: 1 }).limit(100).toArray();
+    return res.json({ posts: posts.map(serialize) });
+  });
 
   router.post("/follow/:uid", async (req: Request, res: Response) => {
     const viewer = await resolveCurrentUser(req);
@@ -195,20 +329,36 @@ export default function mountCommunityEndpoints(router: Router) {
     const user = await resolveCurrentUser(req);
     if (!user) return res.status(401).json({ error: "unauthorized" });
     if (user.blocked) return res.status(403).json({ error: "account_unavailable" });
-    const content = String(req.body?.content || "").trim();
-    const media = safeMedia(req.body?.media ?? []);
-    if (content.length > MAX_POST_TEXT || !media || (!content && !media.length)) {
-      return res.status(400).json({ error: "invalid_post", message: "Add text or up to four uploaded photos or videos. Text must be 2,000 characters or fewer." });
+    const fields = parsePostInput(req.body || {});
+    if (!fields) return res.status(400).json({ error: "invalid_post", message: "Check the post content, options, audience and attachments." });
+    const collaborators = fields.collaboratorIds.length
+      ? await req.app.locals.userCollection.find({ uid: { $in: fields.collaboratorIds }, blocked: { $ne: true }, publicProfile: { $ne: false }, "settings.publicProfile": { $ne: false } }).toArray()
+      : [];
+    if (collaborators.length !== fields.collaboratorIds.length) return res.status(400).json({ error: "invalid_collaborators" });
+    let job = null;
+    if (fields.jobId) {
+      job = await req.app.locals.jobCollection.findOne({
+        slug: fields.jobId,
+        status: "active",
+        moderationStatus: "approved",
+        expiresAt: { $gt: new Date().toISOString() },
+      });
+      if (!job) return res.status(400).json({ error: "job_unavailable", message: "Choose an active approved SMAJ Jobs listing." });
+    }
+    const publishAt = req.body?.publishAt ? new Date(String(req.body.publishAt)) : null;
+    if (publishAt && (!Number.isFinite(publishAt.getTime()) || publishAt.getTime() < Date.now() + 60_000 || publishAt.getTime() > Date.now() + 365 * 86_400_000)) {
+      return res.status(400).json({ error: "invalid_schedule", message: "Choose a publish time between one minute and one year from now." });
     }
     const recentPosts = await req.app.locals.communityPostCollection.countDocuments({ authorId: user.uid, createdAt: { $gte: new Date(Date.now() - 60_000) } });
     if (recentPosts >= 3) return res.status(429).json({ error: "posting_rate_limited", message: "Please wait before publishing another post." });
     const now = new Date();
     const post = {
+      ...fields,
+      ...(job ? { job: { id: job.slug, title: job.title, company: job.company, location: job.location } } : {}),
       authorId: user.uid,
-      content,
-      media,
       type: "post",
-      status: "published",
+      status: publishAt ? "scheduled" : "published",
+      ...(publishAt ? { publishAt } : {}),
       likeCount: 0,
       commentCount: 0,
       repostCount: 0,
@@ -217,6 +367,99 @@ export default function mountCommunityEndpoints(router: Router) {
     };
     const result = await req.app.locals.communityPostCollection.insertOne(post);
     return res.status(201).json({ post: { ...post, _id: String(result.insertedId), author: await publicIdentity(req.app.locals, user), likedByMe: false } });
+  });
+
+  router.patch("/posts/:id/schedule", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    if (!ObjectId.isValid(req.params.id)) return res.status(404).json({ error: "scheduled_post_unavailable" });
+    const post = await req.app.locals.communityPostCollection.findOne({ _id: new ObjectId(req.params.id), authorId: user.uid, status: "scheduled" });
+    if (!post) return res.status(404).json({ error: "scheduled_post_unavailable" });
+    const publishAt = new Date(String(req.body?.publishAt || ""));
+    if (!Number.isFinite(publishAt.getTime()) || publishAt.getTime() < Date.now() + 60_000 || publishAt.getTime() > Date.now() + 365 * 86_400_000) {
+      return res.status(400).json({ error: "invalid_schedule", message: "Choose a publish time between one minute and one year from now." });
+    }
+    const updatesContent = Object.keys(req.body || {}).some(key => key !== "publishAt");
+    let fields: ReturnType<typeof parsePostInput> = null;
+    let job: Record<string, any> | null = null;
+    if (updatesContent) {
+      fields = parsePostInput({
+        ...post,
+        ...req.body,
+        collaborators: req.body?.collaborators ?? post.collaboratorIds ?? [],
+        postType: req.body?.postType || post.postType || "post",
+      });
+      if (!fields) return res.status(400).json({ error: "invalid_post", message: "Check the post content, options, audience and attachments." });
+      const collaborators = fields.collaboratorIds.length
+        ? await req.app.locals.userCollection.find({ uid: { $in: fields.collaboratorIds }, blocked: { $ne: true }, publicProfile: { $ne: false }, "settings.publicProfile": { $ne: false } }).toArray()
+        : [];
+      if (collaborators.length !== fields.collaboratorIds.length) return res.status(400).json({ error: "invalid_collaborators" });
+      if (fields.jobId) {
+        job = await req.app.locals.jobCollection.findOne({
+          slug: fields.jobId,
+          status: "active",
+          moderationStatus: "approved",
+          expiresAt: { $gt: new Date().toISOString() },
+        });
+        if (!job) return res.status(400).json({ error: "job_unavailable", message: "Choose an active approved SMAJ Jobs listing." });
+      }
+    }
+    const updatedAt = new Date();
+    const updateFields = {
+      ...(fields || {}),
+      ...(job ? { job: { id: job.slug, title: job.title, company: job.company, location: job.location } } : {}),
+      publishAt,
+      updatedAt,
+    };
+    const unsetFields: Record<string, ""> = {};
+    if (fields) {
+      for (const key of ["poll", "event", "document", "jobId", "job", "celebration"]) {
+        if (!(key in updateFields)) unsetFields[key] = "";
+      }
+    }
+    await req.app.locals.communityPostCollection.updateOne(
+      { _id: post._id, authorId: user.uid, status: "scheduled" },
+      { $set: updateFields, ...(Object.keys(unsetFields).length ? { $unset: unsetFields } : {}) },
+    );
+    const updatedPost = { ...post, ...updateFields };
+    Object.keys(unsetFields).forEach(key => delete updatedPost[key]);
+    return res.json({ post: serialize(updatedPost) });
+  });
+
+  router.delete("/posts/:id/schedule", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    if (!ObjectId.isValid(req.params.id)) return res.status(404).json({ error: "scheduled_post_unavailable" });
+    const result = await req.app.locals.communityPostCollection.updateOne(
+      { _id: new ObjectId(req.params.id), authorId: user.uid, status: "scheduled" },
+      { $set: { status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() } },
+    );
+    return result.modifiedCount ? res.json({ cancelled: true }) : res.status(404).json({ error: "scheduled_post_unavailable" });
+  });
+
+  router.post("/posts/:id/poll/vote", async (req: Request, res: Response) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const result = await getPublicPost(req, req.params.id);
+    if (!result?.post.poll) return res.status(404).json({ error: "poll_unavailable" });
+    const optionId = String(req.body?.optionId || "");
+    if (!result.post.poll.options.some((option: Record<string, any>) => option.id === optionId)
+      || (result.post.poll.expiresAt && new Date(result.post.poll.expiresAt).getTime() <= Date.now())) {
+      return res.status(400).json({ error: "invalid_poll_vote" });
+    }
+    await req.app.locals.communityPollVoteCollection.updateOne(
+      { postId: String(result.post._id), userId: user.uid },
+      { $set: { optionId, votedAt: new Date() } },
+      { upsert: true },
+    );
+    const votes = await req.app.locals.communityPollVoteCollection.find({ postId: String(result.post._id) }).toArray();
+    return res.json({
+      myVote: optionId,
+      options: result.post.poll.options.map((option: Record<string, any>) => ({
+        ...option,
+        votes: votes.filter((vote: Record<string, any>) => vote.optionId === option.id).length,
+      })),
+    });
   });
 
   router.post("/posts/:id/like", async (req: Request, res: Response) => {
@@ -249,6 +492,7 @@ export default function mountCommunityEndpoints(router: Router) {
   router.get("/posts/:id/comments", async (req: Request, res: Response) => {
     const result = await getPublicPost(req, req.params.id);
     if (!result) return res.status(404).json({ error: "post_unavailable" });
+    if (!await canCommentOnPost(req, result.post, result.viewer)) return res.status(403).json({ error: "comments_unavailable" });
     const comments = await req.app.locals.communityCommentCollection.find({ postId: String(result.post._id), status: "visible" }).sort({ createdAt: 1 }).limit(50).toArray();
     const authors = comments.length
       ? await req.app.locals.userCollection.find({ uid: { $in: [...new Set(comments.map((comment: Record<string, any>) => comment.authorId))] }, blocked: { $ne: true }, publicProfile: { $ne: false } }).toArray()
@@ -276,6 +520,7 @@ export default function mountCommunityEndpoints(router: Router) {
     if (!user) return res.status(401).json({ error: "unauthorized" });
     const result = await getPublicPost(req, req.params.id);
     if (!result) return res.status(404).json({ error: "post_unavailable" });
+    if (!await canCommentOnPost(req, result.post, user)) return res.status(403).json({ error: "comments_unavailable" });
     const content = String(req.body?.content || "").trim();
     if (!content || content.length > MAX_COMMENT_TEXT) return res.status(400).json({ error: "invalid_comment", message: "Comments must contain 1–1,000 characters." });
     const recentComments = await req.app.locals.communityCommentCollection.countDocuments({ authorId: user.uid, createdAt: { $gte: new Date(Date.now() - 60_000) } });
@@ -292,10 +537,16 @@ export default function mountCommunityEndpoints(router: Router) {
     if (!user) return res.status(401).json({ error: "unauthorized" });
     const result = await getPublicPost(req, req.params.id);
     if (!result) return res.status(404).json({ error: "post_unavailable" });
+    if ((result.post.audience || "everyone") !== "everyone") {
+      return res.status(403).json({ error: "repost_unavailable", message: "Posts with limited audiences cannot be reposted." });
+    }
     if (result.post.authorId === user.uid) return res.status(400).json({ error: "self_repost" });
     const originalId = String(result.post.repostOf || result.post._id);
     const originalResult = await getPublicPost(req, originalId);
     if (!originalResult) return res.status(404).json({ error: "post_unavailable" });
+    if ((originalResult.post.audience || "everyone") !== "everyone") {
+      return res.status(403).json({ error: "repost_unavailable", message: "Posts with limited audiences cannot be reposted." });
+    }
     if (originalResult.post.authorId === user.uid) return res.status(400).json({ error: "self_repost" });
     if (await req.app.locals.communityPostCollection.findOne({ authorId: user.uid, type: "repost", repostOf: originalId, status: "published" })) {
       return res.status(409).json({ error: "already_reposted" });

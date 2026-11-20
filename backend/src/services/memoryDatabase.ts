@@ -240,6 +240,7 @@ export const createMemoryCollections = () => ({
   communityLikeCollection: new MemoryCollection(),
   communityCommentCollection: new MemoryCollection(),
   communityFollowCollection: new MemoryCollection(),
+  communityPollVoteCollection: new MemoryCollection(),
   favoriteCollection: new MemoryCollection(),
   reviewCollection: new MemoryCollection(),
   conversationCollection: new MemoryCollection(),

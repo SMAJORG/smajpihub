@@ -46,6 +46,7 @@ import RoleRoute from "./components/RoleRoute";
 import SearchPage from "./pages/private/SearchPage";
 import DashboardPage from "./pages/private/DashboardPage";
 import PrivateCommunityPage from "./pages/private/CommunityPage";
+import CommunityPostCreatePage from "./pages/private/CommunityPostCreatePage";
 import PublicProfilePage from "./pages/private/PublicProfilePage";
 import StorePage from "./pages/private/StorePage";
 import ProductDetailPage from "./pages/private/ProductDetailPage";
@@ -628,6 +629,16 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <PrivateLayout>
           <PrivateCommunityPage />
+        </PrivateLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/community/create",
+    element: (
+      <ProtectedRoute>
+        <PrivateLayout fullScreen>
+          <CommunityPostCreatePage />
         </PrivateLayout>
       </ProtectedRoute>
     ),

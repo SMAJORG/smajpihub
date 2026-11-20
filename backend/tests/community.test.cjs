@@ -4,6 +4,7 @@ const express = require("express");
 const session = require("express-session");
 const { ObjectId } = require("mongodb");
 const { createMemoryCollections } = require("../build/services/memoryDatabase");
+const { publishDueCommunityPosts } = require("../build/services/communityScheduler");
 const mountAdminEndpoints = require("../build/handlers/admin").default;
 const mountCommunityEndpoints = require("../build/handlers/community").default;
 const mountUserEndpoints = require("../build/handlers/users").default;
@@ -215,6 +216,96 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(result.response.status, 200);
   result = await request("GET", "/community/feed", viewer.uid);
   assert.ok(result.data.posts.some(post => post._id === postId));
+
+  const privacyAuthor = await makeAccount("privacy-author");
+  const limitedPost = await request("POST", "/community/posts", privacyAuthor.uid, {
+    content: "Followers-only post", audience: "followers", commentPolicy: "nobody", media: [],
+  });
+  assert.equal(limitedPost.response.status, 201);
+  result = await request("GET", `/community/feed?authorId=${privacyAuthor.uid}`, viewer.uid);
+  assert.equal(result.data.posts.length, 0);
+  result = await request("POST", `/community/posts/${limitedPost.data.post._id}/comments`, viewer.uid, { content: "Not allowed" });
+  assert.equal(result.response.status, 404, "non-followers cannot interact with a restricted post");
+  result = await request("POST", `/community/follow/${privacyAuthor.uid}`, viewer.uid);
+  assert.equal(result.response.status, 201);
+  result = await request("GET", `/community/feed?authorId=${privacyAuthor.uid}`, viewer.uid);
+  assert.equal(result.data.posts.length, 1);
+  assert.equal(result.data.posts[0].canComment, false);
+  result = await request("GET", `/community/posts/${limitedPost.data.post._id}/comments`, viewer.uid);
+  assert.equal(result.response.status, 403);
+  result = await request("POST", `/community/posts/${limitedPost.data.post._id}/repost`, viewer.uid);
+  assert.equal(result.response.status, 403);
+  result = await request("GET", `/community/feed?authorId=${privacyAuthor.uid}`, privacyAuthor.uid);
+  assert.equal(result.data.posts.length, 1);
+
+  const pollAuthor = await makeAccount("poll-author");
+  const pollPost = await request("POST", "/community/posts", pollAuthor.uid, {
+    postType: "poll", content: "Choose an option", poll: { question: "Which?", options: ["One", "Two"] },
+  });
+  assert.equal(pollPost.response.status, 201);
+  result = await request("POST", `/community/posts/${pollPost.data.post._id}/poll/vote`, viewer.uid, { optionId: "option-1" });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.options[0].votes, 1);
+  result = await request("GET", `/community/feed?authorId=${pollAuthor.uid}`, viewer.uid);
+  assert.equal(result.data.posts[0].myVote, "option-1");
+  assert.equal(result.data.posts[0].poll.options[0].votes, 1);
+
+  const jobsAuthor = await makeAccount("jobs-author");
+  await locals.jobCollection.insertOne({
+    slug: "community-job",
+    title: "Community engineer",
+    company: "SMAJ",
+    location: "Remote",
+    status: "active",
+    moderationStatus: "approved",
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+  });
+  result = await request("POST", "/community/posts", jobsAuthor.uid, { postType: "job", jobId: "community-job" });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.data.post.job.id, "community-job");
+  result = await request("POST", "/community/posts", jobsAuthor.uid, { postType: "job", jobId: "missing-job" });
+  assert.equal(result.response.status, 400);
+
+  const scheduler = await makeAccount("scheduler");
+  const publishAt = new Date(Date.now() + 120_000).toISOString();
+  const scheduled = await request("POST", "/community/posts", scheduler.uid, {
+    content: "Scheduled community post", media: [], publishAt,
+  });
+  assert.equal(scheduled.response.status, 201);
+  assert.equal(scheduled.data.post.status, "scheduled");
+  result = await request("GET", `/community/feed?authorId=${scheduler.uid}`, scheduler.uid);
+  assert.equal(result.data.posts.length, 0);
+  result = await request("GET", "/community/posts/scheduled", scheduler.uid);
+  assert.equal(result.data.posts.length, 1);
+  const updatedPublishAt = new Date(Date.now() + 240_000).toISOString();
+  result = await request("PATCH", `/community/posts/${scheduled.data.post._id}/schedule`, scheduler.uid, {
+    publishAt: updatedPublishAt,
+    postType: "poll",
+    content: "Scheduled poll edit",
+    media: [],
+    audience: "everyone",
+    commentPolicy: "everyone",
+    collaborators: [],
+    brandPartnership: false,
+    poll: { question: "Edit this poll?", options: ["Yes", "No"] },
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.post.poll.question, "Edit this poll?");
+  assert.equal(result.data.post.content, "Scheduled poll edit");
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(scheduled.data.post._id) })).postType, "poll");
+  result = await request("PATCH", `/community/posts/${scheduled.data.post._id}/schedule`, scheduler.uid, { publishAt: updatedPublishAt });
+  assert.equal(result.response.status, 200);
+  assert.equal(new Date(result.data.post.publishAt).toISOString(), updatedPublishAt);
+  result = await request("DELETE", `/community/posts/${scheduled.data.post._id}/schedule`, scheduler.uid);
+  assert.equal(result.response.status, 200);
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(scheduled.data.post._id) })).status, "cancelled");
+
+  const automatic = await request("POST", "/community/posts", scheduler.uid, {
+    content: "Automatically published", media: [], publishAt: new Date(Date.now() + 120_000).toISOString(),
+  });
+  assert.equal(automatic.response.status, 201);
+  assert.equal(await publishDueCommunityPosts(app, new Date(Date.now() + 180_000)), 1);
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(automatic.data.post._id) })).status, "published");
 });
 
 after(async () => {
