@@ -131,6 +131,7 @@
 .messages-filter-tabs {
   display: flex;
   flex: 0 0 auto;
+  min-width: 0;
   gap: 4px;
   overflow-x: auto;
   padding: 12px 12px 8px;
@@ -138,12 +139,16 @@
 }
 
 .full-screen-page .messages-page .messages-filter-tabs button {
+  width: auto;
   min-height: 36px;
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
   padding: 7px 12px;
   color: var(--smaj-text-secondary);
   background: transparent;
-  border: 0;
+  border: 1px solid var(--smaj-border);
   border-radius: 999px;
   cursor: pointer;
   font: inherit;
@@ -153,8 +158,9 @@
 }
 
 .full-screen-page .messages-page .messages-filter-tabs button.active {
-  color: var(--smaj-primary);
-  background: var(--smaj-secondary-bg);
+  color: #fff; /* theme-color-exception: white text on the fixed purple active filter */
+  background: var(--smaj-primary);
+  border-color: var(--smaj-primary);
 }
 
 .full-screen-page .messages-page .messages-filter-tabs .messages-manage-done {
@@ -215,35 +221,77 @@
 }
 
 .messages-select-indicator.selected {
-  color: var(--smaj-card);
+  color: #fff; /* theme-color-exception: white checkmark on the fixed purple selection */
   background: var(--smaj-primary) !important;
   border-color: var(--smaj-primary);
 }
 
 .full-screen-page .messages-page .conversation-selection-sheet {
-  position: sticky;
+  position: fixed;
+  right: 12px;
   bottom: 0;
-  z-index: 4;
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
+  left: 12px;
+  z-index: 30;
+  display: grid;
+  width: min(calc(100% - 24px), 680px);
+  box-sizing: border-box;
+  grid-template-columns: repeat(5, max-content);
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px max(12px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  gap: 6px;
+  margin: 0 auto;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   background: var(--smaj-card);
   border-top: 1px solid var(--smaj-border);
   box-shadow: 0 -8px 24px color-mix(in srgb, var(--smaj-text) 10%, transparent);
 }
 
+.full-screen-page .messages-page .conversation-list > button[data-conversation-id].selected {
+  background: color-mix(in srgb, var(--smaj-primary) 10%, var(--smaj-card));
+  outline: 0;
+  box-shadow: none;
+}
+
+.full-screen-page .messages-page .messages-select-indicator.selected {
+  color: #fff; /* theme-color-exception: white checkmark on the fixed purple selection */
+}
+
+.full-screen-page .messages-page .conversation-selection-sheet > button {
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid var(--smaj-border);
+  border-radius: 9px;
+  color: var(--smaj-text);
+  background: var(--smaj-secondary-bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.full-screen-page .messages-page .conversation-selection-sheet > button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.full-screen-page .messages-page .conversation-selection-sheet .conversation-delete-button {
+  color: var(--smaj-card);
+  background: var(--smaj-accent);
+  border-color: var(--smaj-accent);
+}
+
+.full-screen-page .messages-page .conversation-selection-error {
+  grid-column: 1 / -1;
+}
+
 .messages-compose-fab {
   position: absolute;
-  right: max(24px, env(safe-area-inset-right, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
   bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   z-index: 5;
   display: grid;
-  width: 58px;
-  height: 58px;
+  width: 48px;
+  height: 48px;
   place-items: center;
   color: #fff; /* theme-color-exception: white icon on the fixed brand button */
   background: var(--smaj-primary);
@@ -261,7 +309,7 @@
 }
 
 .messages-compose-fab svg {
-  font-size: 28px;
+  font-size: 24px;
 }
 
 .messages-sheet-backdrop {
@@ -518,8 +566,25 @@
   }
 
   .messages-compose-fab {
-    right: max(16px, env(safe-area-inset-right, 0px));
-    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .full-screen-page .messages-page .conversation-selection-sheet {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    padding-inline: 8px;
+  }
+
+  .full-screen-page .messages-page .conversation-selection-sheet > strong {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
+  .full-screen-page .messages-page .conversation-selection-sheet > button {
+    min-width: 0;
+    padding-inline: 5px;
+    font-size: 11px;
   }
 }
 
