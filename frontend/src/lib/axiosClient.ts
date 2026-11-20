@@ -104,7 +104,9 @@ const isAccountScopedRead = (url = "") =>
     normalizeApiPath(url)
   );
 
-const shouldInvalidateCachedReads = (url = "") => isCacheableApiRead(url) || normalizeApiPath(url) === "/user/settings";
+const shouldInvalidateCachedReads = (url = "") =>
+  isCacheableApiRead(url)
+  || ["/user/settings", "/user/social-settings"].includes(normalizeApiPath(url));
 
 const createCacheResponse = (cached: CachedResponse, config: InternalAxiosRequestConfig): AxiosResponse => ({
   data: cached.data,

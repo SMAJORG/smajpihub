@@ -6,6 +6,7 @@ import { useAuthContext } from "../../contexts/AuthContext";
 import UserAvatarFrame, { type AvatarFrameId } from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import type { User } from "../../types/pi";
+import "./ProfileAvatarFramesPage.css";
 
 type SocialSettings = {
   publicProfile: boolean;
@@ -70,10 +71,19 @@ const ProfileAvatarFramesPage = () => {
   const saveSettings = async (updates: Partial<SocialSettings>, success: string) => {
     if (saving || loading) return;
     const next = { ...settings, ...updates };
+    const previous = settings;
     setSaving(true);
+    setSettings(next);
     setError("");
     setNotice("");
     try {
+      if (user) synchronizeUser({
+        ...user,
+        publicProfile: next.publicProfile,
+        allowContact: next.allowContact,
+        openToWork: next.openToWork,
+        activeAvatarFrame: next.activeAvatarFrame,
+      });
       const { data } = await axiosClient.put<{ settings: SocialSettings; user?: Partial<User> }>(
         "/user/social-settings",
         {
@@ -87,6 +97,8 @@ const ProfileAvatarFramesPage = () => {
       if (data.user) synchronizeUser(data.user);
       setNotice(success);
     } catch (reason: unknown) {
+      setSettings(previous);
+      if (user) synchronizeUser(user);
       setError(
         isAxiosError<{ message?: string }>(reason)
           ? reason.response?.data?.message || "Avatar frame settings could not be saved."
@@ -112,14 +124,11 @@ const ProfileAvatarFramesPage = () => {
 
   return (
     <main className="private-page profile-avatar-frames-page">
-      <header className="private-page-head">
+      <header className="profile-frames-page-header">
         <button className="profile-frames-back" type="button" onClick={() => navigate("/profile")} aria-label="Back to profile">
           <ArrowBackIosNewOutlinedIcon />
         </button>
-        <div>
-          <p className="private-kicker">PROFILE</p>
-          <h1>Avatar Frames</h1>
-        </div>
+        <h1>Avatar Frames</h1>
       </header>
 
       {error ? (
@@ -152,7 +161,7 @@ const ProfileAvatarFramesPage = () => {
                         selected ? "Avatar frame removed." : `${label} frame activated.`,
                       )}
                     >
-                      {selected ? "Remove frame" : settings.activeAvatarFrame ? "Switch to frame" : "Activate frame"}
+                      {selected ? "Remove" : "Activate"}
                     </button>
                   ) : id === "open_to_work" ? (
                     <div className="profile-avatar-frame-unlock">
@@ -163,7 +172,7 @@ const ProfileAvatarFramesPage = () => {
                         disabled={saving || loading}
                         onClick={toggleOpenToWork}
                       >
-                        Turn on Open to Work
+                        Turn on
                       </button>
                     </div>
                   ) : (
@@ -176,7 +185,7 @@ const ProfileAvatarFramesPage = () => {
                       disabled={saving || loading}
                       onClick={toggleOpenToWork}
                     >
-                      Turn off Open to Work
+                      Turn off
                     </button>
                   ) : null}
                 </article>

@@ -76,7 +76,12 @@ const PublicProfilePage = () => {
       <header className="public-profile-hero">
         {profile.coverImage ? <img className="public-profile-cover" src={profile.coverImage} alt="" /> : <div className="public-profile-cover-placeholder" />}
         <div className="public-profile-main">
-          <UserAvatarFrame name={profile.displayName} image={profile.avatar} frame={profile.activeAvatarFrame} size={104} />
+          <UserAvatarFrame
+            name={profile.displayName}
+            image={profile.avatar}
+            frame={profile.uid === user?.uid ? user.activeAvatarFrame : profile.activeAvatarFrame}
+            size={104}
+          />
           <div className="public-profile-identity">
             <p className="private-kicker">PUBLIC PROFILE</p>
             <h1>{profile.displayName}<TrustBadge userId={profile.uid} /></h1>

@@ -163,7 +163,7 @@ const CommunityPage = () => {
       <section className="community-feed" aria-label="Community posts" aria-busy={loading}>
         {loading && !posts.length ? <PrivateSkeleton variant="list" count={4} /> : null}
         {!loading && !error && !filteredPosts.length ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
-        {filteredPosts.map(post => <CommunityPostCard key={post._id} post={post} viewerId={user?.uid} onChange={() => void load()} />)}
+        {filteredPosts.map(post => <CommunityPostCard key={post._id} post={post} viewerId={user?.uid} viewerAvatarFrame={user?.activeAvatarFrame} onChange={() => void load()} />)}
       </section>
       {hasMore ? <button className="community-load-more" type="button" disabled={loading} onClick={() => void load(page + 1, true)}>{loading ? "Loading…" : "Load more"}</button> : null}
       {!loading && error ? <button className="community-load-more" type="button" onClick={() => void load()}>Retry</button> : null}

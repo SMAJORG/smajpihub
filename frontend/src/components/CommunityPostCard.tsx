@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import UserAvatarFrame from "./UserAvatarFrame";
+import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import {
   createCommunityComment,
@@ -14,14 +14,14 @@ import {
   type CommunityPost,
 } from "../lib/communityApi";
 
-type Props = { post: CommunityPost; viewerId?: string; onChange?: () => void };
+type Props = { post: CommunityPost; viewerId?: string; viewerAvatarFrame?: AvatarFrameId | null; onChange?: () => void };
 const reportReasons = ["Harassment or bullying", "Hate or harmful content", "Spam or scam", "Privacy violation", "Other"];
 const when = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
 };
 
-export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
+export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, onChange }: Props) {
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likeCount || 0);
   const [commentCount, setCommentCount] = useState(post.commentCount || 0);
@@ -186,7 +186,12 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
       {post.type === "repost" ? <p className="community-repost-label">Reposted by <Link to={`/people/${encodeURIComponent(post.author.uid)}`}>{post.author.displayName}</Link></p> : null}
       <header className="community-post-author">
         <Link to={`/people/${encodeURIComponent(author.uid)}`} aria-label={`View ${author.displayName}'s public profile`}>
-          <UserAvatarFrame name={author.displayName} image={author.avatar} frame={author.activeAvatarFrame} size={56} />
+          <UserAvatarFrame
+            name={author.displayName}
+            image={author.avatar}
+            frame={author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : author.activeAvatarFrame}
+            size={56}
+          />
         </Link>
         <div>
           <Link to={`/people/${encodeURIComponent(author.uid)}`} className="community-post-author-name">{author.displayName}<TrustBadge userId={author.uid} /></Link>
@@ -236,7 +241,12 @@ export default function CommunityPostCard({ post, viewerId, onChange }: Props) {
       {commentsOpen ? <section className="community-comments" aria-label="Comments">
         {comments.map(comment => <article className="community-comment" key={comment._id}>
           <Link to={`/people/${encodeURIComponent(comment.author.uid)}`} aria-label={`View ${comment.author.displayName}'s public profile`}>
-            <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.activeAvatarFrame} size={34} />
+            <UserAvatarFrame
+              name={comment.author.displayName}
+              image={comment.author.avatar}
+              frame={comment.author.uid === viewerId && viewerAvatarFrame !== undefined ? viewerAvatarFrame : comment.author.activeAvatarFrame}
+              size={34}
+            />
           </Link>
           <div><Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link><p>{comment.content}</p><small>{when(comment.createdAt)}</small></div>
         </article>)}
