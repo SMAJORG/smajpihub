@@ -1378,7 +1378,6 @@
   width: 100%;
   max-height: min(78vh, 760px);
   overflow: hidden;
-  border-radius: 12px;
   background: var(--soft-bg);
 }
 
@@ -1462,13 +1461,13 @@
 .community-video-preview.landscape video {
   display: block;
   width: 100%;
+  height: 100%;
   max-height: min(78vh, 760px);
   object-fit: contain;
 }
 
 .community-video-preview.portrait {
   max-width: 520px;
-  aspect-ratio: 9 / 16;
   margin-inline: auto;
   border-radius: 15px;
 }
