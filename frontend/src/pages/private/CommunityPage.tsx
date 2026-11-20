@@ -5,8 +5,8 @@ import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import CommunityFeedPostCard from "../../components/CommunityFeedPostCard";
+import CommunitySkeleton from "../../components/CommunitySkeleton";
 import CommunityVideoViewer, { type CommunityVideoItem } from "../../components/CommunityVideoViewer";
-import PrivateSkeleton from "../../components/PrivateSkeleton";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { getCommunityFeed, type CommunityPost } from "../../lib/communityApi";
@@ -22,6 +22,7 @@ const CommunityPage = () => {
   const [searchText, setSearchText] = useState("");
   const [posts, setPosts] = useState<CommunityPost[]>(() => incomingPublishedPost ? [incomingPublishedPost] : []);
   const [loading, setLoading] = useState(true);
+  const [loadedScope, setLoadedScope] = useState<"all" | "following" | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
@@ -43,6 +44,7 @@ const CommunityPage = () => {
       setPosts(current => keep ? [...current, ...feedPosts.filter(post => !current.some(item => item._id === post._id))] : feedPosts);
       setHasMore(result.hasMore);
       setPage(nextPage);
+      setLoadedScope(scope);
     } catch (reason) {
       setError(reason && typeof reason === "object" && "response" in reason
         && (reason as { response?: { status?: number } }).response?.status === 401
@@ -207,8 +209,8 @@ const CommunityPage = () => {
       </div>
       {error ? <p className="community-error" role="alert">{error}</p> : null}
       <section className="community-feed" aria-label="Community posts" aria-busy={loading}>
-        {loading && !posts.length ? <PrivateSkeleton variant="list" count={4} /> : null}
-        {!loading && !error && !filteredPosts.length ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
+        {loading && loadedScope !== scope && !filteredPosts.length ? <CommunitySkeleton variant="feed" count={4} /> : null}
+        {!error && !filteredPosts.length && (!loading || loadedScope === scope) ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
         {filteredPosts.map(post => <CommunityFeedPostCard
           key={post._id}
           post={post}

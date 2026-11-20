@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import {
@@ -30,6 +31,9 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [commentsLoadError, setCommentsLoadError] = useState("");
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
@@ -70,14 +74,18 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
       setCommentsOpen(false);
       return;
     }
+    setCommentsOpen(true);
+    setCommentsLoading(true);
+    setCommentsLoadError("");
     setBusy(true);
     setError("");
     try {
       setComments(await getCommunityComments(post._id));
-      setCommentsOpen(true);
+      setCommentsLoaded(true);
     } catch {
-      setError("Comments could not be loaded. Please try again.");
+      setCommentsLoadError("Comments could not be loaded. Please try again.");
     } finally {
+      setCommentsLoading(false);
       setBusy(false);
     }
   };
@@ -106,6 +114,8 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
     try {
       const comment = await createCommunityComment(post._id, text);
       setComments(current => [...current, comment]);
+      setCommentsLoaded(true);
+      setCommentsLoadError("");
       setCommentText("");
       setCommentCount(current => current + 1);
     } catch {
@@ -239,6 +249,7 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
         <button type="submit" disabled={busy}>Send report</button>
       </form> : null}
       {commentsOpen ? <section className="community-comments" aria-label="Comments">
+        {commentsLoading && !commentsLoaded ? <CommunitySkeleton variant="comments" count={3} /> : null}
         {comments.map(comment => <article className="community-comment" key={comment._id}>
           <Link to={`/people/${encodeURIComponent(comment.author.uid)}`} aria-label={`View ${comment.author.displayName}'s public profile`}>
             <UserAvatarFrame
@@ -250,7 +261,8 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
           </Link>
           <div><Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link><p>{comment.content}</p><small>{when(comment.createdAt)}</small></div>
         </article>)}
-        {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+        {commentsLoadError ? <p className="community-post-error" role="alert">{commentsLoadError}</p> : null}
+        {commentsLoaded && !commentsLoadError && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
           <label className="visually-hidden" htmlFor={`community-comment-${post._id}`}>Write a comment</label>
           <input id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder="Write a comment…" />

@@ -31,27 +31,42 @@ const initialSettings: SocialSettings = {
   activeAvatarFrame: null,
 };
 
+const ProfileFrameSkeleton = () => (
+  <section className="profile-avatar-frame-grid profile-frames-skeleton-grid" aria-label="Loading avatar frames" aria-busy="true">
+    {frameOptions.map(({ id }) => (
+      <article className="profile-avatar-frame-option profile-frames-skeleton-card" key={id} aria-hidden="true">
+        <span className="profile-frames-skeleton-avatar" />
+        <span className="profile-frames-skeleton-title" />
+        <span className="profile-frames-skeleton-copy" />
+        <span className="profile-frames-skeleton-copy short" />
+        <span className="profile-frames-skeleton-button" />
+      </article>
+    ))}
+  </section>
+);
+
 const ProfileAvatarFramesPage = () => {
   const { user, synchronizeUser } = useAuthContext();
   const navigate = useNavigate();
   const [settings, setSettings] = useState(initialSettings);
   const [loading, setLoading] = useState(true);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsUserId, setSettingsUserId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const settingsLoaded = Boolean(user?.uid && settingsUserId === user.uid);
+  const showSettingsSkeleton = !settingsLoaded && (loading || !error);
 
   const loadSettings = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
-    setSettingsLoaded(false);
     setError("");
     try {
       const { data } = await axiosClient.get<{ settings: SocialSettings }>("/user/social-settings", {
         smajSkipResponseCache: true,
       });
       setSettings(data.settings);
-      setSettingsLoaded(true);
+      setSettingsUserId(user.uid);
     } catch (reason: unknown) {
       const status = isAxiosError(reason) ? reason.response?.status : undefined;
       setError(
@@ -123,7 +138,7 @@ const ProfileAvatarFramesPage = () => {
   const name = user?.displayName || user?.username || "Pi User";
 
   return (
-    <main className="private-page profile-avatar-frames-page">
+    <main className="private-page profile-avatar-frames-page" aria-busy={showSettingsSkeleton}>
       <header className="profile-frames-page-header">
         <button className="profile-frames-back" type="button" onClick={() => navigate("/profile")} aria-label="Back to profile">
           <ArrowBackIosNewOutlinedIcon />
@@ -138,7 +153,7 @@ const ProfileAvatarFramesPage = () => {
         </div>
       ) : null}
       {notice ? <p className="private-alert success" role="status">{notice}</p> : null}
-      {loading ? <p className="profile-frames-loading" role="status">Loading social settings…</p> : null}
+      {showSettingsSkeleton ? <ProfileFrameSkeleton /> : null}
 
       {settingsLoaded ? (
         <>

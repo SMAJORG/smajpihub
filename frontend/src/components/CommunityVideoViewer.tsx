@@ -9,6 +9,7 @@ import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import CommunitySkeleton from "./CommunitySkeleton";
 import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
 import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
 import CommunityCaptionTrack from "./CommunityCaptionTrack";
@@ -62,6 +63,9 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [commentsLoadError, setCommentsLoadError] = useState("");
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
@@ -110,6 +114,9 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     setRepostCount(current.post.repostCount || 0);
     setFollowing(current.post.isFollowedByMe === true);
     setCommentsOpen(false);
+    setCommentsLoading(false);
+    setCommentsLoaded(false);
+    setCommentsLoadError("");
     setComments([]);
     setReplyTo(null);
     setExpanded(false);
@@ -141,13 +148,17 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
       setCommentsOpen(false);
       return;
     }
+    setCommentsOpen(true);
+    setCommentsLoading(true);
+    setCommentsLoadError("");
     setBusy(true);
     try {
       setComments(await getCommunityComments(current.post._id));
-      setCommentsOpen(true);
+      setCommentsLoaded(true);
     } catch {
-      setError("Comments could not be loaded.");
+      setCommentsLoadError("Comments could not be loaded.");
     } finally {
+      setCommentsLoading(false);
       setBusy(false);
     }
   };
@@ -159,6 +170,8 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     try {
       const comment = await createCommunityComment(current.post._id, commentText.trim(), replyTo?._id);
       setComments(value => [...value, comment]);
+      setCommentsLoaded(true);
+      setCommentsLoadError("");
       setCommentText("");
       setReplyTo(null);
       setCommentCount(value => value + 1);
@@ -338,11 +351,15 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
       {commentsOpen ? <section className="community-video-comments" aria-label="Video comments">
         <button type="button" className="community-video-comments-close" onClick={() => setCommentsOpen(false)} aria-label="Close comments">×</button>
         <h2>Comments</h2>
-        <div className="community-video-comments-list">{comments.filter(comment => !comment.parentId).map(comment => <div className="community-video-comment-thread" key={comment._id}>
-          {renderComment(comment)}
-          {comments.filter(reply => reply.parentId === comment._id).map(reply => renderComment(reply, true))}
-        </div>)}</div>
-        {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+        <div className="community-video-comments-list">
+          {commentsLoading && !commentsLoaded ? <CommunitySkeleton variant="videoComments" count={3} /> : null}
+          {comments.filter(comment => !comment.parentId).map(comment => <div className="community-video-comment-thread" key={comment._id}>
+            {renderComment(comment)}
+            {comments.filter(reply => reply.parentId === comment._id).map(reply => renderComment(reply, true))}
+          </div>)}
+          {commentsLoadError ? <p className="community-post-error" role="alert">{commentsLoadError}</p> : null}
+          {commentsLoaded && !commentsLoadError && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+        </div>
         <form onSubmit={event => void submitComment(event)}>
           <input aria-label={replyTo ? `Reply to ${replyTo.author.displayName}` : "Write a comment"} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
           {replyTo ? <button type="button" className="community-video-comment-cancel-reply" onClick={() => setReplyTo(null)}>Cancel reply</button> : null}

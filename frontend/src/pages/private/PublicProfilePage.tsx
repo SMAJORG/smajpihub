@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuthContext } from "../../contexts/AuthContext";
 import CommunityPostCard from "../../components/CommunityPostCard";
-import PrivateSkeleton from "../../components/PrivateSkeleton";
+import CommunitySkeleton from "../../components/CommunitySkeleton";
 import TrustBadge from "../../components/TrustBadge";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { getCommunityFeed, getPublicProfile, toggleCommunityFollow, type CommunityPost, type PublicProfileResponse } from "../../lib/communityApi";
@@ -13,6 +13,9 @@ const PublicProfilePage = () => {
   const { user, requireAuth } = useAuthContext();
   const [data, setData] = useState<PublicProfileResponse | null>(null);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [postsLoadedForUid, setPostsLoadedForUid] = useState<string | null>(null);
+  const postsLoadedForUidRef = useRef<string | null>(null);
+  const [postsError, setPostsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -20,15 +23,22 @@ const PublicProfilePage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    setPostsError("");
     try {
       const profile = await getPublicProfile(uid);
       setData(profile);
       try {
         const feed = await getCommunityFeed({ authorId: uid });
         setPosts(feed.posts);
+        postsLoadedForUidRef.current = uid;
+        setPostsLoadedForUid(uid);
       } catch {
-        setPosts([]);
-        setError("This profile is available, but its posts could not be loaded.");
+        const message = "This profile is available, but its posts could not be loaded.";
+        setPostsError(message);
+        setError(message);
+        if (postsLoadedForUidRef.current !== uid) setPosts([]);
+        postsLoadedForUidRef.current = uid;
+        setPostsLoadedForUid(uid);
       }
     } catch (reason) {
       const status = reason && typeof reason === "object" && "response" in reason
@@ -64,8 +74,10 @@ const PublicProfilePage = () => {
     }
   };
 
-  if (loading && !data) return <main className="private-page public-profile-page"><PrivateSkeleton variant="profile" /></main>;
-  if (!data) return <main className="private-page public-profile-page"><div className="private-state error"><h1>Profile unavailable</h1><p>{error}</p><Link to="/search">Search people</Link></div></main>;
+  if (!data || data.profile.uid !== uid) {
+    if (loading) return <main className="private-page public-profile-page"><CommunitySkeleton variant="profile" /></main>;
+    return <main className="private-page public-profile-page"><div className="private-state error"><h1>Profile unavailable</h1><p>{error}</p><Link to="/search">Search people</Link></div></main>;
+  }
 
   const profile = data.profile;
   const messageHref = `/messages?${new URLSearchParams({ recipient: profile.uid, name: profile.displayName, avatar: profile.avatar })}`;
@@ -122,8 +134,10 @@ const PublicProfilePage = () => {
 
       <section className="public-profile-posts">
         <div className="community-section-heading"><div><h2>Posts</h2><p>Posts shared by {profile.displayName}.</p></div></div>
-        {posts.length ? posts.map(post => <CommunityPostCard key={post._id} post={post} viewerId={user?.uid} onChange={() => void load()} />)
-          : <div className="private-state compact"><p>No community posts yet.</p></div>}
+        {postsLoadedForUid !== uid ? <CommunitySkeleton variant="profilePosts" count={2} />
+          : posts.length ? posts.map(post => <CommunityPostCard key={post._id} post={post} viewerId={user?.uid} onChange={() => void load()} />)
+            : postsError ? null
+              : <div className="private-state compact"><p>No community posts yet.</p></div>}
       </section>
     </main>
   );

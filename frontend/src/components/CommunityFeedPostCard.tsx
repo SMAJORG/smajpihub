@@ -12,6 +12,7 @@ import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import CommunityVideoPreview from "./CommunityVideoPreview";
@@ -97,6 +98,9 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [commentsLoadError, setCommentsLoadError] = useState("");
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
@@ -194,14 +198,18 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
       setCommentsOpen(false);
       return;
     }
+    setCommentsOpen(true);
+    setCommentsLoading(true);
+    setCommentsLoadError("");
     setBusy(true);
     setError("");
     try {
       setComments(await getCommunityComments(content._id));
-      setCommentsOpen(true);
+      setCommentsLoaded(true);
     } catch {
-      setError("Comments could not be loaded. Please try again.");
+      setCommentsLoadError("Comments could not be loaded. Please try again.");
     } finally {
+      setCommentsLoading(false);
       setBusy(false);
     }
   };
@@ -230,6 +238,8 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     try {
       const comment = await createCommunityComment(content._id, text, replyTo?._id);
       setComments(current => [...current, comment]);
+      setCommentsLoaded(true);
+      setCommentsLoadError("");
       setCommentText("");
       setReplyTo(null);
       setCommentCount(current => current + 1);
@@ -454,11 +464,13 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
         <button type="submit" disabled={busy}>Send report</button>
       </form> : null}
       {commentsOpen ? <section className="community-comments" aria-label="Comments">
+        {commentsLoading && !commentsLoaded ? <CommunitySkeleton variant="comments" count={3} /> : null}
         {comments.filter(comment => !comment.parentId).map(comment => <div className="community-comment-thread" key={comment._id}>
           {renderComment(comment)}
           {comments.filter(reply => reply.parentId === comment._id).map(reply => renderComment(reply, true))}
         </div>)}
-        {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
+        {commentsLoadError ? <p className="community-post-error" role="alert">{commentsLoadError}</p> : null}
+        {commentsLoaded && !commentsLoadError && !comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
           <input aria-label={replyTo ? `Reply to ${replyTo.author.displayName}` : "Write a comment"} id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
           {replyTo ? <button type="button" className="community-comment-cancel-reply" onClick={() => setReplyTo(null)}>Cancel reply</button> : null}

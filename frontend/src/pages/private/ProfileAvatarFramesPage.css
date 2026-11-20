@@ -1,5 +1,11 @@
 .profile-avatar-frames-page {
   max-width: 720px;
+  align-content: start;
+  align-items: start;
+  justify-items: stretch;
+  gap: 12px;
+  margin-inline: auto;
+  padding-top: 0;
 }
 
 .profile-frames-page-header {
@@ -8,7 +14,8 @@
   justify-content: flex-start;
   gap: 10px;
   min-height: 44px;
-  margin: 0 0 8px;
+  align-self: start;
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -50,4 +57,75 @@
   border-radius: 8px;
   font-size: 12px;
   line-height: 1.2;
+}
+
+.profile-avatar-frames-page .profile-avatar-frame-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.profile-avatar-frames-page .profile-avatar-frame-option {
+  box-sizing: border-box;
+  min-height: 250px;
+}
+
+.profile-frames-skeleton-card {
+  gap: 8px;
+}
+
+.profile-frames-skeleton-avatar,
+.profile-frames-skeleton-title,
+.profile-frames-skeleton-copy,
+.profile-frames-skeleton-button {
+  display: block;
+  background: linear-gradient(
+    100deg,
+    var(--smaj-secondary-bg) 20%,
+    color-mix(in srgb, var(--smaj-secondary-bg) 72%, var(--smaj-text-secondary)) 38%,
+    var(--smaj-secondary-bg) 56%
+  );
+  background-size: 220% 100%;
+  animation: profile-frames-shimmer 1.35s ease-in-out infinite;
+}
+
+.profile-frames-skeleton-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+}
+
+.profile-frames-skeleton-title {
+  width: 88px;
+  height: 12px;
+  border-radius: 6px;
+}
+
+.profile-frames-skeleton-copy {
+  width: 92%;
+  height: 9px;
+  border-radius: 5px;
+}
+
+.profile-frames-skeleton-copy.short {
+  width: 62%;
+}
+
+.profile-frames-skeleton-button {
+  width: 88px;
+  min-height: 32px;
+  margin-top: auto;
+  border-radius: 8px;
+}
+
+@keyframes profile-frames-shimmer {
+  to { background-position: -220% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-frames-skeleton-avatar,
+  .profile-frames-skeleton-title,
+  .profile-frames-skeleton-copy,
+  .profile-frames-skeleton-button {
+    animation: none;
+  }
 }
