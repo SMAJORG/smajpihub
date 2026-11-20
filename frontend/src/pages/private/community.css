@@ -38,35 +38,38 @@
   z-index: 20;
   display: grid;
   gap: 14px;
-  max-height: 180px;
   overflow: hidden;
   padding-top: env(safe-area-inset-top, 0px);
   background: var(--bg);
-  transition: max-height 230ms ease, padding-top 230ms ease, transform 230ms ease, opacity 230ms ease;
+  transition: transform 220ms ease, opacity 220ms ease;
   will-change: transform, opacity;
 }
 
 .community-private-shell.community-chrome-hidden .community-feed-chrome {
-  max-height: 0;
-  padding-top: 0;
   transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
 }
 
 .community-private-shell .mobile-bottom-nav {
-  transition: transform 230ms ease, opacity 230ms ease;
+  transition: transform 220ms ease, opacity 220ms ease, visibility 0s;
   will-change: transform, opacity;
 }
 
 .community-private-shell .mobile-bottom-nav.community-nav-hidden {
   transform: translateY(calc(100% + env(safe-area-inset-bottom)));
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
+  transition: transform 220ms ease, opacity 220ms ease, visibility 0s linear 220ms;
 }
 
 .community-private-shell.community-video-open .mobile-bottom-nav {
-  display: none !important;
+  transform: translateY(100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: none;
 }
 
 .community-feed-header {
@@ -1375,6 +1378,7 @@
   width: 100%;
   max-height: min(78vh, 760px);
   overflow: hidden;
+  border-radius: 12px;
   background: var(--soft-bg);
 }
 
@@ -1418,10 +1422,7 @@
 .community-video-viewer {
   --community-video-background: #101015; /* theme-color-exception: video canvas remains dark for all media contrast */
   --community-video-overlay-text: #FFFFFF; /* theme-color-exception: pure-white text over the fixed dark video scrim */
-  --community-video-scrim-top: rgb(0 0 0 / 65%); /* theme-color-exception: fixed top scrim behind video author details */
-  --community-video-scrim-bottom: rgb(0 0 0 / 72%); /* theme-color-exception: fixed bottom scrim behind video descriptions */
   --community-video-control-background: rgb(0 0 0 / 55%); /* theme-color-exception: dark control surface over video */
-  --community-video-control-border: rgb(255 255 255 / 65%); /* theme-color-exception: contrast border on video overlay controls */
   --community-video-muted-text: rgb(255 255 255 / 82%); /* theme-color-exception: secondary text over dark video scrim */
   --community-video-text-shadow: #000; /* theme-color-exception: shadow behind text over video content */
 }
@@ -1429,7 +1430,9 @@
 .community-video-preview {
   position: relative;
   width: 100%;
+  max-height: min(78vh, 760px);
   overflow: hidden;
+  border-radius: 12px;
   background: var(--community-video-background);
   cursor: pointer;
 }
@@ -1455,105 +1458,16 @@
   display: none;
 }
 
-.community-video-preview.landscape video {
+.community-video-preview > video {
   display: block;
   width: 100%;
   height: 100%;
-  max-height: min(78vh, 760px);
   object-fit: contain;
 }
 
-.community-video-preview.portrait {
-  max-width: 520px;
-  margin-inline: auto;
-  border-radius: 15px;
-}
-
-.community-video-preview.portrait video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.community-video-author-overlay,
-.community-video-description,
 .community-video-controls {
   position: absolute;
   z-index: 1;
-}
-
-.community-video-author-overlay {
-  top: 0;
-  right: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 12px 24px;
-  color: var(--community-video-overlay-text);
-  background: linear-gradient(180deg, var(--community-video-scrim-top), transparent);
-}
-
-.community-video-author-overlay > span {
-  display: grid;
-  min-width: 0;
-  text-shadow: 0 1px 5px var(--community-video-text-shadow);
-}
-
-.community-video-author-actions {
-  display: flex;
-  flex: 0 0 auto;
-  margin-left: auto;
-}
-
-.community-video-author-actions button {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  color: var(--community-video-overlay-text);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.community-video-follow {
-  width: fit-content;
-  padding: 0;
-  color: var(--community-video-overlay-text);
-  background: transparent;
-  border: 0;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.community-video-author-overlay strong,
-.community-video-author-overlay small {
-  color: var(--community-video-overlay-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.community-video-author-overlay small {
-  font-size: 11px;
-}
-
-.community-video-description {
-  right: 0;
-  bottom: 0;
-  left: 0;
-  max-height: 34%;
-  margin: 0;
-  padding: 30px 12px 56px;
-  overflow: hidden;
-  color: var(--community-video-overlay-text);
-  background: linear-gradient(0deg, var(--community-video-scrim-bottom), transparent);
-  line-height: 1.4;
-  text-shadow: 0 1px 4px var(--community-video-text-shadow);
 }
 
 .community-video-controls {
@@ -2042,7 +1956,9 @@
 @media (prefers-reduced-motion: reduce) {
   .community-feed-image-frame > img,
   .community-feed-image-frame::before,
-  .community-video-preview::before {
+  .community-video-preview::before,
+  .community-feed-chrome,
+  .community-private-shell .mobile-bottom-nav {
     transition: none;
     animation: none;
   }

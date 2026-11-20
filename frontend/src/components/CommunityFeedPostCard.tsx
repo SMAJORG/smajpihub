@@ -99,12 +99,26 @@ const AudienceIcon = ({ audience }: { audience?: CommunityPost["audience"] }) =>
   : audience === "only_me" ? <LockOutlinedIcon aria-label="Only me" /> : <PublicOutlinedIcon aria-label="Public" />;
 
 const CommunityFeedImage = ({ media, index }: { media: CommunityMedia; index: number }) => {
+  const frameRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const [shouldLoad, setShouldLoad] = useState(() => typeof IntersectionObserver === "undefined");
   const width = media.width || 16;
   const height = media.height || 9;
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame || shouldLoad) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setShouldLoad(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "700px 0px" });
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [shouldLoad]);
   return (
-    <div className={`community-feed-image-frame${loaded ? " is-loaded" : ""}`} style={{ aspectRatio: `${width} / ${height}` }}>
-      <img
+    <div ref={frameRef} className={`community-feed-image-frame${loaded ? " is-loaded" : ""}`} style={{ aspectRatio: `${width} / ${height}` }}>
+      {shouldLoad ? <img
         loading="lazy"
         decoding="async"
         width={media.width || 16}
@@ -113,7 +127,7 @@ const CommunityFeedImage = ({ media, index }: { media: CommunityMedia; index: nu
         alt={media.altText || `Community post image ${index + 1}`}
         onLoad={() => setLoaded(true)}
         onError={() => setLoaded(true)}
-      />
+      /> : null}
     </div>
   );
 };
@@ -578,14 +592,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
             ? <CommunityVideoPreview
               key={`${media.url}-${index}`}
               media={media}
-              author={author}
-              content={content.content}
-              following={following}
-              canFollow={author.uid !== viewerId}
               onOpen={() => onOpenVideo?.(content, media)}
-              onMore={openOptionsMenu}
-              onDismiss={dismiss}
-              onFollow={() => void followAuthor()}
             />
             : <CommunityFeedImage key={`${media.url}-${index}`} media={media} index={index} />)}
         </div> : null}

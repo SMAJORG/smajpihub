@@ -13,64 +13,143 @@ import { getCommunityFeed, type CommunityPost } from "../../lib/communityApi";
 import { setCommunityVideoViewerOpen } from "../../components/communityVideoPlayback";
 import "./community.css";
 
+type FeedScope = "all" | "following";
+type FeedSnapshot = { posts: CommunityPost[]; hasMore: boolean; page: number; loaded: boolean };
+type FeedSnapshots = Record<FeedScope, FeedSnapshot>;
+
+const emptyFeedSnapshot = (): FeedSnapshot => ({ posts: [], hasMore: false, page: 1, loaded: false });
+const feedCacheKey = (uid: string, scope: FeedScope) => `smaj-community-feed-v1:${uid}:${scope}`;
+
+const readFeedCache = (uid: string | undefined, scope: FeedScope): FeedSnapshot | null => {
+  if (!uid || typeof window === "undefined") return null;
+  try {
+    const stored = window.sessionStorage.getItem(feedCacheKey(uid, scope));
+    if (!stored) return null;
+    const value = JSON.parse(stored) as Partial<FeedSnapshot>;
+    if (!Array.isArray(value.posts) || !value.posts.every(post => post && typeof post._id === "string" && Array.isArray(post.media))) return null;
+    return {
+      posts: value.posts,
+      hasMore: value.hasMore === true,
+      page: Number.isInteger(value.page) && Number(value.page) > 0 ? Number(value.page) : 1,
+      loaded: true,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeFeedCache = (uid: string | undefined, scope: FeedScope, snapshot: FeedSnapshot) => {
+  if (!uid || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(feedCacheKey(uid, scope), JSON.stringify(snapshot));
+  } catch {
+    // The in-memory feed remains available when session storage is full or disabled.
+  }
+};
+
 const CommunityPage = () => {
   const { user } = useAuthContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const incomingPublishedPost = (location.state as { communityPublishedPost?: CommunityPost } | null)?.communityPublishedPost;
-  const [scope, setScope] = useState<"all" | "following">("all");
+  const [scope, setScope] = useState<FeedScope>("all");
   const [searchText, setSearchText] = useState("");
-  const [posts, setPosts] = useState<CommunityPost[]>(() => incomingPublishedPost ? [incomingPublishedPost] : []);
-  const [loading, setLoading] = useState(true);
-  const [loadedScope, setLoadedScope] = useState<"all" | "following" | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [page, setPage] = useState(1);
+  const [feeds, setFeeds] = useState<FeedSnapshots>(() => ({
+    all: readFeedCache(user?.uid, "all") || (incomingPublishedPost
+      ? { posts: [incomingPublishedPost], hasMore: false, page: 1, loaded: true }
+      : emptyFeedSnapshot()),
+    following: readFeedCache(user?.uid, "following") || emptyFeedSnapshot(),
+  }));
+  const feedsRef = useRef(feeds);
+  const [feedOwner, setFeedOwner] = useState(user?.uid);
+  const activeFeed = feedOwner === user?.uid ? feeds[scope] : emptyFeedSnapshot();
+  const posts = activeFeed.posts;
+  const hasMore = activeFeed.hasMore;
+  const page = activeFeed.page;
+  const [loading, setLoading] = useState(!activeFeed.loaded);
+  const activeScopeRef = useRef(scope);
+  activeScopeRef.current = scope;
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
-  const [error, setError] = useState("");
+  const [feedError, setFeedError] = useState<{ scope: FeedScope; message: string } | null>(null);
+  const error = feedError?.scope === scope ? feedError.message : "";
   const [publishedNotice, setPublishedNotice] = useState(Boolean(incomingPublishedPost));
   const [videoViewerIndex, setVideoViewerIndex] = useState<number | null>(null);
   const feedScrollPosition = useRef<{ element: HTMLElement | null; top: number; windowTop: number } | null>(null);
   const pendingPublishedPost = useRef(incomingPublishedPost || null);
 
+  const updateFeed = useCallback((targetScope: FeedScope, update: (snapshot: FeedSnapshot) => FeedSnapshot) => {
+    const nextFeed = update(feedsRef.current[targetScope]);
+    const nextFeeds = { ...feedsRef.current, [targetScope]: nextFeed };
+    feedsRef.current = nextFeeds;
+    setFeeds(nextFeeds);
+    writeFeedCache(user?.uid, targetScope, nextFeed);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (feedOwner === user?.uid) return;
+    const all = readFeedCache(user?.uid, "all") || (pendingPublishedPost.current
+      ? { posts: [pendingPublishedPost.current], hasMore: false, page: 1, loaded: true }
+      : emptyFeedSnapshot());
+    const following = readFeedCache(user?.uid, "following") || emptyFeedSnapshot();
+    const nextFeeds = { all, following };
+    feedsRef.current = nextFeeds;
+    setFeeds(nextFeeds);
+    setFeedOwner(user?.uid);
+  }, [feedOwner, user?.uid]);
+
+  useEffect(() => {
+    setLoading(!activeFeed.loaded);
+  }, [scope, feedOwner, activeFeed.loaded]);
+
   const load = useCallback(async (nextPage = 1, keep = false) => {
-    setLoading(true);
-    setError("");
+    const existing = feedsRef.current[scope];
+    if (!existing.loaded && !existing.posts.length) setLoading(true);
+    setFeedError(null);
     try {
       const result = await getCommunityFeed({ scope, page: nextPage });
       const feedPosts = result.posts;
       const pending = pendingPublishedPost.current;
       if (scope === "all" && pending && !feedPosts.some(post => post._id === pending._id)) feedPosts.unshift(pending);
       if (pending && feedPosts.some(post => post._id === pending._id)) pendingPublishedPost.current = null;
-      setPosts(current => keep ? [...current, ...feedPosts.filter(post => !current.some(item => item._id === post._id))] : feedPosts);
-      setHasMore(result.hasMore);
-      setPage(nextPage);
-      setLoadedScope(scope);
+      updateFeed(scope, current => ({
+        posts: keep ? [...current.posts, ...feedPosts.filter(post => !current.posts.some(item => item._id === post._id))] : feedPosts,
+        hasMore: result.hasMore,
+        page: nextPage,
+        loaded: true,
+      }));
     } catch (reason) {
-      setError(reason && typeof reason === "object" && "response" in reason
-        && (reason as { response?: { status?: number } }).response?.status === 401
-        ? "Sign in to view the community feed."
-        : "Community posts could not be loaded. Please try again.");
+      if (!existing.loaded && !existing.posts.length) {
+        const message = reason && typeof reason === "object" && "response" in reason
+          && (reason as { response?: { status?: number } }).response?.status === 401
+          ? "Sign in to view the community feed."
+          : "Community posts could not be loaded. Please try again.";
+        setFeedError({ scope, message });
+      }
     } finally {
-      setLoading(false);
+      if (activeScopeRef.current === scope) setLoading(false);
     }
-  }, [scope]);
+  }, [scope, updateFeed]);
   const refreshFeed = useCallback(() => { void load(); }, [load]);
   const dismissPost = useCallback((postId: string) => {
-    setPosts(current => current.filter(post => post._id !== postId));
-  }, []);
+    updateFeed(scope, current => ({ ...current, posts: current.posts.filter(post => post._id !== postId) }));
+  }, [scope, updateFeed]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => () => setCommunityVideoViewerOpen(false), []);
   useEffect(() => {
     const post = pendingPublishedPost.current;
     if (!post) return;
-    setPosts(current => [post, ...current.filter(item => item._id !== post._id)]);
+    updateFeed("all", current => ({
+      ...current,
+      posts: [post, ...current.posts.filter(item => item._id !== post._id)],
+      loaded: true,
+    }));
     setPublishedNotice(true);
     const timer = window.setTimeout(() => setPublishedNotice(false), 4500);
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
     return () => window.clearTimeout(timer);
-  }, [location.pathname, location.search, navigate]);
+  }, [location.pathname, location.search, navigate, updateFeed]);
   useEffect(() => {
     const target = params.get("post");
     if (!target || loading) return;
@@ -226,8 +305,8 @@ const CommunityPage = () => {
       </div>
       {error ? <p className="community-error" role="alert">{error}</p> : null}
       <section className="community-feed" aria-label="Community posts" aria-busy={loading}>
-        {loading && loadedScope !== scope && !filteredPosts.length ? <CommunitySkeleton variant="feed" count={4} /> : null}
-        {!error && !filteredPosts.length && (!loading || loadedScope === scope) ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
+        {!activeFeed.loaded && !filteredPosts.length && !error ? <CommunitySkeleton variant="feed" count={4} /> : null}
+        {!error && !filteredPosts.length && activeFeed.loaded ? <div className="private-state compact"><h2>{searchText.trim() ? "No matching community posts" : scope === "following" ? "No posts from people you follow" : "No community posts yet"}</h2><p>{searchText.trim() ? "Try another search or clear the search field." : scope === "following" ? "Follow people from Search or their public profiles to see their posts here." : "Be the first to share something with the community."}</p>{scope === "following" && !searchText.trim() ? <Link to="/search">Search people</Link> : null}</div> : null}
         {filteredPosts.map(post => <CommunityFeedPostCard
           key={post._id}
           post={post}

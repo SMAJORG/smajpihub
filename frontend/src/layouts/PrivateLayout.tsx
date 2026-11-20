@@ -347,77 +347,84 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     }
     if (communityVideoViewerOpen) return;
 
-    const privateContent = document.querySelector<HTMLElement>(".community-private-shell .private-content");
     const feed = document.querySelector<HTMLElement>(".community-private-shell .community-feed");
-    if (!privateContent || !feed) return;
-
-    let animationFrame = 0;
+    if (!feed) return;
     const rootScroller = document.scrollingElement as HTMLElement | null;
     if (!rootScroller) return;
-    let activeScroller = rootScroller;
-    let previousPosition = rootScroller.scrollTop;
-    let lastScrollTarget: EventTarget | null = null;
-    const isScrollable = (element: HTMLElement) => {
+    const canScrollVertically = (element: HTMLElement) => {
       const overflowY = window.getComputedStyle(element).overflowY;
-      return (overflowY === "auto" || overflowY === "scroll") && element.scrollHeight > element.clientHeight + 2;
+      if (overflowY !== "auto" && overflowY !== "scroll") return false;
+      return element.matches(".private-content") || element.scrollHeight > element.clientHeight + 2;
     };
-    const nearestFeedScroller = () => {
-      for (let element = feed.parentElement; element; element = element.parentElement) {
-        if (isScrollable(element)) return element;
+    let scroller = rootScroller;
+    for (let element = feed.parentElement; element; element = element.parentElement) {
+      if (canScrollVertically(element)) {
+        scroller = element;
+        break;
       }
-      return rootScroller;
-    };
-    const getScrollPosition = (element: HTMLElement) => element === rootScroller
-      ? window.scrollY || rootScroller.scrollTop
-      : element.scrollTop;
-    const resolveScrollTarget = (eventTarget?: EventTarget | null) => {
-      if (eventTarget === window || eventTarget === document || eventTarget === document.documentElement) return rootScroller;
-      if (eventTarget instanceof HTMLElement && isScrollable(eventTarget)) return eventTarget;
-      return nearestFeedScroller();
-    };
-    const canScrollFeed = (element: HTMLElement) => feed.querySelector(".community-feed-post")
-      && element.scrollHeight > element.clientHeight + 2;
+    }
+    const isRootScroller = scroller === rootScroller;
+    const getScrollPosition = () => isRootScroller ? window.scrollY || rootScroller.scrollTop : scroller.scrollTop;
+    const canScrollFeed = () => Boolean(feed.querySelector(".community-feed-post"))
+      && scroller.scrollHeight > scroller.clientHeight + 2;
 
+    setCommunityChromeHidden(false);
+    let animationFrame = 0;
+    let previousPosition = getScrollPosition();
+    let accumulatedDelta = 0;
+    let previousDirection = 0;
     const updateChrome = () => {
       animationFrame = 0;
-      const nextScroller = resolveScrollTarget(lastScrollTarget);
-      if (nextScroller !== activeScroller) {
-        activeScroller = nextScroller;
-        previousPosition = getScrollPosition(activeScroller);
-      }
-      const position = getScrollPosition(activeScroller);
-      if (!canScrollFeed(activeScroller) || position <= 8) {
-        setCommunityChromeHidden(false);
-      } else if (position > previousPosition) {
-        setCommunityChromeHidden(true);
-      } else if (position < previousPosition) {
-        setCommunityChromeHidden(false);
-      }
+      const position = getScrollPosition();
+      const delta = position - previousPosition;
       previousPosition = position;
+      if (!canScrollFeed() || position <= 8) {
+        setCommunityChromeHidden(false);
+        accumulatedDelta = 0;
+        previousDirection = 0;
+        return;
+      }
+      if (!delta) return;
+      const direction = delta > 0 ? 1 : -1;
+      if (direction !== previousDirection) {
+        previousDirection = direction;
+        accumulatedDelta = delta;
+      } else {
+        accumulatedDelta += delta;
+      }
+      if (Math.abs(accumulatedDelta) >= 12) {
+        setCommunityChromeHidden(direction > 0);
+        accumulatedDelta = 0;
+      }
     };
-    const scheduleUpdate = (event?: Event) => {
-      if (event?.type === "scroll") lastScrollTarget = event.target;
+    const scheduleUpdate = () => {
       if (!animationFrame) animationFrame = window.requestAnimationFrame(updateChrome);
     };
+    const resetPosition = () => {
+      previousPosition = getScrollPosition();
+      accumulatedDelta = 0;
+      previousDirection = 0;
+      if (!canScrollFeed()) setCommunityChromeHidden(false);
+    };
+    const resetAfterFeedChange = resetPosition;
 
-    document.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
-    window.visualViewport?.addEventListener("resize", scheduleUpdate);
-
-    const mutationObserver = new MutationObserver(() => scheduleUpdate());
+    const onScroll = () => scheduleUpdate();
+    const onResize = () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+      resetPosition();
+    };
+    const scrollTarget: Window | HTMLElement = isRootScroller ? window : scroller;
+    scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    const mutationObserver = new MutationObserver(resetAfterFeedChange);
     mutationObserver.observe(feed, { childList: true, subtree: true });
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => scheduleUpdate());
-    resizeObserver?.observe(feed);
     scheduleUpdate();
 
     return () => {
-      document.removeEventListener("scroll", scheduleUpdate, true);
-      window.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-      window.visualViewport?.removeEventListener("resize", scheduleUpdate);
+      scrollTarget.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
       mutationObserver.disconnect();
-      resizeObserver?.disconnect();
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
     };
   }, [isCommunityFeed, communityVideoViewerOpen]);
