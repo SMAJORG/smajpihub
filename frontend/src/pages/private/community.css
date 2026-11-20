@@ -576,12 +576,48 @@
 
 .community-comments form {
   display: flex;
+  align-items: center;
   gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
 .community-comments input {
+  box-sizing: border-box;
   flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 14px;
+  color: var(--text);
+  background: var(--soft-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font: inherit;
+}
+
+.community-comments form .community-comment-send {
+  --community-comment-send-text: #FFFFFF; /* theme-color-exception: white send icon on the purple action button */
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  place-items: center;
+  padding: 0;
+  color: var(--community-comment-send-text);
+  background: var(--primary);
+  border: 0;
+  border-radius: 50%;
+}
+
+.community-comments form .community-comment-send svg {
+  font-size: 19px;
+}
+
+.community-comments form .community-comment-send:disabled {
+  opacity: .48;
+  cursor: not-allowed;
 }
 
 .community-comments .community-comment-cancel-reply {
@@ -1186,7 +1222,7 @@
 .community-video-preview,
 .community-video-viewer {
   --community-video-background: #101015; /* theme-color-exception: video canvas remains dark for all media contrast */
-  --community-video-overlay-text: #fff; /* theme-color-exception: white text over the fixed dark video scrim */
+  --community-video-overlay-text: #FFFFFF; /* theme-color-exception: pure-white text over the fixed dark video scrim */
   --community-video-scrim-top: rgb(0 0 0 / 65%); /* theme-color-exception: fixed top scrim behind video author details */
   --community-video-scrim-bottom: rgb(0 0 0 / 72%); /* theme-color-exception: fixed bottom scrim behind video descriptions */
   --community-video-control-background: rgb(0 0 0 / 55%); /* theme-color-exception: dark control surface over video */
@@ -1226,8 +1262,7 @@
 
 .community-video-author-overlay,
 .community-video-description,
-.community-video-controls,
-.community-video-open {
+.community-video-controls {
   position: absolute;
   z-index: 1;
 }
@@ -1281,6 +1316,7 @@
 
 .community-video-author-overlay strong,
 .community-video-author-overlay small {
+  color: var(--community-video-overlay-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1311,8 +1347,7 @@
   gap: 5px;
 }
 
-.community-video-controls button,
-.community-video-open {
+.community-video-controls button {
   display: grid;
   width: 36px;
   height: 36px;
@@ -1329,16 +1364,6 @@
   cursor: not-allowed;
 }
 
-.community-video-open {
-  top: 8px;
-  right: 8px;
-}
-
-.community-video-preview.portrait .community-video-open {
-  top: auto;
-  bottom: 54px;
-}
-
 .community-video-fallback {
   display: grid;
   min-height: 180px;
@@ -1348,7 +1373,8 @@
 
 .community-feed-actions {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   align-items: center;
   gap: clamp(4px, 1.4vw, 14px);
   min-width: 0;
@@ -1361,6 +1387,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
+  width: 100%;
   min-width: 0;
   min-height: 36px;
   padding: 4px 2px;
@@ -1390,16 +1417,8 @@
 .community-reaction-control {
   position: relative;
   display: flex;
+  width: 100%;
   align-items: center;
-}
-
-.community-reaction-picker-toggle {
-  width: 20px;
-  height: 30px;
-  color: var(--muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
 }
 
 .community-reaction-picker {
@@ -1764,10 +1783,23 @@
   overflow-y: auto;
 }
 
+.community-video-comment-thread {
+  display: grid;
+  gap: 8px;
+}
+
 .community-video-comments-list article {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+}
+
+.community-video-comments-list article.community-video-comment-reply {
+  margin-left: clamp(24px, 8vw, 48px);
+}
+
+.community-video-comments-list article > div {
+  min-width: 0;
 }
 
 .community-video-comments-list p {
@@ -1782,14 +1814,36 @@
   font-size: 12px;
 }
 
+.community-video-comment-reply-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+  padding: 2px 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.community-video-comment-reply-button svg {
+  font-size: 14px;
+}
+
 .community-video-comments form {
   display: flex;
+  align-items: center;
+  width: 100%;
   gap: 8px;
 }
 
 .community-video-comments input {
+  box-sizing: border-box;
   flex: 1;
   min-width: 0;
+  min-height: 42px;
   padding: 9px 11px;
   color: var(--text);
   background: var(--soft-bg);
@@ -1805,6 +1859,31 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.community-video-comments form .community-video-comment-send {
+  --community-video-comment-send-text: #FFFFFF; /* theme-color-exception: white send icon on the purple action button */
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  place-items: center;
+  padding: 0;
+  color: var(--community-video-comment-send-text);
+  background: var(--primary);
+  border: 0;
+  border-radius: 50%;
+}
+
+.community-video-comments form .community-video-comment-send:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.community-video-comments form .community-video-comment-cancel-reply {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 @media (min-width: 800px) {

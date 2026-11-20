@@ -5,6 +5,8 @@ import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutline
 import ClosedCaptionOutlinedIcon from "@mui/icons-material/ClosedCaptionOutlined";
 import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
 import RepeatOutlinedIcon from "@mui/icons-material/RepeatOutlined";
+import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
@@ -62,6 +64,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentText, setCommentText] = useState("");
+  const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const touchStartY = useRef<number | null>(null);
   const dirty = useRef(false);
@@ -108,6 +111,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     setFollowing(current.post.isFollowedByMe === true);
     setCommentsOpen(false);
     setComments([]);
+    setReplyTo(null);
     setExpanded(false);
     setError("");
   }, [current]);
@@ -153,9 +157,10 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     if (!current || !commentText.trim() || busy) return;
     setBusy(true);
     try {
-      const comment = await createCommunityComment(current.post._id, commentText.trim());
+      const comment = await createCommunityComment(current.post._id, commentText.trim(), replyTo?._id);
       setComments(value => [...value, comment]);
       setCommentText("");
+      setReplyTo(null);
       setCommentCount(value => value + 1);
       dirty.current = true;
     } catch {
@@ -237,6 +242,18 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   if (!current) return null;
   const progress = duration ? currentTime / duration * 100 : 0;
   const description = current.content || "";
+  const renderComment = (comment: CommunityComment, isReply = false) => (
+    <article className={isReply ? "community-video-comment-reply" : ""} key={comment._id}>
+      <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.activeAvatarFrame} size={32} />
+      <div>
+        <p><strong>{comment.author.displayName}</strong>{comment.content}</p>
+        {viewerId && current.post.canComment !== false ? <button type="button" className="community-video-comment-reply-button" onClick={() => {
+          const parent = comment.parentId ? comments.find(item => item._id === comment.parentId) : comment;
+          setReplyTo(parent || comment);
+        }}><ReplyOutlinedIcon /> Reply</button> : null}
+      </div>
+    </article>
+  );
 
   return (
     <div
@@ -321,14 +338,15 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
       {commentsOpen ? <section className="community-video-comments" aria-label="Video comments">
         <button type="button" className="community-video-comments-close" onClick={() => setCommentsOpen(false)} aria-label="Close comments">×</button>
         <h2>Comments</h2>
-        <div className="community-video-comments-list">{comments.map(comment => <article key={comment._id}>
-          <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.activeAvatarFrame} size={32} />
-          <p><strong>{comment.author.displayName}</strong>{comment.content}</p>
-        </article>)}</div>
+        <div className="community-video-comments-list">{comments.filter(comment => !comment.parentId).map(comment => <div className="community-video-comment-thread" key={comment._id}>
+          {renderComment(comment)}
+          {comments.filter(reply => reply.parentId === comment._id).map(reply => renderComment(reply, true))}
+        </div>)}</div>
         {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
-          <input aria-label="Write a comment" value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder="Write a comment…" />
-          <button type="submit" disabled={busy || !commentText.trim()}>Post</button>
+          <input aria-label={replyTo ? `Reply to ${replyTo.author.displayName}` : "Write a comment"} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
+          {replyTo ? <button type="button" className="community-video-comment-cancel-reply" onClick={() => setReplyTo(null)}>Cancel reply</button> : null}
+          <button type="submit" className="community-video-comment-send" aria-label="Send comment" disabled={busy || !commentText.trim()}><SendOutlinedIcon /></button>
         </form>
       </section> : null}
       {error ? <p className="community-video-viewer-error" role="status">{error}</p> : null}

@@ -3,7 +3,6 @@ import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
 import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
 import ClosedCaptionOutlinedIcon from "@mui/icons-material/ClosedCaptionOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
-import FullscreenOutlinedIcon from "@mui/icons-material/FullscreenOutlined";
 import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
 import UserAvatarFrame from "./UserAvatarFrame";
 import CommunityCaptionTrack from "./CommunityCaptionTrack";
@@ -94,9 +93,6 @@ export default function CommunityVideoPreview({ media, author, content, followin
         setCaptionsAvailable(true);
         if (captionsEnabled) setCaptionTrack(true);
       }} /> : null}</video> : <div className="community-video-fallback">This video could not be loaded.</div>}
-      <button type="button" className="community-video-open" onClick={event => { event.stopPropagation(); onOpen(); }} aria-label="Open full-screen video">
-        <FullscreenOutlinedIcon />
-      </button>
       {portrait ? <div className="community-video-author-overlay">
         <UserAvatarFrame name={author.displayName} image={author.avatar} frame={author.activeAvatarFrame} size={34} />
         <span><strong>{author.displayName}</strong>{author.headline ? <small>{author.headline}</small> : null}

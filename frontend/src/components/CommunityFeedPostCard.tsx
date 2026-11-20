@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
@@ -10,6 +10,7 @@ import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import RepeatOutlinedIcon from "@mui/icons-material/RepeatOutlined";
 import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
@@ -106,7 +107,13 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
   const [expanded, setExpanded] = useState(false);
   const [poll, setPoll] = useState(content.poll);
   const [myVote, setMyVote] = useState(content.myVote || null);
+  const reactionPressTimer = useRef<number | null>(null);
+  const longPressOpenedReactions = useRef(false);
   const isOwnPost = viewerId === post.authorId;
+
+  useEffect(() => () => {
+    if (reactionPressTimer.current !== null) window.clearTimeout(reactionPressTimer.current);
+  }, []);
 
   useEffect(() => {
     setReaction(content.myReaction || (content.likedByMe ? "like" : null));
@@ -150,6 +157,35 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     } finally {
       setBusy(false);
     }
+  };
+
+  const startReactionPress = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || busy) return;
+    if (reactionPressTimer.current !== null) window.clearTimeout(reactionPressTimer.current);
+    longPressOpenedReactions.current = false;
+    reactionPressTimer.current = window.setTimeout(() => {
+      reactionPressTimer.current = null;
+      longPressOpenedReactions.current = true;
+      setReactionMenuOpen(true);
+    }, 450);
+  };
+  const finishReactionPress = () => {
+    if (reactionPressTimer.current !== null) {
+      window.clearTimeout(reactionPressTimer.current);
+      reactionPressTimer.current = null;
+    }
+  };
+  const openReactionsFromContextMenu = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    longPressOpenedReactions.current = true;
+    setReactionMenuOpen(true);
+  };
+  const handleLikeClick = () => {
+    if (longPressOpenedReactions.current) {
+      longPressOpenedReactions.current = false;
+      return;
+    }
+    void chooseReaction("like");
   };
 
   const toggleComments = async () => {
@@ -213,7 +249,10 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
         <Link className="community-comment-author" to={`/people/${encodeURIComponent(comment.author.uid)}`}>{comment.author.displayName}</Link>
         <p>{comment.content}</p>
         <small title={new Date(comment.createdAt).toLocaleString()}>{when(comment.createdAt)}</small>
-        {viewerId && content.canComment !== false ? <button type="button" className="community-comment-reply-button" onClick={() => setReplyTo(comment)}><ReplyOutlinedIcon /> Reply</button> : null}
+        {viewerId && content.canComment !== false ? <button type="button" className="community-comment-reply-button" onClick={() => {
+          const parent = comment.parentId ? comments.find(item => item._id === comment.parentId) : comment;
+          setReplyTo(parent || comment);
+        }}><ReplyOutlinedIcon /> Reply</button> : null}
       </div>
     </article>
   );
@@ -383,8 +422,20 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
       </div>
       <div className="community-feed-actions">
         <div className="community-reaction-control">
-          <button type="button" className="community-feed-action" aria-label={`${reaction === "like" ? "Unlike" : "Like"}, ${likeCount}`} aria-pressed={reaction === "like"} disabled={busy} onClick={() => void chooseReaction("like")}><ThumbUpAltOutlinedIcon /> <span>{likeCount}</span></button>
-          <button type="button" className="community-reaction-picker-toggle" aria-label="Choose a reaction" aria-expanded={reactionMenuOpen} onClick={() => setReactionMenuOpen(value => !value)}>⌄</button>
+          <button
+            type="button"
+            className="community-feed-action"
+            aria-label={`${reaction === "like" ? "Unlike" : "Like"}, ${likeCount}`}
+            aria-pressed={reaction === "like"}
+            aria-expanded={reactionMenuOpen}
+            disabled={busy}
+            onPointerDown={startReactionPress}
+            onPointerUp={finishReactionPress}
+            onPointerLeave={finishReactionPress}
+            onPointerCancel={finishReactionPress}
+            onContextMenu={openReactionsFromContextMenu}
+            onClick={handleLikeClick}
+          ><ThumbUpAltOutlinedIcon /> <span>{likeCount}</span></button>
           {reactionMenuOpen ? <div className="community-reaction-picker" role="group" aria-label="Reactions">
             {reactionOptions.map(option => <button key={option.type} type="button" aria-label={option.label} aria-pressed={reaction === option.type} onClick={() => void chooseReaction(option.type)}>{option.emoji}</button>)}
           </div> : null}
@@ -409,10 +460,9 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
         </div>)}
         {!comments.length ? <p className="community-empty-comments">Be the first to comment.</p> : null}
         <form onSubmit={event => void submitComment(event)}>
-          <label className="visually-hidden" htmlFor={`community-comment-${post._id}`}>Write a comment</label>
-          <input id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
+          <input aria-label={replyTo ? `Reply to ${replyTo.author.displayName}` : "Write a comment"} id={`community-comment-${post._id}`} value={commentText} onChange={event => setCommentText(event.target.value)} maxLength={1000} placeholder={replyTo ? `Reply to ${replyTo.author.displayName}…` : "Write a comment…"} />
           {replyTo ? <button type="button" className="community-comment-cancel-reply" onClick={() => setReplyTo(null)}>Cancel reply</button> : null}
-          <button type="submit" disabled={busy || !commentText.trim()}>Post</button>
+          <button type="submit" className="community-comment-send" aria-label="Send comment" disabled={busy || !commentText.trim()}><SendOutlinedIcon /></button>
         </form>
       </section> : null}
     </article>
