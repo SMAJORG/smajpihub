@@ -97,8 +97,7 @@
 .community-skeleton-feed-media,
 .community-skeleton-profile-post-media {
   width: 100%;
-  aspect-ratio: 1.7;
-  border-radius: 12px;
+  aspect-ratio: 16 / 9;
 }
 
 .community-skeleton-feed-actions {

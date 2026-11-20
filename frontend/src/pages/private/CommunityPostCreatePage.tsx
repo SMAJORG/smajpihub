@@ -83,6 +83,29 @@ const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   reader.onerror = () => reject(new Error("Could not read the selected file."));
   reader.readAsDataURL(file);
 });
+const readMediaDimensions = (type: CommunityMedia["type"], url: string) => new Promise<{ width: number; height: number } | undefined>(resolve => {
+  let finished = false;
+  const finish = (width = 0, height = 0) => {
+    if (finished) return;
+    finished = true;
+    window.clearTimeout(timeout);
+    resolve(width > 0 && height > 0 ? { width: Math.round(width), height: Math.round(height) } : undefined);
+  };
+  const timeout = window.setTimeout(() => finish(), 5000);
+  if (type === "image") {
+    const image = new Image();
+    image.onload = () => finish(image.naturalWidth, image.naturalHeight);
+    image.onerror = () => finish();
+    image.src = url;
+    return;
+  }
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.onloadedmetadata = () => finish(video.videoWidth, video.videoHeight);
+  video.onerror = () => finish();
+  video.src = url;
+  video.load();
+});
 const getCropRect = (ratio: CropRatio, width: number, height: number): CropRect => {
   const requestedRatio = cropRatios[ratio];
   if (!requestedRatio) return { x: 0, y: 0, width: 1, height: 1 };
@@ -746,7 +769,12 @@ export default function CommunityPostCreatePage() {
       if (totalWeight) onProgress?.(Math.round(progress.reduce((sum, value, item) => sum + value * weights[item], 0) / totalWeight));
     };
     const uploads: CommunityMedia[] = await Promise.all(mediaFiles.map(async (media, index): Promise<CommunityMedia> => {
+      const dimensions = await readMediaDimensions(
+        media.file.type.startsWith("video/") ? "video" : "image",
+        media.previewUrl,
+      );
       const metadata = {
+        ...(dimensions || {}),
         altText: media.altText,
         taggedPeople: media.taggedPeople,
         ...(media.captionsVtt?.trim() ? { captionsVtt: media.captionsVtt.trim() } : {}),

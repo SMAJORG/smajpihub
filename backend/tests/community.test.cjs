@@ -203,6 +203,8 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
     media: [{
       type: "image",
       url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+      width: 1200,
+      height: 1500,
       altText: "A sample image",
       taggedPeople: [viewer.uid],
     }],
@@ -213,6 +215,11 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   result = await request("GET", `/community/feed?authorId=${author.uid}`, viewer.uid);
   const savedMediaPost = result.data.posts.find(post => post._id === taggedPost.data.post._id);
   assert.equal(savedMediaPost.media[0].url, taggedPost.data.post.media[0].url, "published attachments remain present in the feed response");
+  assert.deepEqual(
+    [savedMediaPost.media[0].width, savedMediaPost.media[0].height],
+    [1200, 1500],
+    "media dimensions remain available for layout reservation",
+  );
   const captionAuthor = await makeAccount("caption-author");
   const captionsVtt = "WEBVTT\n\n00:00:00.000 --> 00:00:02.500\nA spoken caption.";
   result = await request("POST", "/community/posts", captionAuthor.uid, {

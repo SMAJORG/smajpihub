@@ -10,6 +10,7 @@ import CommunityVideoViewer, { type CommunityVideoItem } from "../../components/
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { getCommunityFeed, type CommunityPost } from "../../lib/communityApi";
+import { setCommunityVideoViewerOpen } from "../../components/communityVideoPlayback";
 import "./community.css";
 
 const CommunityPage = () => {
@@ -55,8 +56,12 @@ const CommunityPage = () => {
     }
   }, [scope]);
   const refreshFeed = useCallback(() => { void load(); }, [load]);
+  const dismissPost = useCallback((postId: string) => {
+    setPosts(current => current.filter(post => post._id !== postId));
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => () => setCommunityVideoViewerOpen(false), []);
   useEffect(() => {
     const post = pendingPublishedPost.current;
     if (!post) return;
@@ -149,17 +154,29 @@ const CommunityPage = () => {
   const openVideo = useCallback((post: CommunityPost, media: { url: string }) => {
     const index = videoItems.findIndex(item => item.post._id === post._id && item.media.url === media.url);
     if (index < 0) return;
-    const element = document.querySelector<HTMLElement>(".community-private-shell .private-body");
+    const rootScroller = document.scrollingElement as HTMLElement | null;
+    const feed = document.querySelector<HTMLElement>(".community-private-shell .community-feed");
+    let element: HTMLElement | null = null;
+    for (let candidate = feed?.parentElement || null; candidate; candidate = candidate.parentElement) {
+      const overflowY = window.getComputedStyle(candidate).overflowY;
+      if ((overflowY === "auto" || overflowY === "scroll") && candidate.scrollHeight > candidate.clientHeight + 2) {
+        element = candidate;
+        break;
+      }
+    }
+    element ||= rootScroller;
     feedScrollPosition.current = { element, top: element?.scrollTop || 0, windowTop: window.scrollY };
+    setCommunityVideoViewerOpen(true);
     setVideoViewerIndex(index);
   }, [videoItems]);
   const closeVideo = useCallback(() => {
+    setCommunityVideoViewerOpen(false);
     setVideoViewerIndex(null);
     requestAnimationFrame(() => {
       const position = feedScrollPosition.current;
       if (!position) return;
-      if (position.element) position.element.scrollTop = position.top;
-      window.scrollTo({ top: position.windowTop });
+      if (position.element === document.scrollingElement) window.scrollTo({ top: position.windowTop });
+      else if (position.element) position.element.scrollTop = position.top;
     });
   }, []);
 
@@ -217,7 +234,7 @@ const CommunityPage = () => {
           viewerId={user?.uid}
           viewerAvatarFrame={user?.activeAvatarFrame}
           onChange={refreshFeed}
-          onDismiss={() => setPosts(current => current.filter(item => item._id !== post._id))}
+          onDismiss={dismissPost}
           onOpenVideo={openVideo}
         />)}
       </section>

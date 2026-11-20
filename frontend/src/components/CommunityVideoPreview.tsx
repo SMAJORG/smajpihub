@@ -23,11 +23,14 @@ type Props = {
 
 export default function CommunityVideoPreview({ media, author, content, following, canFollow, onOpen, onMore, onDismiss, onFollow }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [portrait, setPortrait] = useState(false);
   const [muted, setMuted] = useState(true);
   const [captionsAvailable, setCaptionsAvailable] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+  const portrait = Boolean(media.width && media.height && media.height > media.width);
+  const width = media.width || 16;
+  const height = media.height || 9;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -74,20 +77,26 @@ export default function CommunityVideoPreview({ media, author, content, followin
     .replace(/\.(mp4|webm|mov)(\?.*)?$/i, ".jpg$2");
 
   return (
-    <div className={`community-video-preview${portrait ? " portrait" : " landscape"}`} onClick={onOpen}>
+    <div
+      className={`community-video-preview ${portrait ? "portrait" : "landscape"}${videoReady ? " is-ready" : ""}${videoError ? " has-error" : ""}`}
+      style={{ aspectRatio: `${width} / ${height}` }}
+      onClick={onOpen}
+    >
       {!videoError ? <video
         ref={videoRef}
         src={media.url}
         poster={poster}
+        width={width}
+        height={height}
         muted
         playsInline
         preload="none"
         onLoadedMetadata={event => {
           const video = event.currentTarget;
-          setPortrait(video.videoHeight > video.videoWidth);
           setCaptionsAvailable(Boolean(media.captionsVtt) || video.textTracks.length > 0);
           if (video.textTracks.length) setCaptionTrack(captionsEnabled);
         }}
+        onLoadedData={() => setVideoReady(true)}
         onError={() => setVideoError(true)}
       >{media.captionsVtt ? <CommunityCaptionTrack vtt={media.captionsVtt} onLoad={() => {
         setCaptionsAvailable(true);

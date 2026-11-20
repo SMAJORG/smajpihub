@@ -4,7 +4,7 @@ import { Request, Response, Router } from "express";
 import { resolveCurrentUser } from "../services/auth";
 import { getEligibleAvatarFrames, getEligibleAvatarFramesForUsers, resolveAvatarFrame, type AvatarFrameId } from "../services/avatarFrames";
 
-type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[]; captionsVtt?: string };
+type CommunityMedia = { type: "image" | "video"; url: string; width?: number; height?: number; altText?: string; taggedPeople?: string[]; captionsVtt?: string };
 type CommunityAudience = "everyone" | "followers" | "only_me";
 type CommunityCommentPolicy = "everyone" | "followers" | "nobody";
 const MAX_POST_TEXT = 2000;
@@ -54,10 +54,18 @@ const safeMedia = (input: unknown): CommunityMedia[] | null => {
     if (!item || typeof item !== "object") return null;
     const type = (item as Record<string, unknown>).type;
     const rawUrl = String((item as Record<string, unknown>).url || "").trim();
+    const rawWidth = (item as Record<string, unknown>).width;
+    const rawHeight = (item as Record<string, unknown>).height;
     const altText = String((item as Record<string, unknown>).altText || "").trim();
     const rawTaggedPeople = (item as Record<string, unknown>).taggedPeople ?? [];
     const captionsVtt = String((item as Record<string, unknown>).captionsVtt || "").trim();
     if (!Array.isArray(rawTaggedPeople) || rawTaggedPeople.length > 10) return null;
+    const hasDimensions = rawWidth !== undefined || rawHeight !== undefined;
+    const width = Number(rawWidth);
+    const height = Number(rawHeight);
+    if (hasDimensions && (!Number.isInteger(width) || !Number.isInteger(height)
+      || width < 1 || height < 1 || width > 20_000 || height > 20_000
+      || width / height < 0.05 || width / height > 20)) return null;
     if (captionsVtt && (type !== "video" || captionsVtt.length > 20_000
       || !/^WEBVTT(?:\r?\n)/.test(captionsVtt)
       || !/(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}/.test(captionsVtt))) return null;
@@ -70,6 +78,7 @@ const safeMedia = (input: unknown): CommunityMedia[] | null => {
       media.push({
         type: type as CommunityMedia["type"],
         url: url.toString(),
+        ...(hasDimensions ? { width, height } : {}),
         ...(altText ? { altText: altText.slice(0, 500) } : {}),
         ...(taggedPeople.length ? { taggedPeople } : {}),
         ...(captionsVtt ? { captionsVtt } : {}),

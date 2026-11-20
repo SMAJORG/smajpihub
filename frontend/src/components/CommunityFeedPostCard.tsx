@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from "react";
 import { Link } from "react-router-dom";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import BookmarkBorderOutlinedIcon from "@mui/icons-material/BookmarkBorderOutlined";
@@ -51,7 +51,7 @@ type Props = {
   viewerId?: string;
   viewerAvatarFrame?: AvatarFrameId | null;
   onChange?: () => void;
-  onDismiss?: () => void;
+  onDismiss?: (postId: string) => void;
   onOpenVideo?: (post: CommunityPost, media: CommunityMedia) => void;
 };
 
@@ -98,7 +98,27 @@ const AudienceIcon = ({ audience }: { audience?: CommunityPost["audience"] }) =>
   ? <GroupsOutlinedIcon aria-label="Followers" />
   : audience === "only_me" ? <LockOutlinedIcon aria-label="Only me" /> : <PublicOutlinedIcon aria-label="Public" />;
 
-export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, onDismiss, onOpenVideo }: Props) {
+const CommunityFeedImage = ({ media, index }: { media: CommunityMedia; index: number }) => {
+  const [loaded, setLoaded] = useState(false);
+  const width = media.width || 16;
+  const height = media.height || 9;
+  return (
+    <div className={`community-feed-image-frame${loaded ? " is-loaded" : ""}`} style={{ aspectRatio: `${width} / ${height}` }}>
+      <img
+        loading="lazy"
+        decoding="async"
+        width={media.width || 16}
+        height={media.height || 9}
+        src={media.url}
+        alt={media.altText || `Community post image ${index + 1}`}
+        onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
+      />
+    </div>
+  );
+};
+
+function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, onDismiss, onOpenVideo }: Props) {
   const original = post.originalPost;
   const content: CommunityPost = original ? { ...post, ...original } : post;
   const author = content.author || post.author;
@@ -372,7 +392,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     setError("");
     try {
       await hideCommunityAuthor(author.uid);
-      onDismiss?.();
+      onDismiss?.(post._id);
       onChange?.();
     } catch {
       setError("Posts by this user could not be hidden. Please try again.");
@@ -387,7 +407,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     setError("");
     try {
       await markCommunityPostNotInterested(post._id);
-      onDismiss?.();
+      onDismiss?.(post._id);
       onChange?.();
     } catch {
       setError("This post could not be removed from your feed. Please try again.");
@@ -488,7 +508,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     setError("");
     try {
       await deleteCommunityPost(post._id);
-      onDismiss?.();
+      onDismiss?.(post._id);
       onChange?.();
     } catch {
       setError("Post could not be deleted. Please try again.");
@@ -497,9 +517,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     }
   };
 
-  const dismiss = () => {
-    onDismiss?.();
-  };
+  const dismiss = useCallback(() => onDismiss?.(post._id), [onDismiss, post._id]);
 
   const activityText = post.socialActivity
     ? post.socialActivity.kind === "likes" ? "likes this"
@@ -569,7 +587,7 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
               onDismiss={dismiss}
               onFollow={() => void followAuthor()}
             />
-            : <img key={`${media.url}-${index}`} loading="lazy" src={media.url} alt={media.altText || `Community post image ${index + 1}`} />)}
+            : <CommunityFeedImage key={`${media.url}-${index}`} media={media} index={index} />)}
         </div> : null}
       </div>
       <div className="community-feed-actions">
@@ -686,3 +704,5 @@ export default function CommunityFeedPostCard({ post, viewerId, viewerAvatarFram
     </article>
   );
 }
+
+export default memo(CommunityFeedPostCard);

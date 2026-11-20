@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import ClosedCaptionOutlinedIcon from "@mui/icons-material/ClosedCaptionOutlined";
-import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
 import RepeatOutlinedIcon from "@mui/icons-material/RepeatOutlined";
 import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
@@ -16,12 +15,9 @@ import CommunityCaptionTrack from "./CommunityCaptionTrack";
 import UserAvatarFrame from "./UserAvatarFrame";
 import {
   createCommunityComment,
-  deleteCommunityPost,
   getCommunityComments,
-  reportCommunityPost,
   repostCommunityPost,
   setCommunityReaction,
-  toggleCommunityFollow,
   type CommunityComment,
   type CommunityIdentity,
   type CommunityMedia,
@@ -53,15 +49,12 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const [playing, setPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [expanded, setExpanded] = useState(false);
   const [reaction, setReaction] = useState<CommunityReaction | null>(null);
   const [likeCount, setLikeCount] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
-  const [following, setFollowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
@@ -112,14 +105,12 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     setLikeCount(current.post.likeCount || 0);
     setCommentCount(current.post.commentCount || 0);
     setRepostCount(current.post.repostCount || 0);
-    setFollowing(current.post.isFollowedByMe === true);
     setCommentsOpen(false);
     setCommentsLoading(false);
     setCommentsLoaded(false);
     setCommentsLoadError("");
     setComments([]);
     setReplyTo(null);
-    setExpanded(false);
     setError("");
   }, [current]);
 
@@ -209,19 +200,6 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
     }
   };
 
-  const followAuthor = async () => {
-    if (!current || !viewerId || current.author.uid === viewerId || busy) return;
-    setBusy(true);
-    try {
-      setFollowing(await toggleCommunityFollow(current.author.uid));
-      dirty.current = true;
-    } catch {
-      setError("Follow status could not be updated.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const setCaptionMode = (enabled: boolean) => {
     const video = videoRef.current;
     if (!video || (enabled && !video.textTracks.length)) return;
@@ -230,31 +208,8 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   };
   const toggleCaptions = () => setCaptionMode(!captionsEnabled);
 
-  const removeOrReport = async () => {
-    if (!current || busy) return;
-    setBusy(true);
-    try {
-      if (viewerId === current.author.uid) {
-        if (window.confirm("Delete this post? This cannot be undone.")) {
-          await deleteCommunityPost(current.post._id);
-          dirty.current = true;
-          closeViewer();
-        }
-      } else {
-        await reportCommunityPost(current.post._id, "Other");
-        setError("Report sent for review.");
-      }
-    } catch {
-      setError("The post action could not be completed.");
-    } finally {
-      setBusy(false);
-      setMenuOpen(false);
-    }
-  };
-
   if (!current) return null;
   const progress = duration ? currentTime / duration * 100 : 0;
-  const description = current.content || "";
   const renderComment = (comment: CommunityComment, isReply = false) => (
     <article className={isReply ? "community-video-comment-reply" : ""} key={comment._id}>
       <UserAvatarFrame name={comment.author.displayName} image={comment.author.avatar} frame={comment.author.activeAvatarFrame} size={32} />
@@ -270,16 +225,24 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
 
   return (
     <div
-      className="community-video-viewer"
+      className={`community-video-viewer${commentsOpen ? " with-comments" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="Full-screen community video"
       onTouchStart={event => { touchStartY.current = event.touches[0]?.clientY ?? null; }}
       onTouchEnd={event => {
+        if (event.target instanceof Element && event.target.closest(".community-video-comments")) {
+          touchStartY.current = null;
+          return;
+        }
         if (touchStartY.current === null) return;
         const difference = touchStartY.current - (event.changedTouches[0]?.clientY ?? touchStartY.current);
         if (Math.abs(difference) > 60) move(difference > 0 ? 1 : -1);
         touchStartY.current = null;
+      }}
+      onWheel={event => {
+        event.stopPropagation();
+        if (!(event.target instanceof Element) || !event.target.closest(".community-video-comments")) event.preventDefault();
       }}
     >
       <video
@@ -323,22 +286,14 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
         <button type="button" disabled={busy} onClick={() => void repost()}><RepeatOutlinedIcon /><span>{repostCount}</span></button>
         <button type="button" onClick={() => void share()}><ShareOutlinedIcon /></button>
       </div>
-      <div className="community-video-viewer-description">
-        <div className="community-video-viewer-author">
-          <Link to={`/people/${encodeURIComponent(current.author.uid)}`} onClick={closeViewer}>
-            <UserAvatarFrame name={current.author.displayName} image={current.author.avatar} frame={current.author.activeAvatarFrame} size={44} />
-          </Link>
-          <span>
-            <Link to={`/people/${encodeURIComponent(current.author.uid)}`} onClick={closeViewer}>{current.author.displayName}</Link>
-            {current.author.headline ? <small>{current.author.headline}</small> : null}
-          </span>
-          {current.author.uid !== viewerId ? <button type="button" disabled={busy} onClick={() => void followAuthor()}>{following ? "Following" : "+ Follow"}</button> : null}
-        </div>
-        {description ? <p>{expanded || description.length <= 180 ? description : `${description.slice(0, 180).trimEnd()}…`} {description.length > 180 ? <button type="button" onClick={() => setExpanded(value => !value)}>{expanded ? "less" : "more"}</button> : null}</p> : null}
-        <div className="community-video-viewer-menu-wrap">
-          <button type="button" aria-label="Video post options" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><MoreVertOutlinedIcon /></button>
-          {menuOpen ? <div role="menu"><button type="button" role="menuitem" disabled={busy} onClick={() => void removeOrReport()}>{viewerId === current.author.uid ? "Delete post" : "Report post"}</button></div> : null}
-        </div>
+      <div className="community-video-viewer-author">
+        <Link to={`/people/${encodeURIComponent(current.author.uid)}`} onClick={closeViewer}>
+          <UserAvatarFrame name={current.author.displayName} image={current.author.avatar} frame={current.author.activeAvatarFrame} size={44} />
+        </Link>
+        <span>
+          <Link to={`/people/${encodeURIComponent(current.author.uid)}`} onClick={closeViewer}>{current.author.displayName}</Link>
+          {current.author.headline ? <small>{current.author.headline}</small> : null}
+        </span>
       </div>
       <div className="community-video-viewer-progress">
         <input aria-label="Video playback position" type="range" min={0} max={duration || 0} step="0.1" value={currentTime} onChange={event => {

@@ -41,6 +41,7 @@ import { getStreamDownloads, STREAM_DOWNLOADS_CHANGED_EVENT } from "../lib/strea
 import ServiceLaunchGate from "../components/ServiceLaunchGate";
 import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 import UserAvatarFrame from "../components/UserAvatarFrame";
+import { communityVideoViewerStateEvent } from "../components/communityVideoPlayback";
 
 type PrivateLayoutProps = { children: ReactNode; fullScreen?: boolean };
 const SIDEBAR_STORAGE_KEY = "smaj_private_sidebar_collapsed";
@@ -145,6 +146,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [streamDownloadCount, setStreamDownloadCount] = useState(0);
   const [communityChromeHidden, setCommunityChromeHidden] = useState(false);
+  const [communityVideoViewerOpen, setCommunityVideoViewerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<"light" | "dark">(() => window.localStorage.getItem("smaj_private_theme_mode") === "dark" ? "dark" : "light");
   const [showSignOut, setShowSignOut] = useState(false);
@@ -332,10 +334,18 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const streamDownloadBadgeLabel = streamDownloadCount > 99 ? "99+" : streamDownloadCount;
   const isCommunityFeed = location.pathname === "/community/feed";
   useEffect(() => {
+    const onVideoViewerState = (event: Event) => {
+      setCommunityVideoViewerOpen((event as CustomEvent<boolean>).detail === true);
+    };
+    window.addEventListener(communityVideoViewerStateEvent, onVideoViewerState);
+    return () => window.removeEventListener(communityVideoViewerStateEvent, onVideoViewerState);
+  }, []);
+  useEffect(() => {
     if (!isCommunityFeed) {
       setCommunityChromeHidden(false);
       return;
     }
+    if (communityVideoViewerOpen) return;
 
     const privateContent = document.querySelector<HTMLElement>(".community-private-shell .private-content");
     const feed = document.querySelector<HTMLElement>(".community-private-shell .community-feed");
@@ -410,7 +420,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       resizeObserver?.disconnect();
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
     };
-  }, [isCommunityFeed]);
+  }, [isCommunityFeed, communityVideoViewerOpen]);
 
   useEffect(() => {
     if (!isStreamShell) return;
@@ -433,7 +443,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, [isStreamShell]);
 
   return (
-    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${isCommunityFeed ? `community-private-shell${communityChromeHidden ? " community-chrome-hidden" : ""}` : ""} ${fullScreen ? "full-screen-page" : ""}`}>
+    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${isCommunityFeed ? `community-private-shell${communityChromeHidden ? " community-chrome-hidden" : ""}${communityVideoViewerOpen ? " community-video-open" : ""}` : ""} ${fullScreen ? "full-screen-page" : ""}`}>
       <ServiceLaunchGate />
       {fullScreen ? null : (
         <header className="private-header">

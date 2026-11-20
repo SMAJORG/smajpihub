@@ -20,7 +20,7 @@ export type CommunityIdentity = {
   allowContact: boolean;
   createdAt: string | null;
 };
-export type CommunityMedia = { type: "image" | "video"; url: string; altText?: string; taggedPeople?: string[]; captionsVtt?: string };
+export type CommunityMedia = { type: "image" | "video"; url: string; width?: number; height?: number; altText?: string; taggedPeople?: string[]; captionsVtt?: string };
 export type CommunityPoll = {
   question: string;
   options: Array<{ id: string; label: string; votes: number }>;
