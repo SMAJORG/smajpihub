@@ -67,39 +67,56 @@ const CommunityPage = () => {
     const userId = user?.uid;
     if (!userId) return;
     let active = true;
-    const refreshUnreadMessages = async () => {
+    let cursor = "";
+    let generation = 0;
+    let request: AbortController | null = null;
+    let retryTimer: number | null = null;
+    const updateCount = (conversations: Array<{ _id: string; unreadBy?: string[]; unreadCount?: number }>) => {
+      const unread = new Map(conversations.map(conversation => [conversation._id, conversation]));
+      const count = [...unread.values()]
+        .filter(conversation => conversation.unreadBy?.includes(userId))
+        .reduce((total, conversation) => total + Math.max(1, conversation.unreadCount || 0), 0);
+      setUnreadMessageCount(count);
+    };
+    const synchronize = async (run = generation) => {
+      if (!active || run !== generation || document.hidden || !navigator.onLine) return;
+      const controller = new AbortController();
+      request = controller;
       try {
-        const headers = { "X-SMAJ-Chat-Owner": userId, "X-SMAJ-Silent": "true" };
-        const [marketplace, jobs] = await Promise.all([
-          axiosClient.get<{ conversations: Array<{ _id: string; unreadBy?: string[] }> }>("/messages", {
-            params: { includePreviews: "0" },
-            headers,
-          }),
-          axiosClient.get<{ conversations: Array<{ _id: string; unreadBy?: string[] }> }>("/messages", {
-            params: { context: "jobs", includePreviews: "0" },
-            headers,
-          }),
-        ]);
-        if (!active) return;
-        const unreadIds = new Set(
-          [...marketplace.data.conversations, ...jobs.data.conversations]
-            .filter(conversation => conversation.unreadBy?.includes(userId))
-            .map(conversation => conversation._id),
-        );
-        setUnreadMessageCount(unreadIds.size);
+        const { data } = await axiosClient.get<{ cursor: string; conversations: Array<{ _id: string; unreadBy?: string[]; unreadCount?: number }> }>("/messages/sync", {
+          params: { cursor, context: "all" },
+          timeout: 30000,
+          signal: controller.signal,
+          headers: { "X-SMAJ-Chat-Owner": userId, "X-SMAJ-Silent": "true" },
+        });
+        if (!active || run !== generation) return;
+        cursor = data.cursor;
+        updateCount(data.conversations);
+        retryTimer = window.setTimeout(() => void synchronize(run), 0);
       } catch {
-        // Keep the last known count if the inbox is temporarily unavailable.
+        if (active && run === generation && !controller.signal.aborted) {
+          retryTimer = window.setTimeout(() => void synchronize(run), 3000);
+        }
       }
     };
-    void refreshUnreadMessages();
-    const interval = window.setInterval(() => {
-      if (!document.hidden) void refreshUnreadMessages();
-    }, 60_000);
-    window.addEventListener("focus", refreshUnreadMessages);
+    const reconnect = () => {
+      generation++;
+      cursor = "";
+      request?.abort();
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      if (!document.hidden && navigator.onLine) void synchronize();
+    };
+    void synchronize();
+    window.addEventListener("focus", reconnect);
+    window.addEventListener("online", reconnect);
+    document.addEventListener("visibilitychange", reconnect);
     return () => {
       active = false;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshUnreadMessages);
+      request?.abort();
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      window.removeEventListener("focus", reconnect);
+      window.removeEventListener("online", reconnect);
+      document.removeEventListener("visibilitychange", reconnect);
     };
   }, [user?.uid]);
 
@@ -197,9 +214,9 @@ const CommunityPage = () => {
             {composerOpen ? <CloseOutlinedIcon /> : <AddOutlinedIcon />}
           </button>
           <Link
-            className="community-header-action community-messages-action"
+            className="community-header-action community-messages-action notification-icon"
             to="/messages"
-            aria-label={unreadMessageCount ? `Messages, ${unreadMessageCount} unread conversations` : "Messages"}
+            aria-label={unreadMessageCount ? `Messages, ${unreadMessageCount > 99 ? "99+" : unreadMessageCount} unread messages` : "Messages"}
             title="Messages"
           >
             <ChatOutlinedIcon />

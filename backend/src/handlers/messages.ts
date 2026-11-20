@@ -1,5 +1,6 @@
 import { readUserPresence } from "../services/userPresence";
 import { Router } from "express";
+import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
 import { createNotification } from "../services/notifications";
 import { resolveCurrentUser } from "../services/auth";
@@ -130,15 +131,28 @@ const enrichConversations = async (req: any, currentUser: Record<string, any>, c
     user.uid,
     resolveAvatarFrame(user, eligibleFramesByUser.get(String(user.uid)) || []),
   ] as const));
+  const unreadCounts = await Promise.all(conversations.map(async (conversation) => {
+    if (!Array.isArray(conversation.unreadBy) || !conversation.unreadBy.includes(currentUser.uid)) return 0;
+    const count = await req.app.locals.messageCollection.countDocuments({
+      conversationId: conversation._id.toString(),
+      senderId: { $ne: currentUser.uid },
+      hiddenFor: { $ne: currentUser.uid },
+      readAt: { $exists: false },
+    });
+    return Math.max(1, count);
+  }));
 
-  return Promise.all(conversations.map(async (conversation) => {
+  return Promise.all(conversations.map(async (conversation, index) => {
     const otherUserId = conversation.buyerId === currentUser.uid ? conversation.sellerId : conversation.buyerId;
     const otherUser = usersById.get(otherUserId);
-    const presence = readUserPresence(otherUser);
+    const presence = otherUser?.settings?.messaging?.onlineStatus === false
+      ? { online: false, lastSeenAt: null, presenceExpiresAt: null }
+      : readUserPresence(otherUser);
     const typingAt = conversation.typingBy?.[otherUserId];
     const typingMs = typingAt ? new Date(typingAt).getTime() : 0;
     return {
       ...serialize(conversation),
+      unreadCount: unreadCounts[index],
       participantId: otherUserId,
       participantName: otherUser?.displayName || otherUser?.username || (conversation.buyerId === currentUser.uid ? conversation.sellerName : conversation.buyerName),
       profileImage: otherUser?.avatar || (conversation.buyerId === currentUser.uid ? conversation.sellerAvatar : conversation.buyerAvatar) || "",
@@ -159,7 +173,7 @@ const directConversation = async (req: any, user: any, recipientId: string, crea
   const pairKey = pairKeyFor(user.uid, recipientId);
   const matches = await req.app.locals.conversationCollection.find({ contextType: { $ne: "jobs" }, $or: [{ pairKey }, { buyerId: user.uid, sellerId: recipientId }, { buyerId: recipientId, sellerId: user.uid }] }).toArray();
   let conversation = await mergePairConversations(req, matches);
-  if (!conversation && (recipient.allowContact === false || recipient.settings?.allowContact === false)) return null;
+  if (!conversation && (recipient.allowContact === false || recipient.settings?.allowContact === false || recipient.settings?.messaging?.privacy === "nobody")) return null;
   if (!conversation && create) {
     const document = { pairKey, buyerId: user.uid, buyerName: user.displayName || user.username, sellerId: recipientId, sellerName: recipient.displayName || recipient.username, participants: [user.uid, recipientId], lastMessage: "", unreadBy: [], createdAt: new Date(), updatedAt: new Date() };
     try {
@@ -190,9 +204,23 @@ export default function mountMessageEndpoints(router: Router) {
     res.on("close", () => { closed = true; });
     const deadline = Date.now() + 24000;
     while (!closed) {
-      const records = await req.app.locals.conversationCollection.find({ participants: user.uid, deletedBy: { $ne: user.uid }, contextType: { $ne: "jobs" } }).sort({ updatedAt: -1 }).toArray();
-      const conversations = await enrichConversations(req, user, records);
-      const { createHash } = await import("crypto");
+      const records = await req.app.locals.conversationCollection.find({
+        participants: user.uid,
+        deletedBy: { $ne: user.uid },
+        ...(req.query.context === "all" ? {} : { contextType: { $ne: "jobs" } }),
+      }).sort({ updatedAt: -1 }).toArray();
+      const visible = req.query.context === "all"
+        ? records.filter((conversation: Record<string, any>) => conversation.contextType !== "jobs"
+          || conversation.sellerId === user.uid || Boolean(conversation.lastMessage))
+        : records;
+      const grouped = new Map<string, Array<Record<string, any>>>();
+      visible.forEach((conversation: Record<string, any>) => {
+        const key = conversation.pairKey || pairKeyFor(conversation.buyerId, conversation.sellerId);
+        grouped.set(key, [...(grouped.get(key) || []), conversation]);
+      });
+      const merged = (await Promise.all([...grouped.values()].map(items => mergePairConversations(req, items))))
+        .filter(Boolean) as Array<Record<string, any>>;
+      const conversations = await enrichConversations(req, user, merged);
       const cursor = createHash("sha256").update(JSON.stringify(conversations)).digest("hex");
       if (cursor !== req.query.cursor || Date.now() >= deadline) return res.json({ cursor, conversations });
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -208,10 +236,15 @@ export default function mountMessageEndpoints(router: Router) {
       const conversations = await req.app.locals.conversationCollection.find({ participants: user.uid, deletedBy: { $ne: user.uid } }).toArray();
       const ids = [...new Set(conversations.map((item: any) => item.buyerId === user.uid ? item.sellerId : item.buyerId).concat(recipient || []).filter((id: any) => typeof id === "string" && id !== user.uid))];
       // A direct recipient has the same visibility as /direct/:recipientId.
-      const users = ids.length ? await req.app.locals.userCollection.find({ uid: { $in: ids } }, { projection: { uid: 1, lastSeenAt: 1, presenceSessions: 1 } }).toArray() : [];
+      const users = ids.length ? await req.app.locals.userCollection.find({ uid: { $in: ids } }, { projection: { uid: 1, lastSeenAt: 1, presenceSessions: 1, "settings.messaging.onlineStatus": 1 } }).toArray() : [];
       const now = Date.now();
       res.setHeader("Cache-Control", "no-store");
-      return res.json({ serverTime: now, peers: users.map((peer: any) => ({ uid: peer.uid, ...readUserPresence(peer, now) })) });
+      return res.json({ serverTime: now, peers: users.map((peer: any) => ({
+        uid: peer.uid,
+        ...(peer.settings?.messaging?.onlineStatus === false
+          ? { online: false, lastSeenAt: null, presenceExpiresAt: null }
+          : readUserPresence(peer, now)),
+      })) });
     } catch {
       return res.status(503).json({ error: "presence_unavailable" });
     }
@@ -224,23 +257,90 @@ export default function mountMessageEndpoints(router: Router) {
     const [enriched] = await enrichConversations(req, user, [conversation]);
     return res.json({ conversation: enriched });
   });
+  router.get("/preferences", async (req, res) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const saved = user.settings?.messaging || {};
+    return res.json({
+      settings: {
+        privacy: saved.privacy || (user.allowContact === false || user.settings?.allowContact === false ? "nobody" : "everyone"),
+        readReceipts: saved.readReceipts !== false,
+        onlineStatus: saved.onlineStatus !== false,
+        notifications: saved.notifications !== false,
+        awayMessage: {
+          enabled: saved.awayMessage?.enabled === true,
+          startAt: saved.awayMessage?.startAt || "",
+          endAt: saved.awayMessage?.endAt || "",
+          message: saved.awayMessage?.message || "",
+        },
+      },
+    });
+  });
+  router.put("/preferences", async (req, res) => {
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    const input = req.body || {};
+    if (!["everyone", "nobody"].includes(input.privacy)
+      || typeof input.readReceipts !== "boolean"
+      || typeof input.onlineStatus !== "boolean"
+      || typeof input.notifications !== "boolean"
+      || !input.awayMessage || typeof input.awayMessage.enabled !== "boolean"
+      || typeof input.awayMessage.message !== "string"
+      || input.awayMessage.message.length > 300
+      || typeof input.awayMessage.startAt !== "string"
+      || typeof input.awayMessage.endAt !== "string") {
+      return res.status(400).json({ error: "invalid_messaging_preferences" });
+    }
+    const { enabled, startAt, endAt, message } = input.awayMessage;
+    const start = Date.parse(startAt);
+    const end = Date.parse(endAt);
+    if (enabled && (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || !message.trim())) {
+      return res.status(400).json({ error: "invalid_away_message", message: "Choose a valid date range and enter an away message." });
+    }
+    const previousMessaging = user.settings?.messaging ?? {};
+    const messaging = {
+      ...previousMessaging,
+      privacy: input.privacy,
+      readReceipts: input.readReceipts,
+      onlineStatus: input.onlineStatus,
+      notifications: input.notifications,
+      awayMessage: {
+        enabled,
+        startAt: enabled ? new Date(start).toISOString() : startAt,
+        endAt: enabled ? new Date(end).toISOString() : endAt,
+        message: message.trim(),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    const allowContact = input.privacy === "everyone";
+    await req.app.locals.userCollection.updateOne(
+      { uid: user.uid },
+      { $set: { "settings.messaging": messaging, "settings.allowContact": allowContact, allowContact } },
+    );
+    return res.json({ settings: { ...messaging, awayMessage: { ...messaging.awayMessage, updatedAt: undefined } } });
+  });
   router.get("/", async (req, res) => {
     const currentUser = await resolveCurrentUser(req);
     if (!currentUser) return res.status(401).json({ error: "unauthorized" });
     const uid = currentUser.uid;
-    const contextType = req.query.context === "jobs" ? "jobs" : "marketplace";
+    const contextType = req.query.context === "jobs" ? "jobs" : req.query.context === "all" ? "all" : "marketplace";
     const conversations = await req.app.locals.conversationCollection.find({
       participants: uid,
       deletedBy: { $ne: uid },
       ...(contextType === "jobs"
         ? { contextType: "jobs", applicationId: { $exists: true, $ne: "" }, jobId: { $exists: true, $ne: "" } }
-        : { contextType: { $ne: "jobs" } }),
+        : contextType === "all"
+          ? {}
+          : { contextType: { $ne: "jobs" } }),
     }).sort({ updatedAt: -1 }).toArray();
     const visibleConversations = contextType === "jobs"
       ? conversations.filter((conversation: Record<string, any>) =>
         conversation.sellerId === uid || Boolean(conversation.lastMessage),
       )
-      : conversations;
+      : contextType === "all"
+        ? conversations.filter((conversation: Record<string, any>) => conversation.contextType !== "jobs"
+          || conversation.sellerId === uid || Boolean(conversation.lastMessage))
+        : conversations;
     const grouped = new Map<string, Array<Record<string, any>>>();
     visibleConversations.forEach((conversation: Record<string, any>) => {
       const key = conversation.pairKey || pairKeyFor(conversation.buyerId, conversation.sellerId);
@@ -287,7 +387,9 @@ export default function mountMessageEndpoints(router: Router) {
     const page = await historyPage(req, req.params.id, uid, limit, before, req.query.light === "1");
     if (!before && req.query.preview !== "true") {
       const readAt = new Date();
-      await req.app.locals.messageCollection.updateMany({ conversationId: req.params.id, senderId: { $ne: uid }, hiddenFor: { $ne: uid }, readAt: { $exists: false } }, { $set: { readAt } });
+      if (currentUser.settings?.messaging?.readReceipts !== false) {
+        await req.app.locals.messageCollection.updateMany({ conversationId: req.params.id, senderId: { $ne: uid }, hiddenFor: { $ne: uid }, readAt: { $exists: false } }, { $set: { readAt } });
+      }
       await req.app.locals.conversationCollection.updateOne({ _id: conversation._id, unreadBy: uid }, { $pull: { unreadBy: uid }, $set: { readUpdatedAt: readAt } });
     }
     const [enrichedConversation] = await enrichConversations(req, currentUser, [conversation]);
@@ -341,6 +443,19 @@ export default function mountMessageEndpoints(router: Router) {
     const updated = await req.app.locals.conversationCollection.findOne({ _id: conversation._id });
     const [enrichedConversation] = await enrichConversations(req, user, updated ? [updated] : []);
     return res.status(200).json({ conversation: enrichedConversation });
+  });
+
+  router.patch("/:id/unread", async (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "bad_request", message: "Invalid conversation id" });
+    const user = await resolveCurrentUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized", message: "User needs to sign in first" });
+    const conversation = await req.app.locals.conversationCollection.findOne({ _id: new ObjectId(req.params.id), participants: user.uid, deletedBy: { $ne: user.uid } });
+    if (!conversation) return res.status(404).json({ error: "not_found", message: "Conversation not found" });
+    await req.app.locals.conversationCollection.updateOne(
+      { _id: conversation._id },
+      { $addToSet: { unreadBy: user.uid }, $set: { messageUpdatedAt: new Date() } },
+    );
+    return res.status(200).json({ unread: true, conversationId: req.params.id });
   });
 
   router.delete("/:id", async (req, res) => {
@@ -439,7 +554,77 @@ export default function mountMessageEndpoints(router: Router) {
       return res.json({ message: serialize(existing), conversation: (await enrichConversations(req, user, [conversation]))[0] });
     }
     await req.app.locals.conversationCollection.updateOne({ _id: conversation._id, $or: [{ lastMessageId: { $exists: false } }, { lastMessageId: { $lt: result.insertedId.toString() } }] }, { $set: { lastMessage: document.message, lastMessageId: result.insertedId.toString(), updatedAt: document.createdAt }, $addToSet: { unreadBy: receiverId }, $pull: { deletedBy: { $in: [user.uid, receiverId] } } });
-    void createNotification(req.app, { userId: receiverId, type: "new_message", title: "New message", message: `${document.senderName}: ${document.message.slice(0, 100)}`, relatedId: req.params.id, image: user.avatar || "" }).catch((error: unknown) => console.error("Message notification failed", error));
+    const recipient = await req.app.locals.userCollection.findOne({ uid: receiverId });
+    if (recipient?.settings?.messaging?.notifications !== false) {
+      void createNotification(req.app, { userId: receiverId, type: "new_message", title: "New message", message: `${document.senderName}: ${document.message.slice(0, 100)}`, relatedId: req.params.id, image: user.avatar || "" }).catch((error: unknown) => console.error("Message notification failed", error));
+    }
+    const away = recipient?.settings?.messaging?.awayMessage;
+    const now = new Date();
+    const awayStart = Date.parse(away?.startAt || "");
+    const awayEnd = Date.parse(away?.endAt || "");
+    if (messageType === "text"
+      && recipient?.settings?.messaging?.privacy !== "nobody"
+      && recipient?.allowContact !== false && recipient?.settings?.allowContact !== false
+      && away?.enabled === true && Number.isFinite(awayStart) && Number.isFinite(awayEnd)
+      && now.getTime() >= awayStart && now.getTime() <= awayEnd
+      && typeof away.message === "string" && away.message.trim()) {
+      const replyKey = `${receiverId}:${away.updatedAt || away.startAt}`;
+      const claim = await req.app.locals.conversationCollection.updateOne(
+        { _id: conversation._id, awayReplyReceipts: { $ne: replyKey } },
+        { $addToSet: { awayReplyReceipts: replyKey } },
+      );
+      if (claim.matchedCount) {
+        const reply = {
+          conversationId: req.params.id,
+          clientMessageId: `away_${createHash("sha256").update(`${req.params.id}:${replyKey}`).digest("hex")}`,
+          senderId: receiverId,
+          senderName: recipient.displayName || recipient.username || "SMAJ user",
+          message: away.message.trim().slice(0, 300),
+          messageType: "text",
+          automatedReply: true,
+          createdAt: new Date(),
+        };
+        try {
+          let storedReply = await req.app.locals.messageCollection.findOne({
+            conversationId: req.params.id,
+            senderId: receiverId,
+            clientMessageId: reply.clientMessageId,
+          });
+          if (!storedReply) {
+            try {
+              const awayResult = await req.app.locals.messageCollection.insertOne(reply);
+              storedReply = { ...reply, _id: awayResult.insertedId };
+            } catch (error: any) {
+              if (error?.code !== 11000) throw error;
+              storedReply = await req.app.locals.messageCollection.findOne({
+                conversationId: req.params.id,
+                senderId: receiverId,
+                clientMessageId: reply.clientMessageId,
+              });
+              if (!storedReply) throw error;
+            }
+          }
+          await req.app.locals.conversationCollection.updateOne(
+            { _id: conversation._id },
+            {
+              $set: {
+                lastMessage: storedReply.message,
+                lastMessageId: storedReply._id.toString(),
+                updatedAt: storedReply.createdAt,
+                messageUpdatedAt: storedReply.createdAt,
+              },
+              $addToSet: { unreadBy: user.uid },
+            },
+          );
+        } catch (error) {
+          await req.app.locals.conversationCollection.updateOne(
+            { _id: conversation._id },
+            { $pull: { awayReplyReceipts: replyKey } },
+          );
+          console.error("Automatic away reply failed", error);
+        }
+      }
+    }
     return res.status(201).json({ message: serialize({ ...document, _id: result.insertedId }), conversation: (await enrichConversations(req, user, [{ ...conversation, lastMessage: document.message, lastMessageId: result.insertedId.toString(), updatedAt: document.createdAt }]))[0] });
   });
 

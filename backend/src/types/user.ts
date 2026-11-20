@@ -34,6 +34,19 @@ export interface UserData {
     notifications: boolean,
     publicProfile?: boolean,
     allowContact?: boolean,
+    messaging?: {
+      privacy?: "everyone" | "nobody",
+      readReceipts?: boolean,
+      onlineStatus?: boolean,
+      notifications?: boolean,
+      awayMessage?: {
+        enabled?: boolean,
+        startAt?: string,
+        endAt?: string,
+        message?: string,
+        updatedAt?: string,
+      },
+    },
   },
   sportsPreferences?: {
     completed: boolean,

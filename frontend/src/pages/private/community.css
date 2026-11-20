@@ -147,13 +147,12 @@
   padding: 0 4px;
   display: grid;
   place-items: center;
-  color: var(--primary);
-  background: var(--primary-soft);
   border: 2px solid var(--surface);
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
+  animation: none !important;
 }
 
 .community-page-header,

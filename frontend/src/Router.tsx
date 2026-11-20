@@ -684,7 +684,7 @@ export const router = createBrowserRouter([
     path: "/messages",
     element: (
       <ProtectedRoute>
-        <PrivateLayout>
+        <PrivateLayout fullScreen>
           <MessagesPage />
         </PrivateLayout>
       </ProtectedRoute>

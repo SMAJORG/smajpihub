@@ -10,7 +10,7 @@ const equal = (a,b) => String(a) === String(b);
 function matches(doc, query) {
   return Object.entries(query).every(([key,value]) => {
     if (key === '$or') return value.some(item => matches(doc,item));
-    const actual=doc[key];
+    const actual=key.split('.').reduce((value,part)=>value?.[part],doc);
     if (value && typeof value === 'object' && !(value instanceof ObjectId) && !(value instanceof Date)) {
       return Object.entries(value).every(([op,target]) => op === '$all' ? target.every(wanted=>Array.isArray(actual)&&actual.some(item=>equal(item,wanted))) : op === '$ne' ? !(Array.isArray(actual) ? actual.some(item=>equal(item,target)) : equal(actual,target)) : op === '$exists' ? (actual !== undefined) === target : op === '$lt' ? String(actual)<String(target) : op === '$in' ? target.some(item=>equal(actual,item)) : false);
     }
@@ -24,6 +24,7 @@ class Collection {
     return { sort(order) { const [key,direction]=Object.entries(order)[0];items.sort((a,b)=>String(a[key]).localeCompare(String(b[key]))*direction);return this; },limit(n){items=items.slice(0,n);return this;},toArray:async()=>items.map(item=>({...item})) };
   }
   async findOne(query) { return this.items.find(item=>matches(item,query)) || null; }
+  async countDocuments(query) { return this.items.filter(item=>matches(item,query)).length; }
   async insertOne(doc) {
     if (this.unique && this.items.some(item=>this.unique(item,doc))) throw Object.assign(new Error('duplicate'),{code:11000});
     const stored={...doc,_id:doc._id || new ObjectId()};this.items.push(stored);return {insertedId:stored._id};
@@ -32,7 +33,11 @@ class Collection {
     let item=this.items.find(item=>matches(item,query)); let inserted=false;
     if (!item && options.upsert) { const result=await this.insertOne(update.$setOnInsert);item=this.items.find(item=>equal(item._id,result.insertedId)); inserted=true; }
     if (!item) return {matchedCount:0};
-    Object.assign(item,update.$set || {});
+    for (const [key,value] of Object.entries(update.$set || {})) {
+      const path=key.split('.');let target=item;
+      for(const part of path.slice(0,-1))target=target[part] ||= {};
+      target[path[path.length-1]]=value;
+    }
     for (const [key,value] of Object.entries(update.$pull || {})) item[key]=(item[key] || []).filter(entry=>value && value.$in ? !value.$in.some(target=>equal(entry,target)) : !equal(entry,value));
     for (const [key,value] of Object.entries(update.$addToSet || {})) item[key]=[...new Set([...(item[key]||[]),value])];
     return {matchedCount:inserted?0:1,upsertedCount:inserted?1:0};
@@ -48,12 +53,12 @@ function harness() {
     userCollection:new Collection([{uid:'alice',displayName:'Alice'},{uid:'bob',displayName:'Bob'},{uid:'mallory',displayName:'Mallory'}]),
     productCollection:new Collection(),
   };
-  const modules={'mongodb':{ObjectId},'../services/auth':{resolveCurrentUser:async req=>locals.userCollection.findOne({uid:req.uid})},'../services/notifications':{createNotification:async()=>{}},'../services/userPresence':presence,crypto:require('node:crypto')};
+  const modules={'mongodb':{ObjectId},'../services/auth':{resolveCurrentUser:async req=>locals.userCollection.findOne({uid:req.uid})},'../services/notifications':{createNotification:async()=>{}},'../services/userPresence':presence,'../services/avatarFrames':{getEligibleAvatarFramesForUsers:async()=>new Map(),resolveAvatarFrame:()=>null},crypto:require('node:crypto')};
   const exports={};
   const code=ts.transpileModule(fs.readFileSync('backend/src/handlers/messages.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   vm.runInNewContext(code,{exports,require:name=>modules[name],Date,Set,Map,console,setTimeout,Buffer});
   const router={use:fn=>middleware.push(fn)};
-  for(const method of ['get','post','patch','delete']) router[method]=(paths,fn)=>{for(const path of [].concat(paths))routes[method+path]=fn;};
+  for(const method of ['get','post','put','patch','delete']) router[method]=(paths,fn)=>{for(const path of [].concat(paths))routes[method+path]=fn;};
   exports.default(router);
   const call=async(method,path,{uid='alice',params={},body={},query={},owner}={})=>{
     let status=200,result,ended=false;const headers={};
@@ -178,4 +183,122 @@ test('no welcome for existing users, missing config, blocked accounts or a non-a
   h.locals.siteContentCollection.items=[];
   await h.service.deliverWelcomeMessage(h.app,h.recipient);
   assert.equal(h.locals.messageCollection.items.length,0);assert.equal(h.recipient.welcomeMessagePending,true);
+});
+
+test('messaging preferences persist privacy and delivery controls without replacing other user settings', async () => {
+  const h=harness();
+  const alice=h.locals.userCollection.items.find(user=>user.uid==='alice');
+  alice.settings={theme:'dark',publicProfile:false};
+  const defaults=await h.call('get','/preferences');
+  assert.equal(defaults.body.settings.privacy,'everyone');
+  const settings={
+    privacy:'nobody',readReceipts:false,onlineStatus:false,notifications:false,
+    awayMessage:{enabled:false,startAt:'',endAt:'',message:''},
+  };
+  assert.equal((await h.call('put','/preferences',{body:settings})).status,200);
+  assert.equal(alice.settings.theme,'dark');
+  assert.equal(alice.settings.publicProfile,false);
+  assert.equal(alice.allowContact,false);
+  assert.equal((await h.call('get','/preferences')).body.settings.readReceipts,false);
+  assert.equal((await h.call('get','/direct/:recipientId',{params:{recipientId:'alice'},uid:'bob'})).status,404);
+  assert.equal((await h.call('put','/preferences',{body:{...settings,awayMessage:{enabled:true,startAt:'',endAt:'',message:''}}})).status,400);
+});
+
+test('read receipts can be disabled while the recipient inbox is still marked read', async () => {
+  const h=harness();
+  const sent=await h.send();
+  const id=sent.body.message.conversationId;
+  const bob=h.locals.userCollection.items.find(user=>user.uid==='bob');
+  bob.settings={messaging:{privacy:'everyone',readReceipts:false}};
+  const history=await h.call('get','/:id',{uid:'bob',params:{id}});
+  assert.equal(history.body.messages[0].readAt,undefined);
+  assert.deepEqual(h.locals.conversationCollection.items[0].unreadBy,[]);
+});
+
+test('away replies are saved once per configured period and never trigger another automatic reply', async () => {
+  const h=harness();
+  const now=Date.now();
+  const bob=h.locals.userCollection.items.find(user=>user.uid==='bob');
+  bob.settings={messaging:{
+    privacy:'everyone',readReceipts:true,onlineStatus:true,notifications:true,
+    awayMessage:{enabled:true,startAt:new Date(now-60_000).toISOString(),endAt:new Date(now+60_000).toISOString(),message:'I am away. I will reply soon.',updatedAt:'away-window-1'},
+  }};
+  const first=await h.send('message_0001');
+  const id=first.body.message.conversationId;
+  let history=await h.call('get','/:id',{uid:'alice',params:{id},query:{preview:'true'}});
+  let automatic=history.body.messages.filter(message=>message.automatedReply);
+  assert.equal(automatic.length,1);
+  assert.equal(automatic[0].message,'I am away. I will reply soon.');
+  await h.send('message_0002',{body:{message:'Following up',clientMessageId:'message_0002'}});
+  history=await h.call('get','/:id',{uid:'alice',params:{id},query:{preview:'true'}});
+  automatic=history.body.messages.filter(message=>message.automatedReply);
+  assert.equal(automatic.length,1);
+});
+
+test('retrying failed away-reply metadata updates reuses the saved reply', async () => {
+  const h=harness();
+  const bob=h.locals.userCollection.items.find(user=>user.uid==='bob');
+  bob.settings={messaging:{privacy:'everyone',awayMessage:{
+    enabled:true,startAt:new Date(Date.now()-60_000).toISOString(),
+    endAt:new Date(Date.now()+60_000).toISOString(),message:'Away for now.',updatedAt:'away-window-retry',
+  }}};
+  const originalUpdate=h.locals.conversationCollection.updateOne.bind(h.locals.conversationCollection);
+  let failOnce=true;
+  h.locals.conversationCollection.updateOne=async(query,update,options)=>{
+    if(failOnce&&update.$set?.messageUpdatedAt&&update.$set?.lastMessage==='Away for now.'){
+      failOnce=false;
+      throw new Error('temporary conversation update failure');
+    }
+    return originalUpdate(query,update,options);
+  };
+  const first=await h.send('message_0001');
+  const id=first.body.message.conversationId;
+  await h.send('message_0002',{body:{message:'Another message',clientMessageId:'message_0002'}});
+  const history=await h.call('get','/:id',{uid:'alice',params:{id},query:{preview:'true'}});
+  assert.equal(history.body.messages.filter(message=>message.automatedReply).length,1);
+  assert.equal(history.body.messages.find(message=>message.automatedReply).message,'Away for now.');
+});
+
+test('All inbox and live sync include both marketplace and jobs conversations', async () => {
+  const h=harness();
+  await h.send();
+  const jobsId=new ObjectId();
+  await h.locals.conversationCollection.insertOne({
+    _id:jobsId,pairKey:'jobs:application:alice:bob',buyerId:'alice',sellerId:'bob',
+    participants:['alice','bob'],contextType:'jobs',applicationId:'application',jobId:'job',
+    lastMessage:'Interview follow-up',unreadBy:['alice'],updatedAt:new Date(),
+  });
+  const all=await h.call('get','/',{query:{context:'all'}});
+  assert.equal(all.body.conversations.length,2);
+  const defaultInbox=await h.call('get','/');
+  assert.equal(defaultInbox.body.conversations.length,1);
+  const sync=await h.call('get','/sync',{query:{context:'all'}});
+  assert.equal(sync.body.conversations.length,2);
+});
+
+test('live sync merges legacy duplicate threads before reporting unread totals', async () => {
+  const h=harness();
+  const olderId=new ObjectId(), newerId=new ObjectId();
+  h.locals.conversationCollection.items.push(
+    {_id:olderId,pairKey:'alice:bob',buyerId:'alice',sellerId:'bob',participants:['alice','bob'],unreadBy:['alice'],lastMessage:'Earlier',updatedAt:new Date(1)},
+    {_id:newerId,pairKey:'alice:bob',buyerId:'alice',sellerId:'bob',participants:['alice','bob'],unreadBy:['alice'],lastMessage:'Later',updatedAt:new Date(2)},
+  );
+  await h.locals.messageCollection.insertOne({conversationId:String(olderId),senderId:'bob',message:'Earlier',createdAt:new Date(1)});
+  await h.locals.messageCollection.insertOne({conversationId:String(newerId),senderId:'bob',message:'Later',createdAt:new Date(2)});
+  const sync=await h.call('get','/sync',{query:{context:'all'}});
+  assert.equal(sync.body.conversations.length,1);
+  assert.equal(sync.body.conversations[0].unreadCount,2);
+  assert.equal(sync.body.conversations[0].lastMessage,'Later');
+  assert.ok(h.locals.messageCollection.items.every(message=>message.conversationId===sync.body.conversations[0]._id));
+});
+
+test('selected conversations can be marked unread without changing other participants state', async () => {
+  const h=harness();
+  const sent=await h.send();
+  const id=sent.body.message.conversationId;
+  await h.call('get','/:id',{uid:'bob',params:{id}});
+  assert.deepEqual(h.locals.conversationCollection.items[0].unreadBy,[]);
+  assert.equal((await h.call('patch','/:id/unread',{uid:'bob',params:{id}})).status,200);
+  assert.deepEqual(h.locals.conversationCollection.items[0].unreadBy,['bob']);
+  assert.equal((await h.call('patch','/:id/unread',{uid:'mallory',params:{id}})).status,404);
 });

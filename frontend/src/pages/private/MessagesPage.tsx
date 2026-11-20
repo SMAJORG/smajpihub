@@ -10,9 +10,10 @@ import { readChatCache, writeChatCache, mergeChatMessages, savedChatHistory } fr
 import { ensureVoicePermission, voiceRecordingError } from "../../lib/voiceRecording";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type TouchEvent } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
 import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 import MicNoneOutlinedIcon from "@mui/icons-material/MicNoneOutlined";
@@ -35,13 +36,26 @@ import ChatAttachmentSheet from "../../components/ChatAttachmentSheet";
 import { VoiceRecordingClock } from "../../lib/voiceRecordingClock";
 import { isFounderWelcomeMessage } from "../../lib/founderWelcome";
 import UserAvatarFrame, { type AvatarFrameId } from "../../components/UserAvatarFrame";
+import "./MessagesInbox.css";
 
 type RichConversation = Conversation & {
   profileImage?: string;
   avatarFrame?: AvatarFrameId | null;
   online?: boolean;
   displayTime?: string;
+  contextType?: "jobs" | "marketplace";
+  unreadCount?: number;
 };
+
+type InboxFilter = "all" | "store" | "jobs" | "unread" | "drafts" | "archived";
+type MessagingPreferences = {
+  privacy: "everyone" | "nobody";
+  readReceipts: boolean;
+  onlineStatus: boolean;
+  notifications: boolean;
+  awayMessage: { enabled: boolean; startAt: string; endAt: string; message: string };
+};
+type ComposeUser = { uid: string; displayName: string; avatar?: string; allowContact?: boolean };
 
 type VoicePreview = {
   blob: Blob;
@@ -91,6 +105,15 @@ const formatPresenceLastSeen = (conversation: RichConversation, now: number) => 
   return `Last seen ${new Date(value).toLocaleDateString()}`;
 };
 
+const toDateTimeInput = (value: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+const fromDateTimeInput = (value: string) => value ? new Date(value).toISOString() : "";
+
 const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result || ""));
@@ -102,10 +125,18 @@ const EMPTY_CHAT_MESSAGES: ChatMessage[] = [];
 const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_CHAT_VIDEO_BYTES = 2_500_000;
 const MAX_CHAT_DOCUMENT_BYTES = 3 * 1024 * 1024;
+const DEFAULT_MESSAGING_PREFERENCES: MessagingPreferences = {
+  privacy: "everyone",
+  readReceipts: true,
+  onlineStatus: true,
+  notifications: true,
+  awayMessage: { enabled: false, startAt: "", endAt: "", message: "" },
+};
 
 const MessagesPageContent = () => {
   const { user } = useAuthContext();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<RichConversation[]>(() => readChatCache(user?.uid, "inbox", []));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(() => !readChatCache<RichConversation[]>(user?.uid, "inbox", []).length);
@@ -132,7 +163,22 @@ const MessagesPageContent = () => {
   const [moreOpen, setMoreOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("Spam or scam");
-  const [inboxFilter, setInboxFilter] = useState<"inbox" | "archived">("inbox");
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeSearch, setComposeSearch] = useState("");
+  const [composeUsers, setComposeUsers] = useState<ComposeUser[]>([]);
+  const [composeLoading, setComposeLoading] = useState(false);
+  const [composeError, setComposeError] = useState("");
+  const [manageConversations, setManageConversations] = useState(false);
+  const [messagingSheet, setMessagingSheet] = useState<"away" | "settings" | null>(null);
+  const [messagingPreferences, setMessagingPreferences] = useState(DEFAULT_MESSAGING_PREFERENCES);
+  const [messagingPreferencesLoaded, setMessagingPreferencesLoaded] = useState(false);
+  const [loadingMessagingPreferences, setLoadingMessagingPreferences] = useState(false);
+  const [savingMessagingPreferences, setSavingMessagingPreferences] = useState(false);
+  const [messagingPreferencesError, setMessagingPreferencesError] = useState("");
+  const [messagingPreferencesNotice, setMessagingPreferencesNotice] = useState("");
+  const [draftVersion, setDraftVersion] = useState(0);
   const [sendingVoice, setSendingVoice] = useState(false);
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
@@ -187,7 +233,15 @@ const MessagesPageContent = () => {
   }, [chatFullscreen, selectedId]);
   const filteredConversations = useMemo(() => {
     const query = conversationSearch.trim().toLowerCase();
-    return conversations.filter((item) => inboxFilter === "archived" ? item.archived : !item.archived).filter((item) => !query || [
+    return conversations.filter((item) => {
+      if (inboxFilter === "archived") return item.archived;
+      if (item.archived) return false;
+      if (inboxFilter === "store" && item.contextType === "jobs") return false;
+      if (inboxFilter === "jobs" && item.contextType !== "jobs") return false;
+      if (inboxFilter === "unread" && !item.unreadBy?.includes(user?.uid || "")) return false;
+      if (inboxFilter === "drafts" && !readChatCache(user?.uid, "draft-text:" + item._id, "").trim()) return false;
+      return true;
+    }).filter((item) => !query || [
       getConversationName(item, user?.uid),
       getConversationRoleLabel(item, user?.uid),
       item.productTitle,
@@ -195,7 +249,7 @@ const MessagesPageContent = () => {
       item.buyerName,
       item.sellerName,
     ].join(" ").toLowerCase().includes(query));
-  }, [conversationSearch, conversations, inboxFilter, user?.uid]);
+  }, [conversationSearch, conversations, draftVersion, inboxFilter, user?.uid]);
   const activeId = selectedId || filteredConversations[0]?._id;
   const messageCache = useRef(new Map<string, ChatMessage[]>());
   if (activeId && !messageCache.current.has(activeId)) {
@@ -380,7 +434,7 @@ const MessagesPageContent = () => {
     const controller = new AbortController(); inboxController.current = controller;
     const request = (async () => {
       try {
-        const { data } = await axiosClient.get<{ conversations: RichConversation[]; previews?: Record<string, { messages: ChatMessage[]; nextCursor: string | null }> }>("/messages", { params: { includePreviews: inboxBootstrapped.current ? "0" : "1" }, signal: controller.signal, smajSkipReadRetry: true, headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" } });
+        const { data } = await axiosClient.get<{ conversations: RichConversation[]; previews?: Record<string, { messages: ChatMessage[]; nextCursor: string | null }> }>("/messages", { params: { context: "all", includePreviews: inboxBootstrapped.current ? "0" : "1" }, signal: controller.signal, smajSkipReadRetry: true, headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" } });
         if (!alive.current) return;
         for (const [id, page] of Object.entries(data.previews || {})) {
           const merged = mergeChatMessages(savedChatHistory(user?.uid, id, messageCache.current) || [], page.messages);
@@ -521,7 +575,7 @@ const MessagesPageContent = () => {
       if (stopped || run !== generation || document.hidden || !navigator.onLine) return;
       controller = new AbortController();
       try {
-        const { data } = await axiosClient.get<{ cursor: string; conversations: RichConversation[] }>("/messages/sync", { params: { cursor }, timeout: 30000, signal: controller.signal, smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user?.uid || "" } });
+        const { data } = await axiosClient.get<{ cursor: string; conversations: RichConversation[] }>("/messages/sync", { params: { cursor, context: "all" }, timeout: 30000, signal: controller.signal, smajSkipReadRetry: true, headers: { "X-SMAJ-Silent": "true", "X-SMAJ-Chat-Owner": user?.uid || "" } });
         if (stopped || run !== generation) return;
         setConnectionState("live");
         const changed = cursor !== data.cursor;
@@ -545,6 +599,64 @@ const MessagesPageContent = () => {
     document.addEventListener("visibilitychange", reconnect);
     return () => { stopped = true; clearTimeout(timer); controller?.abort(); window.removeEventListener("offline", reconnect); window.removeEventListener("online", reconnect); document.removeEventListener("visibilitychange", reconnect); };
   }, [loadConversations, user?.uid]);
+
+  useEffect(() => {
+    if (!composeOpen || composeSearch.trim().length < 2) {
+      setComposeUsers([]);
+      setComposeLoading(false);
+      setComposeError("");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setComposeLoading(true);
+      setComposeError("");
+      try {
+        const { data } = await axiosClient.get<{ users: ComposeUser[] }>("/users/search", {
+          params: { q: composeSearch.trim() },
+          signal: controller.signal,
+          headers: { "X-SMAJ-Silent": "true" },
+        });
+        if (!controller.signal.aborted) setComposeUsers(data.users.filter(item => item.uid !== user?.uid && item.allowContact !== false));
+      } catch {
+        if (!controller.signal.aborted) setComposeError("People could not be searched. Try again.");
+      } finally {
+        if (!controller.signal.aborted) setComposeLoading(false);
+      }
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [composeOpen, composeSearch, user?.uid]);
+
+  useEffect(() => {
+    if (!messagingSheet) return;
+    const controller = new AbortController();
+    setMessagingPreferencesLoaded(false);
+    setLoadingMessagingPreferences(true);
+    setMessagingPreferencesError("");
+    setMessagingPreferencesNotice("");
+    axiosClient.get<{ settings: MessagingPreferences }>("/messages/preferences", {
+      signal: controller.signal,
+      headers: { "X-SMAJ-Chat-Owner": user?.uid || "", "X-SMAJ-Silent": "true" },
+    }).then(({ data }) => {
+      if (!controller.signal.aborted) setMessagingPreferences({
+        ...DEFAULT_MESSAGING_PREFERENCES,
+        ...data.settings,
+        awayMessage: { ...DEFAULT_MESSAGING_PREFERENCES.awayMessage, ...data.settings.awayMessage },
+      });
+      setMessagingPreferencesLoaded(true);
+    }).catch(() => {
+      if (!controller.signal.aborted) setMessagingPreferencesError("Messaging settings could not be loaded.");
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoadingMessagingPreferences(false);
+    });
+    return () => controller.abort();
+  }, [messagingSheet, user?.uid]);
+
+  useEffect(() => {
+    const update = () => setDraftVersion(version => version + 1);
+    window.addEventListener("smaj-chat-draft-change", update);
+    return () => window.removeEventListener("smaj-chat-draft-change", update);
+  }, []);
 
   const flushOutbox = useCallback(async () => {
     if (flushing.current || !navigator.onLine || !user?.uid) return;
@@ -724,6 +836,7 @@ const MessagesPageContent = () => {
   const handleTextChange = (value: string) => {
     setText(value);
     if (activeId) writeChatCache(user?.uid, "draft-text:" + activeId, value);
+    window.dispatchEvent(new Event("smaj-chat-draft-change"));
     if (!value.trim()) {
       if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
       setTyping(false);
@@ -784,10 +897,62 @@ const MessagesPageContent = () => {
     try {
       await Promise.all(selectedConversations.map((conversation) => axiosClient.patch(`/messages/${conversation._id}/archive`, { archive })));
       setSelectedConversationIds(new Set());
+      setManageConversations(false);
       setParams({});
+      setConversationActionError("");
       await loadConversations();
     } catch {
-      setVoiceError("Could not update selected chats. Try again.");
+      setConversationActionError("Could not update selected chats. Try again.");
+    }
+  };
+
+  const markSelectedConversationsUnread = async () => {
+    if (!selectedConversations.length || !user?.uid) return;
+    const currentUserId = user.uid;
+    setConversationActionError("");
+    try {
+      await Promise.all(selectedConversations.map(conversation => axiosClient.patch(`/messages/${conversation._id}/unread`)));
+      const selectedIds = new Set(selectedConversations.map(item => item._id));
+      setConversations(current => current.map(item => selectedIds.has(item._id)
+        ? { ...item, unreadBy: [...new Set([...(item.unreadBy || []), currentUserId])], unreadCount: Math.max(1, item.unreadCount || 0) }
+        : item));
+      setSelectedConversationIds(new Set());
+      setManageConversations(false);
+      setConversationActionError("");
+    } catch {
+      setConversationActionError("Could not mark the selected conversations unread.");
+    }
+  };
+
+  const startConversationWith = (recipient: ComposeUser) => {
+    setComposeOpen(false);
+    setComposeSearch("");
+    setComposeUsers([]);
+    setParams({
+      recipient: recipient.uid,
+      name: recipient.displayName,
+      ...(recipient.avatar ? { avatar: recipient.avatar } : {}),
+    });
+  };
+
+  const saveMessagingPreferences = async () => {
+    setSavingMessagingPreferences(true);
+    setMessagingPreferencesError("");
+    setMessagingPreferencesNotice("");
+    try {
+      const { data } = await axiosClient.put<{ settings: MessagingPreferences }>("/messages/preferences", messagingPreferences);
+      setMessagingPreferences({
+        ...DEFAULT_MESSAGING_PREFERENCES,
+        ...data.settings,
+        awayMessage: { ...DEFAULT_MESSAGING_PREFERENCES.awayMessage, ...data.settings.awayMessage },
+      });
+      setMessagingPreferencesNotice("Messaging settings saved.");
+    } catch (reason) {
+      setMessagingPreferencesError(isAxiosError<{ message?: string }>(reason)
+        ? reason.response?.data?.message || "Messaging settings could not be saved."
+        : "Messaging settings could not be saved.");
+    } finally {
+      setSavingMessagingPreferences(false);
     }
   };
 
@@ -803,6 +968,7 @@ const MessagesPageContent = () => {
       const selectedIds = new Set(selectedConversations.map((conversation) => conversation._id));
       setConversations((current) => current.filter((conversation) => !selectedIds.has(conversation._id)));
       setSelectedConversationIds(new Set());
+      setManageConversations(false);
       setParams({});
       setMessages([]);
     } catch {
@@ -1222,36 +1388,48 @@ const MessagesPageContent = () => {
   };
 
   return (
-    <main className={`private-page messages-page ${selectedId ? "conversation-selected" : ""}`}>
-      <header className="mobile-messages-heading">
+    <main className={`private-page messages-page ${selectedId ? "conversation-selected" : ""}`} aria-label="SMAJ PI HUB Messages">
+      {!chatFullscreen ? <header className="messages-inbox-header">
+        <button type="button" className="messages-header-back" onClick={() => {
+          if (typeof window.history.state?.idx === "number" && window.history.state.idx > 0) navigate(-1);
+          else navigate("/community/feed");
+        }} aria-label="Back">
+          <ArrowBackOutlinedIcon />
+        </button>
         <label className="conversation-search">
           <SearchOutlinedIcon />
-          <input value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder="Search conversations" />
+          <input value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder="Search messages" aria-label="Search messages" />
         </label>
-      </header>
-      <section className="private-page-head messages-desktop-intro">
-        <div>
-          <p className="private-kicker">COMMUNICATION CENTER</p>
-          <p>Buyer and seller conversations across SMAJ PI HUB.</p>
-        </div>
-      </section>
+        <button type="button" className="messages-header-menu" onClick={() => setHeaderMenuOpen(true)} aria-label="Messages menu">
+          <MoreVertOutlinedIcon />
+        </button>
+      </header> : null}
       <section className="messages-layout rich">
         <aside ref={conversationListRef} className="conversation-list">
-          <label className="conversation-search">
-            <SearchOutlinedIcon />
-            <input value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder="Search conversations" />
-          </label>
-          <div className="conversation-filters">
-<button type="button" className={inboxFilter === "inbox" ? "active" : ""} onClick={() => setInboxFilter("inbox")}>Inbox</button><button type="button" className={inboxFilter === "archived" ? "active" : ""} onClick={() => setInboxFilter("archived")}>Archived</button></div>
+          <nav className="messages-filter-tabs" aria-label="Conversation filters">
+            {([
+              ["all", "All"],
+              ["store", "Store"],
+              ["jobs", "Jobs"],
+              ["unread", "Unread"],
+              ["drafts", "Drafts"],
+              ["archived", "Archived"],
+            ] as const).map(([filter, label]) => (
+              <button key={filter} type="button" className={inboxFilter === filter ? "active" : ""} aria-pressed={inboxFilter === filter} onClick={() => setInboxFilter(filter)}>{label}</button>
+            ))}
+            {manageConversations ? <button type="button" className="messages-manage-done" onClick={() => { setManageConversations(false); setSelectedConversationIds(new Set()); }}>Done</button> : null}
+          </nav>
           {loadingConversations ? <PrivateSkeleton variant="messages" count={6} /> : inboxError && !conversations.length ? <div className="chat-history-error" role="status">Chats could not load.<button type="button" onClick={() => void loadConversations()}>Retry</button></div> : filteredConversations.length ? (
             filteredConversations.map((item) => (
               <button
                 className={`${item._id === activeId ? "active" : ""}${selectedConversationIds.has(item._id) ? " selected" : ""}`}
                 key={item._id}
                 data-conversation-id={item._id}
+                aria-pressed={selectedConversationIds.has(item._id)}
                 onPointerDown={() => warmQueue.current?.enqueue([item._id], true)}
                 onFocus={() => warmQueue.current?.enqueue([item._id], true)}
                 onClick={() => {
+                  if (manageConversations) { toggleSelectedConversation(item); return; }
                   if (selectedConversationIds.size > 0 || conversationLongPressTriggeredRef.current) return;
                   flushSync(() => setParams({ conversation: item._id }));
                 }}
@@ -1271,18 +1449,20 @@ const MessagesPageContent = () => {
                   <p className="conversation-meta-line">{/^Voice (message|note)/.test(item.lastMessage || "") ? <><MicNoneOutlinedIcon aria-hidden="true" />{item.lastMessage}</> : getConversationMeta(item, user?.uid)}</p>
                   <small>{formatLastSeen(item)}</small>
                 </div>
-                {user?.uid && item.unreadBy?.includes(user.uid) ? <b>1</b> : null}
+                {user?.uid && item.unreadBy?.includes(user.uid) ? <b aria-label={`${item.unreadCount || 1} unread messages`}>{(item.unreadCount || 1) > 99 ? "99+" : item.unreadCount || 1}</b> : null}
+                {manageConversations ? <span className={`messages-select-indicator${selectedConversationIds.has(item._id) ? " selected" : ""}`} aria-hidden="true">{selectedConversationIds.has(item._id) ? "✓" : ""}</span> : null}
               </button>
             ))
           ) : (
             <div className="private-state compact">
               <h3>{conversations.length ? "No conversations found" : "No conversations yet"}</h3>
-              <p>Start a chat from a product page when contacting a seller.</p>
-              <Link className="private-secondary-button messages-empty-browse" to="/store">Browse Products</Link>
+              <p>{inboxFilter === "unread" ? "You are all caught up." : inboxFilter === "drafts" ? "Unsent messages will appear here." : "Start a chat from a product page, job listing or user profile."}</p>
+              {!conversations.length ? <Link className="private-secondary-button messages-empty-browse" to="/store">Browse Products</Link> : null}
             </div>
           )}
-          {selectedConversations.length ? <div className="conversation-selection-sheet" role="dialog" aria-modal="true" aria-label="Selected chats"><strong>{selectedConversations.length} selected</strong><button type="button" disabled={deletingConversations} onClick={() => void archiveSelectedConversations(inboxFilter !== "archived")}>{inboxFilter === "archived" ? "Unarchive" : "Archive"}</button><button type="button" className="conversation-delete-button" disabled={deletingConversations} onClick={() => void deleteSelectedConversations()}>{deletingConversations ? "Deleting…" : "Delete"}</button><button type="button" disabled={deletingConversations} onClick={() => { setSelectedConversationIds(new Set()); setConversationActionError(""); }}>Cancel</button>{conversationActionError ? <span className="conversation-selection-error" role="alert">{conversationActionError}</span> : null}</div> : null}
+          {selectedConversations.length ? <div className="conversation-selection-sheet" role="toolbar" aria-label="Selected conversations"><strong>{selectedConversations.length} selected</strong><button type="button" disabled={deletingConversations} onClick={() => void markSelectedConversationsUnread()}>Mark unread</button><button type="button" disabled={deletingConversations} onClick={() => void archiveSelectedConversations(inboxFilter !== "archived")}>{inboxFilter === "archived" ? "Unarchive" : "Archive"}</button><button type="button" className="conversation-delete-button" disabled={deletingConversations} onClick={() => void deleteSelectedConversations()}>{deletingConversations ? "Deleting…" : "Delete"}</button><button type="button" disabled={deletingConversations} onClick={() => { setSelectedConversationIds(new Set()); setManageConversations(false); setConversationActionError(""); }}>Cancel</button>{conversationActionError ? <span className="conversation-selection-error" role="alert">{conversationActionError}</span> : null}</div> : null}
         </aside>
+        {!chatFullscreen ? <div className="messages-empty-chat" role="status"><strong>Choose a conversation</strong><p>Your messages will appear here.</p></div> : null}
         {chatFullscreen && active ? createPortal(
           <div key={activeId} ref={chatPanelRef} className="chat-panel chat-panel-fullscreen" role="dialog" aria-modal="true" aria-label="Chat">
             {active ? (
@@ -1308,7 +1488,7 @@ const MessagesPageContent = () => {
                     <button type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} aria-label="More options">
                       <MoreVertOutlinedIcon />
                     </button>
-                    {moreOpen ? <div className="chat-more-menu"><Link to={`/seller/${active.participantId || (active.sellerId === user?.uid ? active.buyerId : active.sellerId)}`}>View profile</Link><Link to={`/product/${active.productId}`}>View product</Link><button type="button" onClick={() => { setMoreOpen(false); setVoiceError("Conversation muted."); }}>Mute notifications</button><button type="button" onClick={() => void archiveConversation(active._id, !active.archived)}>{active.archived ? "Unarchive" : "Archive conversation"}</button><button type="button" onClick={() => { setMoreOpen(false); setVoiceError("User blocked locally. You can report the conversation for review."); }}>Block user</button></div> : null}
+                    {moreOpen ? <div className="chat-more-menu"><Link to={`/seller/${active.participantId || (active.sellerId === user?.uid ? active.buyerId : active.sellerId)}`}>View profile</Link>{active.productId ? <Link to={`/product/${active.productId}`}>View product</Link> : null}<button type="button" onClick={() => void archiveConversation(active._id, !active.archived)}>{active.archived ? "Unarchive" : "Archive conversation"}</button></div> : null}
                   </div>
                   <div className="chat-product-preview">
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
@@ -1433,7 +1613,7 @@ const MessagesPageContent = () => {
                     <button type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} aria-label="More options">
                       <MoreVertOutlinedIcon />
                     </button>
-                    {moreOpen ? <div className="chat-more-menu"><Link to={`/seller/${active.participantId || (active.sellerId === user?.uid ? active.buyerId : active.sellerId)}`}>View profile</Link><Link to={`/product/${active.productId}`}>View product</Link><button type="button" onClick={() => { setMoreOpen(false); setVoiceError("Conversation muted."); }}>Mute notifications</button><button type="button" onClick={() => void archiveConversation(active._id, !active.archived)}>{active.archived ? "Unarchive" : "Archive conversation"}</button><button type="button" onClick={() => { setMoreOpen(false); setVoiceError("User blocked locally. You can report the conversation for review."); }}>Block user</button></div> : null}
+                    {moreOpen ? <div className="chat-more-menu"><Link to={`/seller/${active.participantId || (active.sellerId === user?.uid ? active.buyerId : active.sellerId)}`}>View profile</Link>{active.productId ? <Link to={`/product/${active.productId}`}>View product</Link> : null}<button type="button" onClick={() => void archiveConversation(active._id, !active.archived)}>{active.archived ? "Unarchive" : "Archive conversation"}</button></div> : null}
                   </div>
                   <div className="chat-product-preview">
                     {active.productImage ? <img src={active.productImage} alt="" /> : null}
@@ -1534,6 +1714,62 @@ const MessagesPageContent = () => {
           </div>
         )}
       </section>
+      {!chatFullscreen ? <button type="button" className="messages-compose-fab" onClick={() => { setComposeOpen(true); setComposeError(""); }} aria-label="Compose message" title="New message">
+        <AddOutlinedIcon />
+      </button> : null}
+      {headerMenuOpen ? <div className="messages-sheet-backdrop" role="presentation" onClick={() => setHeaderMenuOpen(false)}>
+        <section className="messages-bottom-sheet" role="dialog" aria-modal="true" aria-label="Messages options" onClick={event => event.stopPropagation()}>
+          <div className="messages-sheet-grip" />
+          <h2>Messages</h2>
+          <button type="button" onClick={() => { setManageConversations(true); setSelectedConversationIds(new Set()); setHeaderMenuOpen(false); }}>Manage conversations</button>
+          <button type="button" onClick={() => { setMessagingSheet("away"); setHeaderMenuOpen(false); }}>Set away message</button>
+          <button type="button" onClick={() => { setMessagingSheet("settings"); setHeaderMenuOpen(false); }}>Manage settings</button>
+          <button type="button" className="messages-sheet-cancel" onClick={() => setHeaderMenuOpen(false)}>Cancel</button>
+        </section>
+      </div> : null}
+      {composeOpen ? <div className="messages-sheet-backdrop" role="presentation" onClick={() => setComposeOpen(false)}>
+        <section className="messages-bottom-sheet messages-compose-sheet" role="dialog" aria-modal="true" aria-label="Compose a message" onClick={event => event.stopPropagation()}>
+          <div className="messages-sheet-grip" />
+          <h2>New message</h2>
+          <label className="conversation-search">
+            <SearchOutlinedIcon />
+            <input autoFocus value={composeSearch} onChange={event => setComposeSearch(event.target.value)} placeholder="Find someone to message" aria-label="Find someone to message" />
+          </label>
+          {composeLoading ? <p role="status">Searching…</p> : null}
+          {composeError ? <p className="messages-preferences-error" role="alert">{composeError}</p> : null}
+          <div className="messages-compose-results">
+            {composeUsers.map(recipient => <button key={recipient.uid} type="button" onClick={() => startConversationWith(recipient)}>
+              <span>{recipient.avatar ? <img src={recipient.avatar} alt="" /> : <UserAvatarFrame name={recipient.displayName} size={40} />}</span>
+              <strong>{recipient.displayName}</strong>
+              <span>Message</span>
+            </button>)}
+          </div>
+          {!composeLoading && !composeError && composeSearch.trim().length >= 2 && !composeUsers.length ? <p>No available accounts found.</p> : null}
+          <button type="button" className="messages-sheet-cancel" onClick={() => setComposeOpen(false)}>Cancel</button>
+        </section>
+      </div> : null}
+      {messagingSheet ? <div className="messages-sheet-backdrop" role="presentation" onClick={() => setMessagingSheet(null)}>
+        <section className="messages-bottom-sheet messages-preferences-sheet" role="dialog" aria-modal="true" aria-label={messagingSheet === "away" ? "Away message" : "Messaging settings"} onClick={event => event.stopPropagation()}>
+          <div className="messages-sheet-grip" />
+          <h2>{messagingSheet === "away" ? "Set away message" : "Messaging settings"}</h2>
+          {messagingSheet === "away" ? <>
+            <label className="messages-toggle-row"><span><strong>Automatic away reply</strong><small>Send one reply to each conversation during this period.</small></span><input type="checkbox" checked={messagingPreferences.awayMessage.enabled} onChange={event => setMessagingPreferences(current => ({ ...current, awayMessage: { ...current.awayMessage, enabled: event.target.checked } }))} /></label>
+            <div className="messages-preferences-grid">
+              <label>Start date<input type="datetime-local" value={toDateTimeInput(messagingPreferences.awayMessage.startAt)} onChange={event => setMessagingPreferences(current => ({ ...current, awayMessage: { ...current.awayMessage, startAt: fromDateTimeInput(event.target.value) } }))} /></label>
+              <label>End date<input type="datetime-local" value={toDateTimeInput(messagingPreferences.awayMessage.endAt)} onChange={event => setMessagingPreferences(current => ({ ...current, awayMessage: { ...current.awayMessage, endAt: fromDateTimeInput(event.target.value) } }))} /></label>
+            </div>
+            <label className="messages-away-message">Away message<textarea value={messagingPreferences.awayMessage.message} maxLength={300} onChange={event => setMessagingPreferences(current => ({ ...current, awayMessage: { ...current.awayMessage, message: event.target.value } }))} placeholder="Let people know when you’ll be available." /><small>{messagingPreferences.awayMessage.message.length}/300</small></label>
+          </> : <>
+            <label className="messages-setting-select">Who can message you?<select value={messagingPreferences.privacy} onChange={event => setMessagingPreferences(current => ({ ...current, privacy: event.target.value as MessagingPreferences["privacy"] }))}><option value="everyone">Everyone</option><option value="nobody">No one (existing conversations remain available)</option></select></label>
+            <label className="messages-toggle-row"><span><strong>Read receipts</strong><small>Let others know when you’ve read their messages.</small></span><input type="checkbox" checked={messagingPreferences.readReceipts} onChange={event => setMessagingPreferences(current => ({ ...current, readReceipts: event.target.checked }))} /></label>
+            <label className="messages-toggle-row"><span><strong>Online status</strong><small>Show when you’re active and your last seen time.</small></span><input type="checkbox" checked={messagingPreferences.onlineStatus} onChange={event => setMessagingPreferences(current => ({ ...current, onlineStatus: event.target.checked }))} /></label>
+            <label className="messages-toggle-row"><span><strong>Message notifications</strong><small>Receive notifications for new messages.</small></span><input type="checkbox" checked={messagingPreferences.notifications} onChange={event => setMessagingPreferences(current => ({ ...current, notifications: event.target.checked }))} /></label>
+          </>}
+          {messagingPreferencesError ? <p className="messages-preferences-error" role="alert">{messagingPreferencesError}</p> : null}
+          {messagingPreferencesNotice ? <p className="messages-preferences-notice" role="status">{messagingPreferencesNotice}</p> : null}
+          <div className="messages-sheet-actions"><button type="button" onClick={() => setMessagingSheet(null)}>Cancel</button><button type="button" className="messages-save-button" disabled={!messagingPreferencesLoaded || loadingMessagingPreferences || savingMessagingPreferences} onClick={() => void saveMessagingPreferences()}>{loadingMessagingPreferences ? "Loading…" : savingMessagingPreferences ? "Saving…" : "Save"}</button></div>
+        </section>
+      </div> : null}
       {imagePreview ? createPortal(<div className={`chat-image-viewer${imagePreviewFullscreen ? " chat-image-viewer-fullscreen" : ""}`} role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }}><div className="chat-image-viewer-actions" onClick={(event) => event.stopPropagation()}><button type="button" className="chat-image-viewer-back" onClick={() => { setImagePreview(null); setImagePreviewFullscreen(false); }} aria-label="Back to chat"><ArrowBackOutlinedIcon /></button><button type="button" className="chat-image-viewer-delete" onClick={() => { setDeleteTarget(imagePreview.message); setImagePreview(null); setImagePreviewFullscreen(false); }}>Delete</button><button type="button" onClick={() => setImagePreviewFullscreen((open) => !open)} aria-label={imagePreviewFullscreen ? "Exit fullscreen" : "Fullscreen"}><FullscreenOutlinedIcon /></button></div><img src={imagePreview.src} alt={imagePreview.caption || "Shared photo"} onClick={(event) => event.stopPropagation()} />{imagePreview.caption && imagePreview.caption !== "Photo" ? <p><ChatMessageText text={imagePreview.caption} /></p> : null}</div>, document.body) : null}
     </main>
   );
