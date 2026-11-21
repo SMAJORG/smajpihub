@@ -45,15 +45,16 @@ export async function testnetDashboard(locals: any, page: number) {
 }
 export async function testnetRecipients(locals: any, page: number, search: string) {
   const collection = collectionFor(locals);
-  const query: any = { blocked: { $ne: true },
-    $or: [{ accessToken: { $type: "string" } }, { piWalletVerifiedAt: { $type: "date" } }, { piVerifiedUid: { $type: "string" } }, { "lastPiLogin.verifiedUid": { $type: "string" } }] };
+  // Search all existing non-blocked users, including older accounts without wallet sharing.
+  // Never treat a matching username as authorization to send a payout.
+  const query: any = { blocked: { $ne: true } };
   const normalized = search.trim().replace(/^@+/, "");
   const walletSearch = piWalletPattern.test(normalized.toUpperCase()) ? normalized.toUpperCase() : "";
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (normalized) query.$and = [{ $or: walletSearch
     ? ["piWalletAddress", "wallet_address", "walletAddress"].map(field => ({ [field]: walletSearch }))
     : ["username", "piUsername", "displayName", "uid"].map(field => ({ [field]: { $regex: escaped, $options: "i" } })) }];
-  const users = await locals.userCollection.find(query).project({ uid: 1, username: 1, displayName: 1, accessToken: 1, accessTokenRevokedAt: 1, blocked: 1, piVerifiedUid: 1, piIdentityVerifiedAt: 1, piWalletAddress: 1, piWalletVerifiedAt: 1 }).sort({ lastSeenAt: -1, _id: -1 }).skip((page - 1) * 20).limit(21).toArray();
+  const users = await locals.userCollection.find(query).project({ uid: 1, username: 1, piUsername: 1, displayName: 1, accessToken: 1, accessTokenRevokedAt: 1, blocked: 1, piVerifiedUid: 1, piIdentityVerifiedAt: 1, piWalletAddress: 1, piWalletVerifiedAt: 1 }).sort({ lastSeenAt: -1, _id: -1 }).skip((page - 1) * 20).limit(21).toArray();
   const diagnostics: Record<string, number> = {};
   const eligible: any[] = [];
   const candidates = users.slice(0, 20);
@@ -64,7 +65,7 @@ export async function testnetRecipients(locals: any, page: number, search: strin
       const verified = review.recipient;
       if (!verified) {
         diagnostics[review.reason] = (diagnostics[review.reason] || 0) + 1;
-        return walletSearch ? null : { uid: user.uid, username: user.username || "", displayName: user.displayName || user.username || "Pi user", walletAddress: "", canReceive: false, status: review.reason };
+        return walletSearch ? null : { uid: user.uid, username: user.piUsername || user.username || "", displayName: user.displayName || user.piUsername || user.username || "Pi user", walletAddress: "", canReceive: false, status: review.reason };
       }
       if (walletSearch && verified.walletAddress !== walletSearch) return null;
       const [uidRecord, walletRecord, previous] = await Promise.all([
