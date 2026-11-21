@@ -320,6 +320,13 @@ export const useAuth = () => {
   const loginWithPi = useCallback(async () => {
     if (loginInProgressRef.current) return false;
     if (testnetPiBrowserOnly) {
+      // The current Pi SDK opens consent through window.parent.postMessage.
+      // A top-level hosted page has no Pi host to receive that request, even
+      // when its user agent says Pi Browser. Never enter a silent 2-minute wait.
+      if (window.parent === window) {
+        setAuthFeedback({ type: "error", message: "This Testnet page is not connected to Pi’s app host. Open SMAJ PI HUB from its existing Testnet app entry in the Pi Developer Portal. Opening the Render website alone does not establish Pi login." });
+        return false;
+      }
       const sandboxPreview = window.location.hostname === "sandbox.minepi.com" || (() => {
         try { return window.self !== window.top && new URL(document.referrer).origin === "https://sandbox.minepi.com"; }
         catch { return false; }
@@ -445,7 +452,7 @@ export const useAuth = () => {
       const message = isAxiosError<BackendErrorBody>(err) || err instanceof PiSignInResponseError
         ? toErrorMessage(err)
         : sdkMessage === "PI_AUTH_TIMEOUT"
-          ? isPiSandboxMode() ? "Pi login timed out. Reopen Pi Browser, confirm your sandbox account is signed in, and try again." : "Pi login timed out. Reopen Pi Browser and approve the Pi sign-in request again."
+          ? testnetPiBrowserOnly ? "Pi did not respond to this Testnet app’s sign-in request. If no consent window appeared, the Pi app connection must be checked in the Developer Portal. No login was completed." : isPiSandboxMode() ? "Pi login timed out. Reopen Pi Browser, confirm your sandbox account is signed in, and try again." : "Pi login timed out. Reopen Pi Browser and approve the Pi sign-in request again."
           : /cancel|denied|reject/i.test(sdkMessage)
             ? "Pi login was cancelled. Please approve the Pi Browser sign-in request and try again."
             : isPiSandboxMode() ? "Pi login failed before reaching the server. In Pi Sandbox mobile preview, sign in to a sandbox Pi account and try again." : "Pi login failed before reaching the server. Reopen SMAJ PI HUB in Pi Browser and approve the sign-in request.";
