@@ -30,7 +30,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     if (!isAuthenticated && !isLoading) {
-      if (location.pathname.startsWith("/product/")) window.sessionStorage.setItem("smaj_post_auth_redirect", location.pathname + location.search + location.hash);
+      if (location.pathname.startsWith("/product/") || (import.meta.env.VITE_TESTNET_PAYOUT_TOOLS === "true" && ["/admin/testnet-payouts", "/testnet-wallet"].includes(location.pathname))) window.sessionStorage.setItem("smaj_post_auth_redirect", location.pathname + location.search + location.hash);
       requireAuth();
     }
   }, [isAuthenticated, isLoading, requireAuth, location.pathname, location.search, location.hash]);

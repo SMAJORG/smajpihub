@@ -34,7 +34,8 @@ const PI_AUTH_TIMEOUT_MS = 20000;
 const MIN_SESSION_LOADING_MS = 450;
 const PI_USER_STORAGE_KEY = "smaj_pi_user";
 const testnetPiBrowserOnly = import.meta.env.VITE_TESTNET_PAYOUT_TOOLS === "true";
-const piAuthScopes = () => isPiSandboxMode() || testnetPiBrowserOnly ? ["username", "wallet_address"] : ["username"];
+// Wallet consent belongs to the payout enrollment flow, not ordinary Pi login.
+const piAuthScopes = () => isPiSandboxMode() ? ["username", "wallet_address"] : ["username"];
 const AUTH_REQUEST_CONFIG = { withCredentials: true, timeout: 45000, headers: { "X-SMAJ-Silent": "true" } };
 
 
