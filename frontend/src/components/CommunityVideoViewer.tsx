@@ -13,9 +13,11 @@ import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
 import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
 import CommunityCaptionTrack from "./CommunityCaptionTrack";
 import UserAvatarFrame from "./UserAvatarFrame";
+import CommunityShareSheet, { openCommunityNativeShare } from "./CommunityShareSheet";
 import {
   createCommunityComment,
   getCommunityComments,
+  recordCommunityPostShare,
   repostCommunityPost,
   setCommunityReaction,
   type CommunityComment,
@@ -55,6 +57,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const [commentCount, setCommentCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
@@ -64,6 +67,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const videoRef = useRef<HTMLVideoElement>(null);
   const touchStartY = useRef<number | null>(null);
   const dirty = useRef(false);
+  const shareInProgress = useRef(false);
   const current = items[activeIndex];
   const closeViewer = useCallback(() => {
     if (dirty.current) {
@@ -186,18 +190,35 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   };
 
   const share = async () => {
-    if (!current) return;
-    const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(current.post._id)}`;
+    if (!current || busy || shareInProgress.current) return;
+    shareInProgress.current = true;
+    const url = new URL("/community/feed", window.location.origin);
+    url.searchParams.set("post", current.post._id);
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "SMAJ PI HUB community video", text: current.content, url });
+      const result = await openCommunityNativeShare({
+        title: "SMAJ PI HUB community video",
+        text: current.content,
+        url: url.toString(),
+      });
+      if (result === "shared") {
         showFeedback("Video shared.", "success");
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        showFeedback("Video link copied.", "success");
-      } else showFeedback("Sharing is not available in this browser.", "error");
-    } catch (reason) {
-      if (!(reason instanceof DOMException && reason.name === "AbortError")) showFeedback("Video could not be shared.", "error");
+        void recordCustomShare();
+      } else if (result === "fallback") {
+        setShareSheetOpen(true);
+      } else if (result === "failed") {
+        showFeedback("Video could not be shared.", "error");
+      }
+    } finally {
+      shareInProgress.current = false;
+    }
+  };
+
+  const recordCustomShare = async () => {
+    if (!current) return;
+    try {
+      await recordCommunityPostShare(current.post._id);
+    } catch {
+      showFeedback("The post was shared, but the share could not be recorded.", "warning");
     }
   };
 
@@ -304,6 +325,14 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
         }} style={{ "--video-progress": `${progress}%` } as CSSProperties} />
         <span>{playing ? "Playing" : "Paused"} · {activeIndex + 1}/{items.length}</span>
       </div>
+      {shareSheetOpen ? <CommunityShareSheet
+        title="SMAJ PI HUB community video"
+        text={current.content}
+        url={new URL(`/community/feed?post=${encodeURIComponent(current.post._id)}`, window.location.origin).toString()}
+        copySuccessMessage="Video link copied."
+        onClose={() => setShareSheetOpen(false)}
+        onShared={recordCustomShare}
+      /> : null}
       {commentsOpen ? <section className="community-video-comments" aria-label="Video comments">
         <button type="button" className="community-video-comments-close" onClick={() => setCommentsOpen(false)} aria-label="Close comments">×</button>
         <h2>Comments</h2>

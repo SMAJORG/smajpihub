@@ -1,14 +1,16 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
+import CommunityShareSheet, { openCommunityNativeShare } from "./CommunityShareSheet";
 import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
   deleteCommunityPost,
   getCommunityComments,
   reportCommunityPost,
+  recordCommunityPostShare,
   repostCommunityPost,
   toggleCommunityLike,
   voteOnCommunityPoll,
@@ -36,6 +38,8 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const [commentText, setCommentText] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(reportReasons[0]);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const shareInProgress = useRef(false);
   const [poll, setPoll] = useState(post.originalPost?.poll || post.poll);
   const [myVote, setMyVote] = useState(post.originalPost?.myVote || post.myVote || null);
   const original = post.originalPost;
@@ -139,17 +143,34 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   };
 
   const share = async () => {
-    const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(post._id)}`;
+    if (busy || shareInProgress.current) return;
+    shareInProgress.current = true;
+    const url = new URL("/community/feed", window.location.origin);
+    url.searchParams.set("post", post._id);
+    const text = [...new Set([
+      ...(post.type === "repost" && post.content?.trim() ? [post.content.trim()] : []),
+      ...(content.content?.trim() ? [content.content.trim()] : []),
+    ])].join("\n\n");
     try {
-      if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community post", text: content.content, url });
-      else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        showFeedback("Post link copied.", "success");
-      } else {
-        showFeedback("Sharing is not available in this browser.", "error");
+      const result = await openCommunityNativeShare({ title: "SMAJ PI HUB community post", text, url: url.toString() });
+      if (result === "shared") {
+        showFeedback("Post shared.", "success");
+        void recordCustomShare();
+      } else if (result === "fallback") {
+        setShareSheetOpen(true);
+      } else if (result === "failed") {
+        showFeedback("Post could not be shared.", "error");
       }
-    } catch (reason) {
-      if (!(reason instanceof DOMException && reason.name === "AbortError")) showFeedback("Post could not be shared.", "error");
+    } finally {
+      shareInProgress.current = false;
+    }
+  };
+
+  const recordCustomShare = async () => {
+    try {
+      await recordCommunityPostShare(post._id);
+    } catch {
+      showFeedback("The post was shared, but the share could not be recorded.", "warning");
     }
   };
 
@@ -232,8 +253,15 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
         <button type="button" aria-pressed={liked} disabled={busy} onClick={() => void toggleLike()}>{liked ? "Liked" : "Like"}</button>
         <button type="button" disabled={busy || post.canComment === false} onClick={() => void toggleComments()}>{post.canComment === false ? "Comments restricted" : commentsOpen ? "Hide comments" : "Comment"}</button>
         <button type="button" disabled={busy} onClick={() => void repost()}>Repost</button>
-        <button type="button" onClick={() => void share()}>Share</button>
+        <button type="button" disabled={busy} onClick={() => void share()}>Share</button>
       </div>
+      {shareSheetOpen ? <CommunityShareSheet
+        title="SMAJ PI HUB community post"
+        text={[post.type === "repost" ? post.content?.trim() : "", content.content?.trim()].filter(Boolean).join("\n\n")}
+        url={new URL(`/community/feed?post=${encodeURIComponent(post._id)}`, window.location.origin).toString()}
+        onClose={() => setShareSheetOpen(false)}
+        onShared={recordCustomShare}
+      /> : null}
       {reportOpen ? <form className="community-report-form" onSubmit={event => void submitReport(event)}>
         <label>Why are you reporting this post?<select value={reportReason} onChange={event => setReportReason(event.target.value)}>{reportReasons.map(reason => <option key={reason}>{reason}</option>)}</select></label>
         <button type="submit" disabled={busy}>Send report</button>

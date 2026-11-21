@@ -24,6 +24,7 @@ import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import CommunityVideoPreview from "./CommunityVideoPreview";
+import CommunityShareSheet, { openCommunityNativeShare } from "./CommunityShareSheet";
 import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
@@ -187,6 +188,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const [reportReason, setReportReason] = useState(reportReasons[0]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuClosing, setMenuClosing] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [saved, setSaved] = useState(post.savedByMe === true);
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState("");
@@ -197,6 +199,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const reactionPressTimer = useRef<number | null>(null);
   const menuCloseTimer = useRef<number | null>(null);
   const menuTouchStartY = useRef<number | null>(null);
+  const shareInProgress = useRef(false);
   const longPressOpenedReactions = useRef(false);
   const isOwnPost = viewerId === post.authorId;
   const menuAuthor = isOwnPost ? post.author : author;
@@ -476,32 +479,40 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   };
 
   const share = async () => {
-    if (busy) return;
-    const url = `${window.location.origin}/community/feed?post=${encodeURIComponent(post._id)}`;
-    let copied = false;
-    setBusy(true);
+    if (busy || shareInProgress.current) return;
+    shareInProgress.current = true;
+    const url = new URL("/community/feed", window.location.origin);
+    url.searchParams.set("post", post._id);
+    const text = [...new Set([
+      ...(post.type === "repost" && post.content?.trim() ? [post.content.trim()] : []),
+      ...(content.content?.trim() ? [content.content.trim()] : []),
+    ])].join("\n\n");
     try {
-      try {
-        if (navigator.share) await navigator.share({ title: "SMAJ PI HUB community post", text: post.content || content.content, url });
-        else if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(url);
-          copied = true;
-        } else {
-          showFeedback("Sharing is not available in this browser.", "error");
-          return;
-        }
-      } catch (reason) {
-        if (!(reason instanceof DOMException && reason.name === "AbortError")) showFeedback("Post could not be shared.", "error");
-        return;
-      }
-      try {
-        await recordCommunityPostShare(post._id);
-        showFeedback(copied ? "Post link copied." : "Post shared.", "success");
-      } catch {
-        showFeedback("The post was shared, but the share could not be recorded.", "warning");
+      const result = await openCommunityNativeShare({
+        title: "SMAJ PI HUB community post",
+        text,
+        url: url.toString(),
+      });
+      if (result === "shared") {
+        showFeedback("Post shared.", "success");
+        await recordCommunityPostShare(post._id).catch(() => {
+          showFeedback("The post was shared, but the share could not be recorded.", "warning");
+        });
+      } else if (result === "fallback") {
+        setShareSheetOpen(true);
+      } else if (result === "failed") {
+        showFeedback("Post could not be shared.", "error");
       }
     } finally {
-      setBusy(false);
+      shareInProgress.current = false;
+    }
+  };
+
+  const recordCustomShare = async () => {
+    try {
+      await recordCommunityPostShare(post._id);
+    } catch {
+      showFeedback("The post was shared, but the share could not be recorded.", "warning");
     }
   };
 
@@ -710,13 +721,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
                 {saved ? <BookmarkOutlinedIcon /> : <BookmarkBorderOutlinedIcon />}
                 <span>{saved ? "Remove from saved posts" : "Save post"}</span>
               </button>
-              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void share())}><ShareOutlinedIcon /> <span>Share via</span></button>
+              <button type="button" disabled={busy} onClick={() => { closeOptionsMenu(); void share(); }}><ShareOutlinedIcon /> <span>Share via</span></button>
             </> : <>
               <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void toggleSavedPost())}>
                 {saved ? <BookmarkOutlinedIcon /> : <BookmarkBorderOutlinedIcon />}
                 <span>{saved ? "Remove from saved posts" : "Save post"}</span>
               </button>
-              <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void share())}><ShareOutlinedIcon /> <span>Share via</span></button>
+              <button type="button" disabled={busy} onClick={() => { closeOptionsMenu(); void share(); }}><ShareOutlinedIcon /> <span>Share via</span></button>
               {following ? <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void unfollowAuthor())}><PersonRemoveOutlinedIcon /> <span>Unfollow</span></button> : null}
               <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void hideAuthorPosts())}><VisibilityOffOutlinedIcon /> <span>Hide posts by {menuAuthor.displayName}</span></button>
               <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void markNotInterested())}><ThumbDownAltOutlinedIcon /> <span>Not interested</span></button>
@@ -725,6 +736,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           </div>
         </section>
       </div> : null}
+      {shareSheetOpen ? <CommunityShareSheet
+        title="SMAJ PI HUB community post"
+        text={[post.type === "repost" ? post.content?.trim() : "", content.content?.trim()].filter(Boolean).join("\n\n")}
+        url={new URL(`/community/feed?post=${encodeURIComponent(post._id)}`, window.location.origin).toString()}
+        onClose={() => setShareSheetOpen(false)}
+        onShared={recordCustomShare}
+      /> : null}
       {editOpen ? <div className="community-post-edit-backdrop" onClick={event => {
         if (event.target === event.currentTarget) setEditOpen(false);
       }}>

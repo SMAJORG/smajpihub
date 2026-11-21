@@ -1207,6 +1207,112 @@
   background: var(--border);
 }
 
+.community-share-backdrop {
+  position: fixed;
+  z-index: 1500;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--community-post-options-scrim, rgb(0 0 0 / 48%));
+  animation: community-options-fade-in 200ms ease-out both;
+}
+
+.community-share-sheet {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  padding: 8px 20px max(24px, env(safe-area-inset-bottom));
+  color: var(--text);
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 40px rgb(0 0 0 / 18%);
+  animation: community-options-sheet-in 220ms cubic-bezier(.2, .75, .3, 1) both;
+}
+
+.community-share-handle {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 14px;
+  border-radius: 99px;
+  background: var(--border);
+}
+
+.community-share-sheet > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.community-share-sheet h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.community-share-sheet > header button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.community-share-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.community-share-actions button {
+  display: grid;
+  min-width: 0;
+  min-height: 84px;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  color: var(--text);
+  background: var(--soft-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.community-share-actions button:disabled,
+.community-share-sheet > header button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.community-share-actions button > svg,
+.community-share-brand {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  font-size: 18px;
+}
+
+.community-share-brand {
+  color: #fff;
+  border-radius: 50%;
+  font-weight: 750;
+}
+
+.community-share-brand.whatsapp {
+  background: #25d366;
+}
+
+.community-share-brand.telegram {
+  background: #229ed9;
+}
+
 .community-post-options-list {
   display: grid;
 }
