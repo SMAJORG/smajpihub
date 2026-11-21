@@ -144,6 +144,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const [serviceMenuOpen, setServiceMenuOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
   const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCountRequest = useRef(0);
   const [streamDownloadCount, setStreamDownloadCount] = useState(0);
   const [communityChromeHidden, setCommunityChromeHidden] = useState(false);
   const [communityHeaderHidden, setCommunityHeaderHidden] = useState(false);
@@ -224,9 +225,21 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     return () => window.removeEventListener("smaj:theme-change", onThemeChange);
   }, []);
 
-  const loadUnreadCount = useCallback(() => {
-    axiosClient.get<{ unreadCount?: number }>("/notifications/unread-count").then(({ data }) => setUnreadCount(data.unreadCount || 0)).catch(() => undefined);
-  }, []);
+  const loadUnreadCount = useCallback(async () => {
+    const requestId = ++unreadCountRequest.current;
+    if (!user?.uid) {
+      setUnreadCount(0);
+      return;
+    }
+    try {
+      const { data } = await axiosClient.get<{ unreadCount?: number }>("/notifications/unread-count");
+      if (requestId !== unreadCountRequest.current) return;
+      const count = Number(data.unreadCount);
+      if (Number.isFinite(count)) setUnreadCount(Math.max(0, Math.floor(count)));
+    } catch {
+      // Keep the last known count during transient refresh failures.
+    }
+  }, [user?.uid]);
 
 
   useEffect(() => {
@@ -239,16 +252,25 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
     const onNotification = (event: MessageEvent<string>) => {
       try {
         const data = JSON.parse(event.data) as { unreadCount?: number };
-        if (typeof data.unreadCount === "number") setUnreadCount(data.unreadCount);
-        window.dispatchEvent(new Event("smaj:notifications-refresh"));
+        let badgeHandled = false;
+        if (typeof data.unreadCount === "number" && Number.isFinite(data.unreadCount)) {
+          unreadCountRequest.current += 1;
+          setUnreadCount(Math.max(0, Math.floor(data.unreadCount)));
+          badgeHandled = true;
+        } else {
+          loadUnreadCount();
+          badgeHandled = true;
+        }
+        window.dispatchEvent(new CustomEvent("smaj:notifications-refresh", { detail: { badgeHandled } }));
       } catch {
         loadUnreadCount();
       }
     };
     stream.addEventListener("notification", onNotification as EventListener);
     let resumeTimer = 0;
-    const onRefresh = () => {
-      if (!document.hidden) loadUnreadCount();
+    const onRefresh = (event: Event) => {
+      const badgeHandled = event instanceof CustomEvent && event.detail?.badgeHandled === true;
+      if (!document.hidden && !badgeHandled) loadUnreadCount();
     };
     const onVisibilityChange = () => {
       window.clearTimeout(resumeTimer);
@@ -571,7 +593,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
             <Link to="/dashboard" className="mobile-private-brand" aria-label="SMAJ PI HUB Home"><img src={logoImage} alt="SMAJ PI HUB" /></Link>
             <span className="environment-badge mobile-environment-badge" aria-label="Testnet beta environment">Beta</span>
             <div className="mobile-private-header-actions">
-              <Link className="mobile-private-icon notification-icon" to="/notifications" aria-label="Notifications"><NotificationsNoneOutlinedIcon />{unreadCount ? <span>{notificationBadgeLabel}</span> : null}</Link>
+              <Link className="mobile-private-icon notification-icon" to="/notifications" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"}><NotificationsNoneOutlinedIcon />{unreadCount ? <span>{notificationBadgeLabel}</span> : null}</Link>
               <button className="mobile-private-icon" type="button" onClick={() => void toggleTheme()} aria-label="Toggle theme" title="Toggle light or dark mode">
                 {themeIcon}
               </button>
