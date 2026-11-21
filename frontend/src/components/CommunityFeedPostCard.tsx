@@ -25,7 +25,7 @@ import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import CommunityVideoPreview from "./CommunityVideoPreview";
 import CommunityShareFallback from "./CommunityShareFallback";
-import { openCommunityNativeShare } from "./communityNativeShare";
+import { communityPostUrl, openCommunityNativeShare } from "./communityNativeShare";
 import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
@@ -172,6 +172,11 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const original = post.originalPost;
   const content: CommunityPost = original ? { ...post, ...original } : post;
   const author = content.author || post.author;
+  const shareUrl = communityPostUrl(post._id);
+  const shareText = [...new Set([
+    ...(post.type === "repost" && post.content?.trim() ? [post.content.trim()] : []),
+    ...(content.content?.trim() ? [content.content.trim()] : []),
+  ])].join("\n\n");
   const [reaction, setReaction] = useState<CommunityReaction | null>(content.myReaction || (content.likedByMe ? "like" : null));
   const [reactionCounts, setReactionCounts] = useState<CommunityReactionCounts>(content.reactionCounts || { like: content.likeCount || 0 });
   const [likeCount, setLikeCount] = useState(content.likeCount || 0);
@@ -482,17 +487,11 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const share = async () => {
     if (busy || shareInProgress.current) return;
     shareInProgress.current = true;
-    const url = new URL("/community/feed", window.location.origin);
-    url.searchParams.set("post", post._id);
-    const text = [...new Set([
-      ...(post.type === "repost" && post.content?.trim() ? [post.content.trim()] : []),
-      ...(content.content?.trim() ? [content.content.trim()] : []),
-    ])].join("\n\n");
     try {
       const result = await openCommunityNativeShare({
         title: "SMAJ PI HUB community post",
-        text,
-        url: url.toString(),
+        text: shareText,
+        url: shareUrl,
       });
       if (result === "shared") {
         showFeedback("Post shared.", "success");
@@ -738,9 +737,11 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
         </section>
       </div> : null}
       {shareFallbackOpen ? <CommunityShareFallback
-        url={new URL(`/community/feed?post=${encodeURIComponent(post._id)}`, window.location.origin).toString()}
+        url={shareUrl}
+        title="SMAJ PI HUB community post"
+        text={shareText}
         onClose={() => setShareFallbackOpen(false)}
-        onCopied={recordCustomShare}
+        onShared={recordCustomShare}
       /> : null}
       {editOpen ? <div className="community-post-edit-backdrop" onClick={event => {
         if (event.target === event.currentTarget) setEditOpen(false);

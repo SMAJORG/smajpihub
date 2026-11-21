@@ -139,13 +139,17 @@ test('one welcome under concurrent delivery appears in both normal inboxes and s
   assert.match(message.message,/https:\/\/smajpihub\.com\/terms/u);
   assert.match(message.message,/https:\/\/smajpihub\.com\/privacy/u);
   assert.match(message.message,/https:\/\/smajpihub\.com\/seller-agreement/u);
-  assert.deepEqual(Array.from(message.message.matchAll(/\p{Extended_Pictographic}/gu),m=>m[0]),['🎉']);
+  assert.match(message.message,/🌍 Become a SMAJ Ambassador!/u);
+  assert.match(message.message,/Help SMAJ PI HUB grow in your country and region\./u);
+  assert.match(message.message,/https:\/\/smajpihub\.com\/app\/services\?ambassador=apply/u);
+  assert.deepEqual(Array.from(message.message.matchAll(/\p{Extended_Pictographic}/gu),m=>m[0]),['🎉','🌍']);
   for(const uid of ['alice','bob']){
     const inbox=await h.call('get','/',{uid});
     assert.equal(inbox.body.conversations.length,1);
     const history=await h.call('get','/:id',{uid,params:{id}});
     assert.equal(history.body.messages[0].message,message.message);
-    assert.equal(history.body.messages[0].linkLabels.length,3);
+    assert.equal(history.body.messages[0].linkLabels.length,4);
+    assert.equal(history.body.messages[0].linkLabels[3].label,'Apply to Become an Ambassador →');
   }
   const reply=await h.call('post','/:id',{uid:'alice',params:{id},body:{message:'Thank you. I have a question.',clientMessageId:'reply_0001'}});
   assert.equal(reply.status,201);

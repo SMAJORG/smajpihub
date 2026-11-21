@@ -6,6 +6,7 @@ import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
+import { useSearchParams } from "react-router-dom";
 import { axiosClient } from "../lib/axiosClient";
 import { uploadImage } from "../lib/uploadImage";
 import { showFeedback } from "../lib/feedback";
@@ -57,10 +58,12 @@ const readImage = (file: File) => new Promise<string>((resolve, reject) => {
 
 const AmbassadorServicesPanel = () => {
   const { user } = useAuthContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const selfieStreamRef = useRef<MediaStream | null>(null);
   const idInputRefs = useRef<Record<"idFront" | "idBack", HTMLInputElement | null>>({ idFront: null, idBack: null });
-  const [mode, setMode] = useState<"apply" | "find" | null>(null);
+  const [mode, setMode] = useState<"apply" | "find" | null>(() =>
+    searchParams.get("ambassador") === "apply" ? "apply" : null);
   const [application, setApplication] = useState<Application | null>(null);
   const [ambassadors, setAmbassadors] = useState<PublicAmbassador[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(false);
@@ -142,7 +145,15 @@ const AmbassadorServicesPanel = () => {
     };
   }, [selfieCameraOpen]);
 
-  const close = () => { setMode(null); setSelfieCameraOpen(false); };
+  const close = () => {
+    setMode(null);
+    setSelfieCameraOpen(false);
+    if (searchParams.get("ambassador") === "apply") {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("ambassador");
+      setSearchParams(nextParams, { replace: true });
+    }
+  };
   const chooseService = (slug: string) => {
     setForm((current) => {
       if (slug === "all") return { ...current, services: ["all"] };

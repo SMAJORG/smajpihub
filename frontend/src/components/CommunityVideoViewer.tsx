@@ -14,7 +14,7 @@ import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
 import CommunityCaptionTrack from "./CommunityCaptionTrack";
 import UserAvatarFrame from "./UserAvatarFrame";
 import CommunityShareFallback from "./CommunityShareFallback";
-import { openCommunityNativeShare } from "./communityNativeShare";
+import { communityPostUrl, openCommunityNativeShare } from "./communityNativeShare";
 import {
   createCommunityComment,
   getCommunityComments,
@@ -194,13 +194,12 @@ export default function CommunityVideoViewer({ items, index, viewerId, returnLab
   const share = async () => {
     if (!current || busy || shareInProgress.current) return;
     shareInProgress.current = true;
-    const url = new URL("/community/feed", window.location.origin);
-    url.searchParams.set("post", current.post._id);
+    const url = communityPostUrl(current.post._id);
     try {
       const result = await openCommunityNativeShare({
         title: "SMAJ PI HUB community video",
         text: current.content,
-        url: url.toString(),
+        url,
       });
       if (result === "shared") {
         showFeedback("Video shared.", "success");
@@ -328,10 +327,12 @@ export default function CommunityVideoViewer({ items, index, viewerId, returnLab
         <span>{playing ? "Playing" : "Paused"} · {activeIndex + 1}/{items.length}</span>
       </div>
       {shareFallbackOpen ? <CommunityShareFallback
-        url={new URL(`/community/feed?post=${encodeURIComponent(current.post._id)}`, window.location.origin).toString()}
+        url={communityPostUrl(current.post._id)}
+        title="SMAJ PI HUB community video"
+        text={current.content}
         copySuccessMessage="Video link copied."
         onClose={() => setShareFallbackOpen(false)}
-        onCopied={recordCustomShare}
+        onShared={recordCustomShare}
       /> : null}
       {commentsOpen ? <section className="community-video-comments" aria-label="Video comments">
         <button type="button" className="community-video-comments-close" onClick={() => setCommentsOpen(false)} aria-label="Close comments">×</button>

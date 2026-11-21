@@ -4,7 +4,7 @@ import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import CommunityShareFallback from "./CommunityShareFallback";
-import { openCommunityNativeShare } from "./communityNativeShare";
+import { communityPostUrl, openCommunityNativeShare } from "./communityNativeShare";
 import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
@@ -46,6 +46,11 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const original = post.originalPost;
   const content: CommunityPost = original ? { ...post, ...original } : post;
   const author = content.author || post.author;
+  const shareUrl = communityPostUrl(post._id);
+  const shareText = [...new Set([
+    ...(post.type === "repost" && post.content?.trim() ? [post.content.trim()] : []),
+    ...(content.content?.trim() ? [content.content.trim()] : []),
+  ])].join("\n\n");
 
   useEffect(() => {
     setLiked(post.likedByMe);
@@ -146,14 +151,8 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const share = async () => {
     if (busy || shareInProgress.current) return;
     shareInProgress.current = true;
-    const url = new URL("/community/feed", window.location.origin);
-    url.searchParams.set("post", post._id);
-    const text = [...new Set([
-      ...(post.type === "repost" && post.content?.trim() ? [post.content.trim()] : []),
-      ...(content.content?.trim() ? [content.content.trim()] : []),
-    ])].join("\n\n");
     try {
-      const result = await openCommunityNativeShare({ title: "SMAJ PI HUB community post", text, url: url.toString() });
+      const result = await openCommunityNativeShare({ title: "SMAJ PI HUB community post", text: shareText, url: shareUrl });
       if (result === "shared") {
         showFeedback("Post shared.", "success");
         void recordCustomShare();
@@ -257,9 +256,11 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
         <button type="button" disabled={busy} onClick={() => void share()}>Share</button>
       </div>
       {shareFallbackOpen ? <CommunityShareFallback
-        url={new URL(`/community/feed?post=${encodeURIComponent(post._id)}`, window.location.origin).toString()}
+        url={shareUrl}
+        title="SMAJ PI HUB community post"
+        text={shareText}
         onClose={() => setShareFallbackOpen(false)}
-        onCopied={recordCustomShare}
+        onShared={recordCustomShare}
       /> : null}
       {reportOpen ? <form className="community-report-form" onSubmit={event => void submitReport(event)}>
         <label>Why are you reporting this post?<select value={reportReason} onChange={event => setReportReason(event.target.value)}>{reportReasons.map(reason => <option key={reason}>{reason}</option>)}</select></label>

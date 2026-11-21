@@ -20,6 +20,12 @@ Our Live Services
 
 Coming Soon: SMAJ Education.
 
+🌍 Become a SMAJ Ambassador!
+
+Help SMAJ PI HUB grow in your country and region. We invite passionate community members to apply as regional ambassadors, support local users and contribute to our global expansion.
+
+https://smajpihub.com/app/services?ambassador=apply
+
 Stay Connected
 
 Follow our official SMAJ PI HUB social media channels:
@@ -51,6 +57,9 @@ test("formats section headings, service lists, paragraphs, and links on separate
   const formatted = formatFounderWelcomeMessage(welcome.message);
   assert.match(formatted, /Our Live Services\n\n• SMAJ Store — Buy and sell\.\n• SMAJ Jobs — Find work and hire\.\n• SMAJ Stream — Watch and explore\./u);
   assert.match(formatted, /Coming Soon:\n• SMAJ Education\./u);
+  assert.match(formatted, /🌍 Become a SMAJ Ambassador!/u);
+  assert.match(formatted, /Help SMAJ PI HUB grow in your country and region\./u);
+  assert.match(formatted, /https:\/\/smajpihub\.com\/app\/services\?ambassador=apply/u);
   assert.match(formatted, /Stay Connected\n\nFollow SMAJ PI HUB on:/u);
   assert.match(formatted, /https:\/\/smajpihub\.com\/terms,\nhttps:\/\/smajpihub\.com\/privacy,\nand https:\/\/smajpihub\.com\/seller-agreement/u);
   assert.match(formatted, /Telegram:\nhttps:\/\/t\.me\/smajpihub\nX:\nhttps:\/\/x\.com\/smajpihub/u);

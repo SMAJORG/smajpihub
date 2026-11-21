@@ -63,6 +63,31 @@ test('approved welcome renders individually named legal links and functional off
   const html=appRequire('react-dom/server').renderToStaticMarkup(React.createElement(component.default,{text:service.welcomeMessage,links:service.welcomeLinks}));
   for(const {href,label} of service.welcomeLinks){assert(html.includes(`href="${href}"`));assert(html.includes(label.replaceAll('&','&amp;')));}
   for(const href of ['https://t.me/smajpihub','https://x.com/smajpihub','https://x.com/Devsmaj'])assert(html.includes(`href="${href}"`));
-  assert.equal((html.match(/class="chat-message-link"/g)||[]).length,6);
+  assert(html.includes('🌍 Become a SMAJ Ambassador!'));
+  assert(html.includes('Help SMAJ PI HUB grow in your country and region.'));
+  assert.equal((html.match(/class="chat-message-link"/g)||[]).length,7);
   assert(!html.includes('Make each document'));
+});
+
+test('Community share targets preserve the exact post URL and text for every app', () => {
+  const file = path.join(__dirname, '../src/components/communityShareTargets.ts');
+  const output = {};
+  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  new Function('require', 'exports', code)(require, output);
+  const url = 'https://smajpihub.com/community/feed?post=post-123';
+  const text = 'A post with & and #pi';
+  const targets = output.createCommunityShareTargets(url, 'SMAJ PI HUB community post', text);
+  assert.deepEqual(targets.map(target => target.name), ['WhatsApp', 'Telegram', 'X', 'Email']);
+  const whatsapp = new URL(targets[0].href);
+  assert.equal(whatsapp.searchParams.get('text'), `${text}\n\n${url}`);
+  const telegram = new URL(targets[1].href);
+  assert.equal(telegram.searchParams.get('url'), url);
+  assert.equal(telegram.searchParams.get('text'), text);
+  const x = new URL(targets[2].href);
+  assert.equal(x.searchParams.get('url'), url);
+  assert.equal(x.searchParams.get('text'), text);
+  const email = new URL(targets[3].href);
+  assert.equal(email.protocol, 'mailto:');
+  assert.equal(email.searchParams.get('subject'), 'SMAJ PI HUB community post');
+  assert.equal(email.searchParams.get('body'), `${text}\n\n${url}`);
 });

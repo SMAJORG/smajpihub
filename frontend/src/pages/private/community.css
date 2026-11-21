@@ -1632,54 +1632,72 @@
 
 .community-share-fallback-backdrop {
   position: fixed;
-  z-index: 1500;
+  z-index: 2147482600;
   inset: 0;
-  display: grid;
-  align-items: center;
+  display: flex;
+  align-items: flex-end;
   justify-content: center;
-  padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+  padding: 0;
   background: var(--community-post-options-scrim, rgb(0 0 0 / 48%));
   animation: community-options-fade-in 200ms ease-out both;
 }
 
+.community-share-fallback-backdrop.is-closing {
+  animation: community-options-fade-out 180ms ease-in both;
+}
+
 .community-share-fallback {
+  position: relative;
   box-sizing: border-box;
-  width: min(440px, 100%);
-  max-height: 100%;
+  width: min(560px, 100%);
+  max-height: min(84dvh, 680px);
   overflow: auto;
-  padding: 22px;
+  padding: 10px 20px calc(22px + env(safe-area-inset-bottom, 0px));
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
-  animation: community-options-sheet-in 180ms ease-out both;
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -18px 48px rgb(0 0 0 / 22%);
+  touch-action: pan-y;
+  animation: community-options-sheet-in 220ms cubic-bezier(.2, .75, .3, 1) both;
+}
+
+.community-share-fallback.is-closing {
+  animation: community-options-sheet-out 180ms ease-in both;
+}
+
+.community-share-fallback-handle {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 15px;
+  border-radius: 99px;
+  background: var(--border);
 }
 
 .community-share-fallback > header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .community-share-fallback h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 19px;
 }
 
 .community-share-fallback p {
-  margin: 7px 0 0;
+  margin: 5px 0 0;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 13px;
 }
 
 .community-share-fallback > header button {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   place-items: center;
   color: var(--muted);
@@ -1689,41 +1707,58 @@
   cursor: pointer;
 }
 
-.community-share-fallback-link {
+.community-share-fallback-options {
   display: grid;
-  gap: 7px;
-  color: var(--muted);
-  font-size: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 6px 0 20px;
 }
 
-.community-share-fallback-link input {
-  box-sizing: border-box;
-  width: 100%;
+.community-share-fallback-option {
   min-width: 0;
-  padding: 11px 12px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   color: var(--text);
-  background: var(--soft-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: none;
 }
+
+.community-share-fallback-icon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  border-radius: 50%;
+}
+
+.community-share-fallback-icon svg {
+  width: 27px;
+  height: 27px;
+}
+
+.community-share-fallback-icon.whatsapp { background: #25d366; }
+.community-share-fallback-icon.telegram { background: #229ed9; }
+.community-share-fallback-icon.x { background: #000; }
+.community-share-fallback-icon.email { background: #6d28d9; }
 
 .community-share-fallback-copy {
-  display: inline-flex;
-  min-height: 42px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
-  margin-top: 14px;
-  padding: 0 15px;
+  padding: 0 14px;
   color: #fff;
   background: var(--primary);
   border: 0;
-  border-radius: 10px;
+  border-radius: 13px;
   font: inherit;
-  font-weight: 650;
+  font-weight: 750;
   cursor: pointer;
 }
 
@@ -1731,6 +1766,21 @@
 .community-share-fallback > header button:disabled {
   opacity: .55;
   cursor: default;
+}
+
+@media (min-width: 640px) {
+  .community-share-fallback-backdrop {
+    align-items: center;
+    padding: 20px;
+  }
+
+  .community-share-fallback {
+    width: min(440px, 100%);
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
+  }
 }
 
 .community-post-options-list {

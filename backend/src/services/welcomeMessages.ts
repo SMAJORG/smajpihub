@@ -5,6 +5,7 @@ export const welcomeLinks = [
   { href: "https://smajpihub.com/terms", label: "Terms & Conditions" },
   { href: "https://smajpihub.com/privacy", label: "Privacy Policy" },
   { href: "https://smajpihub.com/seller-agreement", label: "Seller Agreement" },
+  { href: "https://smajpihub.com/app/services?ambassador=apply", label: "Apply to Become an Ambassador →" },
 ];
 export const welcomeMessage = `🎉 Welcome to SMAJ PI HUB!
 
@@ -19,6 +20,12 @@ Our Live Services
 - SMAJ Stream — Watch and explore.
 
 Coming Soon: SMAJ Education.
+
+🌍 Become a SMAJ Ambassador!
+
+Help SMAJ PI HUB grow in your country and region. We invite passionate community members to apply as regional ambassadors, support local users and contribute to our global expansion.
+
+${welcomeLinks[3].href}
 
 Stay Connected
 
