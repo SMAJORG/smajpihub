@@ -56,7 +56,20 @@ export async function testnetAdminLogin(req: Request, res: Response) {
     const expiresAt = new Date(Date.now() + TTL);
     await collection.insertOne({ _id: digest(token), kind: "session", username, credentialVersion: version, expiresAt, revoked: false, createdAt: new Date() });
     return res.json({ token, username, expiresAt: expiresAt.toISOString(), scope: "testnet-payouts" });
-  } catch { return res.status(503).json({ message: "Testnet administrator login is unavailable. Check the isolated Testnet server configuration." }); }
+  } catch {
+    // Report configuration checks only: never log credentials or database errors.
+    console.warn("[testnet-admin-auth] unavailable", {
+      testnetNetwork: process.env.PI_NETWORK === "Pi Testnet",
+      testnetCommerce: process.env.PI_COMMERCE_MODE === "testnet-development",
+      mainnetAccountMode: process.env.PI_MAINNET_ACCOUNT_MODE === "fresh",
+      isolatedDatabase: Boolean(process.env.PI_TESTNET_PAYOUT_DATABASE_NAME?.endsWith("_testnet_a2u") && process.env.PI_TESTNET_PAYOUT_DATABASE_NAME === env.mongo_db_name),
+      enabled: process.env.PI_TESTNET_ADMIN_AUTH_ENABLED === "true",
+      persistentStorage: Boolean(req.app.locals.testnetAdminAuthCollection && !req.app.locals.memoryDatabase),
+      administratorAllowed: env.admin_pi_usernames.includes(normalize(process.env.PI_TESTNET_ADMIN_USERNAME || "")),
+      passwordHashConfigured: /^scrypt\$[a-f0-9]{32}\$[a-f0-9]{128}$/.test(process.env.PI_TESTNET_ADMIN_PASSWORD_HASH || ""),
+    });
+    return res.status(503).json({ message: "Testnet administrator login is unavailable. Check the isolated Testnet server configuration." });
+  }
 }
 
 export async function testnetAdminLogout(req: Request, res: Response) {
