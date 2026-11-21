@@ -659,19 +659,30 @@
 
 .public-profile-main {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 16px;
-  padding: 18px;
+  gap: 13px;
+  padding: 0 22px 18px;
 }
 
-.public-profile-main > .user-avatar-frame {
-  margin-top: -60px;
+.public-profile-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-top: -56px;
+}
+
+.public-profile-avatar {
+  outline: 4px solid var(--surface);
   border-radius: 50%;
 }
 
 .public-profile-identity {
   min-width: 0;
+}
+
+.public-profile-identity .private-kicker {
+  margin-bottom: 5px;
 }
 
 .public-profile-identity h1 {
@@ -699,12 +710,15 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  margin-top: 12px;
+  min-width: 0;
+  padding-top: 68px;
 }
 
 .public-profile-stats {
   display: flex;
+  justify-content: flex-start;
   gap: 14px;
 }
 
@@ -805,6 +819,174 @@
   gap: 14px;
 }
 
+.public-profile-sticky-stack {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin-top: -20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 6px 18px rgb(23 16 43 / 8%);
+}
+
+.public-profile-sticky-header {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.public-profile-sticky-header > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.public-profile-sticky-header strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-profile-sticky-header > div > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.public-profile-tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.public-profile-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.public-profile-tabs button {
+  position: relative;
+  flex: 1 0 92px;
+  min-height: 48px;
+  padding: 0 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.public-profile-tabs button.active {
+  color: var(--primary);
+}
+
+.public-profile-tabs button.active::after {
+  position: absolute;
+  right: 18px;
+  bottom: 0;
+  left: 18px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--primary);
+  content: "";
+}
+
+.public-profile-tabs button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+
+.public-profile-tab-panel {
+  min-width: 0;
+  scroll-margin-top: 110px;
+}
+
+.public-profile-details {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.public-profile-details > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.3fr) minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+
+.public-profile-details dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.public-profile-details dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.public-profile-empty,
+.public-profile-tab-error {
+  margin: 0;
+  padding: 18px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.public-profile-tab-error {
+  color: var(--danger, #b42318);
+}
+
+.public-profile-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.public-profile-media-item {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.public-profile-media-item img,
+.public-profile-media-item video {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  background: var(--soft-bg);
+}
+
+.public-profile-media-item > span,
+.public-profile-media-item > a {
+  padding: 2px 9px 9px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .public-profile-private-note {
   margin: 0;
   padding: 10px 12px;
@@ -870,8 +1052,7 @@
 }
 
 @media (max-width: 680px) {
-  .community-page-header,
-  .public-profile-main {
+  .community-page-header {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
   }
@@ -894,18 +1075,57 @@
     padding-inline: 10px;
   }
 
-  .public-profile-main > .user-avatar-frame {
-    margin-top: -62px;
+  .public-profile-main {
+    gap: 11px;
+    padding-inline: 14px;
+  }
+
+  .public-profile-top-row {
+    margin-top: -50px;
+  }
+
+  .public-profile-top-row > .user-avatar-frame {
+    --user-avatar-size: 100px !important;
+  }
+
+  .public-profile-actions {
+    padding-top: 58px;
+  }
+
+  .public-profile-actions .private-primary-button,
+  .public-profile-actions .private-secondary-button {
+    min-height: 38px;
+    padding: 8px 13px;
+    font-size: 13px;
   }
 
   .public-profile-stats {
-    justify-content: space-around;
+    justify-content: flex-start;
+    gap: 20px;
     padding-top: 10px;
     border-top: 1px solid var(--border);
   }
 
-  .public-profile-grid {
-    grid-template-columns: minmax(0, 1fr);
+  .public-profile-stats div {
+    min-width: 0;
+  }
+
+  .public-profile-media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-profile-sticky-stack {
+    border-radius: 0 0 10px 10px;
+  }
+
+  .public-profile-sticky-header {
+    min-height: 52px;
+  }
+
+  .public-profile-tabs button {
+    flex-basis: 76px;
+    min-height: 44px;
+    font-size: 13px;
   }
 
   .people-search-card {
@@ -915,6 +1135,19 @@
 
   .people-search-actions {
     width: 100%;
+  }
+}
+
+@media (max-width: 1023px), (hover: none), (pointer: coarse) {
+  .public-profile-sticky-stack {
+    top: 68px;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .private-content:has(.public-profile-page) {
+    height: auto !important;
+    overflow: visible !important;
   }
 }
 

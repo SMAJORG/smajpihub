@@ -41,11 +41,12 @@ type Props = {
   items: CommunityVideoItem[];
   index: number;
   viewerId?: string;
+  returnLabel?: string;
   onClose: () => void;
   onChange?: () => void;
 };
 
-export default function CommunityVideoViewer({ items, index, viewerId, onClose, onChange }: Props) {
+export default function CommunityVideoViewer({ items, index, viewerId, returnLabel = "Return to community feed", onClose, onChange }: Props) {
   const [activeIndex, setActiveIndex] = useState(index);
   const [muted, setMuted] = useState(true);
   const [captionsAvailable, setCaptionsAvailable] = useState(false);
@@ -293,7 +294,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
         setCaptionsAvailable(true);
         if (captionsEnabled) setCaptionMode(true);
       }} /> : null}</video>
-      <button type="button" className="community-video-viewer-back" onClick={closeViewer} aria-label="Return to community feed"><ArrowBackOutlinedIcon /></button>
+      <button type="button" className="community-video-viewer-back" onClick={closeViewer} aria-label={returnLabel}><ArrowBackOutlinedIcon /></button>
       <div className="community-video-viewer-top-actions">
         <button type="button" aria-label={muted ? "Unmute video" : "Mute video"} onClick={() => {
           const video = videoRef.current;
