@@ -146,6 +146,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [streamDownloadCount, setStreamDownloadCount] = useState(0);
   const [communityChromeHidden, setCommunityChromeHidden] = useState(false);
+  const [communityHeaderHidden, setCommunityHeaderHidden] = useState(false);
   const [communityVideoViewerOpen, setCommunityVideoViewerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<"light" | "dark">(() => window.localStorage.getItem("smaj_private_theme_mode") === "dark" ? "dark" : "light");
@@ -450,6 +451,98 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, [isCommunityFeed, communityVideoViewerOpen]);
 
   useEffect(() => {
+    if (!isCommunityFeed || communityVideoViewerOpen) {
+      setCommunityHeaderHidden(false);
+      return;
+    }
+
+    const feed = document.querySelector<HTMLElement>(".community-private-shell .community-feed");
+    const rootScroller = document.scrollingElement as HTMLElement | null;
+    if (!feed || !rootScroller) return;
+
+    const canScrollVertically = (element: HTMLElement) => {
+      const overflowY = window.getComputedStyle(element).overflowY;
+      return (overflowY === "auto" || overflowY === "scroll")
+        && element.scrollHeight > element.clientHeight + 2;
+    };
+    const findScrollContainer = () => {
+      for (let element: HTMLElement | null = feed; element && element !== rootScroller; element = element.parentElement) {
+        if (canScrollVertically(element)) return element;
+      }
+      return rootScroller;
+    };
+
+    let scroller = findScrollContainer();
+    const isRootScroller = () => scroller === rootScroller;
+    const getScrollPosition = () => isRootScroller()
+      ? window.scrollY || rootScroller.scrollTop
+      : scroller.scrollTop;
+    let previousPosition = getScrollPosition();
+    let accumulatedDownwardDelta = 0;
+    let animationFrame = 0;
+
+    if (previousPosition <= 8) setCommunityHeaderHidden(false);
+
+    const updateHeader = () => {
+      animationFrame = 0;
+      const position = getScrollPosition();
+      const delta = position - previousPosition;
+      previousPosition = position;
+
+      if (position <= 8) {
+        setCommunityHeaderHidden(false);
+        accumulatedDownwardDelta = 0;
+        return;
+      }
+      if (delta < 0) {
+        setCommunityHeaderHidden(false);
+        accumulatedDownwardDelta = 0;
+      } else if (delta > 0) {
+        accumulatedDownwardDelta += delta;
+        if (accumulatedDownwardDelta >= 12) {
+          setCommunityHeaderHidden(true);
+          accumulatedDownwardDelta = 0;
+        }
+      }
+    };
+    const scheduleUpdate = () => {
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(updateHeader);
+    };
+    const selectScrollContainer = (event: Event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        if (target !== feed && !target.contains(feed)) return;
+        scroller = canScrollVertically(target) ? target : findScrollContainer();
+      } else {
+        scroller = findScrollContainer();
+      }
+      scheduleUpdate();
+    };
+    const resetScrollBaseline = () => {
+      scroller = findScrollContainer();
+      previousPosition = getScrollPosition();
+      accumulatedDownwardDelta = 0;
+      if (previousPosition <= 8) setCommunityHeaderHidden(false);
+    };
+    const onResize = () => {
+      resetScrollBaseline();
+    };
+    const mutationObserver = new MutationObserver(resetScrollBaseline);
+
+    document.addEventListener("scroll", selectScrollContainer, { capture: true, passive: true });
+    window.addEventListener("scroll", selectScrollContainer, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    mutationObserver.observe(feed, { childList: true, subtree: true });
+    return () => {
+      document.removeEventListener("scroll", selectScrollContainer, true);
+      window.removeEventListener("scroll", selectScrollContainer);
+      window.removeEventListener("resize", onResize);
+      mutationObserver.disconnect();
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, [isCommunityFeed, communityVideoViewerOpen]);
+
+  useEffect(() => {
     if (!isStreamShell) return;
     let active = true;
     const loadDownloadCount = () => {
@@ -470,7 +563,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, [isStreamShell]);
 
   return (
-    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${isCommunityFeed ? `community-private-shell${communityChromeHidden ? " community-chrome-hidden" : ""}${communityVideoViewerOpen ? " community-video-open" : ""}` : ""} ${fullScreen ? "full-screen-page" : ""}`}>
+    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${isCommunityFeed ? `community-private-shell${communityChromeHidden ? " community-chrome-hidden" : ""}${communityHeaderHidden ? " community-header-hidden" : ""}${communityVideoViewerOpen ? " community-video-open" : ""}` : ""} ${fullScreen ? "full-screen-page" : ""}`}>
       <ServiceLaunchGate />
       {fullScreen ? null : (
         <header className="private-header">

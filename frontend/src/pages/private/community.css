@@ -45,7 +45,7 @@
   will-change: transform, opacity;
 }
 
-.community-private-shell.community-chrome-hidden .community-feed-chrome {
+.community-private-shell.community-header-hidden .community-feed-chrome {
   transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
