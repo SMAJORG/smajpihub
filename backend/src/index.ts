@@ -28,6 +28,7 @@ import mountLiveTransactions from "./handlers/transactions";
 import mountUserEndpoints, { handleSignIn } from "./handlers/users";
 import mountReferralEndpoints from "./handlers/referrals";
 import mountCommunityEndpoints from "./handlers/community";
+import { publishDueCommunityPosts } from "./services/communityScheduler";
 
 // We must import typedefs for ts-node-dev to pick them up when they change (even though tsc would supposedly
 // have no problem here)
@@ -477,6 +478,8 @@ const start = async () => {
       app.locals.communityLikeCollection = db.collection("community_likes");
       app.locals.communityCommentCollection = db.collection("community_comments");
       app.locals.communityFollowCollection = db.collection("community_follows");
+      app.locals.communityPreferenceCollection = db.collection("community_preferences");
+      app.locals.communityPollVoteCollection = db.collection("community_poll_votes");
       app.locals.favoriteCollection = db.collection("favorites");
       app.locals.reviewCollection = db.collection("reviews");
       app.locals.conversationCollection = db.collection("conversations");
@@ -571,7 +574,12 @@ const start = async () => {
         app.locals.referralVisitCollection.createIndex({ referralCode: 1, createdAt: -1 }),
         app.locals.userCollection.createIndex({ piUsername: 1 }),
         app.locals.communityPostCollection.createIndex({ status: 1, createdAt: -1 }),
+        app.locals.communityPostCollection.createIndex({ status: 1, publishAt: 1 }),
         app.locals.communityPostCollection.createIndex({ authorId: 1, createdAt: -1 }),
+        app.locals.communityPostCollection.createIndex(
+          { authorId: 1, clientRequestId: 1 },
+          { unique: true, partialFilterExpression: { clientRequestId: { $type: "string" } } },
+        ),
         app.locals.communityPostCollection.createIndex({ repostOf: 1, status: 1 }),
         app.locals.communityPostCollection.createIndex(
           { authorId: 1, repostOf: 1 },
@@ -581,6 +589,8 @@ const start = async () => {
         app.locals.communityCommentCollection.createIndex({ postId: 1, createdAt: 1 }),
         app.locals.communityFollowCollection.createIndex({ followerId: 1, followingId: 1 }, { unique: true }),
         app.locals.communityFollowCollection.createIndex({ followingId: 1, createdAt: -1 }),
+        app.locals.communityPreferenceCollection.createIndex({ userId: 1, kind: 1, targetId: 1 }, { unique: true }),
+        app.locals.communityPollVoteCollection.createIndex({ postId: 1, userId: 1 }, { unique: true }),
         app.locals.reportCollection.createIndex(
           { targetType: 1, targetId: 1, reportedBy: 1 },
           { unique: true, partialFilterExpression: { targetType: "community_post" } },
@@ -645,6 +655,10 @@ const start = async () => {
           userId: 1,
           createdAt: -1,
         }),
+        app.locals.notificationCollection.createIndex(
+          { userId: 1, dedupeKey: 1 },
+          { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } },
+        ),
         app.locals.pushSubscriptionCollection.createIndex(
           { endpoint: 1 },
           { unique: true },
@@ -933,6 +947,15 @@ const start = async () => {
       inventoryTimer.unref();
     }
     startWelcomeDelivery(app);
+    let publishing = false;
+    const publishScheduledPosts = () => {
+      if (publishing) return;
+      publishing = true;
+      void publishDueCommunityPosts(app).catch(error => console.error("Scheduled community post publishing failed:", error)).finally(() => { publishing = false; });
+    };
+    publishScheduledPosts();
+    const communityPostTimer = setInterval(publishScheduledPosts, 30_000);
+    communityPostTimer.unref();
     app.listen(env.port, () => {
       console.log(`SMAJ PI HUB backend listening on port ${env.port}!`);
       console.log(

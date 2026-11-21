@@ -1460,7 +1460,7 @@ const MessagesPageContent = () => {
               {!conversations.length ? <Link className="private-secondary-button messages-empty-browse" to="/store">Browse Products</Link> : null}
             </div>
           )}
-          {selectedConversations.length ? <div className="conversation-selection-sheet" role="toolbar" aria-label="Selected conversations"><strong>{selectedConversations.length} selected</strong><button type="button" disabled={deletingConversations} onClick={() => void markSelectedConversationsUnread()}>Mark unread</button><button type="button" disabled={deletingConversations} onClick={() => void archiveSelectedConversations(inboxFilter !== "archived")}>{inboxFilter === "archived" ? "Unarchive" : "Archive"}</button><button type="button" className="conversation-delete-button" disabled={deletingConversations} onClick={() => void deleteSelectedConversations()}>{deletingConversations ? "Deleting…" : "Delete"}</button><button type="button" disabled={deletingConversations} onClick={() => { setSelectedConversationIds(new Set()); setManageConversations(false); setConversationActionError(""); }}>Cancel</button>{conversationActionError ? <span className="conversation-selection-error" role="alert">{conversationActionError}</span> : null}</div> : null}
+          {manageConversations ? <div className="conversation-selection-sheet" role="toolbar" aria-label="Selected conversations"><strong>{selectedConversations.length} selected</strong><button type="button" disabled={!selectedConversations.length || deletingConversations} onClick={() => void markSelectedConversationsUnread()}>Mark unread</button><button type="button" disabled={!selectedConversations.length || deletingConversations} onClick={() => void archiveSelectedConversations(inboxFilter !== "archived")}>{inboxFilter === "archived" ? "Unarchive" : "Archive"}</button><button type="button" className="conversation-delete-button" disabled={!selectedConversations.length || deletingConversations} onClick={() => void deleteSelectedConversations()}>{deletingConversations ? "Deleting…" : "Delete"}</button><button type="button" disabled={deletingConversations} onClick={() => { setSelectedConversationIds(new Set()); setManageConversations(false); setConversationActionError(""); }}>Cancel</button>{conversationActionError ? <span className="conversation-selection-error" role="alert">{conversationActionError}</span> : null}</div> : null}
         </aside>
         {!chatFullscreen ? <div className="messages-empty-chat" role="status"><strong>Choose a conversation</strong><p>Your messages will appear here.</p></div> : null}
         {chatFullscreen && active ? createPortal(
@@ -1714,7 +1714,7 @@ const MessagesPageContent = () => {
           </div>
         )}
       </section>
-      {!chatFullscreen ? <button type="button" className="messages-compose-fab" onClick={() => { setComposeOpen(true); setComposeError(""); }} aria-label="Compose message" title="New message">
+      {!chatFullscreen && !manageConversations ? <button type="button" className="messages-compose-fab" onClick={() => { setComposeOpen(true); setComposeError(""); }} aria-label="Compose message" title="New message">
         <AddOutlinedIcon />
       </button> : null}
       {headerMenuOpen ? <div className="messages-sheet-backdrop" role="presentation" onClick={() => setHeaderMenuOpen(false)}>

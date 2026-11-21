@@ -5,6 +5,7 @@ import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
@@ -17,7 +18,7 @@ const GAP=12;
 const ACTIVE_TOUR_KEY="smaj_active_tutorial";
 type Box={top:number;left:number;width:number;height:number;right:number;bottom:number};
 const visibleTarget=(selector?:string)=>selector ? [...document.querySelectorAll<HTMLElement>(selector)].find(el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1}) : undefined;
-const iconFor=(icon:string)=> icon==="home"?<DashboardOutlinedIcon/>:icon==="services"?<AppsOutlinedIcon/>:icon==="search"?<SearchOutlinedIcon/>:icon==="messages"?<ChatOutlinedIcon/>:icon==="profile"?<PersonOutlineIcon/>:icon==="done"?<CheckCircleOutlineIcon/>:<LightbulbOutlinedIcon/>;
+const iconFor=(icon:string)=> icon==="home"?<DashboardOutlinedIcon/>:icon==="services"?<AppsOutlinedIcon/>:icon==="search"?<SearchOutlinedIcon/>:icon==="community"?<GroupsOutlinedIcon/>:icon==="messages"?<ChatOutlinedIcon/>:icon==="profile"?<PersonOutlineIcon/>:icon==="done"?<CheckCircleOutlineIcon/>:<LightbulbOutlinedIcon/>;
 
 const WelcomeTour=()=>{
  const {user,isAuthenticated,isLoading}=useAuthContext(); const navigate=useNavigate(); const location=useLocation();

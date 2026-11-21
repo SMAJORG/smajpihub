@@ -4,6 +4,7 @@ const express = require("express");
 const session = require("express-session");
 const { ObjectId } = require("mongodb");
 const { createMemoryCollections } = require("../build/services/memoryDatabase");
+const { publishDueCommunityPosts } = require("../build/services/communityScheduler");
 const mountAdminEndpoints = require("../build/handlers/admin").default;
 const mountCommunityEndpoints = require("../build/handlers/community").default;
 const mountUserEndpoints = require("../build/handlers/users").default;
@@ -183,18 +184,89 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   const created = await request("POST", "/community/posts", author.uid, { content: "A public community post", media: [] });
   assert.equal(created.response.status, 201);
   const postId = created.data.post._id;
+  const retryAuthor = await makeAccount("retry-author");
+  const retryInput = { content: "Retry-safe post", media: [], clientRequestId: "publish-attempt-1234" };
+  const firstAttempt = await request("POST", "/community/posts", retryAuthor.uid, retryInput);
+  const retryAttempt = await request("POST", "/community/posts", retryAuthor.uid, retryInput);
+  assert.equal(firstAttempt.response.status, 201);
+  assert.equal(retryAttempt.response.status, 200);
+  assert.equal(retryAttempt.data.post._id, firstAttempt.data.post._id);
+  result = await request("POST", "/community/posts", retryAuthor.uid, { ...retryInput, content: "Changed after retry" });
+  assert.equal(result.response.status, 409);
   result = await request("POST", "/community/posts", author.uid, {
     content: "Invalid media",
     media: [{ type: "image", url: "https://res.cloudinary.com/example/video/upload/sample.mp4" }],
+  });
+  assert.equal(result.response.status, 400);
+  const taggedPost = await request("POST", "/community/posts", author.uid, {
+    content: "Tagged image",
+    media: [{
+      type: "image",
+      url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+      width: 1200,
+      height: 1500,
+      altText: "A sample image",
+      taggedPeople: [viewer.uid],
+    }],
+  });
+  assert.equal(taggedPost.response.status, 201);
+  assert.equal(taggedPost.data.post.media[0].altText, "A sample image");
+  assert.deepEqual(taggedPost.data.post.media[0].taggedPeople, [viewer.uid]);
+  result = await request("GET", `/community/feed?authorId=${author.uid}`, viewer.uid);
+  const savedMediaPost = result.data.posts.find(post => post._id === taggedPost.data.post._id);
+  assert.equal(savedMediaPost.media[0].url, taggedPost.data.post.media[0].url, "published attachments remain present in the feed response");
+  assert.deepEqual(
+    [savedMediaPost.media[0].width, savedMediaPost.media[0].height],
+    [1200, 1500],
+    "media dimensions remain available for layout reservation",
+  );
+  const captionAuthor = await makeAccount("caption-author");
+  const captionsVtt = "WEBVTT\n\n00:00:00.000 --> 00:00:02.500\nA spoken caption.";
+  result = await request("POST", "/community/posts", captionAuthor.uid, {
+    content: "Captioned video",
+    media: [{ type: "video", url: "https://res.cloudinary.com/demo/video/upload/sample.mp4", captionsVtt }],
+  });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.data.post.media[0].captionsVtt, captionsVtt);
+  result = await request("POST", "/community/posts", captionAuthor.uid, {
+    content: "Invalid captions",
+    media: [{ type: "video", url: "https://res.cloudinary.com/demo/video/upload/sample.mp4", captionsVtt: "not a webvtt file" }],
+  });
+  assert.equal(result.response.status, 400);
+  result = await request("POST", "/community/posts", author.uid, {
+    content: "Invalid tag",
+    media: [{
+      type: "image",
+      url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+      taggedPeople: ["not-a-public-user"],
+    }],
   });
   assert.equal(result.response.status, 400);
   result = await request("POST", `/community/posts/${postId}/like`, viewer.uid);
   assert.deepEqual(result.data, { liked: true, likeCount: 1 });
   result = await request("POST", `/community/posts/${postId}/like`, viewer.uid);
   assert.deepEqual(result.data, { liked: false, likeCount: 0 });
+  result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: "love" });
+  assert.equal(result.data.myReaction, "love");
+  assert.equal(result.data.reactionCounts.love, 1);
+  assert.equal((await locals.communityLikeCollection.findOne({ postId, userId: viewer.uid })).reaction, "love");
+  result = await request("GET", "/community/feed", viewer.uid);
+  const refreshedReactionPost = result.data.posts.find(post => post._id === postId);
+  assert.equal(refreshedReactionPost.myReaction, "love");
+  assert.equal(refreshedReactionPost.reactionCounts.love, 1);
+  result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: "support" });
+  assert.equal(result.data.reactionCounts.love, 0);
+  assert.equal(result.data.reactionCounts.support, 1);
+  result = await request("POST", `/community/posts/${postId}/reaction`, viewer.uid, { reaction: null });
+  assert.equal(result.data.likeCount, 0);
   result = await request("POST", `/community/posts/${postId}/comments`, viewer.uid, { content: "A comment" });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.comment.content, "A comment");
+  const parentCommentId = result.data.comment._id;
+  result = await request("POST", `/community/posts/${postId}/comments`, author.uid, { content: "A reply", parentId: parentCommentId });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.data.comment.parentId, parentCommentId);
+  assert.equal((await locals.communityCommentCollection.find({ postId }).toArray()).length, 2);
 
   result = await request("POST", `/community/posts/${postId}/repost`, viewer.uid);
   assert.equal(result.response.status, 201);
@@ -215,6 +287,152 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   assert.equal(result.response.status, 200);
   result = await request("GET", "/community/feed", viewer.uid);
   assert.ok(result.data.posts.some(post => post._id === postId));
+  const activePost = result.data.posts.find(post => post._id === postId);
+  assert.equal(activePost.myReaction, null);
+  assert.equal(activePost.reactionCounts.like, 0);
+  assert.equal(activePost.socialActivity.kind, "reposted");
+  assert.equal(activePost.socialActivity.displayName, viewer.displayName);
+
+  const privacyAuthor = await makeAccount("privacy-author");
+  const limitedPost = await request("POST", "/community/posts", privacyAuthor.uid, {
+    content: "Followers-only post", audience: "followers", commentPolicy: "nobody", media: [],
+  });
+  assert.equal(limitedPost.response.status, 201);
+  result = await request("GET", `/community/feed?authorId=${privacyAuthor.uid}`, viewer.uid);
+  assert.equal(result.data.posts.length, 0);
+  result = await request("POST", `/community/posts/${limitedPost.data.post._id}/comments`, viewer.uid, { content: "Not allowed" });
+  assert.equal(result.response.status, 404, "non-followers cannot interact with a restricted post");
+  result = await request("POST", `/community/follow/${privacyAuthor.uid}`, viewer.uid);
+  assert.equal(result.response.status, 201);
+  result = await request("GET", `/community/feed?authorId=${privacyAuthor.uid}`, viewer.uid);
+  assert.equal(result.data.posts.length, 1);
+  assert.equal(result.data.posts[0].canComment, false);
+  result = await request("GET", `/community/posts/${limitedPost.data.post._id}/comments`, viewer.uid);
+  assert.equal(result.response.status, 403);
+  result = await request("POST", `/community/posts/${limitedPost.data.post._id}/repost`, viewer.uid);
+  assert.equal(result.response.status, 403);
+  result = await request("GET", `/community/feed?authorId=${privacyAuthor.uid}`, privacyAuthor.uid);
+  assert.equal(result.data.posts.length, 1);
+
+  const pollAuthor = await makeAccount("poll-author");
+  const pollPost = await request("POST", "/community/posts", pollAuthor.uid, {
+    postType: "poll", content: "Choose an option", poll: { question: "Which?", options: ["One", "Two"] },
+  });
+  assert.equal(pollPost.response.status, 201);
+  result = await request("POST", `/community/posts/${pollPost.data.post._id}/poll/vote`, viewer.uid, { optionId: "option-1" });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.options[0].votes, 1);
+  result = await request("GET", `/community/feed?authorId=${pollAuthor.uid}`, viewer.uid);
+  assert.equal(result.data.posts[0].myVote, "option-1");
+  assert.equal(result.data.posts[0].poll.options[0].votes, 1);
+
+  const jobsAuthor = await makeAccount("jobs-author");
+  await locals.jobCollection.insertOne({
+    slug: "community-job",
+    title: "Community engineer",
+    company: "SMAJ",
+    location: "Remote",
+    status: "active",
+    moderationStatus: "approved",
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+  });
+  result = await request("POST", "/community/posts", jobsAuthor.uid, { postType: "job", jobId: "community-job" });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.data.post.job.id, "community-job");
+  result = await request("POST", "/community/posts", jobsAuthor.uid, { postType: "job", jobId: "missing-job" });
+  assert.equal(result.response.status, 400);
+
+  const scheduler = await makeAccount("scheduler");
+  result = await request("GET", "/community/posts/scheduled", scheduler.uid);
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(result.data.posts, []);
+  const publishAt = new Date(Date.now() + 120_000).toISOString();
+  const scheduled = await request("POST", "/community/posts", scheduler.uid, {
+    content: "Scheduled community post", media: [], publishAt,
+  });
+  assert.equal(scheduled.response.status, 201);
+  assert.equal(scheduled.data.post.status, "scheduled");
+  result = await request("GET", `/community/feed?authorId=${scheduler.uid}`, scheduler.uid);
+  assert.equal(result.data.posts.length, 0);
+  result = await request("GET", "/community/posts/scheduled", scheduler.uid);
+  assert.equal(result.data.posts.length, 1);
+  const updatedPublishAt = new Date(Date.now() + 240_000).toISOString();
+  result = await request("PATCH", `/community/posts/${scheduled.data.post._id}/schedule`, scheduler.uid, {
+    publishAt: updatedPublishAt,
+    postType: "poll",
+    content: "Scheduled poll edit",
+    media: [],
+    audience: "everyone",
+    commentPolicy: "everyone",
+    collaborators: [],
+    brandPartnership: false,
+    poll: { question: "Edit this poll?", options: ["Yes", "No"] },
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.post.poll.question, "Edit this poll?");
+  assert.equal(result.data.post.content, "Scheduled poll edit");
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(scheduled.data.post._id) })).postType, "poll");
+  result = await request("PATCH", `/community/posts/${scheduled.data.post._id}/schedule`, scheduler.uid, { publishAt: updatedPublishAt });
+  assert.equal(result.response.status, 200);
+  assert.equal(new Date(result.data.post.publishAt).toISOString(), updatedPublishAt);
+  result = await request("DELETE", `/community/posts/${scheduled.data.post._id}/schedule`, scheduler.uid);
+  assert.equal(result.response.status, 200);
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(scheduled.data.post._id) })).status, "cancelled");
+
+  const automatic = await request("POST", "/community/posts", scheduler.uid, {
+    content: "Automatically published", media: [], publishAt: new Date(Date.now() + 120_000).toISOString(),
+  });
+  assert.equal(automatic.response.status, 201);
+  assert.equal(await publishDueCommunityPosts(app, new Date(Date.now() + 180_000)), 1);
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(automatic.data.post._id) })).status, "published");
+
+  const menuAuthor = await makeAccount("menu-author");
+  const menuViewer = await makeAccount("menu-viewer");
+  const menuPost = await request("POST", "/community/posts", menuAuthor.uid, {
+    content: "Menu actions post",
+    media: [{ type: "image", url: "https://res.cloudinary.com/demo/image/upload/menu.jpg" }],
+  });
+  const menuPostId = menuPost.data.post._id;
+  result = await request("POST", `/community/follow/${menuAuthor.uid}`, menuViewer.uid, { following: true });
+  assert.equal(result.data.following, true);
+  result = await request("POST", `/community/follow/${menuAuthor.uid}`, menuViewer.uid, { following: false });
+  assert.equal(result.data.following, false);
+  result = await request("POST", `/community/posts/${menuPostId}/save`, menuViewer.uid, { saved: true });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.saved, true);
+  result = await request("GET", "/community/feed", menuViewer.uid);
+  assert.equal(result.data.posts.find(post => post._id === menuPostId).savedByMe, true);
+  result = await request("POST", `/community/posts/${menuPostId}/save`, menuViewer.uid, { saved: false });
+  assert.equal(result.data.saved, false);
+  assert.equal(await locals.communityPreferenceCollection.countDocuments({
+    userId: menuViewer.uid, kind: "saved_post", targetId: menuPostId,
+  }), 0);
+
+  result = await request("POST", `/community/posts/${menuPostId}/share`, menuViewer.uid);
+  assert.equal(result.data.shareCount, 1);
+  assert.equal((await locals.communityPostCollection.findOne({ _id: new ObjectId(menuPostId) })).shareCount, 1);
+
+  result = await request("PATCH", `/community/posts/${menuPostId}`, menuAuthor.uid, { content: "Edited menu actions post" });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.post.content, "Edited menu actions post");
+  assert.equal(result.data.post.media[0].url, menuPost.data.post.media[0].url);
+  result = await request("PATCH", `/community/posts/${menuPostId}`, menuViewer.uid, { content: "Unauthorized edit" });
+  assert.equal(result.response.status, 404);
+
+  const anotherMenuPost = await request("POST", "/community/posts", menuAuthor.uid, { content: "Not interested post", media: [] });
+  result = await request("POST", `/community/posts/${anotherMenuPost.data.post._id}/not-interested`, menuViewer.uid);
+  assert.equal(result.response.status, 200);
+  result = await request("GET", "/community/feed", menuViewer.uid);
+  assert.ok(!result.data.posts.some(post => post._id === anotherMenuPost.data.post._id));
+  result = await request("GET", `/community/feed?authorId=${menuAuthor.uid}`, menuViewer.uid);
+  assert.ok(result.data.posts.some(post => post._id === anotherMenuPost.data.post._id), "profile feeds remain unaffected by feed-only preferences");
+
+  result = await request("POST", `/community/authors/${menuAuthor.uid}/hide`, menuViewer.uid);
+  assert.equal(result.data.hidden, true);
+  result = await request("GET", "/community/feed", menuViewer.uid);
+  assert.ok(!result.data.posts.some(post => post.authorId === menuAuthor.uid));
+  result = await request("POST", `/community/authors/${menuViewer.uid}/hide`, menuViewer.uid);
+  assert.equal(result.response.status, 400);
 });
 
 after(async () => {

@@ -75,7 +75,19 @@ export type SellerSummary = { uid: string; username?: string; piUsername?: strin
 export type Review = { _id: string; buyerName: string; rating: number; message?: string; createdAt: string };
 export type Conversation = { _id: string; buyerId: string; sellerId: string; productId: string; productTitle: string; productImage?: string; lastMessage?: string; updatedAt: string; unreadBy?: string[]; archived?: boolean; buyerName?: string; sellerName?: string; participantId?: string; participantName?: string; profileImage?: string; verificationLevel?: VerificationLevel; verificationStatus?: VerificationStatus; online?: boolean; presenceExpiresAt?: string; lastSeenAt?: string; typing?: boolean };
 export type ChatMessage = { linkLabels?: { href: string; label: string }[]; welcomeAccountId?: string; welcomeVersion?: number; mediaAvailable?: boolean; clientMessageId?: string; deliveryState?: "pending" | "failed"; productContextExplicit?: boolean; _id: string; conversationId: string; senderId: string; message: string; messageType?: "text" | "voice" | "image" | "document"; productId?: string; productTitle?: string; productImage?: string; audioDataUrl?: string; audioMimeType?: string; audioDurationSeconds?: number; attachmentUrl?: string; attachmentDataUrl?: string; attachmentName?: string; attachmentMimeType?: string; attachmentSize?: number; deletedForEveryone?: boolean; deletedAt?: string; createdAt: string; readAt?: string };
-export type AppNotification = { _id: string; type: string; title: string; message: string; read: boolean; relatedId?: string; createdAt: string; image?: string };
+export type AppNotification = {
+  _id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  relatedId?: string;
+  createdAt: string;
+  image?: string;
+  action?: string;
+  actionUrl?: string;
+  actor?: { uid: string; displayName: string; avatar?: string };
+};
 
 export type OrderStatus = "pending" | "paid" | "processing" | "shipped" | "delivered" | "completed" | "cancelled";
 

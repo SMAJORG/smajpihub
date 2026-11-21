@@ -30,7 +30,7 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import { useAuthContext } from "../contexts/AuthContext";
 import NativeAdSlot from "../components/NativeAdSlot";
 import SmajAiFloatingAssistant from "../components/SmajAiFloatingAssistant";
-import { axiosClient } from "../lib/axiosClient";
+import { axiosClient, getBaseURL } from "../lib/axiosClient";
 import ConfirmSignOutModal from "../components/ConfirmSignOutModal";
 import WelcomeTour from "../components/WelcomeTour";
 import logoImage from "/logo.png";
@@ -41,6 +41,7 @@ import { getStreamDownloads, STREAM_DOWNLOADS_CHANGED_EVENT } from "../lib/strea
 import ServiceLaunchGate from "../components/ServiceLaunchGate";
 import { serviceLaunchNavigationState } from "../lib/serviceLaunch";
 import UserAvatarFrame from "../components/UserAvatarFrame";
+import { communityVideoViewerStateEvent } from "../components/communityVideoPlayback";
 
 type PrivateLayoutProps = { children: ReactNode; fullScreen?: boolean };
 const SIDEBAR_STORAGE_KEY = "smaj_private_sidebar_collapsed";
@@ -145,6 +146,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [streamDownloadCount, setStreamDownloadCount] = useState(0);
   const [communityChromeHidden, setCommunityChromeHidden] = useState(false);
+  const [communityVideoViewerOpen, setCommunityVideoViewerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<"light" | "dark">(() => window.localStorage.getItem("smaj_private_theme_mode") === "dark" ? "dark" : "light");
   const [showSignOut, setShowSignOut] = useState(false);
@@ -222,7 +224,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, []);
 
   const loadUnreadCount = useCallback(() => {
-    axiosClient.get("/notifications").then(({ data }) => setUnreadCount(data.unreadCount || 0)).catch(() => undefined);
+    axiosClient.get<{ unreadCount?: number }>("/notifications/unread-count").then(({ data }) => setUnreadCount(data.unreadCount || 0)).catch(() => undefined);
   }, []);
 
 
@@ -231,6 +233,18 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, [loadUnreadCount, location.pathname]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    const stream = new EventSource(`${getBaseURL().replace(/\/+$/, "")}/notifications/stream`, { withCredentials: true });
+    const onNotification = (event: MessageEvent<string>) => {
+      try {
+        const data = JSON.parse(event.data) as { unreadCount?: number };
+        if (typeof data.unreadCount === "number") setUnreadCount(data.unreadCount);
+        window.dispatchEvent(new Event("smaj:notifications-refresh"));
+      } catch {
+        loadUnreadCount();
+      }
+    };
+    stream.addEventListener("notification", onNotification as EventListener);
     let resumeTimer = 0;
     const onRefresh = () => {
       if (!document.hidden) loadUnreadCount();
@@ -239,18 +253,20 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
       window.clearTimeout(resumeTimer);
       if (!document.hidden) resumeTimer = window.setTimeout(loadUnreadCount, 300);
     };
-    const timer = window.setInterval(onRefresh, 60_000);
+    const timer = window.setInterval(onRefresh, 15_000);
     window.addEventListener("smaj:notifications-refresh", onRefresh);
     window.addEventListener("smaj:native-push", onRefresh);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.clearInterval(timer);
       window.clearTimeout(resumeTimer);
+      stream.close();
+      stream.removeEventListener("notification", onNotification as EventListener);
       window.removeEventListener("smaj:notifications-refresh", onRefresh);
       window.removeEventListener("smaj:native-push", onRefresh);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [loadUnreadCount]);
+  }, [loadUnreadCount, user?.uid]);
 
   useEffect(() => { document.body.style.overflow = mobileSidebarOpen ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [mobileSidebarOpen]);
   const toggleSidebar = () => {
@@ -332,69 +348,106 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   const streamDownloadBadgeLabel = streamDownloadCount > 99 ? "99+" : streamDownloadCount;
   const isCommunityFeed = location.pathname === "/community/feed";
   useEffect(() => {
+    const onVideoViewerState = (event: Event) => {
+      setCommunityVideoViewerOpen((event as CustomEvent<boolean>).detail === true);
+    };
+    window.addEventListener(communityVideoViewerStateEvent, onVideoViewerState);
+    return () => window.removeEventListener(communityVideoViewerStateEvent, onVideoViewerState);
+  }, []);
+  useEffect(() => {
     if (!isCommunityFeed) {
       setCommunityChromeHidden(false);
       return;
     }
+    if (communityVideoViewerOpen) return;
 
-    const privateContent = document.querySelector<HTMLElement>(".community-private-shell .private-content");
     const feed = document.querySelector<HTMLElement>(".community-private-shell .community-feed");
-    if (!privateContent || !feed) return;
+    if (!feed) return;
+    const rootScroller = document.scrollingElement as HTMLElement | null;
+    if (!rootScroller) return;
+    const canScrollVertically = (element: HTMLElement) => {
+      const overflowY = window.getComputedStyle(element).overflowY;
+      if (overflowY !== "auto" && overflowY !== "scroll") return false;
+      return element.scrollHeight > element.clientHeight + 2;
+    };
+    let scroller = rootScroller;
+    for (let element = feed.parentElement; element; element = element.parentElement) {
+      if (canScrollVertically(element)) {
+        scroller = element;
+        break;
+      }
+    }
+    const isRootScroller = scroller === rootScroller;
+    const getScrollPosition = () => isRootScroller ? window.scrollY || rootScroller.scrollTop : scroller.scrollTop;
+    const canScrollFeed = () => Boolean(feed.querySelector(".community-feed-post"))
+      && scroller.scrollHeight > scroller.clientHeight + 2;
 
+    setCommunityChromeHidden(false);
     let animationFrame = 0;
-    const getScrollElement = () => {
-      const overflowY = window.getComputedStyle(privateContent).overflowY;
-      return overflowY === "auto" || overflowY === "scroll"
-        ? privateContent
-        : document.scrollingElement as HTMLElement;
-    };
-    const getScrollPosition = () => {
-      const element = getScrollElement();
-      return element === document.scrollingElement ? window.scrollY : element.scrollTop;
-    };
-    const canScrollFeed = () => {
-      if (!feed.querySelector(".community-post-card")) return false;
-      const element = getScrollElement();
-      return element.scrollHeight > element.clientHeight + 16;
-    };
     let previousPosition = getScrollPosition();
-
+    let accumulatedDelta = 0;
+    let previousDirection = 0;
     const updateChrome = () => {
       animationFrame = 0;
       const position = getScrollPosition();
-      if (!canScrollFeed() || position <= 16) {
-        setCommunityChromeHidden(false);
-      } else if (position - previousPosition > 5) {
-        setCommunityChromeHidden(true);
-      } else if (previousPosition - position > 5) {
-        setCommunityChromeHidden(false);
-      }
+      const delta = position - previousPosition;
       previousPosition = position;
+      if (!canScrollFeed() || position <= 8) {
+        setCommunityChromeHidden(false);
+        accumulatedDelta = 0;
+        previousDirection = 0;
+        return;
+      }
+      if (!delta) return;
+      const direction = delta > 0 ? 1 : -1;
+      if (direction < 0) {
+        setCommunityChromeHidden(false);
+        accumulatedDelta = 0;
+        previousDirection = direction;
+        return;
+      }
+      if (direction !== previousDirection) {
+        previousDirection = direction;
+        accumulatedDelta = delta;
+      } else {
+        accumulatedDelta += delta;
+      }
+      if (accumulatedDelta >= 10) {
+        setCommunityChromeHidden(true);
+        accumulatedDelta = 0;
+      }
     };
     const scheduleUpdate = () => {
       if (!animationFrame) animationFrame = window.requestAnimationFrame(updateChrome);
     };
+    const resetPosition = () => {
+      previousPosition = getScrollPosition();
+      accumulatedDelta = 0;
+      previousDirection = 0;
+      if (!canScrollFeed()) setCommunityChromeHidden(false);
+    };
+    const resetAfterFeedChange = resetPosition;
 
-    const scrollElement = getScrollElement();
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    scrollElement.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
-
-    const mutationObserver = new MutationObserver(scheduleUpdate);
+    const onScroll = () => scheduleUpdate();
+    const onResize = () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+      resetPosition();
+    };
+    const scrollTarget: Window | HTMLElement = isRootScroller ? window : scroller;
+    scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    const mutationObserver = new MutationObserver(resetAfterFeedChange);
     mutationObserver.observe(feed, { childList: true, subtree: true });
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleUpdate);
-    resizeObserver?.observe(feed);
     scheduleUpdate();
 
     return () => {
-      window.removeEventListener("scroll", scheduleUpdate);
-      scrollElement.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
+      scrollTarget.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
       mutationObserver.disconnect();
-      resizeObserver?.disconnect();
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
     };
-  }, [isCommunityFeed]);
+  }, [isCommunityFeed, communityVideoViewerOpen]);
 
   useEffect(() => {
     if (!isStreamShell) return;
@@ -417,7 +470,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
   }, [isStreamShell]);
 
   return (
-    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${isCommunityFeed ? `community-private-shell${communityChromeHidden ? " community-chrome-hidden" : ""}` : ""} ${fullScreen ? "full-screen-page" : ""}`}>
+    <div className={`private-shell ${isStoreShell ? "store-private-shell" : ""} ${isStreamShell ? "stream-private-shell" : ""} ${isStreamImmersive ? "stream-title-immersive-shell" : ""} ${location.pathname === "/dashboard" ? "mobile-home-shell" : ""} ${isDashboardDiscovery ? "mobile-discovery-shell" : ""} ${location.pathname === "/categories" ? "mobile-category-shell" : ""} ${isHeaderHiddenPage ? "hide-mobile-header" : ""} ${isCommunityFeed ? `community-private-shell${communityChromeHidden ? " community-chrome-hidden" : ""}${communityVideoViewerOpen ? " community-video-open" : ""}` : ""} ${fullScreen ? "full-screen-page" : ""}`}>
       <ServiceLaunchGate />
       {fullScreen ? null : (
         <header className="private-header">

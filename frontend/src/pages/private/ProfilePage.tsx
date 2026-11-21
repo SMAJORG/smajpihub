@@ -12,6 +12,7 @@ import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import TrustBadge from "../../components/TrustBadge";
+import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { uploadImage } from "../../lib/uploadImage";
 import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
@@ -702,7 +703,9 @@ const ProfilePage = () => {
             aria-label="Upload profile picture"
             onClick={() => avatarInputRef.current?.click()}
           >
-            {form.avatar ? <img src={form.avatar} alt="Profile" /> : name.slice(0, 1).toUpperCase()}
+            <div className="real-profile-avatar-photo" aria-hidden="true">
+              <UserAvatarFrame name={name} image={form.avatar} frame={user?.activeAvatarFrame} size={104} />
+            </div>
             <span>
               <CameraAltOutlinedIcon />
             </span>

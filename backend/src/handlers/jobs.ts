@@ -1072,10 +1072,13 @@ export default function mountJobsEndpoints(router: Router) {
     if (employer) {
       await createNotification(req.app, {
         userId: employer.uid,
+        actorId: userId(user),
         type: "jobs_new_application",
         title: "New application received",
         message: `${profile.title || user.displayName || user.username || "A candidate"} applied for ${job.title}.`,
         relatedId: result.insertedId.toString(),
+        actionUrl: "/services/jobs/employer",
+        dedupeKey: `jobs:application:${result.insertedId}`,
       });
     }
     res.status(201).json({
@@ -1214,16 +1217,18 @@ export default function mountJobsEndpoints(router: Router) {
       (!isAdmin(user) && application.employerId !== userId(user))
     )
       return res.status(404).json({ error: "not_found" });
+    if (application.status === status) return res.json({ status });
     if (!isAdmin(user) && (await isCandidateBlockingEmployer(req, userId(user), application.candidateId)))
       return res.status(403).json({ error: "candidate_blocked", message: "This candidate has restricted employer access." });
     const now = new Date().toISOString();
-    await req.app.locals.jobApplicationCollection.updateOne(
-      { _id: application._id },
+    const statusUpdate = await req.app.locals.jobApplicationCollection.updateOne(
+      { _id: application._id, status: { $ne: status } },
       {
         $set: { status, updatedAt: now },
         $push: { statusHistory: { status, at: now, actorId: userId(user) } },
       },
     );
+    if (!statusUpdate.modifiedCount) return res.json({ status });
     await audit(req, user, "application.status_changed", req.params.id, {
       status,
     });
@@ -1233,10 +1238,13 @@ export default function mountJobsEndpoints(router: Router) {
     if (candidate) {
       await createNotification(req.app, {
         userId: candidate.uid,
+        actorId: userId(user),
         type: "jobs_application_status",
         title: "Application update",
         message: `Your application for ${application.jobTitle} is now "${status}".`,
         relatedId: application._id.toString(),
+        actionUrl: application.jobId ? `/services/jobs/job/${encodeURIComponent(application.jobId)}` : "/services/jobs/saved?tab=applied",
+        dedupeKey: `jobs:application-status:${application._id}:${status}:${now}`,
       });
     }
     res.json({ status });
@@ -1288,10 +1296,13 @@ export default function mountJobsEndpoints(router: Router) {
     if (candidate) {
       await createNotification(req.app, {
         userId: candidate.uid,
+        actorId: userId(user),
         type: "jobs_interview_scheduled",
         title: "Interview scheduled",
         message: `${application.company} scheduled an interview for ${application.jobTitle}.`,
         relatedId: application._id.toString(),
+        actionUrl: application.jobId ? `/services/jobs/job/${encodeURIComponent(application.jobId)}` : "/services/jobs/saved?tab=applied",
+        dedupeKey: `jobs:interview:${application._id}:${interview.id}`,
       });
     }
     res.status(201).json({ interview });
@@ -1573,10 +1584,13 @@ export default function mountJobsEndpoints(router: Router) {
       : await req.app.locals.userCollection?.findOne({ uid: application.candidateId });
     if (candidate) await createNotification(req.app, {
       userId: candidate.uid,
+      actorId: userId(user),
       type: "jobs_offer_received",
       title: "Job offer received",
       message: `${application.company} sent you an offer for ${application.jobTitle}.`,
       relatedId: application._id.toString(),
+      actionUrl: application.jobId ? `/services/jobs/job/${encodeURIComponent(application.jobId)}` : "/services/jobs/saved?tab=applied",
+      dedupeKey: `jobs:offer:${offer.offerId}`,
     });
     res.status(201).json({ offer, status: "offer_sent" });
   });
@@ -1604,10 +1618,13 @@ export default function mountJobsEndpoints(router: Router) {
       : null;
     if (employer) await createNotification(req.app, {
       userId: employer.uid,
+      actorId: userId(user),
       type: "jobs_offer_response",
       title: `Offer ${decision}`,
       message: `The candidate ${decision} your offer for ${application.jobTitle}.`,
       relatedId: application._id.toString(),
+      actionUrl: "/services/jobs/employer",
+      dedupeKey: `jobs:offer-response:${application.offer.offerId}:${decision}`,
     });
     res.json({ status, offerStatus: decision });
   });
@@ -1647,10 +1664,13 @@ export default function mountJobsEndpoints(router: Router) {
       : await req.app.locals.userCollection?.findOne({ uid: application.candidateId });
     if (candidate) await createNotification(req.app, {
       userId: candidate.uid,
+      actorId: userId(user),
       type: "jobs_salary_recorded",
       title: "Salary payment recorded",
       message: `${application.company} recorded a payment of ${amountPi} Pi. Confirm it after checking your wallet.`,
       relatedId: payment.paymentRecordId,
+      actionUrl: "/services/jobs/my-earnings",
+      dedupeKey: `jobs:payment:${payment.paymentRecordId}:recorded`,
     });
     res.status(201).json({ payment });
   });
@@ -1692,10 +1712,13 @@ export default function mountJobsEndpoints(router: Router) {
         : null;
       if (employer) await createNotification(req.app, {
         userId: employer.uid,
+        actorId: userId(user),
         type: "jobs_salary_confirmed",
         title: "Salary payment confirmed",
         message: `The candidate confirmed receipt of ${payment.amountPi} Pi.`,
         relatedId: payment.paymentRecordId,
+        actionUrl: "/services/jobs/employer",
+        dedupeKey: `jobs:payment:${payment.paymentRecordId}:confirmed`,
       });
       return res.json({ status: "completed" });
     }
@@ -1724,10 +1747,13 @@ export default function mountJobsEndpoints(router: Router) {
       : null;
     if (employer) await createNotification(req.app, {
       userId: employer.uid,
+      actorId: userId(user),
       type: "jobs_salary_disputed",
       title: "Salary payment disputed",
       message: "A candidate disputed a recorded salary transaction. The case is awaiting admin review.",
       relatedId: dispute.disputeId,
+      actionUrl: "/services/jobs/employer",
+      dedupeKey: `jobs:dispute:${dispute.disputeId}:opened`,
     });
     res.status(201).json({ status: "disputed", dispute });
   });
@@ -1767,10 +1793,13 @@ export default function mountJobsEndpoints(router: Router) {
       const participants = await req.app.locals.userCollection.find({ _id: { $in: participantIds.map((id: string) => new ObjectId(id)) } }).toArray();
       await Promise.all(participants.map((participant: any) => createNotification(req.app, {
         userId: participant.uid,
+        actorId: userId(user),
         type: "jobs_salary_dispute_resolved",
         title: "Salary dispute reviewed",
         message: outcome === "payment_confirmed" ? "The salary transaction was confirmed." : "The salary transaction record was voided.",
         relatedId: dispute.disputeId,
+        actionUrl: "/services/jobs/my-earnings",
+        dedupeKey: `jobs:dispute:${dispute.disputeId}:resolved:${participant.uid}`,
       })));
     }
     res.json({ status, outcome, paymentStatus });

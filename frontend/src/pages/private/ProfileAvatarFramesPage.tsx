@@ -6,6 +6,7 @@ import { useAuthContext } from "../../contexts/AuthContext";
 import UserAvatarFrame, { type AvatarFrameId } from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import type { User } from "../../types/pi";
+import "./ProfileAvatarFramesPage.css";
 
 type SocialSettings = {
   publicProfile: boolean;
@@ -30,27 +31,42 @@ const initialSettings: SocialSettings = {
   activeAvatarFrame: null,
 };
 
+const ProfileFrameSkeleton = () => (
+  <section className="profile-avatar-frame-grid profile-frames-skeleton-grid" aria-label="Loading avatar frames" aria-busy="true">
+    {frameOptions.map(({ id }) => (
+      <article className="profile-avatar-frame-option profile-frames-skeleton-card" key={id} aria-hidden="true">
+        <span className="profile-frames-skeleton-avatar" />
+        <span className="profile-frames-skeleton-title" />
+        <span className="profile-frames-skeleton-copy" />
+        <span className="profile-frames-skeleton-copy short" />
+        <span className="profile-frames-skeleton-button" />
+      </article>
+    ))}
+  </section>
+);
+
 const ProfileAvatarFramesPage = () => {
   const { user, synchronizeUser } = useAuthContext();
   const navigate = useNavigate();
   const [settings, setSettings] = useState(initialSettings);
   const [loading, setLoading] = useState(true);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsUserId, setSettingsUserId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const settingsLoaded = Boolean(user?.uid && settingsUserId === user.uid);
+  const showSettingsSkeleton = !settingsLoaded && (loading || !error);
 
   const loadSettings = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
-    setSettingsLoaded(false);
     setError("");
     try {
       const { data } = await axiosClient.get<{ settings: SocialSettings }>("/user/social-settings", {
         smajSkipResponseCache: true,
       });
       setSettings(data.settings);
-      setSettingsLoaded(true);
+      setSettingsUserId(user.uid);
     } catch (reason: unknown) {
       const status = isAxiosError(reason) ? reason.response?.status : undefined;
       setError(
@@ -70,10 +86,19 @@ const ProfileAvatarFramesPage = () => {
   const saveSettings = async (updates: Partial<SocialSettings>, success: string) => {
     if (saving || loading) return;
     const next = { ...settings, ...updates };
+    const previous = settings;
     setSaving(true);
+    setSettings(next);
     setError("");
     setNotice("");
     try {
+      if (user) synchronizeUser({
+        ...user,
+        publicProfile: next.publicProfile,
+        allowContact: next.allowContact,
+        openToWork: next.openToWork,
+        activeAvatarFrame: next.activeAvatarFrame,
+      });
       const { data } = await axiosClient.put<{ settings: SocialSettings; user?: Partial<User> }>(
         "/user/social-settings",
         {
@@ -87,6 +112,8 @@ const ProfileAvatarFramesPage = () => {
       if (data.user) synchronizeUser(data.user);
       setNotice(success);
     } catch (reason: unknown) {
+      setSettings(previous);
+      if (user) synchronizeUser(user);
       setError(
         isAxiosError<{ message?: string }>(reason)
           ? reason.response?.data?.message || "Avatar frame settings could not be saved."
@@ -111,15 +138,12 @@ const ProfileAvatarFramesPage = () => {
   const name = user?.displayName || user?.username || "Pi User";
 
   return (
-    <main className="private-page profile-avatar-frames-page">
-      <header className="private-page-head">
+    <main className="private-page profile-avatar-frames-page" aria-busy={showSettingsSkeleton}>
+      <header className="profile-frames-page-header">
         <button className="profile-frames-back" type="button" onClick={() => navigate("/profile")} aria-label="Back to profile">
           <ArrowBackIosNewOutlinedIcon />
         </button>
-        <div>
-          <p className="private-kicker">PROFILE</p>
-          <h1>Avatar Frames</h1>
-        </div>
+        <h1>Avatar Frames</h1>
       </header>
 
       {error ? (
@@ -129,7 +153,7 @@ const ProfileAvatarFramesPage = () => {
         </div>
       ) : null}
       {notice ? <p className="private-alert success" role="status">{notice}</p> : null}
-      {loading ? <p className="profile-frames-loading" role="status">Loading social settings…</p> : null}
+      {showSettingsSkeleton ? <ProfileFrameSkeleton /> : null}
 
       {settingsLoaded ? (
         <>
@@ -152,7 +176,7 @@ const ProfileAvatarFramesPage = () => {
                         selected ? "Avatar frame removed." : `${label} frame activated.`,
                       )}
                     >
-                      {selected ? "Remove frame" : settings.activeAvatarFrame ? "Switch to frame" : "Activate frame"}
+                      {selected ? "Remove" : "Activate"}
                     </button>
                   ) : id === "open_to_work" ? (
                     <div className="profile-avatar-frame-unlock">
@@ -163,7 +187,7 @@ const ProfileAvatarFramesPage = () => {
                         disabled={saving || loading}
                         onClick={toggleOpenToWork}
                       >
-                        Turn on Open to Work
+                        Turn on
                       </button>
                     </div>
                   ) : (
@@ -176,7 +200,7 @@ const ProfileAvatarFramesPage = () => {
                       disabled={saving || loading}
                       onClick={toggleOpenToWork}
                     >
-                      Turn off Open to Work
+                      Turn off
                     </button>
                   ) : null}
                 </article>

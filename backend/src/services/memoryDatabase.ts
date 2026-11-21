@@ -28,6 +28,7 @@ const matchesValue = (value: any, condition: any): boolean => {
   if ("$exists" in condition && (value !== undefined) !== condition.$exists) return false;
   if ("$ne" in condition && sameValue(value, condition.$ne)) return false;
   if ("$in" in condition && !condition.$in.some((item: any) => sameValue(value, item))) return false;
+  if ("$nin" in condition && condition.$nin.some((item: any) => sameValue(value, item))) return false;
   if ("$gte" in condition && !(value >= condition.$gte)) return false;
   if ("$gt" in condition && !(value > condition.$gt)) return false;
   if ("$lte" in condition && !(value <= condition.$lte)) return false;
@@ -240,6 +241,8 @@ export const createMemoryCollections = () => ({
   communityLikeCollection: new MemoryCollection(),
   communityCommentCollection: new MemoryCollection(),
   communityFollowCollection: new MemoryCollection(),
+  communityPreferenceCollection: new MemoryCollection(),
+  communityPollVoteCollection: new MemoryCollection(),
   favoriteCollection: new MemoryCollection(),
   reviewCollection: new MemoryCollection(),
   conversationCollection: new MemoryCollection(),

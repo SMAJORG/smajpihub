@@ -29,6 +29,21 @@ const isHttpsUrl = (value: string) => /^https:\/\/[^\s]+$/i.test(value);
 const isBase64Pdf = (value: unknown): value is string =>
   typeof value === "string" && /^data:application\/pdf;base64,/i.test(value);
 
+const fetchUpload = async (url: string, body: URLSearchParams) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 110_000);
+  try {
+    return await fetch(url, { method: "POST", body, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw Object.assign(new Error("Media upload timed out. Check your connection and try again."), { statusCode: 504 });
+    }
+    throw Object.assign(new Error("Media storage could not be reached. Retry the upload."), { statusCode: 502 });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export const sanitizeAssetName = (value: unknown, fallback = "image") => {
   const safeName = String(value || fallback)
     .replace(/[\/\\]/g, "-")
@@ -59,14 +74,10 @@ export const uploadImageToCloudinary = async (image: string, purpose = "image", 
   params.set("upload_preset", env.cloudinary_upload_preset);
   params.set("filename_override", sanitizeAssetName(originalName || purpose));
 
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${env.cloudinary_cloud_name}/image/upload`, {
-    method: "POST",
-    body: params,
-  });
+  const response = await fetchUpload(`https://api.cloudinary.com/v1_1/${env.cloudinary_cloud_name}/image/upload`, params);
 
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Cloudinary upload failed: ${response.status} ${body}`);
+    throw Object.assign(new Error(`Media storage rejected the image upload (HTTP ${response.status}).`), { statusCode: 502 });
   }
 
   const data = (await response.json()) as CloudinaryResponse;
@@ -100,11 +111,8 @@ export const uploadVideoToCloudinary = async (video: string, purpose = "communit
   params.set("upload_preset", env.cloudinary_upload_preset);
   params.set("filename_override", sanitizeAssetName(originalName, purpose));
   params.set("folder", `${env.cloudinary_folder}/${safePurpose(purpose)}`);
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${env.cloudinary_cloud_name}/video/upload`, {
-    method: "POST",
-    body: params,
-  });
-  if (!response.ok) throw new Error(`Cloudinary video upload failed: ${response.status}`);
+  const response = await fetchUpload(`https://api.cloudinary.com/v1_1/${env.cloudinary_cloud_name}/video/upload`, params);
+  if (!response.ok) throw Object.assign(new Error(`Media storage rejected the video upload (HTTP ${response.status}).`), { statusCode: 502 });
   const data = (await response.json()) as CloudinaryResponse;
   if (!data.secure_url || !data.secure_url.startsWith("https://res.cloudinary.com/")) {
     throw new Error("Cloudinary did not return a secure video URL");

@@ -518,7 +518,6 @@ const SettingsPage = () => {
         <div>
           <strong>{form.fullName || user?.displayName || user?.username || "Pi user"}</strong>
           {user?.uid ? <Link className="settings-profile-username" to={`/people/${encodeURIComponent(user.uid)}`}>{piAccount}</Link> : <span>{piAccount}</span>}
-          {user?.uid ? <Link className="settings-public-profile-link" to={`/people/${encodeURIComponent(user.uid)}`}>View public profile</Link> : null}
           <small>
             <TrustBadge userId={user?.uid} />
             {isSmajVerificationApproved(identityVerification)
