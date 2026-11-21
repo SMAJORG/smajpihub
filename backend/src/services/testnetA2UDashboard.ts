@@ -24,19 +24,17 @@ export async function testnetDashboard(locals: any, page: number) {
     { $count: "total" },
   ]).toArray();
   const lock = await collection.findOne({ _id: "wallet-lock" });
-  // The wallet snapshot is read-only and must never trigger a payout.
-  // Keep wallet readiness fail-closed if the upstream Pi API is unavailable.
-  let wallet: Awaited<ReturnType<typeof testnetWalletSnapshot>>;
-  try {
-    wallet = await testnetWalletSnapshot();
-  } catch {
-    wallet = { address: "", balance: null, spendable: null, ready: false,
-      apiKeyAccepted: false, seedValid: false, incompletePayments: 0,
-      message: "Testnet wallet status is unavailable. Do not send a payout until wallet checks pass.",
-      code: "wallet_status_unavailable", apiStatus: null,
-      seedConfigured: Boolean(process.env.PI_TESTNET_WALLET_SEED),
-      apiKeyConfigured: Boolean(process.env.PI_TESTNET_API_KEY) };
-  }
+  // Do not invoke stellar-sdk Keypair.fromSecret in this dashboard request.
+  // A native SIGSEGV cannot be caught by try/catch and kills the entire API.
+  // Wallet readiness is explicitly fail-closed until its native crash is isolated.
+  const wallet = {
+    address: "", balance: null, spendable: null, ready: false,
+    apiKeyAccepted: false, seedValid: false, incompletePayments: 0,
+    message: "Testnet wallet diagnostics temporarily disabled while investigating a backend process crash. Payouts remain unavailable.",
+    code: "wallet_diagnostics_disabled", apiStatus: null,
+    seedConfigured: Boolean(process.env.PI_TESTNET_WALLET_SEED),
+    apiKeyConfigured: Boolean(process.env.PI_TESTNET_API_KEY),
+  };
   return { backendRevision: process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || null,
     wallet, records, page, hasMore: page * 20 < total, total,
     successfulUniqueWallets: completedWallets[0]?.total || 0,
