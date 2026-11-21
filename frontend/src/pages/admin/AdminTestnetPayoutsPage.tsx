@@ -7,6 +7,7 @@ import { axiosClient } from "../../lib/axiosClient";
 import "./admin-analytics.css";
 import "./testnet-payouts.css";
 
+type HistoricalTransaction = { transactionId: string; paymentId?: string; amount?: number; time?: string; verified: boolean; walletAddress?: string; status: string };
 type Recipient = { uid: string; username: string; displayName: string; walletAddress: string; canReceive: boolean; status: string };
 type Payment = { recipientUid: string; recipientWalletAddress?: string; amount: number; status: string; paymentId?: string; txid?: string; createdAt?: string };
 type Snapshot = { backendRevision?: string | null; wallet: { address: string; balance: number | null; spendable: number | null; ready: boolean; message: string; apiKeyAccepted?: boolean; apiStatus?: number | null; seedValid?: boolean }; records: Payment[]; successfulUniqueWallets: number; walletLocked: boolean; hasMore: boolean; appWalletConnection: string };
@@ -16,6 +17,7 @@ const amount = (value: number | null) => value === null ? "Unavailable" : `${val
 
 export default function AdminTestnetPayoutsPage({ client = axiosClient, showWalletConsent = true }: { client?: AxiosInstance; showWalletConsent?: boolean } = {}) {
   const [data, setData] = useState<Snapshot | null>(null), [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [history, setHistory] = useState<HistoricalTransaction[]>([]), [historyError, setHistoryError] = useState<string | null>(null);
   const [page, setPage] = useState(1), [recipientPage, setRecipientPage] = useState(1), [moreRecipients, setMoreRecipients] = useState(false);
   const [search, setSearch] = useState(""), [query, setQuery] = useState("");
   const [recipientError, setRecipientError] = useState(""), [recipientInfo, setRecipientInfo] = useState(""), [diagnostics, setDiagnostics] = useState<Record<string, number>>({});
@@ -34,11 +36,11 @@ export default function AdminTestnetPayoutsPage({ client = axiosClient, showWall
     const version = ++recipientRequestVersion.current;
     setUsersLoading(true); setRecipientError(""); setRecipientInfo(""); setDiagnostics({});
     try {
-      const response = await client.get<{ recipients: Recipient[]; hasMore: boolean; message?: string; diagnostics?: Record<string, number> }>("/admin/testnet/a2u/recipients", { ...options, params: { page: recipientPage, search: query } });
+      const response = await client.get<{ recipients: Recipient[]; history?: HistoricalTransaction[]; historyError?: string | null; hasMore: boolean; message?: string; diagnostics?: Record<string, number> }>("/admin/testnet/a2u/recipients", { ...options, params: { page: recipientPage, search: query } });
       if (version !== recipientRequestVersion.current) return;
       if (!Array.isArray(response.data.recipients)) throw new Error("The recipient API returned an unexpected response. Check the deployed API address.");
-      setRecipients(response.data.recipients); setMoreRecipients(response.data.hasMore); setRecipientInfo(response.data.message || ""); setDiagnostics(response.data.diagnostics || {});
-    } catch (error) { if (version === recipientRequestVersion.current) { setRecipientError(messageFor(error)); setRecipients([]); setMoreRecipients(false); } }
+      setRecipients(response.data.recipients); setHistory(response.data.history || []); setHistoryError(response.data.historyError || null); setMoreRecipients(response.data.hasMore); setRecipientInfo(response.data.message || ""); setDiagnostics(response.data.diagnostics || {});
+    } catch (error) { if (version === recipientRequestVersion.current) { setRecipientError(messageFor(error)); setRecipients([]); setHistory([]); setHistoryError(null); setMoreRecipients(false); } }
     finally { if (version === recipientRequestVersion.current) setUsersLoading(false); }
   }, [recipientPage, query, client]);
   useEffect(() => { void load(); }, [load]);
@@ -87,8 +89,8 @@ export default function AdminTestnetPayoutsPage({ client = axiosClient, showWall
       <article className="ea-card tp-card"><h2>Five-wallet goal</h2><strong className="tp-progress-count">{Math.min(5, data.successfulUniqueWallets)} / 5</strong><progress aria-label="Successful unique wallet payments" value={Math.min(5, data.successfulUniqueWallets)} max={5} /><p>{data.successfulUniqueWallets} unique wallets have received a verified successful payment.</p><p className="tp-hint">Each wallet counts once. Pending or failed payments do not count.</p></article></section>
     </>}
     {showWalletConsent && <TestnetWalletConsent disabled={sending} onSaved={() => { setSelected(null); setCheck(null); void loadRecipients(); }} />}
-    <section className="ea-card tp-card"><h2>Select a recipient</h2><p>Search registered Pi users by username or UID. Previously verified wallets can receive payouts without another login. Unverified accounts appear with their verification status.</p>
-      <form className="tp-search" onSubmit={event => { event.preventDefault(); ++selectionVersion.current; setSelected(null); setCheck(null); setRecipientPage(1); setQuery(search); }}><label>Find a user<input value={search} maxLength={80} onChange={event => setSearch(event.target.value)} placeholder="Pi username, UID or verified wallet address" /></label><button className="ea-button" disabled={sending}>Search</button></form>
+    <section className="ea-card tp-card"><h2>Select a recipient</h2><p>Search real verified Testnet transactions by transaction ID or payment ID. Pi users are listed separately for payout eligibility; transaction history does not authorize an outgoing payment.</p>
+      <form className="tp-search" onSubmit={event => { event.preventDefault(); ++selectionVersion.current; setSelected(null); setCheck(null); setRecipientPage(1); setQuery(search); }}><label>Find a user<input value={search} maxLength={80} onChange={event => setSearch(event.target.value)} placeholder="Username, UID, wallet, transaction ID or payment ID" /></label><button className="ea-button" disabled={sending}>Search</button></form>
       {recipientError && <p className="tp-alert" role="alert">{recipientError}</p>}
       {recipientInfo && <p className="tp-hint">{recipientInfo}</p>}
       {Object.entries(diagnostics).filter(([, count]) => count > 0).map(([reason, count]) => <p className="tp-hint" key={reason}>{count} account(s): {({ pi_login_expired: "No saved wallet-sharing evidence is available and the stored Pi token expired. Ask the user to open /testnet-wallet in the same Testnet app and verify wallet sharing.", wallet_consent_required: "Wallet sharing has not been approved. Ask the user to sign in and approve wallet sharing.", pi_api_unavailable: "Pi identity verification is unavailable. This is not a no-match search result.", pi_uid_mismatch: "Pi UID did not match the stored account. A fresh Pi login is required.", pi_permission_denied: "Pi denied access. The user must renew app permissions.", account_unavailable: "Account is blocked or access was revoked.", pi_login_required: "A verified Pi login is required." } as Record<string, string>)[reason] || reason.replaceAll("_", " ")}</p>)}
@@ -96,6 +98,19 @@ export default function AdminTestnetPayoutsPage({ client = axiosClient, showWall
       <nav className="tp-pagination" aria-label="Recipient pages"><button className="ea-button" disabled={recipientPage <= 1 || usersLoading || sending} onClick={() => setRecipientPage(value => value - 1)}>Previous users</button><span>Page {recipientPage}</span><button className="ea-button" disabled={!moreRecipients || usersLoading || sending} onClick={() => setRecipientPage(value => value + 1)}>Next users</button></nav>
       {selected && <div className="tp-selected"><strong>Recipient: {selected.displayName}</strong><p className="tp-address">{check?.recipientWalletAddress || selected.walletAddress}</p><p role="status">{checking ? "Checking recipient readiness…" : check?.checksPassed ? "Recipient checks passed" : "Recipient is not ready — see the error above"}</p></div>}
       <button className="private-primary-button tp-send" disabled={!ready} onClick={() => { setDialogOpen(true); }}>Send 0.01 Test-Pi</button>
+    </section>
+    <section className="ea-card tp-card" aria-label="Verified production Testnet transactions">
+      <h2>Verified Pi Testnet transactions (production database)</h2>
+      <p className="tp-hint">Read-only transaction records. An incoming payment does not prove ownership of the sender wallet or authorize an A2U payout.</p>
+      {historyError && <p className="tp-alert" role="alert">{historyError}</p>}
+      {usersLoading ? <p role="status">Searching verified transactions…</p> : history.length ? <div className="tp-history">{history.map(row => <article key={row.transactionId}><dl>
+        <dt>Transaction ID</dt><dd className="tp-address">{row.transactionId}</dd>
+        <dt>Payment ID</dt><dd>{row.paymentId || "Not recorded"}</dd>
+        <dt>Amount</dt><dd>{row.amount ?? "Unavailable"} Test-Pi</dd>
+        <dt>Completed</dt><dd>{row.time ? new Date(row.time).toLocaleString() : "Unavailable"}</dd>
+        <dt>Verification</dt><dd>{row.verified ? "Verified transaction" : "Not verified"}</dd>
+        <dt>Wallet address</dt><dd>{row.walletAddress || "Not stored in this transaction record"}</dd>
+      </dl></article>)}</div> : !historyError && <p>No verified production transactions matched this search.</p>}
     </section>
     <section className="ea-card tp-card"><h2>Payment history</h2>{data?.records.length ? <div className="tp-history">{data.records.map((record, index) => <article key={record.paymentId || record.recipientUid + index}><header><strong>0.01 Test-Pi</strong><span className="tp-badge">{record.status.replaceAll("_", " ")}</span></header><dl><dt>Recipient UID</dt><dd>{record.recipientUid}</dd><dt>Wallet address</dt><dd>{record.recipientWalletAddress || "Awaiting verification"}</dd><dt>Payment ID</dt><dd>{record.paymentId || "Not assigned"}</dd><dt>Transaction ID</dt><dd>{record.txid || "Not submitted"}</dd><dt>Created</dt><dd>{record.createdAt ? new Date(record.createdAt).toLocaleString() : "Unavailable"}</dd></dl>{record.status !== "completed" && record.paymentId && <button className="ea-button" disabled={sending} onClick={() => void reconcile(record.recipientUid)}>Verify existing transfer (no resend)</button>}</article>)}</div> : <p>No payments recorded on this page.</p>}<nav className="tp-pagination" aria-label="Payment history pages"><button className="ea-button" disabled={page <= 1 || loading || sending} onClick={() => setPage(value => value - 1)}>Previous payments</button><span>Page {page}</span><button className="ea-button" disabled={!data?.hasMore || loading || sending} onClick={() => setPage(value => value + 1)}>Next payments</button></nav></section>
     <dialog ref={dialog} className="tp-dialog" aria-labelledby="tp-confirm-title" onCancel={event => { if (sending) event.preventDefault(); else setDialogOpen(false); }} onClose={() => { if (!sending) setDialogOpen(false); }}><h2 id="tp-confirm-title">Confirm Testnet payout</h2><p>Send <strong>0.01 Test-Pi</strong> to <strong>{selected?.displayName}</strong>?</p><dl><dt>Recipient wallet</dt><dd>{check?.recipientWalletAddress}</dd><dt>App wallet</dt><dd>{check?.senderWalletAddress}</dd></dl><p>This transfer cannot be reversed after submission.</p><footer><button className="ea-button" disabled={sending} onClick={() => setDialogOpen(false)}>Cancel</button><button className="private-primary-button" disabled={!ready || sending} onClick={() => void send()}>{sending ? "Sending…" : "Confirm and send 0.01 Test-Pi"}</button></footer></dialog>
