@@ -320,13 +320,6 @@ export const useAuth = () => {
   const loginWithPi = useCallback(async () => {
     if (loginInProgressRef.current) return false;
     if (testnetPiBrowserOnly) {
-      // The current Pi SDK opens consent through window.parent.postMessage.
-      // A top-level hosted page has no Pi host to receive that request, even
-      // when its user agent says Pi Browser. Never enter a silent 2-minute wait.
-      if (window.parent === window) {
-        setAuthFeedback({ type: "error", message: "This Testnet page is not connected to Pi’s app host. Open SMAJ PI HUB from its existing Testnet app entry in the Pi Developer Portal. Opening the Render website alone does not establish Pi login." });
-        return false;
-      }
       const sandboxPreview = window.location.hostname === "sandbox.minepi.com" || (() => {
         try { return window.self !== window.top && new URL(document.referrer).origin === "https://sandbox.minepi.com"; }
         catch { return false; }

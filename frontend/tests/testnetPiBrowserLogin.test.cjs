@@ -44,11 +44,12 @@ test('Testnet desktop localhost cannot fall back to OAuth or development authent
   }
 });
 
-test('a direct Render page without a Pi host fails immediately instead of waiting for invisible consent', async () => {
+test('top-level Pi Browser pages reach SDK authentication and backend verification', async () => {
   const f = fixture({ browser: true, disconnected: true });
-  assert.equal(await f.login(), false);
-  assert.equal(f.calls.sdk + f.calls.backend + f.calls.oauth + f.calls.dev, 0);
-  assert.match(f.calls.feedback.at(-1).message, /not connected to Pi/);
+  assert.equal(await f.login(), true);
+  assert.equal(f.calls.sdk, 1);
+  assert.equal(f.calls.backend, 1);
+  assert.equal(f.calls.oauth + f.calls.dev, 0);
 });
 
 test('Testnet timeout does not claim an approval window appeared', async () => {
