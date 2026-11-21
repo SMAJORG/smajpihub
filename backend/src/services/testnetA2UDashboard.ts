@@ -170,10 +170,7 @@ export async function testnetRecipients(locals: any, page: number, search: strin
   if (normalized) query.$and = [{ $or: walletSearch
     ? ["piWalletAddress", "wallet_address", "walletAddress"].map(field => ({ [field]: walletSearch }))
     : ["username", "piUsername", "displayName", "uid"].map(field => ({ [field]: { $regex: escaped, $options: "i" } })) }];
-, $options: "i" } }],
-  }) : null;
   const users = await locals.userCollection.find(query).project({ uid: 1, username: 1, piUsername: 1, displayName: 1, accessToken: 1, accessTokenRevokedAt: 1, blocked: 1, piVerifiedUid: 1, piIdentityVerifiedAt: 1, piWalletAddress: 1, piWalletVerifiedAt: 1 }).sort({ lastSeenAt: -1, _id: -1 }).skip((page - 1) * 20).limit(21).toArray();
-  if (exactUsername && !users.some((user: any) => String(user.uid) === String(exactUsername.uid))) users.unshift(exactUsername);
   const diagnostics: Record<string, number> = {};
   const eligible: any[] = [];
   const candidates = users.slice(0, 20);
