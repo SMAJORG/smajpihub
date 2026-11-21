@@ -21435,8 +21435,7 @@ svg {
   .storefront-page .storefront-discovery-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; }
 }
 
-/* Private Services ambassador program: mobile and tablet only. */
-@media (max-width: 1023px) {
+/* Private Services ambassador program. */
   .services-ambassador-card {
     position: relative;
     margin: 0 0 16px;
@@ -21521,12 +21520,25 @@ svg {
   .ambassador-empty svg, .ambassador-application-status > svg { color: var(--smaj-primary); font-size: 44px; }
   .ambassador-empty p, .ambassador-application-status p { margin: 5px 0; }
   .ambassador-application-status button { margin-top: 14px; padding: 10px 14px; color: #fff; background: var(--smaj-primary); border: 0; border-radius: 9px; font-weight: 800; }
-}
-
 @media (max-width: 520px) {
   .ambassador-form-row, .ambassador-directory-filters { grid-template-columns: 1fr; }
   .ambassador-modal-backdrop { padding-inline: 0; padding-bottom: 0; }
   .ambassador-modal { max-height: 92dvh; border-radius: 22px 22px 0 0; }
+}
+
+@media (min-width: 1024px) {
+  .services-launcher.ambassador-application-open .services-desktop-view { display: none; }
+  .services-launcher.ambassador-application-open .services-mobile-view {
+    display: block;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .services-launcher.ambassador-application-open .services-mobile-view > header { padding: 5px 2px 20px; }
+  .services-launcher.ambassador-application-open .services-mobile-view h1 { color: var(--smaj-text); font-size: 1.75rem; letter-spacing: -.035em; }
+  .services-launcher.ambassador-application-open .services-mobile-view p { max-width: 330px; margin-top: 6px; color: var(--smaj-text-secondary); font-size: 13px; line-height: 1.5; }
+  .services-launcher.ambassador-application-open .mobile-services-grid { display: none; }
+  .services-launcher.ambassador-application-open .ambassador-modal-backdrop { align-items: center; }
+  .services-launcher.ambassador-application-open .ambassador-modal { border-radius: 22px; }
 }
 
 .community-follow-prompt { display: none; }

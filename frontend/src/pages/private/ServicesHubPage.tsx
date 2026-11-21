@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import RewardedAdPlacement from "../../components/RewardedAdPlacement";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import ServiceArt from "../../components/ServiceArt";
@@ -40,9 +40,11 @@ const orderedServices = [...serviceCatalog].sort((left, right) => {
 });
 const ServicesHubPage = () => {
   const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const ambassadorApplicationOpen = searchParams.get("ambassador") === "apply";
   const visible = useMemo(() => orderedServices.filter((service) => [service.name, service.description, ...service.items].join(" ").toLowerCase().includes(search.trim().toLowerCase())), [search]);
 
-  return <main className="private-page services-launcher">
+  return <main className={`private-page services-launcher${ambassadorApplicationOpen ? " ambassador-application-open" : ""}`}>
     <div className="services-desktop-view">
       <section className="private-page-head"><div><p className="private-kicker">SMAJ ECOSYSTEM</p><h1>All SMAJ PI HUB Services</h1><p>Explore one connected ecosystem for everyday life.</p></div></section>
       <label className="services-search"><SearchOutlinedIcon /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Discover anything..." /></label>
