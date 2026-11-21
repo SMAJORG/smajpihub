@@ -24,7 +24,8 @@ import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import CommunityVideoPreview from "./CommunityVideoPreview";
-import CommunityShareSheet, { openCommunityNativeShare } from "./CommunityShareSheet";
+import CommunityShareFallback from "./CommunityShareFallback";
+import { openCommunityNativeShare } from "./communityNativeShare";
 import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
@@ -188,7 +189,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
   const [reportReason, setReportReason] = useState(reportReasons[0]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuClosing, setMenuClosing] = useState(false);
-  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareFallbackOpen, setShareFallbackOpen] = useState(false);
   const [saved, setSaved] = useState(post.savedByMe === true);
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState("");
@@ -499,7 +500,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           showFeedback("The post was shared, but the share could not be recorded.", "warning");
         });
       } else if (result === "fallback") {
-        setShareSheetOpen(true);
+        setShareFallbackOpen(true);
       } else if (result === "failed") {
         showFeedback("Post could not be shared.", "error");
       }
@@ -736,12 +737,10 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
           </div>
         </section>
       </div> : null}
-      {shareSheetOpen ? <CommunityShareSheet
-        title="SMAJ PI HUB community post"
-        text={[post.type === "repost" ? post.content?.trim() : "", content.content?.trim()].filter(Boolean).join("\n\n")}
+      {shareFallbackOpen ? <CommunityShareFallback
         url={new URL(`/community/feed?post=${encodeURIComponent(post._id)}`, window.location.origin).toString()}
-        onClose={() => setShareSheetOpen(false)}
-        onShared={recordCustomShare}
+        onClose={() => setShareFallbackOpen(false)}
+        onCopied={recordCustomShare}
       /> : null}
       {editOpen ? <div className="community-post-edit-backdrop" onClick={event => {
         if (event.target === event.currentTarget) setEditOpen(false);

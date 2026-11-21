@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import CommunitySkeleton from "./CommunitySkeleton";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
-import CommunityShareSheet, { openCommunityNativeShare } from "./CommunityShareSheet";
+import CommunityShareFallback from "./CommunityShareFallback";
+import { openCommunityNativeShare } from "./communityNativeShare";
 import { showFeedback } from "../lib/feedback";
 import {
   createCommunityComment,
@@ -38,7 +39,7 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
   const [commentText, setCommentText] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(reportReasons[0]);
-  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareFallbackOpen, setShareFallbackOpen] = useState(false);
   const shareInProgress = useRef(false);
   const [poll, setPoll] = useState(post.originalPost?.poll || post.poll);
   const [myVote, setMyVote] = useState(post.originalPost?.myVote || post.myVote || null);
@@ -157,7 +158,7 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
         showFeedback("Post shared.", "success");
         void recordCustomShare();
       } else if (result === "fallback") {
-        setShareSheetOpen(true);
+        setShareFallbackOpen(true);
       } else if (result === "failed") {
         showFeedback("Post could not be shared.", "error");
       }
@@ -255,12 +256,10 @@ export default function CommunityPostCard({ post, viewerId, viewerAvatarFrame, o
         <button type="button" disabled={busy} onClick={() => void repost()}>Repost</button>
         <button type="button" disabled={busy} onClick={() => void share()}>Share</button>
       </div>
-      {shareSheetOpen ? <CommunityShareSheet
-        title="SMAJ PI HUB community post"
-        text={[post.type === "repost" ? post.content?.trim() : "", content.content?.trim()].filter(Boolean).join("\n\n")}
+      {shareFallbackOpen ? <CommunityShareFallback
         url={new URL(`/community/feed?post=${encodeURIComponent(post._id)}`, window.location.origin).toString()}
-        onClose={() => setShareSheetOpen(false)}
-        onShared={recordCustomShare}
+        onClose={() => setShareFallbackOpen(false)}
+        onCopied={recordCustomShare}
       /> : null}
       {reportOpen ? <form className="community-report-form" onSubmit={event => void submitReport(event)}>
         <label>Why are you reporting this post?<select value={reportReason} onChange={event => setReportReason(event.target.value)}>{reportReasons.map(reason => <option key={reason}>{reason}</option>)}</select></label>

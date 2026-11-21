@@ -13,7 +13,8 @@ import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
 import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
 import CommunityCaptionTrack from "./CommunityCaptionTrack";
 import UserAvatarFrame from "./UserAvatarFrame";
-import CommunityShareSheet, { openCommunityNativeShare } from "./CommunityShareSheet";
+import CommunityShareFallback from "./CommunityShareFallback";
+import { openCommunityNativeShare } from "./communityNativeShare";
 import {
   createCommunityComment,
   getCommunityComments,
@@ -57,7 +58,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
   const [commentCount, setCommentCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareFallbackOpen, setShareFallbackOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
@@ -204,7 +205,7 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
         showFeedback("Video shared.", "success");
         void recordCustomShare();
       } else if (result === "fallback") {
-        setShareSheetOpen(true);
+        setShareFallbackOpen(true);
       } else if (result === "failed") {
         showFeedback("Video could not be shared.", "error");
       }
@@ -325,13 +326,11 @@ export default function CommunityVideoViewer({ items, index, viewerId, onClose, 
         }} style={{ "--video-progress": `${progress}%` } as CSSProperties} />
         <span>{playing ? "Playing" : "Paused"} · {activeIndex + 1}/{items.length}</span>
       </div>
-      {shareSheetOpen ? <CommunityShareSheet
-        title="SMAJ PI HUB community video"
-        text={current.content}
+      {shareFallbackOpen ? <CommunityShareFallback
         url={new URL(`/community/feed?post=${encodeURIComponent(current.post._id)}`, window.location.origin).toString()}
         copySuccessMessage="Video link copied."
-        onClose={() => setShareSheetOpen(false)}
-        onShared={recordCustomShare}
+        onClose={() => setShareFallbackOpen(false)}
+        onCopied={recordCustomShare}
       /> : null}
       {commentsOpen ? <section className="community-video-comments" aria-label="Video comments">
         <button type="button" className="community-video-comments-close" onClick={() => setCommentsOpen(false)} aria-label="Close comments">×</button>
