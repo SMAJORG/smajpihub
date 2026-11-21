@@ -6,12 +6,14 @@ import { testnetGet, testnetWalletSnapshot } from "./testnetA2UWallet";
 export async function testnetA2UPreflight(locals: any, uid: string) {
   if (!locals.testnetA2UCollection || !locals.userCollection || locals.memoryDatabase) throw new PayoutError(503, "Persistent payout database unavailable.");
   const user = await locals.userCollection.findOne({ uid });
+  if (!user) throw new PayoutError(404, "No Pi account found for this UID. Sign in to the Testnet app using Pi Browser before requesting a payout.", "recipient_not_found");
   const review = await reviewPiRecipient(user);
   await persistPiRecipientReview(locals.userCollection, user, review);
   const recipient = review.recipient;
   if (!recipient) {
     const unavailable = review.reason === "pi_api_unavailable";
-    const message = unavailable ? "Pi identity verification is unavailable. Retry this check later; no payment was created."
+    const message = review.reason === "pi_login_required" ? "This account has no server-verified Pi login and wallet consent. Sign in through Pi Browser on the Testnet app and approve wallet_address sharing; a past incoming payment does not grant payout consent."
+      : unavailable ? "Pi identity verification is unavailable. Retry this check later; no payment was created."
       : review.reason === "wallet_consent_required" ? "The recipient must approve wallet sharing (wallet_address) during Pi login."
       : "Recipient UID requires a fresh verified Pi login with wallet sharing; the previous token expired, permissions were denied, or identity did not match.";
     throw new PayoutError(unavailable ? 503 : 422, message, review.reason);
