@@ -76,5 +76,37 @@ export async function testnetRecipients(locals: any, page: number, search: strin
     }));
     eligible.push(...batch.filter(Boolean));
   }
-  return { recipients: eligible, page, hasMore: users.length > 20, checked: candidates.length, diagnostics, walletSearch: Boolean(walletSearch), message: walletSearch ? "Wallet search includes stored wallet references for diagnosis. Only server-verified Pi identity and wallet consent enable payouts; an unverified wallet match cannot be paid." : "Previously verified Pi recipients remain eligible without logging in again. Unverified recipient identity or wallet information must still be established before payment." };
+  // Read-only production Testnet history: never create recipient identities from payments.
+  // The payout DB is isolated, but historical transactions live in the original DB.
+  let history: any[] = [];
+  let historyError: string | null = null;
+  try {
+    if (!locals.mongoClient) throw new Error("Mongo client unavailable");
+    const source = locals.mongoClient.db("smajpihub");
+    const term = normalized.slice(0, 80);
+    const historicalQuery: any = { network: "Pi Testnet", verified: true };
+    if (term) {
+      const clauses: any[] = [
+        { transactionId: { $regex: escaped, $options: "i" } },
+        { paymentId: { $regex: escaped, $options: "i" } },
+      ];
+      if (walletSearch) {
+        clauses.push({ recipientAddress: walletSearch }, { senderAddress: walletSearch });
+      }
+      historicalQuery.$or = clauses;
+    }
+    const rows = await source.collection("pi_live_testnet_transactions")
+      .find(historicalQuery, { projection: { _id: 0, transactionId: 1, paymentId: 1, amount: 1, time: 1, network: 1, verified: 1 } })
+      .sort({ time: -1 }).skip((page - 1) * 20).limit(20).maxTimeMS(7000).toArray();
+    history = rows.map((row: any) => ({
+      transactionId: row.transactionId, paymentId: row.paymentId,
+      amount: row.amount, time: row.time, verified: row.verified,
+      network: row.network, walletAddress: "",
+      source: "production_testnet_transaction", canReceive: false,
+      status: "historical_transaction_not_payout_authorization",
+    }));
+  } catch {
+    historyError = "Production Testnet history is unavailable to this backend. Verify read-only access to the smajpihub database.";
+  }
+  return { recipients: eligible, history, historyError, historyReadOnly: true, page, hasMore: users.length > 20, checked: candidates.length, diagnostics, walletSearch: Boolean(walletSearch), message: walletSearch ? "Wallet search includes stored wallet references for diagnosis. Only server-verified Pi identity and wallet consent enable payouts; an unverified wallet match cannot be paid." : "Previously verified Pi recipients remain eligible without logging in again. Unverified recipient identity or wallet information must still be established before payment." };
 }
