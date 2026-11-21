@@ -11,13 +11,37 @@ const collectionFor = (locals: any) => {
 export async function testnetDashboard(locals: any, page: number) {
   const collection = collectionFor(locals);
   const filter = { network: "Pi Testnet" };
-  const [wallet, records, total, completedWallets, lock] = await Promise.all([
-    testnetWalletSnapshot(), collection.find(filter).project(safePaymentFields).sort({ createdAt: -1 }).skip((page - 1) * 20).limit(20).toArray(),
-    collection.countDocuments(filter),
-    collection.distinct("recipientWalletAddress", { network: "Pi Testnet", status: "completed", ledgerVerified: true, "piStatus.transaction_verified": true, "piStatus.developer_completed": true, txid: { $type: "string" }, recipientWalletAddress: { $regex: "^G[A-Z2-7]{55}$" } }),
-    collection.findOne({ _id: "wallet-lock" }),
-  ]);
-  return { backendRevision: process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || null, wallet, records, page, hasMore: page * 20 < total, total, successfulUniqueWallets: completedWallets.length, target: 5, walletLocked: Boolean(lock), appWalletConnection: "Compare this configured wallet address with the connected Testnet App Wallet in Pi Developer Portal. Pi verifies the sender during payout." };
+  // Run read-only database checks sequentially. Parallel wallet/ledger calls and
+  // an unbounded distinct() can overwhelm the small isolated Testnet instance.
+  const records = await collection.find(filter).project(safePaymentFields)
+    .sort({ createdAt: -1 }).skip((page - 1) * 20).limit(20).toArray();
+  const total = await collection.countDocuments(filter);
+  const completedWallets = await collection.aggregate([
+    { $match: { network: "Pi Testnet", status: "completed", ledgerVerified: true,
+      "piStatus.transaction_verified": true, "piStatus.developer_completed": true,
+      txid: { $type: "string" }, recipientWalletAddress: { $regex: "^G[A-Z2-7]{55}$" } } },
+    { $group: { _id: "$recipientWalletAddress" } },
+    { $count: "total" },
+  ]).toArray();
+  const lock = await collection.findOne({ _id: "wallet-lock" });
+  // The wallet snapshot is read-only and must never trigger a payout.
+  // Keep wallet readiness fail-closed if the upstream Pi API is unavailable.
+  let wallet: Awaited<ReturnType<typeof testnetWalletSnapshot>>;
+  try {
+    wallet = await testnetWalletSnapshot();
+  } catch {
+    wallet = { address: "", balance: null, spendable: null, ready: false,
+      apiKeyAccepted: false, seedValid: false, incompletePayments: 0,
+      message: "Testnet wallet status is unavailable. Do not send a payout until wallet checks pass.",
+      code: "wallet_status_unavailable", apiStatus: null,
+      seedConfigured: Boolean(process.env.PI_TESTNET_WALLET_SEED),
+      apiKeyConfigured: Boolean(process.env.PI_TESTNET_API_KEY) };
+  }
+  return { backendRevision: process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || null,
+    wallet, records, page, hasMore: page * 20 < total, total,
+    successfulUniqueWallets: completedWallets[0]?.total || 0,
+    target: 5, walletLocked: Boolean(lock),
+    appWalletConnection: "Compare this configured wallet address with the connected Testnet App Wallet in Pi Developer Portal. Pi verifies the sender during payout." };
 }
 export async function testnetRecipients(locals: any, page: number, search: string) {
   const collection = collectionFor(locals);
