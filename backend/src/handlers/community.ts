@@ -316,6 +316,61 @@ const userProfile = async (req: Request, res: Response) => {
   });
 };
 
+const userConnections = async (req: Request, res: Response, relation: "followers" | "following") => {
+  const profileUser = await req.app.locals.userCollection.findOne({ uid: req.params.uid, blocked: { $ne: true } });
+  const viewer = await resolveCurrentUser(req);
+  if (!profileUser || profileUser.blocked || (!isPublic(profileUser) && viewer?.uid !== profileUser.uid)) {
+    return res.status(404).json({ error: "profile_unavailable", message: "This profile is not available." });
+  }
+
+  const page = Math.max(1, Math.min(1000, Number.parseInt(String(req.query.page || "1"), 10) || 1));
+  const connectionQuery = relation === "followers" ? { followingId: profileUser.uid } : { followerId: profileUser.uid };
+  const [total, connections] = await Promise.all([
+    req.app.locals.communityFollowCollection.countDocuments(connectionQuery),
+    req.app.locals.communityFollowCollection.find(connectionQuery)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize + 1)
+      .toArray(),
+  ]);
+  const pageConnections = connections.slice(0, pageSize);
+  const userIds: string[] = [...new Set<string>(pageConnections.map((item: Record<string, any>) =>
+    String(relation === "followers" ? item.followerId : item.followingId)))];
+  const people = userIds.length ? await req.app.locals.userCollection.find({
+    uid: { $in: userIds },
+    blocked: { $ne: true },
+    publicProfile: { $ne: false },
+    "settings.publicProfile": { $ne: false },
+  }).toArray() : [];
+  const peopleById = new Map<string, Record<string, any>>(people.filter(isPublic).map((person: Record<string, any>) => [person.uid, person]));
+  const visiblePeople = userIds.flatMap(uid => {
+    const person = peopleById.get(uid);
+    return person ? [person] : [];
+  });
+  const eligibilityByUser = await getEligibleAvatarFramesForUsers(req.app.locals, visiblePeople);
+  const viewerFollows = viewer && visiblePeople.length
+    ? await req.app.locals.communityFollowCollection.find({
+      followerId: viewer.uid,
+      followingId: { $in: visiblePeople.map(person => person.uid) },
+    }).toArray()
+    : [];
+  const viewerFollowingIds = new Set(viewerFollows.map((item: Record<string, any>) => item.followingId));
+  const users = await Promise.all(visiblePeople.map(async person => ({
+    ...await publicIdentity(req.app.locals, person, eligibilityByUser.get(person.uid)),
+    following: viewerFollowingIds.has(person.uid),
+    isSelf: viewer?.uid === person.uid,
+  })));
+
+  return res.json({
+    profile: await publicIdentity(req.app.locals, profileUser),
+    relation,
+    users,
+    total,
+    page,
+    hasMore: connections.length > pageSize,
+  });
+};
+
 const listPosts = async (req: Request, res: Response) => {
   const viewer = await resolveCurrentUser(req);
   const page = Math.max(1, Math.min(1000, Number.parseInt(String(req.query.page || "1"), 10) || 1));
@@ -487,6 +542,8 @@ export default function mountCommunityEndpoints(router: Router) {
       Promise.resolve(handler(req, res, next)).catch(next));
   }
   router.use(noStore);
+  router.get("/profiles/:uid/followers", (req: Request, res: Response) => userConnections(req, res, "followers"));
+  router.get("/profiles/:uid/following", (req: Request, res: Response) => userConnections(req, res, "following"));
   router.get("/profiles/:uid", userProfile);
   router.get("/feed", listPosts);
   router.get("/posts/scheduled", async (req: Request, res: Response) => {

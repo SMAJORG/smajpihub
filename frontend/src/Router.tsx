@@ -48,6 +48,7 @@ import DashboardPage from "./pages/private/DashboardPage";
 import PrivateCommunityPage from "./pages/private/CommunityPage";
 import CommunityPostCreatePage from "./pages/private/CommunityPostCreatePage";
 import PublicProfilePage from "./pages/private/PublicProfilePage";
+import PublicProfileConnectionsPage from "./pages/private/PublicProfileConnectionsPage";
 import StorePage from "./pages/private/StorePage";
 import ProductDetailPage from "./pages/private/ProductDetailPage";
 import AddProductPage from "./pages/private/AddProductPage";
@@ -276,6 +277,7 @@ const swapRoutes: Array<[string, SwapPageKind]> = [
   ["confirm", "confirm"],
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components
 const PublicProfileRoute = () => {
   const { isAuthenticated, isLoading } = useAuthContext();
   return isLoading || isAuthenticated
@@ -642,6 +644,14 @@ export const router = createBrowserRouter([
         </PrivateLayout>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/people/:uid/followers",
+    element: <PublicProfileConnectionsPage relation="followers" />,
+  },
+  {
+    path: "/people/:uid/following",
+    element: <PublicProfileConnectionsPage relation="following" />,
   },
   {
     path: "/people/:uid",

@@ -123,11 +123,26 @@ export type PublicProfileResponse = {
     streamVideos: number;
   };
 };
+export type CommunityConnectionUser = CommunityIdentity & { following: boolean; isSelf: boolean };
+export type CommunityConnectionRelation = "followers" | "following";
+export type CommunityConnectionsResponse = {
+  profile: CommunityIdentity;
+  relation: CommunityConnectionRelation;
+  users: CommunityConnectionUser[];
+  total: number;
+  page: number;
+  hasMore: boolean;
+};
 
 export const getCommunityFeed = async (params: { scope?: "all" | "following"; authorId?: string; page?: number } = {}) =>
   (await axiosClient.get<{ posts: CommunityPost[]; hasMore: boolean }>("/community/feed", { params })).data;
 export const getPublicProfile = async (uid: string) =>
   (await axiosClient.get<PublicProfileResponse>(`/community/profiles/${encodeURIComponent(uid)}`)).data;
+export const getCommunityConnections = async (uid: string, relation: CommunityConnectionRelation, page = 1) =>
+  (await axiosClient.get<CommunityConnectionsResponse>(
+    `/community/profiles/${encodeURIComponent(uid)}/${relation}`,
+    { params: { page } },
+  )).data;
 export const getCommunityComments = async (postId: string) =>
   (await axiosClient.get<{ comments: CommunityComment[] }>(`/community/posts/${encodeURIComponent(postId)}/comments`)).data.comments;
 export const createCommunityPost = async (input: CommunityPostInput) =>

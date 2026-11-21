@@ -8,6 +8,7 @@ import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { axiosClient } from "../lib/axiosClient";
 import { uploadImage } from "../lib/uploadImage";
+import { showFeedback } from "../lib/feedback";
 import { serviceCatalog } from "../content/serviceCatalog";
 import { useAuthContext } from "../contexts/AuthContext";
 
@@ -29,15 +30,27 @@ type FormState = {
 };
 
 const MAX_IDENTITY_IMAGE_BYTES = 5 * 1024 * 1024;
+const identityImageMimeByExtension: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const flagFor = (code: string) => code.replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
 const countries = Country.getAllCountries().map((country) => ({ ...country, flag: flagFor(country.isoCode) })).sort((a, b) => a.name.localeCompare(b.name));
 const serviceOptions = [{ slug: "all", name: "All SMAJ services" }, ...serviceCatalog.map((service) => ({ slug: service.slug, name: service.name }))];
 
 const readImage = (file: File) => new Promise<string>((resolve, reject) => {
-  if (!file.type.startsWith("image/")) return reject(new Error("Choose a JPG, PNG, or WebP image."));
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  const extensionMime = identityImageMimeByExtension[extension];
+  const fileType = file.type.toLowerCase();
+  const normalizedFileType = fileType === "image/jpg" ? "image/jpeg" : fileType;
+  const mime = ["image/jpeg", "image/png", "image/webp"].includes(normalizedFileType)
+    ? normalizedFileType
+    : !fileType || fileType === "application/octet-stream" ? extensionMime || "" : "";
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) return reject(new Error("Choose a JPG, PNG, or WebP image."));
   if (file.size > MAX_IDENTITY_IMAGE_BYTES) return reject(new Error("Each identity image must be 5 MB or smaller."));
   const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result || ""));
+  reader.onload = () => {
+    const dataUrl = String(reader.result || "");
+    if (!dataUrl.startsWith("data:")) return reject(new Error("The image could not be read."));
+    resolve(dataUrl.replace(/^data:[^;]+;/i, `data:${mime};`));
+  };
   reader.onerror = () => reject(new Error("The image could not be read."));
   reader.readAsDataURL(file);
 });
@@ -46,6 +59,7 @@ const AmbassadorServicesPanel = () => {
   const { user } = useAuthContext();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const selfieStreamRef = useRef<MediaStream | null>(null);
+  const idInputRefs = useRef<Record<"idFront" | "idBack", HTMLInputElement | null>>({ idFront: null, idBack: null });
   const [mode, setMode] = useState<"apply" | "find" | null>(null);
   const [application, setApplication] = useState<Application | null>(null);
   const [ambassadors, setAmbassadors] = useState<PublicAmbassador[]>([]);
@@ -55,7 +69,6 @@ const AmbassadorServicesPanel = () => {
   const [submitting, setSubmitting] = useState(false);
   const [selfieCameraOpen, setSelfieCameraOpen] = useState(false);
   const [selfieCameraReady, setSelfieCameraReady] = useState(false);
-  const [error, setError] = useState("");
   const [form, setForm] = useState<FormState>({
     displayName: user?.displayName || user?.username || "",
     email: "",
@@ -114,9 +127,8 @@ const AmbassadorServicesPanel = () => {
           await videoRef.current.play().catch(() => undefined);
         }
         setSelfieCameraReady(true);
-        setError("");
       } catch {
-        setError("Camera access is needed for the live selfie. Allow camera permission or try another browser.");
+        showFeedback("Camera access is needed for the live selfie. Allow camera permission or try another browser.", "error");
         setSelfieCameraOpen(false);
       }
     };
@@ -130,7 +142,7 @@ const AmbassadorServicesPanel = () => {
     };
   }, [selfieCameraOpen]);
 
-  const close = () => { setMode(null); setSelfieCameraOpen(false); setError(""); };
+  const close = () => { setMode(null); setSelfieCameraOpen(false); };
   const chooseService = (slug: string) => {
     setForm((current) => {
       if (slug === "all") return { ...current, services: ["all"] };
@@ -145,16 +157,16 @@ const AmbassadorServicesPanel = () => {
     try {
       const image = await readImage(file);
       setForm((current) => ({ ...current, [field]: image }));
-      setError("");
+      showFeedback(`${field === "idFront" ? "ID front" : "ID back"} selected.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The image could not be selected.");
+      showFeedback(err instanceof Error ? err.message : "The image could not be selected.", "error");
     }
     event.target.value = "";
   };
   const captureSelfie = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) {
-      setError("Camera is still starting. Try capture again in a moment.");
+      showFeedback("Camera is still starting. Try capture again in a moment.", "warning");
       return;
     }
     const canvas = document.createElement("canvas");
@@ -162,18 +174,18 @@ const AmbassadorServicesPanel = () => {
     canvas.height = video.videoHeight;
     const context = canvas.getContext("2d");
     if (!context) {
-      setError("The selfie could not be captured.");
+      showFeedback("The selfie could not be captured.", "error");
       return;
     }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     setForm((current) => ({ ...current, selfie: canvas.toDataURL("image/jpeg", 0.9) }));
     setSelfieCameraOpen(false);
-    setError("");
+    showFeedback("Live selfie captured.", "success");
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!selectedCountry || !selectedRegionName || !form.services.length) {
-      setError("Choose a country, region, and at least one service.");
+      showFeedback("Choose a country, region, and at least one service.", "error");
       return;
     }
     const missingIdentity = [
@@ -182,11 +194,10 @@ const AmbassadorServicesPanel = () => {
       { value: form.selfie, label: "live selfie" },
     ].find((item) => !item.value);
     if (missingIdentity) {
-      setError(`Add ${missingIdentity.label} before submitting.`);
+      showFeedback(`Add ${missingIdentity.label} before submitting.`, "error");
       return;
     }
     setSubmitting(true);
-    setError("");
     try {
       const [idFrontUrl, idBackUrl, selfieUrl] = await Promise.all([
         uploadImage(form.idFront, "ambassador-private-id-front"),
@@ -209,9 +220,10 @@ const AmbassadorServicesPanel = () => {
         selfieUrl,
       });
       setApplication(data.application);
+      showFeedback("Your private ambassador application was submitted.", "success");
       close();
     } catch (err: unknown) {
-      setError(isAxiosError<{ message?: string }>(err) ? err.response?.data?.message || "Application could not be submitted." : err instanceof Error ? err.message : "Application could not be submitted.");
+      showFeedback(isAxiosError<{ message?: string }>(err) ? err.response?.data?.message || "Application could not be submitted." : err instanceof Error ? err.message : "Application could not be submitted.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -238,9 +250,8 @@ const AmbassadorServicesPanel = () => {
           <div className="ambassador-form-row"><label>Country<select required value={form.countryCode} onChange={(event) => setForm({ ...form, countryCode: event.target.value, regionCode: "", customRegion: "" })}><option value="">🌍 Select country</option>{countries.map((country) => <option key={country.isoCode} value={country.isoCode}>{country.flag} {country.name}</option>)}</select></label><label>Region{form.countryCode && !regions.length ? <input required value={form.customRegion} onChange={(event) => setForm({ ...form, customRegion: event.target.value })} placeholder={`${selectedCountry?.flag || "📍"} Region or local area`} /> : <select required disabled={!form.countryCode} value={form.regionCode} onChange={(event) => setForm({ ...form, regionCode: event.target.value })}><option value="">{form.countryCode ? `${selectedCountry?.flag || "📍"} Select region` : "Select country first"}</option>{regions.map((region) => <option key={`${region.countryCode}-${region.isoCode}`} value={region.isoCode}>{selectedCountry?.flag} {region.name}</option>)}</select>}</label></div>
           <label>Services<details className="ambassador-service-multiselect"><summary>{form.services.includes("all") ? "All SMAJ services" : `${form.services.length} services selected`}<span>⌄</span></summary><div className="ambassador-service-options" role="group" aria-label="Choose one or more services">{serviceOptions.map((service) => <label key={service.slug} className={form.services.includes(service.slug) ? "selected" : ""}><input type="checkbox" checked={form.services.includes(service.slug)} onChange={() => chooseService(service.slug)} /><span>{service.name}</span></label>)}</div></details></label>
           <label>Why do you want to become an ambassador?<textarea required minLength={20} maxLength={1500} value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} placeholder="Tell us about your local community and experience." /></label>
-          <fieldset><legend>Private identity verification</legend><div className="ambassador-identity-grid">{([['idFront', 'ID front', 'environment'], ['idBack', 'ID back', 'environment']] as const).map(([field, label, capture]) => <label className={form[field] ? "uploaded" : ""} key={field}>{form[field] ? <img src={form[field]} alt={`${label} preview`} /> : <BadgeOutlinedIcon />}<strong>{form[field] ? `${label} added` : label}</strong><span>{form[field] ? "Tap to replace" : "JPG, PNG or WebP · max 5 MB"}</span><input type="file" accept="image/jpeg,image/png,image/webp" capture={capture} onChange={(event) => void selectImage(field, event)} /></label>)}<button type="button" className={`ambassador-selfie-tile${form.selfie ? " uploaded" : ""}`} onClick={() => setSelfieCameraOpen(true)}>{form.selfie ? <img src={form.selfie} alt="Live selfie preview" /> : <PhotoCameraOutlinedIcon />}<strong>{form.selfie ? "Live selfie added" : "Live selfie"}</strong><span>{form.selfie ? "Tap to retake" : "Open camera to capture"}</span></button></div></fieldset>
+          <fieldset><legend>Private identity verification</legend><div className="ambassador-identity-grid">{([['idFront', 'ID front'], ['idBack', 'ID back']] as const).map(([field, label]) => <div className="ambassador-identity-control" key={field}><button type="button" className={`ambassador-id-tile${form[field] ? " uploaded" : ""}`} onClick={() => idInputRefs.current[field]?.click()} aria-label={`${form[field] ? "Replace" : "Choose"} ${label} image`}>{form[field] ? <img src={form[field]} alt={`${label} preview`} /> : <BadgeOutlinedIcon />}<strong>{form[field] ? `${label} added` : label}</strong><span>{form[field] ? "Tap to replace" : "JPG, PNG or WebP · max 5 MB"}</span></button><input ref={element => { idInputRefs.current[field] = element; }} className="ambassador-id-input" type="file" tabIndex={-1} accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(event) => void selectImage(field, event)} /></div>)}<button type="button" className={`ambassador-selfie-tile${form.selfie ? " uploaded" : ""}`} onClick={() => setSelfieCameraOpen(true)}>{form.selfie ? <img src={form.selfie} alt="Live selfie preview" /> : <PhotoCameraOutlinedIcon />}<strong>{form.selfie ? "Live selfie added" : "Live selfie"}</strong><span>{form.selfie ? "Tap to retake" : "Open camera to capture"}</span></button></div></fieldset>
           <label className="ambassador-consent"><input required type="checkbox" />I confirm these details are mine and consent to private identity review.</label>
-          {error ? <p className="ambassador-form-error" role="alert">{error}</p> : null}
           <button className="ambassador-submit" disabled={submitting}>{submitting ? "Uploading and submitting…" : "Submit private application"}</button>
         </form>}
       </section>

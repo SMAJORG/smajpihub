@@ -189,22 +189,13 @@ const PublicProfilePage = () => {
           </div>
           <div className="public-profile-stats">
             <div><strong>{data.stats.posts}</strong><span>Posts</span></div>
-            <div><strong>{data.stats.followers}</strong><span>Followers</span></div>
-            <div><strong>{data.stats.following}</strong><span>Following</span></div>
+            <Link to={`/people/${encodeURIComponent(profile.uid)}/followers`}><strong>{data.stats.followers}</strong><span>Followers</span></Link>
+            <Link to={`/people/${encodeURIComponent(profile.uid)}/following`}><strong>{data.stats.following}</strong><span>Following</span></Link>
           </div>
         </div>
       </header>
 
       <div className="public-profile-sticky-stack">
-        <div className="public-profile-sticky-header" aria-label={`${profile.displayName}, ${data.stats.posts} posts`}>
-          <UserAvatarFrame
-            name={profile.displayName}
-            image={profile.avatar}
-            frame={profile.uid === user?.uid ? user.activeAvatarFrame : profile.activeAvatarFrame}
-            size={38}
-          />
-          <div><strong>{profile.displayName}<TrustBadge userId={profile.uid} /></strong><span>{data.stats.posts} {data.stats.posts === 1 ? "post" : "posts"}</span></div>
-        </div>
         <nav className="public-profile-tabs" role="tablist" aria-label="Profile sections">
           {(["posts", "about", "activity", "media"] as const).map(tab => (
             <button
@@ -256,8 +247,8 @@ const PublicProfilePage = () => {
           <div className="community-section-heading"><div><h2>Service activity</h2><p>Current public activity across SMAJ PI HUB.</p></div></div>
           <div className="public-profile-activity-stats">
             <span><strong>{data.stats.posts}</strong>Posts</span>
-            <span><strong>{data.stats.followers}</strong>Followers</span>
-            <span><strong>{data.stats.following}</strong>Following</span>
+            <Link to={`/people/${encodeURIComponent(profile.uid)}/followers`}><strong>{data.stats.followers}</strong>Followers</Link>
+            <Link to={`/people/${encodeURIComponent(profile.uid)}/following`}><strong>{data.stats.following}</strong>Following</Link>
             <span><strong>{data.activities.marketplaceListings.length}</strong>Recent listings</span>
             <span><strong>{data.activities.jobs}</strong>Active jobs</span>
             <span><strong>{data.activities.streamVideos}</strong>Videos</span>

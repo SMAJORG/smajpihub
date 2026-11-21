@@ -110,6 +110,16 @@ test("community profiles, privacy, eligibility, engagement, and moderation", asy
   result = await request("POST", `/community/follow/${author.uid}`, viewer.uid);
   assert.equal(result.response.status, 201);
   assert.equal(result.data.following, true);
+  result = await request("GET", `/community/profiles/${author.uid}/followers`, viewer.uid);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.total, 1);
+  assert.equal(result.data.users[0].uid, viewer.uid);
+  result = await request("GET", `/community/profiles/${viewer.uid}/following`, viewer.uid);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.users[0].uid, author.uid);
+  assert.equal(result.data.users[0].following, true);
+  result = await request("GET", `/community/profiles/${privateUser.uid}/followers`, viewer.uid);
+  assert.equal(result.response.status, 404);
 
   result = await request("GET", "/user/search?q=User", viewer.uid);
   assert.equal(result.response.status, 200);
