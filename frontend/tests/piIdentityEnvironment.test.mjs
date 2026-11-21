@@ -33,3 +33,17 @@ test('returning to Mainnet from a Sandbox link does not initialize production lo
  assert.equal(mode('true','true','smajpihub.com','https://sandbox.minepi.com/'),false);
  assert.equal(mode('true','true','www.smajpihub.com','https://sandbox.minepi.com/'),false);
 });
+
+test('direct Pi Browser Testnet login ignores stale Sandbox settings and referrers',()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{userAgent:'Mozilla/5.0 PiBrowser'}});
+ try {
+  assert.equal(mode('true','true','testnet.smajpihub.com',''),false);
+  assert.equal(mode('true','true','127.0.0.1',''),false);
+  assert.equal(mode('true','true','testnet.smajpihub.com','https://sandbox.minepi.com/'),false);
+  assert.equal(mode('true','true','testnet.smajpihub.com','https://sandbox.minepi.com/',true),true);
+ } finally {
+  if(previous) Object.defineProperty(globalThis,'navigator',previous);
+  else delete globalThis.navigator;
+ }
+});

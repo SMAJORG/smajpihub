@@ -6,7 +6,10 @@ const pendingAuthentication = new WeakMap<PiSdk, Map<string, Promise<AuthResult>
 export const isPiSandboxMode = () => {
   if (["public", "capacitor"].includes(import.meta.env.MODE)) return false;
   const sandboxReferrer = (() => { try { return new URL(document.referrer).hostname === "sandbox.minepi.com"; } catch { return false; } })();
-  const sandboxFrame = window.location.hostname === "sandbox.minepi.com" || sandboxReferrer;
+  const sandboxFrame = window.location.hostname === "sandbox.minepi.com" || (window.self !== window.top && sandboxReferrer);
+  // Sandbox authentication talks to the preview's parent frame. A normal
+  // Pi Browser tab must use its native bridge, including for registered Testnet apps.
+  if (!sandboxFrame && typeof navigator !== "undefined" && /PiBrowser|Pi Browser/i.test(navigator.userAgent)) return false;
   // The Mainnet domain must not inherit an obsolete Sandbox build setting.
   // A top-level navigation from Sandbox leaves a referrer but is not its preview iframe.
   if (["smajpihub.com", "www.smajpihub.com"].includes(window.location.hostname) && !(window.self !== window.top && sandboxReferrer)) return false;
