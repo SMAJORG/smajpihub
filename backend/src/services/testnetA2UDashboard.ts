@@ -65,9 +65,9 @@ export async function testnetRecipients(locals: any, page: number, search: strin
       const verified = review.recipient;
       if (!verified) {
         diagnostics[review.reason] = (diagnostics[review.reason] || 0) + 1;
-        return walletSearch ? null : { uid: user.uid, username: user.piUsername || user.username || "", displayName: user.displayName || user.piUsername || user.username || "Pi user", walletAddress: "", canReceive: false, status: review.reason };
+        return { uid: user.uid, username: user.piUsername || user.username || "", displayName: user.displayName || user.piUsername || user.username || "Pi user", walletAddress: "", canReceive: false, status: review.reason };
       }
-      if (walletSearch && verified.walletAddress !== walletSearch) return null;
+      if (walletSearch && verified.walletAddress !== walletSearch) return { uid: user.uid, username: user.piUsername || user.username || "", displayName: user.displayName || user.piUsername || user.username || "Pi user", walletAddress: "", canReceive: false, status: "wallet_not_verified_for_account" };
       const [uidRecord, walletRecord, previous] = await Promise.all([
         collection.findOne({ _id: `recipient:${user.uid}` }), collection.findOne({ _id: `wallet:${verified.walletAddress}` }),
         collection.findOne({ recipientWalletAddress: verified.walletAddress, status: { $in: ["completed", "submitting", "submitted", "reconciliation_required"] } }),
@@ -76,5 +76,5 @@ export async function testnetRecipients(locals: any, page: number, search: strin
     }));
     eligible.push(...batch.filter(Boolean));
   }
-  return { recipients: eligible, page, hasMore: users.length > 20, checked: candidates.length, diagnostics, walletSearch: Boolean(walletSearch), message: walletSearch ? "Wallet lookup only covers users who authenticated with this app and whose wallet was server-verified. Search by Pi username or UID to find previously verified recipients. A recipient without any previously verified wallet cannot be paid from this dashboard." : "Previously verified Pi recipients remain eligible without logging in again. Unverified recipient identity or wallet information must still be established before payment." };
+  return { recipients: eligible, page, hasMore: users.length > 20, checked: candidates.length, diagnostics, walletSearch: Boolean(walletSearch), message: walletSearch ? "Wallet search includes stored wallet references for diagnosis. Only server-verified Pi identity and wallet consent enable payouts; an unverified wallet match cannot be paid." : "Previously verified Pi recipients remain eligible without logging in again. Unverified recipient identity or wallet information must still be established before payment." };
 }
