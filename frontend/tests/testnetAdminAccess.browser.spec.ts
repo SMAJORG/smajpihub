@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 const token = 'testnet_admin.' + 'a'.repeat(64);
 const sender = 'G' + 'B'.repeat(55), recipient = 'G' + 'A'.repeat(55);
 
-for (const theme of ['light', 'dark']) test(`isolated admin sign-in, payment confirmation and logout in ${theme}`, async ({ page }) => {
-  await page.setViewportSize({ width: theme === 'light' ? 390 : 1280, height: 900 });
+test('payout route opens the administrator login without requiring a Pi session', () => {
+  const router = readFileSync(new URL('../src/Router.tsx', import.meta.url), 'utf8');
+  expect(router).toMatch(/path: "\/admin\/testnet-payouts", element: <TestnetAdminAccessPage\s*\/>/);
+});
+
+for (const theme of ['light', 'dark']) for (const width of [390, 1280]) test(`isolated admin sign-in, payment confirmation and logout in ${theme} at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
   let sent = 0, logins = 0;
   await page.route('**/admin/testnet/auth/login', async route => {
     logins++;
