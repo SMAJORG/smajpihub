@@ -75,5 +75,5 @@ export async function testnetRecipients(locals: any, page: number, search: strin
     }));
     eligible.push(...batch.filter(Boolean));
   }
-  return { recipients: eligible, page, hasMore: users.length > 20, checked: candidates.length, diagnostics, walletSearch: Boolean(walletSearch), message: walletSearch ? "Wallet lookup only covers users who authenticated with this app and whose wallet was server-verified. Search their Pi username first to verify an older login, or ask them to sign in with wallet sharing." : "Only server-verified Pi users with wallet sharing are eligible. Upstream failures and expired logins without saved consent are reported separately." };
+  return { recipients: eligible, page, hasMore: users.length > 20, checked: candidates.length, diagnostics, walletSearch: Boolean(walletSearch), message: walletSearch ? "Wallet lookup only covers users who authenticated with this app and whose wallet was server-verified. Search by Pi username or UID to find previously verified recipients. A recipient without any previously verified wallet cannot be paid from this dashboard." : "Previously verified Pi recipients remain eligible without logging in again. Unverified recipient identity or wallet information must still be established before payment." };
 }
