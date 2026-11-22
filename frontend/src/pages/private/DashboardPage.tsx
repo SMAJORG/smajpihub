@@ -50,6 +50,11 @@ const categoryGroups = [
   { title: "Community & Utilities", description: "Support communities and power everyday life.", slugs: ["charity", "energy"] },
   { title: "Finance & Rewards", description: "Exchange value and access ecosystem rewards.", slugs: ["swap", "token"] },
 ] as const;
+const serviceBadgeClass = (service: ServiceDefinition) =>
+  getServiceLaunchLabel(service.slug).toLowerCase().includes("soon")
+    ? "service-launch-badge soon"
+    : "service-launch-badge";
+
 const popularSearches = ["Electronics", "Phones", "Food", "Cars", "Jobs", "Housing", "Health", "Education", "Transport"];
 const trustedFallbackSellers = [
   { id: "beta-seller-1", name: "SMAJ Verified Market", location: "Global", rating: "4.8", listings: 12 },
