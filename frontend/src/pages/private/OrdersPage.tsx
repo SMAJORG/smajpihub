@@ -1,3 +1,4 @@
+import "./OrdersPage.css";
 import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { chatLink } from "../../lib/chatCache";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,6 +16,12 @@ const OrdersPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [orderTab, setOrderTab] = useState<"buyer" | "seller">("buyer");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState((location.state as { message?: string } | null)?.message || "");
   const [updatingId, setUpdatingId] = useState("");
@@ -201,57 +208,76 @@ const OrdersPage = () => {
     );
   };
 
-  const orderSection = (
-    title: string,
-    description: string,
-    list: Order[],
-    mode: "buyer" | "seller"
-  ) => (
-    <section className="orders-section">
-      <div className="section-title">
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-        <span>{list.length}</span>
-      </div>
-      {list.length ? (
-        <div className="orders-list">{list.map((order) => renderOrder(order, mode))}</div>
-      ) : (
-        <div className="private-state compact">
-          <h3>No {mode === "buyer" ? "buyer" : "seller"} orders</h3>
-          <p>
-            {mode === "buyer"
-              ? "Orders you create from SMAJ Store will appear here."
-              : "Orders placed for your products will appear here."}
-          </p>
-        </div>
-      )}
-    </section>
-  );
+  const activeOrders = orderTab === "buyer" ? buyerOrders : sellerOrders;
+  const filteredOrders = activeOrders.filter(order => {
+    const searchText = [order._id, order.productTitle, order.sellerName, order.buyerName].join(" ").toLowerCase();
+    return (statusFilter === "all" || order.status === statusFilter)
+      && searchText.includes(orderSearch.trim().toLowerCase());
+  }).sort((a, b) => {
+    if (sortOrder === "highest") return b.pricePi - a.pricePi;
+    const delta = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return sortOrder === "oldest" ? -delta : delta;
+  });
+  const changeTab = (tab: "buyer" | "seller") => {
+    setOrderTab(tab);
+    setStatusFilter("all");
+    setOrderSearch("");
+    setVisibleCount(20);
+  };
 
   return (
     <main className="private-page">
       <PullToRefresh onRefresh={loadOrders} />
-      <section className="private-page-head">
-        <div>
-          <p className="private-kicker">STORE ACTIVITY</p>
-          <h1>Orders</h1>
-          <p>Manage purchases, sales, and Pi payment status.</p>
-        </div>
-      </section>
-      {!window.Pi ? (
-        <div className="private-alert">Please open SMAJ PI HUB inside Pi Browser to use Pi payment.</div>
-      ) : null}
+      <header className="orders-compact-header">
+        <h1>My Orders</h1>
+        <p>Track purchases and manage sales</p>
+      </header>
+      {!window.Pi ? <div className="private-alert">Please open SMAJ PI HUB inside Pi Browser to use Pi payment.</div> : null}
       {message ? <div className="private-alert success">{message}</div> : null}
-      {error ? <div className="private-alert error">{error}</div> : null}
-      {loading ? <PrivateSkeleton variant="orders" count={4} /> : null}
-      {!loading ? (
-        <>
-          {orderSection("Buyer Orders", "Products you ordered from SMAJ sellers.", buyerOrders, "buyer")}
-          {orderSection("Seller Orders", "Orders customers placed for your products.", sellerOrders, "seller")}
-        </>
-      ) : null}
+      {error ? <div className="private-alert error" role="alert">{error} <button type="button" onClick={() => void loadOrders()}>Retry</button></div> : null}
+      <div className="orders-compact-tabs" role="tablist" aria-label="Order type">
+        <button type="button" role="tab" aria-selected={orderTab === "buyer"} className={orderTab === "buyer" ? "active" : ""} onClick={() => changeTab("buyer")}>Purchases <strong>{buyerOrders.length}</strong></button>
+        <button type="button" role="tab" aria-selected={orderTab === "seller"} className={orderTab === "seller" ? "active" : ""} onClick={() => changeTab("seller")}>Sales <strong>{sellerOrders.length}</strong></button>
+      </div>
+      <div className="orders-compact-search">
+        <label className="sr-only" htmlFor="orders-search">Search orders</label>
+        <input id="orders-search" type="search" value={orderSearch} onChange={event => {setOrderSearch(event.target.value);setVisibleCount(20);}} placeholder="Search orders..." />
+      </div>
+      <div className="orders-compact-filters">
+        <label className="sr-only" htmlFor="orders-status">Order status</label>
+        <select id="orders-status" value={statusFilter} onChange={event => {setStatusFilter(event.target.value);setVisibleCount(20);}}>
+          <option value="all">All orders</option>
+          <option value="pending">Pending</option>
+          <option value="paid">Paid</option>
+          <option value="processing">Processing</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced(!showAdvanced)}>☷ Filter</button>
+      </div>
+      {showAdvanced ? <div className="orders-compact-advanced">
+        <label htmlFor="orders-sort">Sort orders</label>
+        <select id="orders-sort" value={sortOrder} onChange={event => setSortOrder(event.target.value)}>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="highest">Highest amount</option>
+        </select>
+        <button type="button" onClick={() => {setStatusFilter("all");setSortOrder("newest");setOrderSearch("");setVisibleCount(20);setShowAdvanced(false);}}>Reset filters</button>
+      </div> : null}
+      {loading ? <PrivateSkeleton variant="orders" count={4} /> : (
+        <section className="orders-compact-results">
+          <div className="orders-compact-results-head"><h2>{orderTab === "buyer" ? "Purchase history" : "Sales history"}</h2><span>{filteredOrders.length} orders</span></div>
+          {filteredOrders.length ? <div className="orders-list">{filteredOrders.slice(0,visibleCount).map(order => renderOrder(order,orderTab))}</div> : <div className="orders-compact-empty">
+            <span aria-hidden="true">♡</span>
+            <h3>{activeOrders.length ? "No matching orders" : orderTab === "buyer" ? "No purchases yet" : "No sales yet"}</h3>
+            <p>{activeOrders.length ? "Try a different search or filter." : orderTab === "buyer" ? "Your purchases will appear here." : "Customer orders will appear here."}</p>
+            {activeOrders.length ? <button type="button" onClick={() => {setStatusFilter("all");setOrderSearch("");}}>Clear filters</button> : orderTab === "buyer" ? <button type="button" onClick={() => navigate("/store")}>Explore Store</button> : null}
+          </div>}
+          {filteredOrders.length > visibleCount ? <button className="orders-load-more" type="button" onClick={() => setVisibleCount(n => n+20)}>Load more ({filteredOrders.length-visibleCount} remaining)</button> : null}
+        </section>
+      )}
       {actionOrder ? (
         <div className="service-modal-backdrop" onMouseDown={() => setActionOrder(null)}>
           <form className="service-modal marketplace-action-modal" onSubmit={(event) => { event.preventDefault(); void submitOrderAction(); }} onMouseDown={(event) => event.stopPropagation()}>
