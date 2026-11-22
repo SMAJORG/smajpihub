@@ -44,8 +44,6 @@ type DiscoveryTab = "for-you" | "trending" | "lifestyle" | "categories";
 const why = [[PublicOutlinedIcon, "Access anywhere", "Access multiple digital services from anywhere you are."], [LockOutlinedIcon, "Simple access", "One account for your everyday needs."], [HubOutlinedIcon, "Connect everyone", "People, businesses, and opportunities connected together."], [RocketLaunchOutlinedIcon, "Built for the future", "A growing ecosystem designed for everyday life."]] as const;
 const discoveryTabs = [["For you", "for-you"], ["Trending", "trending"], ["Lifestyle", "lifestyle"], ["Categories", "categories"]] as const;
 const serviceHints: Record<string, string> = { store: "Shopping - Deals", food: "Eat - Delivery", jobs: "Work - Hire", education: "Learn - Skills", health: "Care - Doctors", transport: "Ride - Move", agro: "Farm - Trade", energy: "Power - Bills", charity: "Give - Help", housing: "Rent - Buy", events: "Tickets - Fun", swap: "Trade - Exchange", stream: "Watch - Videos", sports: "Play - Scores", token: "Rewards - Utility" };
-const lifestyleSlugs = ["food", "health", "housing", "transport", "education", "charity", "events", "agro"];
-const trendingSlugs = ["store", "stream", "sports", "events", "food", "jobs", "education", "health", "housing", "transport"];
 const categoryGroups = [
   { title: "Shopping & Entertainment", description: "Shop, watch, play, and discover experiences.", slugs: ["store", "stream", "sports", "events"] },
   { title: "Daily Life", description: "Handle food, care, travel, and your home.", slugs: ["food", "health", "transport", "housing"] },
@@ -53,7 +51,6 @@ const categoryGroups = [
   { title: "Community & Utilities", description: "Support communities and power everyday life.", slugs: ["charity", "energy"] },
   { title: "Finance & Rewards", description: "Exchange value and access ecosystem rewards.", slugs: ["swap", "token"] },
 ] as const;
-const lifestyleGroups = [
   { title: "Food & errands", description: "Order what you need and get where you are going.", slugs: ["food", "store", "transport"] },
   { title: "Home & care", description: "Look after your home, health, and essential utilities.", slugs: ["housing", "health", "energy"] },
   { title: "Learning & growth", description: "Build skills and find your next opportunity.", slugs: ["education", "jobs", "agro"] },
@@ -242,37 +239,6 @@ const DiscoveryTabButtons = ({ activeTab, onTabChange, className }: { activeTab:
     ))}
   </nav>
 );
-
-const serviceBadgeClass = (service: ServiceDefinition, kind: "card" | "rating" = "card") => {
-  const status = getServiceLaunchStatus(service.slug);
-  if (status === "live") return `${kind === "rating" ? "live-rating-badge" : "live-card-badge"} service-live-boil`;
-  return status === "coming-soon" ? "service-coming-soon-badge" : "service-in-progress-badge";
-};
-
-const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: "desktop" | "mobile" }) => (mode === "desktop" ? (
-    <div className="desktop-suggested-grid dashboard-tab-service-grid">
-      {services.map((service) => (
-        <Link to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={`desktop-service-app ${service.inProgress ? "service-in-progress-card" : ""}`} key={service.slug}>
-          <ServiceArt index={service.atlasIndex} />
-          <div><strong>{service.name}</strong><span>{service.items.slice(0, 2).join(" - ")}</span></div>
-          <small className={serviceBadgeClass(service, "rating")}>{getServiceLaunchLabel(service.slug)}</small>
-        </Link>
-      ))}
-    </div>
-  ) : (
-    <div className="mobile-services-grid dashboard-tab-service-grid">
-      {services.map((service) => (
-        <Link key={service.slug} to={servicePath(service)} state={serviceLaunchNavigationState(service.slug)} className={service.inProgress ? "service-in-progress-card" : undefined}>
-          <ServiceArt index={service.atlasIndex} />
-          <em className={serviceBadgeClass(service)}>{getServiceLaunchLabel(service.slug)}</em>
-          <strong>{service.name.replace("SMAJ ", "")}</strong>
-          <span>{serviceHints[service.slug] || service.items.slice(0, 2).join(" - ")}</span>
-        </Link>
-      ))}
-    </div>
-  )
-);
-
 
 const CompactCategoryGrid = ({ mode }: { mode: "mobile" | "desktop" }) => (
   <div className={`discovery-compact-directory ${mode}`}>
