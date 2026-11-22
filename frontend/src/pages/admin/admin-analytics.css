@@ -127,3 +127,11 @@
 @media (min-width:700px) { .smaj-admin-stats { grid-template-columns:repeat(3,minmax(0,1fr)); } .smaj-admin-service-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media (min-width:1100px) { .smaj-admin-stats { grid-template-columns:repeat(4,minmax(0,1fr)); } .smaj-admin-service-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 @media (max-width:520px) { .admin-overview-redesign .ea-page-head { gap:12px; } .admin-overview-redesign .ea-page-head > div { flex:1; min-width:0; } .admin-overview-redesign .ea-page-head h1 { font-size:25px; } .smaj-admin-stat { padding:14px; } .smaj-admin-overview-tabs :is(button,a) { font-size:12px; padding:8px; } .admin-shell .private-header .private-brand img { width:34px; height:34px; } }
+
+/* Keep the mobile admin overflow (three-dot) control at the far right. */
+@media (max-width: 1023px) {
+  .admin-shell .private-header { display: flex; align-items: center; width: 100%; }
+  .admin-shell .private-header .admin-mobile-menu-toggle { order: 1; flex-shrink: 0; }
+  .admin-shell .private-header .private-brand { order: 2; flex-shrink: 0; }
+  .admin-shell .private-header .admin-mobile-more { order: 3; margin-left: auto !important; margin-right: 0 !important; flex-shrink: 0; }
+}
