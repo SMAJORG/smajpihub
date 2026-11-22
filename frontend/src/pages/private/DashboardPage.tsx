@@ -50,11 +50,6 @@ const categoryGroups = [
   { title: "Community & Utilities", description: "Support communities and power everyday life.", slugs: ["charity", "energy"] },
   { title: "Finance & Rewards", description: "Exchange value and access ecosystem rewards.", slugs: ["swap", "token"] },
 ] as const;
-  { title: "Food & errands", description: "Order what you need and get where you are going.", slugs: ["food", "store", "transport"] },
-  { title: "Home & care", description: "Look after your home, health, and essential utilities.", slugs: ["housing", "health", "energy"] },
-  { title: "Learning & growth", description: "Build skills and find your next opportunity.", slugs: ["education", "jobs", "agro"] },
-  { title: "Entertainment & community", description: "Watch, play, attend, and support causes.", slugs: ["stream", "sports", "events", "charity"] },
-] as const;
 const popularSearches = ["Electronics", "Phones", "Food", "Cars", "Jobs", "Housing", "Health", "Education", "Transport"];
 const trustedFallbackSellers = [
   { id: "beta-seller-1", name: "SMAJ Verified Market", location: "Global", rating: "4.8", listings: 12 },
