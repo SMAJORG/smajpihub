@@ -11,6 +11,9 @@ import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlin
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import HighlightOffRoundedIcon from "@mui/icons-material/HighlightOffRounded";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import ServiceArt from "../../components/ServiceArt";
 import { serviceCatalog } from "../../content/serviceCatalog";
@@ -128,7 +131,8 @@ export default function WalletPage() {
     [page, setPage] = useState(0),
     [visible, setVisible] = useState(true),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [infoOpen, setInfoOpen] = useState(false);
   const snapshot = storedSnapshot && storedSnapshot.owner === user?.uid ? storedSnapshot.data : null;
   const controller = useRef<AbortController | null>(null),
     flight = useRef(false),
@@ -229,9 +233,9 @@ export default function WalletPage() {
             {visible ? "Hide" : "Show"}
           </button>
         </div>
-        <strong className="pi-wallet-balance-value">{visible ? "0.000 \u03c0" : "****"}</strong>
+        <strong className="pi-wallet-balance-value">{visible ? "Balance unavailable" : "••••"}</strong>
         <div className="pi-wallet-balance-note">
-          <p>Not synced. Zero is a placeholder. Open Pi Wallet to view your actual balance.</p>
+          <p>Not synced. Open Pi Wallet to see your actual balance.</p>
           {selectedNetwork ? <span>{walletNetworkLabel(selectedNetwork)}</span> : null}
         </div>
         <nav className="pi-wallet-quick-actions" aria-label="Wallet actions">
@@ -413,16 +417,22 @@ export default function WalletPage() {
           </nav>
         ) : null}
       </section>
-      <footer className="pi-wallet-footer">
-        <p>
-          SMAJ PI HUB tracks your activity without holding your Pi. No wallet passphrase or private key is required.
-        </p>
+      <footer className="pi-wallet-footer pi-wallet-footer-compact">
+        <span className="pi-wallet-footer-security"><ShieldOutlinedIcon aria-hidden="true" /> Secure wallet information</span>
         {current ? <small>Last synced {dateLabel(current.serverTime)}</small> : null}
-        <small>
-          Paid and completed totals use verified payment receipts. Sales, held payouts and unverified records are not
-          spendable balances.
-        </small>
+        <button type="button" className="pi-wallet-info-button" aria-label="Read wallet safety information" aria-haspopup="dialog" onClick={() => setInfoOpen(true)}><InfoOutlinedIcon /></button>
       </footer>
+      {infoOpen ? (
+        <div className="pi-wallet-info-overlay" onClick={() => setInfoOpen(false)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="pi-wallet-info-title" className="pi-wallet-info-dialog" onClick={event => event.stopPropagation()}>
+            <header><ShieldOutlinedIcon /><h2 id="pi-wallet-info-title">Wallet information</h2><button type="button" aria-label="Close wallet information" onClick={() => setInfoOpen(false)}><CloseRoundedIcon /></button></header>
+            <p>SMAJ PI HUB tracks your activity without holding your Pi. No wallet passphrase or private key is required.</p>
+            <p>Your real Pi balance is available in Pi Wallet. Recorded activity is not your spendable balance.</p>
+            <p>Paid and completed totals use verified payment receipts. Sales, held payouts and unverified records are not spendable balances.</p>
+            <button type="button" className="pi-wallet-info-done" onClick={() => setInfoOpen(false)}>Got it</button>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
