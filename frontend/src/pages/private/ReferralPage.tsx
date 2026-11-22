@@ -5,6 +5,8 @@ import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import QueryStatsOutlinedIcon from "@mui/icons-material/QueryStatsOutlined";
 import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { useAuthContext } from "../../contexts/AuthContext";
@@ -31,6 +33,8 @@ const ReferralPage = () => {
   const { user } = useAuthContext();
   const { t } = useTranslation();
   const [toast, setToast] = useState<ReferralToast | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historySearch, setHistorySearch] = useState("");
   const [referralResponse, setReferralResponse] = useState<{
     uid: string;
     data?: ReferralData;
@@ -41,6 +45,8 @@ const ReferralPage = () => {
   const referralData = currentResponse?.data || null;
   const referralError = currentResponse?.error || "";
   const invitationUrl = createInvitationUrl(referralData?.referralCode);
+  const historyMatches = (referralData?.invitations || []).filter((item) => item.name.toLowerCase().includes(historySearch.trim().toLowerCase()));
+  const historyPages = Math.max(1, Math.ceil(historyMatches.length / 10));
   const toastId = toast?.id;
 
   useEffect(() => {
@@ -114,14 +120,14 @@ const ReferralPage = () => {
         <div>
           <p className="private-kicker">SMAJ PI HUB</p>
           <h1>Invite &amp; Earn</h1>
-          <p>Invite friends and follow their registrations. Rewards are coming soon.</p>
+          <p>Invite friends. Track your progress.</p>
         </div>
       </header>
 
       <section className="referral-link-panel" aria-labelledby="referral-link-title">
         <div className="referral-section-title">
           <LinkOutlinedIcon />
-          <h2 id="referral-link-title">Your invitation link</h2>
+          <h2 id="referral-link-title">Your referral link</h2>
         </div>
         {referralError ? <p className="referral-note" role="alert">{referralError}</p> : invitationUrl ? (
           <>
@@ -130,7 +136,7 @@ const ReferralPage = () => {
               <button type="button" onClick={copyLink}><ContentCopyOutlinedIcon />Copy link</button>
               <button type="button" className="referral-share-button" onClick={shareLink}><IosShareOutlinedIcon />Share</button>
             </div>
-            <p className="referral-note">Your invitation code is unique to your account. Registrations are counted only after Pi authentication.</p>
+            
           </>
         ) : <p className="referral-note">{referralData ? "Not available" : "Loading your invitation link…"}</p>}
       </section>
@@ -138,13 +144,13 @@ const ReferralPage = () => {
       <section className="referral-stats-panel" aria-labelledby="referral-stats-title">
         <div className="referral-section-title">
           <QueryStatsOutlinedIcon />
-          <h2 id="referral-stats-title">Referral statistics</h2>
+          <h2 id="referral-stats-title">Your progress</h2>
         </div>
         <div className="referral-stat-grid">
-          <article><span>Unique visits</span><strong>{referralData?.visits ?? "—"}</strong></article>
-          <article><span>Successful registrations</span><strong>{referralData?.successfulSignUps ?? "—"}</strong></article>
+          <article><div className="referral-stat-label"><VisibilityOutlinedIcon /><span>Unique visits</span></div><strong>{referralData?.visits ?? "—"}</strong></article>
+          <article><div className="referral-stat-label"><PeopleOutlineIcon /><span>Joined</span></div><strong>{referralData?.successfulSignUps ?? "—"}</strong></article>
         </div>
-        <p className="referral-note">Visits are deduplicated by invitation link and network address. Registrations are recorded only for new Pi-authenticated accounts.</p>
+        <p className="referral-note">Registrations count after Pi authentication.</p>
       </section>
 
       <section className="referral-history-panel" aria-labelledby="referral-history-title">
@@ -152,9 +158,10 @@ const ReferralPage = () => {
           <HistoryOutlinedIcon />
           <h2 id="referral-history-title">Invitation history</h2>
         </div>
-        {referralError ? <p className="referral-empty-state" role="alert">{referralError}</p> : referralData?.invitations.length ? (
+        {referralData?.invitations.length ? <label className="referral-history-search"><span className="referral-sr-only">Search invitations</span><input type="search" placeholder="Search registrations..." value={historySearch} onChange={(event) => { setHistorySearch(event.target.value); setHistoryPage(1); }} /></label> : null}
+        {referralError ? <p className="referral-empty-state" role="alert">{referralError}</p> : historyMatches.length ? (
           <ul className="referral-history-list">
-            {referralData.invitations.map((invitation, index) => (
+            {historyMatches.slice((historyPage - 1) * 10, historyPage * 10).map((invitation, index) => (
               <li key={`${invitation.registeredAt || "registration"}-${index}`}>
                 <span>{invitation.name}</span>
                 <time dateTime={invitation.registeredAt || undefined}>
@@ -163,15 +170,16 @@ const ReferralPage = () => {
               </li>
             ))}
           </ul>
-        ) : <p className="referral-empty-state">{referralData ? "No registrations have been attributed to your invitation yet." : "Loading invitation history…"}</p>}
+        ) : <p className="referral-empty-state">{referralData ? "No registrations yet. Share your link to invite friends." : "Loading invitation history…"}</p>}
+        {historyPages > 1 ? <nav className="referral-pagination" aria-label="Invitation pages"><button type="button" disabled={historyPage === 1} onClick={() => setHistoryPage((page) => Math.max(1, page - 1))}>Previous</button><span>{historyPage} / {historyPages}</span><button type="button" disabled={historyPage >= historyPages} onClick={() => setHistoryPage((page) => Math.min(historyPages, page + 1))}>Next</button></nav> : null}
       </section>
 
       <section className="referral-reward-panel" aria-labelledby="referral-reward-title">
         <div className="referral-section-title">
           <RedeemOutlinedIcon />
-          <h2 id="referral-reward-title">Reward status</h2>
+          <h2 id="referral-reward-title">Referral rewards <span className="referral-soon">Coming soon</span></h2>
         </div>
-        <p>Rewards are coming soon. No reward policy has been approved, and no Pi payments are active.</p>
+        <p>Rewards are not active yet. Your referral activity is still tracked.</p>
       </section>
       {toast ? (
         <div className={`referral-toast ${toast.type}${toast.dismissing ? " is-dismissing" : ""}`} role="status" aria-live="polite" key={toast.id}>
