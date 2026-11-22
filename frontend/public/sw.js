@@ -1,5 +1,5 @@
-const SHELL_CACHE = "smaj-shell-v2";
-const STATIC_CACHE = "smaj-static-v2";
+const SHELL_CACHE = "smaj-shell-v3";
+const STATIC_CACHE = "smaj-static-v3";
 const OFFLINE_SHELL = "/index.html";
 
 self.addEventListener("install", event => {
@@ -40,17 +40,29 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (["script", "style", "image", "font"].includes(request.destination)) {
+  // Always fetch current JavaScript and CSS first. Old cached chunks can be
+  // removed by a new deployment and must never be served indefinitely.
+  if (request.destination === "script" || request.destination === "style") {
     event.respondWith(
-      caches.match(request).then(
-        cached =>
-          cached ||
-          fetch(request).then(response => {
-            if (response.ok) caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
-            return response;
-          })
-      )
+      fetch(request).then(response => {
+        if (response.ok && !response.redirected) {
+          const copy = response.clone();
+          void caches.open(STATIC_CACHE).then(cache => cache.put(request, copy));
+        }
+        return response;
+      }).catch(async () => (await caches.match(request)) || Response.error())
     );
+    return;
+  }
+
+  if (["image", "font"].includes(request.destination)) {
+    event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
+      if (response.ok) {
+        const copy = response.clone();
+        void caches.open(STATIC_CACHE).then(cache => cache.put(request, copy));
+      }
+      return response;
+    })));
   }
 });
 
