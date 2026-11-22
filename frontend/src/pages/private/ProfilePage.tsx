@@ -17,6 +17,7 @@ import { axiosClient } from "../../lib/axiosClient";
 import { uploadImage } from "../../lib/uploadImage";
 import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 
 const countryCodes = [
   "AE",
@@ -667,7 +668,7 @@ const ProfilePage = () => {
   };
 
   return (
-    <main className="private-page real-profile-page">
+    <main className={`private-page real-profile-page${editing ? " real-profile-edit-mode" : ""}`}>
       <input
         id="profileAvatarUpload"
         className="profile-file-input"
@@ -884,7 +885,8 @@ const ProfilePage = () => {
               />
               <small className="form-help">{form.bio.length}/500 characters.</small>
             </label>
-            <div className="private-form-row">
+            <h2 className="profile-edit-section-title">Region &amp; Language</h2>
+            <div className="private-form-row profile-edit-region-row">
               <div className="country-picker-label">
                 Country
                 <button
@@ -908,6 +910,7 @@ const ProfilePage = () => {
                 >
                   {selectedCountry ? <FlagIcon code={selectedCountry.code} label={selectedCountry.name} /> : null}
                   <span>{selectedCountry ? selectedCountry.name : form.country || "Choose country"}</span>
+                  <KeyboardArrowDownOutlinedIcon className="profile-picker-chevron" aria-hidden="true" />
                 </button>
               </div>
               <div className="language-picker-label">
@@ -934,9 +937,11 @@ const ProfilePage = () => {
                   <FlagIcon code={selectedLanguage.flag} label={selectedLanguage.name} />
                   <strong>{selectedLanguage.name}</strong>
                   <small>{selectedLanguage.native}</small>
+                  <KeyboardArrowDownOutlinedIcon className="profile-picker-chevron" aria-hidden="true" />
                 </button>
               </div>
             </div>
+            <h2 className="profile-edit-section-title">Contact &amp; Privacy</h2>
             <label>
               Phone / WhatsApp
               <input
