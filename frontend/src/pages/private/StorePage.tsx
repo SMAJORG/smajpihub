@@ -15,6 +15,7 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import { axiosClient } from "../../lib/axiosClient";
 import MarketplaceProductCard from "../../components/MarketplaceProductCard";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
@@ -496,6 +497,7 @@ const StorePage = () => {
               <label>Condition<select value={condition} onChange={(event) => { setCondition(event.target.value); updateFilterParam("condition", event.target.value, "All"); }}><option>All</option>{["New", "Like New", "Used", "Refurbished"].map((item) => <option key={item}>{item}</option>)}</select></label>
               <label className="storefront-filter-check"><input type="checkbox" checked={verifiedOnly} onChange={(event) => { setVerifiedOnly(event.target.checked); updateFilterParam("verified", event.target.checked ? "true" : ""); }} /><span>Verified sellers only</span></label>
               <label className="storefront-filter-check"><input type="checkbox" checked={inStockOnly} onChange={(event) => { setInStockOnly(event.target.checked); updateFilterParam("stock", event.target.checked ? "true" : ""); }} /><span>In-stock products only</span></label>
+              <button type="button" className="storefront-filter-apply" onClick={() => setOpenShoppingTool("")}>Apply filters</button>
             </div> : null}
           </div>
 
@@ -507,6 +509,7 @@ const StorePage = () => {
               <label>Minimum USDT<input type="number" min="0" inputMode="decimal" value={minPrice} onChange={(event) => { setMinPrice(event.target.value); updateFilterParam("minPrice", event.target.value); }} placeholder="0" /></label>
               <label>Maximum USDT<input type="number" min="0" inputMode="decimal" value={maxPrice} onChange={(event) => { setMaxPrice(event.target.value); updateFilterParam("maxPrice", event.target.value); }} placeholder="No maximum" /></label>
               <button type="button" onClick={() => { setMinPrice(""); setMaxPrice(""); updateFilterParam("minPrice", ""); updateFilterParam("maxPrice", ""); }}>Clear price</button>
+              <button type="button" className="storefront-filter-apply" onClick={() => setOpenShoppingTool("")}>Apply price</button>
             </div> : null}
           </div>
 
@@ -548,7 +551,7 @@ const StorePage = () => {
 
         {catalogError ? <div className="private-alert error">{catalogError}</div> : null}
         {loading ? <PrivateSkeleton variant="grid" count={6} /> : null}
-        {!loading && products.length && !showSearchResults ? (
+        {!loading && !catalogError && products.length > 0 && !showSearchResults ? (
           <div className="storefront-home-sections">
             {storefrontSections.map((section, sectionIndex) => {
               return (
@@ -580,7 +583,8 @@ const StorePage = () => {
           </div>
         ) : null}
 
-        {showSearchResults ? (
+        {!loading && !catalogError && products.length === 0 ? <section className="storefront-empty-marketplace" aria-live="polite"><div className="storefront-empty-icon"><Inventory2OutlinedIcon fontSize="large" /></div><h2>No products listed yet</h2><p>Our marketplace is getting ready. Be among the first sellers to list a real product on SMAJ Store.</p><Link className="storefront-empty-cta" to="/seller">List your first product</Link><small>Seller verification and approval may be required.</small></section> : null}
+        {!loading && !catalogError && showSearchResults && products.length > 0 ? (
           <section className="storefront-search-results">
             <div className="storefront-section-head">
               <div><h2>{search ? `Results for "${search}"` : collection === "recommended" ? "Recommended for you" : collection === "new-arrivals" ? "New arrivals" : `${category} products`}</h2><p>{visibleProducts.length} products found</p></div>
@@ -599,7 +603,7 @@ const StorePage = () => {
                 />
               ))}
             </div>
-            </> : <div className="private-state"><h2>No real products found</h2><p>Try another search or add a seller product.</p></div>}
+            </> : <div className="storefront-empty-marketplace storefront-no-matches"><div className="storefront-empty-icon"><SearchOutlinedIcon fontSize="large" /></div><h2>No matching products</h2><p>Try a different search or clear your filters to see available listings.</p><button type="button" className="storefront-empty-cta" onClick={() => { clearStoreFilters(); updateSearch(""); }}>Clear filters and search</button></div>}
           </section>
         ) : null}
 
