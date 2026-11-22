@@ -16,6 +16,7 @@ import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { uploadImage } from "../../lib/uploadImage";
 import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
 const countryCodes = [
   "AE",
@@ -746,16 +747,17 @@ const ProfilePage = () => {
           <section className="real-profile-stats">
             <article>
               <Inventory2OutlinedIcon />
-              <span>Products</span>
               <strong>{stats.totalProducts}</strong>
+              <span>Products</span>
             </article>
             <article>
               <StorefrontOutlinedIcon />
-              <span>Successful Orders</span>
               <strong>{stats.successfulOrders}</strong>
+              <span>Orders</span>
             </article>
             <article>
               <VerifiedUserOutlinedIcon />
+              <strong aria-label="Verification status"> <TrustBadge userId={user?.uid} /> </strong>
               <span>Verification</span>
             </article>
           </section>
@@ -793,20 +795,20 @@ const ProfilePage = () => {
                 </div>
                 <div>
                   <dt>Contact</dt>
-                  <dd>{user?.contactPhone || "Not set"}</dd>
+                  <dd>{user?.contactPhone ? "Private" : "Not set"}</dd>
                 </div>
               </dl>
             </article>
 
-            <article className="real-profile-card">
+            <article className="real-profile-card real-profile-seller-compact">
               <div className="real-profile-card-head">
                 <StorefrontOutlinedIcon />
-                <h2>Seller Profile</h2>
+                <h2>{sellerActive ? "Seller Tools" : "Become a Seller"}</h2>
               </div>
               <p>
                 {sellerActive
                   ? "Seller tools are active. Your listings can be reviewed and approved for SMAJ Store."
-                  : "Use one verified Pi identity to activate seller tools when you are ready to list products."}
+                  : "Start selling with your Pi identity."}
               </p>
               <div className="form-actions">
                 <button
@@ -825,9 +827,9 @@ const ProfilePage = () => {
               </div>
             </article>
 
-            <article className="real-profile-card">
+            <article className="real-profile-card real-profile-preferences-compact">
               <div className="real-profile-card-head">
-                <LanguageOutlinedIcon />
+                <SettingsOutlinedIcon />
                 <h2>Preferences</h2>
               </div>
               <dl>
