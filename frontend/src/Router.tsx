@@ -3,7 +3,7 @@ import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import TestnetAdminAccessPage from "./pages/admin/TestnetAdminAccessPage";
 import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, useRouteError } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { useAuthContext } from "./contexts/AuthContext";
@@ -283,6 +283,19 @@ const PublicProfileRoute = () => {
   return isLoading || isAuthenticated
     ? <PrivateLayout><PublicProfilePage /></PrivateLayout>
     : <AppLayout><PublicProfilePage /></AppLayout>;
+};
+
+const AdminChunkError = () => {
+  const error = useRouteError();
+  const message = error instanceof Error ? error.message : "";
+  const isChunkFailure = /dynamically imported module|failed to fetch|importing a module script|loading chunk/i.test(message);
+  return <main style={{ minHeight: "65vh", display: "grid", placeItems: "center", padding: 24, background: "#f8f9fc" }}>
+    <section style={{ maxWidth: 440, width: "100%", padding: 24, borderRadius: 20, background: "#fff", border: "1px solid #e5e7eb", textAlign: "center" }}>
+      <h1 style={{ fontSize: 22, margin: "0 0 12px", color: "#172033" }}>{isChunkFailure ? "Update needed" : "This page couldn't open"}</h1>
+      <p style={{ color: "#667085", lineHeight: 1.5 }}>{isChunkFailure ? "The app was updated while you were browsing. Reload to open the latest version." : "Please reload this page. Your account and saved data will not be changed."}</p>
+      <button type="button" onClick={() => window.location.reload()} style={{ background: "#7137ef", color: "#fff", border: 0, borderRadius: 12, padding: "12px 24px", fontWeight: 700, cursor: "pointer" }}>Reload page</button>
+    </section>
+  </main>;
 };
 
 export const router = createBrowserRouter([
@@ -1422,6 +1435,7 @@ export const router = createBrowserRouter([
   ...["/admin/analytics", "/admin/services/:service"].map(path => ({
     path,
     element: <ProtectedRoute><AdminLayout><AdminAnalyticsPage /></AdminLayout></ProtectedRoute>,
+    errorElement: <AdminChunkError />,
   })),
   {
     path: "/admin/users",
