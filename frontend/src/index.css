@@ -23246,3 +23246,31 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .smaj-refined-discover .managed-card-copy h3{font-size:1rem;line-height:1.3;letter-spacing:-.02em;}
 .smaj-refined-discover .managed-card-copy p{font-size:.875rem;line-height:1.45;}
 @media(min-width:768px){.smaj-refined-home-section .beta-product-card,.smaj-refined-home-section .beta-seller-card,.smaj-refined-discover .managed-content-card{flex-basis:260px;}}
+
+
+/* Dashboard discovery tabs: compact, consistent, mobile-first. */
+.discovery-compact-layout,.discovery-compact-directory{display:grid;gap:18px;min-width:0;margin:0;padding:8px 0 16px}
+.discovery-compact-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.discovery-compact-title h2{margin:0;font-size:21px;font-weight:800;line-height:1.25;letter-spacing:-.025em;color:var(--smaj-text,#182033)}
+.discovery-compact-title p,.discovery-compact-title>span{margin:4px 0 0;font-size:12px;color:var(--smaj-text-secondary,#667085)}
+.discovery-compact-group{display:grid;gap:11px}
+.discovery-compact-group h3{margin:0;font-size:14px;font-weight:750;color:var(--smaj-text,#182033)}
+.discovery-compact-icons{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 6px}
+.discovery-compact-item{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;text-align:center;text-decoration:none;color:var(--smaj-text,#182033);font-size:11px;font-weight:650;line-height:1.3}
+.discovery-compact-art{display:grid;place-items:center;width:56px;height:56px;max-width:100%;background:rgba(124,58,237,.09);border-radius:15px;overflow:hidden}
+.discovery-compact-art img,.discovery-compact-art svg{max-width:42px;max-height:42px;object-fit:contain}
+.discovery-lifestyle-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.discovery-lifestyle-card{display:block;overflow:hidden;border:1px solid var(--smaj-border,#e5e7eb);border-radius:16px;text-decoration:none;background:var(--smaj-card,#fff);color:var(--smaj-text,#182033)}
+.discovery-lifestyle-card>img{display:block;width:100%;aspect-ratio:5/4;object-fit:cover}
+.discovery-lifestyle-card>div{display:grid;gap:5px;padding:11px}
+.discovery-lifestyle-card strong{font-size:13px;line-height:1.35}
+.discovery-lifestyle-card small,.discovery-lifestyle-learning small{font-size:11px;color:var(--smaj-text-secondary,#667085)}
+.discovery-lifestyle-learning{display:flex;align-items:center;gap:12px;padding:13px;border-radius:15px;background:var(--smaj-secondary-bg,#f6f2ff);text-decoration:none;color:var(--smaj-text,#182033)}
+.discovery-lifestyle-learning>span:nth-child(2){display:grid;gap:4px;flex:1}
+.discovery-lifestyle-learning strong{font-size:13px}
+.discovery-learning-icon{display:grid;place-items:center;width:42px;height:42px;overflow:hidden}
+.discovery-learning-icon img{max-width:42px;max-height:42px;object-fit:contain}
+.discovery-lifestyle-learning>svg{color:#7c3aed}
+.discovery-compact-layout .mobile-feed-section,.discovery-compact-layout .desktop-feed-section{margin:0;min-width:0}
+.discovery-compact-layout .discovery-section-note{display:none}
+@media(min-width:768px){.discovery-compact-layout,.discovery-compact-directory{gap:24px}.discovery-lifestyle-cards{grid-template-columns:repeat(4,minmax(0,1fr))}.discovery-compact-icons{grid-template-columns:repeat(4,minmax(0,90px));gap:16px}}
