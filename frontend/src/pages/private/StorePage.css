@@ -83,3 +83,17 @@ html[dir="rtl"] .storefront-page :is([data-testid^="ArrowBack"], [data-testid^="
   }
   .storefront-page .storefront-tool-panel :is(select, input[type="number"]) { min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box; }
 }
+
+
+/* Store discovery controls and honest empty catalog state. */
+.storefront-page .storefront-shopping-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.storefront-page .storefront-tool-trigger { min-height:40px; }
+.storefront-page .storefront-filter-apply { display:block; width:100%; margin-top:10px; padding:10px 14px; border-radius:9px; border:1px solid var(--smaj-border); background:var(--smaj-text); color:var(--smaj-card); font:inherit; cursor:pointer; }
+.storefront-page .storefront-empty-marketplace { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:13px; max-width:760px; min-height:310px; margin:28px auto 38px; padding:36px 24px; border:1px solid var(--smaj-border); border-radius:18px; background:var(--smaj-card); color:var(--smaj-text); text-align:center; }
+.storefront-page .storefront-empty-icon { display:grid; place-items:center; width:72px; height:72px; border-radius:50%; background:var(--smaj-secondary-bg); color:var(--smaj-text-secondary); }
+.storefront-page .storefront-empty-marketplace h2 { margin:0; font-size:clamp(20px,3vw,26px); }
+.storefront-page .storefront-empty-marketplace p { margin:0; max-width:480px; line-height:1.6; color:var(--smaj-text-secondary); }
+.storefront-page .storefront-empty-marketplace small { color:var(--smaj-text-secondary); }
+.storefront-page .storefront-empty-cta { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:10px 20px; border:1px solid var(--smaj-border); border-radius:10px; background:var(--smaj-text); color:var(--smaj-card); text-decoration:none; font:inherit; font-weight:650; cursor:pointer; }
+.storefront-page .storefront-no-matches { margin:18px auto; }
+@media(max-width:600px) { .storefront-page .storefront-shopping-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; } .storefront-page .storefront-tool-trigger { width:100%; min-width:0; padding-inline:6px; font-size:12px; } .storefront-page .storefront-tool-trigger span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .storefront-page .storefront-clear-tools { grid-column:1/-1; } .storefront-page .storefront-empty-marketplace { margin:16px 10px 28px; padding:30px 16px; min-height:280px; } }
