@@ -171,3 +171,41 @@
  .admin-shell .private-sidebar-collapsed .admin-drawer-footer{justify-content:center;padding:8px 0}
  .admin-shell .private-sidebar-collapsed .admin-drawer-footer .private-sidebar-logout{padding:8px}
 }
+
+
+/* Pending actions: compact mobile-first cards, scalable to tablet/desktop */
+.pending-actions-redesign{max-width:1160px;margin-inline:auto;gap:18px!important}
+.pending-actions-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pending-actions-head h1{font-size:clamp(25px,3vw,34px);margin:6px 0 5px}
+.pending-actions-head p:last-child{font-size:13px;color:#667085;margin:0;line-height:1.5}
+.pending-actions-head button{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:9px 12px;border:1px solid #e1e4ea;border-radius:12px;background:#fff;color:#1d2939;font:inherit;font-size:13px;font-weight:650;cursor:pointer;flex-shrink:0}
+.pending-actions-head button svg{width:18px;height:18px}
+.pending-actions-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.pending-actions-kpis article{display:grid;gap:9px;padding:15px;border:1px solid #e6e7ec;border-radius:15px;background:#f7f8fb;min-width:0}
+.pending-actions-kpis span{font-size:12px;color:#667085}
+.pending-actions-kpis strong{font-size:clamp(23px,3vw,32px);line-height:1.1;color:#172033}
+.pending-actions-filters{display:grid;gap:11px}
+.pending-actions-search{display:flex;align-items:center;gap:9px;padding:0 12px;min-height:46px;border-radius:13px;background:#f7f8fb;border:1px solid #e1e4ea}
+.pending-actions-search svg{width:19px;height:19px;color:#667085}
+.pending-actions-search input{min-width:0;width:100%;border:0;outline:0;background:transparent;color:#172033;font:inherit;font-size:14px}
+.pending-actions-tabs{display:flex;align-items:center;gap:8px}
+.pending-actions-tabs button{min-height:39px;padding:8px 16px;border:1px solid #e1e4ea;border-radius:11px;background:#fff;color:#475467;font:inherit;font-size:13px;font-weight:650;cursor:pointer}
+.pending-actions-tabs button[aria-pressed=true]{background:#f0eaff;border-color:#d8c9ff;color:#6b35d5}
+.pending-actions-list-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pending-actions-list-head h2{font-size:17px;margin:0}
+.pending-actions-list-head span{color:#667085;font-size:12px}
+.pending-actions-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:11px}
+.pending-actions-card{display:grid;gap:14px;padding:15px;border:1px solid #e2e5e9;border-radius:17px;background:#fff;color:#172033;text-decoration:none;min-width:0}
+.pending-actions-card:focus-visible{outline:3px solid #7137ef;outline-offset:2px}
+.pending-actions-card-top{display:flex;align-items:flex-start;gap:11px;min-width:0}
+.pending-actions-card-icon{width:37px;height:37px;display:grid;place-items:center;border-radius:11px;background:#f1ebff;color:#7137ef;flex-shrink:0;font-size:18px}
+.pending-actions-card-top>div{display:grid;gap:5px;min-width:0;flex:1}
+.pending-actions-card-top strong{font-size:14px;overflow-wrap:anywhere}
+.pending-actions-card-top small{font-size:12px;line-height:1.5;color:#667085;overflow-wrap:anywhere}
+.pending-actions-status{font-size:11px;font-weight:650;font-style:normal;text-transform:capitalize;border-radius:99px;padding:5px 8px;background:#f2f4f7;color:#667085;white-space:nowrap}
+.pending-actions-status.pending,.pending-actions-status.open{background:#fff4df;color:#946200}
+.pending-actions-status.active,.pending-actions-status.approved,.pending-actions-status.resolved{background:#e7f7ed;color:#137847}
+.pending-actions-card-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#667085}
+.pending-actions-card-bottom span{color:#7137ef;font-weight:650;white-space:nowrap}
+@media(min-width:760px){.pending-actions-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.pending-actions-kpis{gap:14px}.pending-actions-kpis article{padding:20px}.pending-actions-filters{display:flex;justify-content:space-between;align-items:center}.pending-actions-search{flex:1;max-width:500px}}
+@media(max-width:390px){.pending-actions-head h1{font-size:23px}.pending-actions-head button{padding:9px}.pending-actions-kpis article{padding:10px}.pending-actions-kpis span{font-size:11px}.pending-actions-card{padding:12px}.pending-actions-card-bottom{flex-wrap:wrap}}
