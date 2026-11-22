@@ -200,17 +200,27 @@ export const AdminJobsReviewPage = () => {
       reportError(error, "Job could not be updated.");
     }
   };
-  const decideCompany = async (company: JobsAdminReviewCompany, action: "approved" | "verified" | "pi_kyb" | "rejected") => {
+  const decideCompany = async (company: JobsAdminReviewCompany, action: "approved" | "verified" | "pi_kyb" | "rejected" | "changes_requested") => {
     if (companyUpdatingId) return;
+    const feedback = action === "changes_requested"
+      ? window.prompt("Tell the employer what changes are needed.")?.trim() || ""
+      : action === "rejected"
+        ? window.prompt("Feedback for the employer (optional):") || ""
+        : "";
+    if (action === "changes_requested" && !feedback) return;
     setCompanyUpdatingId(company.id);
     try {
       const hasVerificationEvidence = Boolean(company.verificationEvidence && company.verificationStatus === "pending");
       if (action === "approved") {
         await moderateJobCompany(company.id, "approved");
         setMessage(`${company.name} approved for the company directory.`);
+        showFeedback(`${company.name} approved for the company directory.`, "success");
+      } else if (action === "changes_requested") {
+        await moderateJobCompany(company.id, "changes_requested", feedback);
+        setMessage(`Changes requested for ${company.name}.`);
       } else if (action === "rejected") {
         await Promise.all([
-          moderateJobCompany(company.id, "rejected"),
+          moderateJobCompany(company.id, "rejected", feedback),
           ...(hasVerificationEvidence ? [verifyJobsCompany(company.id, "rejected")] : []),
         ]);
         setMessage(`${company.name} rejected.`);
@@ -282,6 +292,8 @@ export const AdminJobsReviewPage = () => {
             <div>
               <span>{hasVerificationEvidence ? "Verification evidence" : "Company listing"} · {company.field}</span>
               <h3><Link to={`/services/jobs/company/${company.id}`}>{company.name}</Link></h3>
+              <p>{company.location || "Location not provided"}</p>
+              {company.description ? <p>{company.description}</p> : null}
               <p>{company.website || "No website provided"}</p>
               {company.verificationEvidence ? (
                 <div className="admin-company-evidence">
@@ -291,6 +303,7 @@ export const AdminJobsReviewPage = () => {
                   {company.verificationEvidence.notes ? <p><b>Evidence notes:</b> {company.verificationEvidence.notes}</p> : null}
                 </div>
               ) : <p className="admin-company-stage-note">Basic listing details only. Verification evidence has not been submitted.</p>}
+              {company.moderationFeedback ? <p><b>Previous feedback:</b> {company.moderationFeedback}</p> : null}
               <small>{company.verificationRequestedAt ? new Date(company.verificationRequestedAt).toLocaleString() : "Awaiting listing review"}</small>
             </div>
             <strong className="open">{hasVerificationEvidence ? "VERIFY" : "LISTING"}</strong>
@@ -299,7 +312,10 @@ export const AdminJobsReviewPage = () => {
               {hasVerificationEvidence ? <>
                 <button disabled={companyUpdatingId === company.id} onClick={() => void decideCompany(company, "verified")}>Verify</button>
                 <button disabled={companyUpdatingId === company.id} onClick={() => void decideCompany(company, "pi_kyb")}>Pi KYB</button>
-              </> : <button disabled={companyUpdatingId === company.id} onClick={() => void decideCompany(company, "approved")}>Approve listing</button>}
+              </> : <>
+                <button disabled={companyUpdatingId === company.id} onClick={() => void decideCompany(company, "approved")}>Approve listing</button>
+                <button disabled={companyUpdatingId === company.id} onClick={() => void decideCompany(company, "changes_requested")}>Request changes</button>
+              </>}
               <button className="danger" disabled={companyUpdatingId === company.id} onClick={() => void decideCompany(company, "rejected")}>Reject</button>
             </div>
           </article>

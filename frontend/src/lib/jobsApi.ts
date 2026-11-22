@@ -39,7 +39,9 @@ export type JobsApiCompany = {
   description?: string;
   location?: string;
   country?: string;
-  moderationStatus?: "pending" | "approved" | "rejected";
+  moderationStatus?: "pending" | "approved" | "rejected" | "changes_requested";
+  moderationFeedback?: string;
+  moderatedAt?: string;
 };
 
 export type JobsApiInterview = { id: string; scheduledAt: string; note?: string; createdAt: string; createdBy: string };
@@ -236,6 +238,7 @@ export const enrollEmployer = async () => (await axiosClient.post<{ role: string
 export const createJobCompany = async (company: {
   name: string;
   field: string;
+  requestId?: string;
   logoUrl?: string;
   website?: string;
   description?: string;
@@ -354,6 +357,9 @@ export type JobsAdminReviewJob = JobsApiJob & { employerId?: string };
 export type JobsAdminReviewCompany = JobsApiCompany & {
   verificationEvidence?: { registrationNumber?: string; businessEmail?: string; representativeRole?: string; notes?: string };
   verificationRequestedAt?: string;
+  description?: string;
+  location?: string;
+  moderationFeedback?: string;
 };
 export type JobsAdminReviewProfile = {
   id: string;
@@ -373,8 +379,8 @@ export const getJobsAdminReview = async () =>
   ).data;
 export const moderateJobPosting = async (id: string, status: "approved" | "rejected") =>
   (await axiosClient.patch<{ moderationStatus: string; status: string }>(`/jobs/admin/jobs/${encodeURIComponent(id)}/moderate`, { status })).data;
-export const moderateJobCompany = async (id: string, status: "approved" | "rejected") =>
-  (await axiosClient.patch<{ moderationStatus: string }>(`/jobs/admin/companies/${encodeURIComponent(id)}/moderate`, { status })).data;
+export const moderateJobCompany = async (id: string, status: "approved" | "rejected" | "changes_requested", feedback = "") =>
+  (await axiosClient.patch<{ moderationStatus: string }>(`/jobs/admin/companies/${encodeURIComponent(id)}/moderate`, { status, feedback })).data;
 export const verifyJobsCompany = async (id: string, status: "verified" | "pi_kyb" | "rejected") =>
   (await axiosClient.patch<{ verificationStatus: string }>(`/jobs/admin/companies/${encodeURIComponent(id)}/verify`, { status })).data;
 export const verifyJobsCandidate = async (userId: string, status: "verified" | "rejected") =>

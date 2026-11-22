@@ -299,10 +299,10 @@ const enrichApplicationsWithCandidateProfiles = async (req: Request, application
   });
 };
 const isCandidateBlockingEmployer = async (req: Request, employerUserId: string, candidateUserId: string) => {
-  const company = await req.app.locals.jobCompanyCollection.findOne({ ownerId: employerUserId });
-  if (!company) return false;
+  const companies = await req.app.locals.jobCompanyCollection.find({ ownerId: employerUserId }).project({ slug: 1 }).toArray();
+  if (!companies.length) return false;
   const profile = await req.app.locals.jobProfileCollection.findOne({ userId: candidateUserId });
-  return Boolean(profile?.blockedEmployerIds?.includes(company.slug));
+  return Boolean(profile?.blockedEmployerIds?.some((slug: string) => companies.some((company: any) => company.slug === slug)));
 };
 const requireUser = async (req: Request, res: Response) => {
   const user = await resolveCurrentUser(req);
@@ -530,12 +530,20 @@ export default function mountJobsEndpoints(router: Router) {
     const name = String(req.body?.name || "")
       .trim()
       .slice(0, 120);
-    if (name.length < 2)
+    const field = String(req.body?.field || "").trim().slice(0, 100);
+    const location = String(req.body?.location || "").trim().slice(0, 160);
+    const description = String(req.body?.description || "").trim().slice(0, 1200);
+    if (name.length < 2 || !field || !location || !description)
       return res.status(400).json({
         error: "invalid_company",
-        message: "Company name is required.",
+        message: "Company name, industry, location, and company description are required.",
       });
+    const requestId = String(req.body?.requestId || "").trim().slice(0, 80);
     const ownerId = userId(user);
+    if (requestId) {
+      const previousSubmission = await req.app.locals.jobCompanyCollection.findOne({ ownerId, requestId });
+      if (previousSubmission) return res.status(200).json({ company: serializeJobDocument(previousSubmission) });
+    }
 
     const slug = `${name
       .toLowerCase()
@@ -545,9 +553,7 @@ export default function mountJobsEndpoints(router: Router) {
     const company = {
       slug,
       name,
-      field: String(req.body?.field || "Other")
-        .trim()
-        .slice(0, 100),
+      field,
       mark: name
         .split(/\s+/)
         .map((word: string) => word[0])
@@ -559,12 +565,13 @@ export default function mountJobsEndpoints(router: Router) {
       verificationStatus: "claimed",
       website: cleanPublicUrl(req.body?.website, 500),
       logoUrl: cleanPublicUrl(req.body?.logoUrl),
-      description: String(req.body?.description || "").trim().slice(0, 1200),
-      location: String(req.body?.location || "").trim().slice(0, 160),
+      description,
+      location,
       country: String(req.body?.country || "").trim().slice(0, 120),
       registrationNumber: String(req.body?.registrationNumber || "").trim().slice(0, 120),
       representativeRole: String(req.body?.representativeRole || "").trim().slice(0, 120),
       moderationStatus: "pending",
+      ...(requestId ? { requestId } : {}),
       createdAt: new Date().toISOString(),
     };
     await req.app.locals.jobCompanyCollection.insertOne(company);
@@ -1184,10 +1191,10 @@ export default function mountJobsEndpoints(router: Router) {
       .sort({ createdAt: -1 })
       .toArray();
     if (!isAdmin(user)) {
-      const ownCompany = await req.app.locals.jobCompanyCollection.findOne({ ownerId: owner });
-      if (ownCompany) {
+      const ownCompanies = await req.app.locals.jobCompanyCollection.find({ ownerId: owner }).project({ slug: 1 }).toArray();
+      if (ownCompanies.length) {
         const blockedByProfiles = await req.app.locals.jobProfileCollection
-          .find({ blockedEmployerIds: ownCompany.slug })
+          .find({ blockedEmployerIds: { $in: ownCompanies.map((company: any) => company.slug) } })
           .toArray();
         const blockedCandidateIds = new Set(blockedByProfiles.map((profile: any) => profile.userId));
         applications = applications.filter((application: any) => !blockedCandidateIds.has(application.candidateId));
@@ -1392,19 +1399,25 @@ export default function mountJobsEndpoints(router: Router) {
       return user
         ? res.status(403).json({ error: "admin_required" })
         : undefined;
-    const moderationStatus = ["approved", "rejected"].includes(req.body?.status)
+    const moderationStatus = ["approved", "rejected", "changes_requested"].includes(req.body?.status)
       ? req.body.status
-      : "pending";
-    await req.app.locals.jobCompanyCollection.updateOne(
+      : "";
+    if (!moderationStatus) return res.status(400).json({ error: "invalid_status", message: "Choose an approval, rejection, or request-changes decision." });
+    const feedback = String(req.body?.feedback || "").trim().slice(0, 1200);
+    if (moderationStatus === "changes_requested" && !feedback)
+      return res.status(400).json({ error: "feedback_required", message: "Explain what changes are needed." });
+    const result = await req.app.locals.jobCompanyCollection.updateOne(
       { slug: req.params.id },
       {
         $set: {
           moderationStatus,
+          moderationFeedback: feedback,
           moderatedAt: new Date().toISOString(),
           moderatorId: userId(user),
         },
       },
     );
+    if (!result.matchedCount) return res.status(404).json({ error: "not_found", message: "Company not found." });
     await audit(req, user, "company.moderated", req.params.id, {
       moderationStatus,
     });
@@ -1446,8 +1459,9 @@ export default function mountJobsEndpoints(router: Router) {
     const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 20));
     const skip = (page - 1) * pageSize;
 
-    const company = await req.app.locals.jobCompanyCollection.findOne({ ownerId: owner });
-    const blockedSlugs = company ? [company.slug] : [];
+    const companies = await req.app.locals.jobCompanyCollection.find({ ownerId: owner }).project({ slug: 1 }).toArray();
+    const company = companies[0] || null;
+    const blockedSlugs = companies.map((company: any) => company.slug);
     const blockedByProfiles = await req.app.locals.jobProfileCollection
       .find({ blockedEmployerIds: { $in: blockedSlugs } })
       .toArray();
@@ -1513,8 +1527,9 @@ export default function mountJobsEndpoints(router: Router) {
     const owner = userId(user);
     const candidateUserId = req.params.userId;
 
-    const company = await req.app.locals.jobCompanyCollection.findOne({ ownerId: owner });
-    const blockedSlugs = company ? [company.slug] : [];
+    const companies = await req.app.locals.jobCompanyCollection.find({ ownerId: owner }).project({ slug: 1 }).toArray();
+    const company = companies[0] || null;
+    const blockedSlugs = companies.map((company: any) => company.slug);
     const profile = await req.app.locals.jobProfileCollection.findOne({
       userId: candidateUserId,
       blockedEmployerIds: { $nin: blockedSlugs },

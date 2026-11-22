@@ -364,6 +364,9 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   const [employerCompanyStatus, setEmployerCompanyStatus] = useState("all");
   const [companyRegistrationOpen, setCompanyRegistrationOpen] = useState(false);
   const [companySubmitting, setCompanySubmitting] = useState(false);
+  const companySubmittingRef = useRef(false);
+  const companyRequestIdRef = useRef("");
+  const [companyWorkspaceTab, setCompanyWorkspaceTab] = useState<"mine" | "directory">("mine");
   const [verificationCompanyId, setVerificationCompanyId] = useState("");
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [applications, setApplications] = useState<JobsApiApplication[]>([]);
@@ -614,7 +617,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   );
   const filteredCompanies = useMemo(() => {
     const term = companyQuery.trim().toLowerCase();
-    return companies.filter(company => {
+    return companies.filter(company => company.moderationStatus === "approved").filter(company => {
       const matchesTerm = !term || [company.name, company.field, company.description, company.location, company.country]
         .some(value => String(value || "").toLowerCase().includes(term));
       const matchesIndustry = companyIndustry === "All" || company.field === companyIndustry;
@@ -626,16 +629,28 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
     const term = employerCompanyQuery.trim().toLowerCase();
     return employerCompanies.filter(company => {
       const status = company.moderationStatus === "pending"
-        ? "review"
+        ? "pending"
         : company.moderationStatus === "rejected"
           ? "rejected"
-          : company.verificationStatus || "claimed";
-      const matchesSearch = !term || [company.name, company.field, company.mark].some(value =>
+          : company.moderationStatus === "changes_requested"
+            ? "changes_requested"
+            : company.verificationStatus === "pending"
+              ? "verification_pending"
+              : company.verificationStatus || "claimed";
+      const matchesSearch = !term || [company.name, company.field, company.mark, company.location, company.description].some(value =>
         String(value || "").toLowerCase().includes(term),
       );
       return matchesSearch && (employerCompanyStatus === "all" || status === employerCompanyStatus);
     });
   }, [employerCompanies, employerCompanyQuery, employerCompanyStatus]);
+  const filteredEmployerDirectoryCompanies = useMemo(() => {
+    const term = employerCompanyQuery.trim().toLowerCase();
+    return companies.filter(company =>
+      company.moderationStatus === "approved" &&
+      [company.name, company.field, company.location, company.country, company.description]
+        .some(value => String(value || "").toLowerCase().includes(term)),
+    );
+  }, [companies, employerCompanyQuery]);
   useEffect(() => {
     if (kind === "activity" && searchParams.get("tab") === "actions") setActivityTab("actions");
   }, [kind, searchParams]);
@@ -1497,12 +1512,15 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   };
   const createCompany = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (companySubmitting) return;
+    if (companySubmittingRef.current) return;
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     const data = new FormData(form);
+    companySubmittingRef.current = true;
     setCompanySubmitting(true);
     try {
       await enrollEmployer();
+      if (!companyRequestIdRef.current) companyRequestIdRef.current = crypto.randomUUID();
       const company = await createJobCompany({
         name: String(data.get("name") || "").trim(),
         field: String(data.get("field") || "").trim(),
@@ -1510,16 +1528,18 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
         website: String(data.get("website") || "").trim(),
         location: String(data.get("location") || "").trim(),
         description: String(data.get("description") || "").trim(),
+        requestId: companyRequestIdRef.current,
       });
       setEmployerCompanies(current => [company, ...current]);
-      setCompanies(current => [company, ...current.filter(item => item.id !== company.id)]);
-      setActionMessage(`${company.name} was submitted for admin listing review.`);
+      setActionMessage(`${company.name} was submitted successfully. Status: Pending Review.`);
       setCompanyRegistrationOpen(false);
       form.reset();
+      companyRequestIdRef.current = "";
     } catch (error) {
       const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
       setActionMessage(message || "Company could not be submitted. Please check the details and try again.");
     } finally {
+      companySubmittingRef.current = false;
       setCompanySubmitting(false);
     }
   };
@@ -4356,8 +4376,8 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                     </button>
                   </header>
 
-                  {companyRegistrationOpen || !employerCompanies.length ? (
-                    <form className="job-form jobs-company-register-form" onSubmit={createCompany}>
+                  {actionMessage ? <p className="jobs-action-message" role="status">{actionMessage}</p> : null}
+                    <form className="job-form jobs-company-register-form" onSubmit={createCompany} noValidate hidden={!companyRegistrationOpen}>
                       <div>
                         <h3>Register an employer company</h3>
                         <p>Add the basic company details first. Admin listing review happens before verification.</p>
@@ -4368,7 +4388,10 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       </label>
                       <label>
                         Industry
-                        <input name="field" required maxLength={100} placeholder="e.g. Software, Retail, Education" />
+                        <select name="field" required defaultValue="">
+                          <option value="" disabled>Select an industry</option>
+                          {["Agriculture", "Arts and Entertainment", "Construction", "Education", "Energy", "Finance", "Food and Hospitality", "Government", "Healthcare", "Manufacturing", "Media and Communications", "Nonprofit", "Professional Services", "Retail and Commerce", "Software and Technology", "Transportation and Logistics", "Other"].map(industry => <option key={industry} value={industry}>{industry}</option>)}
+                        </select>
                       </label>
                       <label>
                         Logo URL
@@ -4380,18 +4403,23 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       </label>
                       <label>
                         Location
-                        <input name="location" maxLength={160} placeholder="City, country or Remote" />
+                        <input name="location" required maxLength={160} placeholder="City, country or Remote" />
                       </label>
                       <label className="wide">
                         About company
-                        <textarea name="description" rows={3} maxLength={1200} placeholder="What your company builds and who you serve" />
+                        <textarea name="description" required rows={3} maxLength={1200} placeholder="What your company builds and who you serve" />
                       </label>
                       <button type="submit" disabled={companySubmitting} aria-busy={companySubmitting}>
                         {companySubmitting ? "Submitting…" : "Submit company for review"}
                       </button>
                     </form>
-                  ) : null}
 
+                  <nav className="jobs-company-tabs" aria-label="Company workspace tabs">
+                    <button type="button" className={companyWorkspaceTab === "mine" ? "active" : ""} aria-pressed={companyWorkspaceTab === "mine"} onClick={() => setCompanyWorkspaceTab("mine")}>My Companies</button>
+                    <button type="button" className={companyWorkspaceTab === "directory" ? "active" : ""} aria-pressed={companyWorkspaceTab === "directory"} onClick={() => setCompanyWorkspaceTab("directory")}>Company Directory</button>
+                  </nav>
+
+                  {companyWorkspaceTab === "mine" ? <>
                   <div className="jobs-company-toolbar">
                     <label>
                       <SearchRoundedIcon />
@@ -4409,9 +4437,11 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       aria-label="Filter companies by status"
                     >
                       <option value="all">All statuses</option>
-                      <option value="review">Listing review</option>
+                      <option value="pending">Pending Review</option>
+                      <option value="approved">Approved</option>
+                      <option value="changes_requested">Changes Requested</option>
                       <option value="claimed">Needs verification</option>
-                      <option value="pending">Verification pending</option>
+                      <option value="verification_pending">Verification pending</option>
                       <option value="verified">Verified</option>
                       <option value="pi_kyb">Pi KYB</option>
                       <option value="rejected">Rejected</option>
@@ -4422,17 +4452,27 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                     <div className="jobs-company-card-grid">
                       {filteredEmployerCompanies.map(company => {
                         const reviewStatus = company.moderationStatus === "pending"
-                          ? "review"
+                          ? "pending"
                           : company.moderationStatus === "rejected"
                             ? "rejected"
-                            : company.verificationStatus || "claimed";
-                        const statusLabel = reviewStatus === "review"
-                          ? "Listing review"
-                          : reviewStatus === "pi_kyb"
-                            ? "Pi KYB verified"
-                            : reviewStatus === "claimed"
-                              ? "Needs verification"
-                              : reviewStatus.replace(/_/g, " ");
+                            : company.moderationStatus === "changes_requested"
+                              ? "changes_requested"
+                              : company.moderationStatus === "approved" && company.verificationStatus === "pending"
+                                ? "verification_pending"
+                                : company.moderationStatus === "approved"
+                                  ? "approved"
+                                  : company.verificationStatus || "claimed";
+                        const statusLabel = ({
+                          pending: "Pending Review",
+                          approved: "Approved",
+                          rejected: "Rejected",
+                          changes_requested: "Changes Requested",
+                          verification_pending: "Verification pending",
+                          pi_kyb: "Pi KYB verified",
+                          claimed: "Needs verification",
+                          unclaimed: "Needs verification",
+                          verified: "Verified",
+                        } as Record<string, string>)[reviewStatus] || reviewStatus.replace(/_/g, " ");
                         const canRequestVerification = company.moderationStatus === "approved" &&
                           !["pending", "verified", "pi_kyb"].includes(company.verificationStatus || "claimed");
                         return (
@@ -4442,10 +4482,11 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                               <div>
                                 <small className={`jobs-company-status ${reviewStatus}`}>{statusLabel}</small>
                                 <h3>{company.name}</h3>
-                                <p>{company.field}</p>
+                                <p>{company.field} · {company.location || "Location not provided"}</p>
                               </div>
                               <ArrowForwardRoundedIcon />
                             </Link>
+                            {company.moderationFeedback ? <p className="jobs-company-review-feedback"><strong>Admin feedback:</strong> {company.moderationFeedback}</p> : null}
                             <footer>
                               <Link to={`/services/jobs/company/${company.id}`}>Open company profile</Link>
                               {canRequestVerification ? (
@@ -4453,7 +4494,7 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                                   {verificationCompanyId === company.id ? "Close form" : "Verify company"}
                                 </button>
                               ) : (
-                                <span>{reviewStatus === "review" ? "Waiting for listing review" : statusLabel}</span>
+                                <span>{reviewStatus === "pending" ? "Waiting for listing review" : statusLabel}</span>
                               )}
                             </footer>
                           </article>
@@ -4467,6 +4508,26 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       <p>Change the search or status filter.</p>
                     </div>
                   )}
+                  </> : <>
+                    <div className="jobs-company-toolbar">
+                      <label><SearchRoundedIcon /><input type="search" value={employerCompanyQuery} onChange={event => setEmployerCompanyQuery(event.target.value)} placeholder="Search approved companies" aria-label="Search approved companies by name, industry, or location" /></label>
+                    </div>
+                    {filteredEmployerDirectoryCompanies.length ? (
+                      <div className="jobs-company-card-grid">
+                        {filteredEmployerDirectoryCompanies.map(company => (
+                          <article className="jobs-company-manage-card" key={company.id}>
+                            <Link to={`/services/jobs/company/${company.id}`} className="jobs-company-card-main">
+                              <CompanyLogo company={company} className="jobs-company-mark" />
+                              <div><small className="jobs-company-status approved">Approved</small><h3>{company.name}</h3><p>{company.field} · {company.location}</p></div>
+                              <ArrowForwardRoundedIcon />
+                            </Link>
+                            <p className="jobs-company-directory-description">{company.description || "No company description provided."}</p>
+                            <footer><Link to={`/services/jobs/company/${company.id}`}>Open company profile</Link>{company.website ? <a href={company.website} target="_blank" rel="noreferrer">Visit website</a> : null}</footer>
+                          </article>
+                        ))}
+                      </div>
+                    ) : <div className="jobs-company-empty-state"><SearchRoundedIcon /><h3>No approved companies found</h3><p>Try a different search.</p></div>}
+                  </>}
 
                   {verificationCompanyId ? (() => {
                     const company = employerCompanies.find(item => item.id === verificationCompanyId);

@@ -557,6 +557,16 @@ const start = async () => {
       app.locals.quizCollection = db.collection("quizzes");
       app.locals.quizSubmissionCollection = db.collection("quiz_submissions");
       app.locals.certificateCollection = db.collection("certificates");
+      const companyIndexes = await app.locals.jobCompanyCollection.listIndexes().toArray();
+      const uniqueOwnerIndex = companyIndexes.find((index: { key?: Record<string, number>; unique?: boolean }) =>
+        index.unique === true && index.key?.ownerId === 1,
+      );
+      if (uniqueOwnerIndex?.name) await app.locals.jobCompanyCollection.dropIndex(uniqueOwnerIndex.name);
+      await app.locals.jobCompanyCollection.createIndex({ ownerId: 1 });
+      await app.locals.jobCompanyCollection.createIndex(
+        { ownerId: 1, requestId: 1 },
+        { unique: true, partialFilterExpression: { requestId: { $type: "string" } } },
+      );
       // Read indexes for the isolated homepage verification/backfill worker.
       await Promise.all([
         app.locals.marketplaceOrderCollection.createIndex({ paymentStatus: 1, paidAt: -1 }),
@@ -729,10 +739,6 @@ const start = async () => {
           directoryPriority: 1,
           name: 1,
         }),
-        app.locals.jobCompanyCollection.createIndex(
-          { ownerId: 1 },
-          { unique: true, sparse: true },
-        ),
         app.locals.jobSavedCollection.createIndex(
           { userId: 1, jobId: 1 },
           { unique: true },

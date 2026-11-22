@@ -4764,6 +4764,15 @@
   background: #fff;
   box-shadow: 0 10px 28px rgb(43 26 83 / 7%);
 }
+.jobs-company-register-form[hidden] { display: none; }
+.jobs-company-tabs { display: flex; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--smaj-border); }
+.jobs-company-tabs button { min-height: 40px; padding: 0 14px; color: var(--smaj-text); background: var(--smaj-card); border: 1px solid var(--smaj-border); border-radius: 10px; font: inherit; font-weight: 800; cursor: pointer; }
+.jobs-company-tabs button.active { color: #fff; background: var(--smaj-primary); border-color: var(--smaj-primary); } /* theme-color-exception: white text on the fixed brand tab button */
+.jobs-company-review-feedback, .jobs-company-directory-description { margin: 0; padding: 0 14px 12px; color: var(--smaj-text-secondary); font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }
+.jobs-company-review-feedback { color: var(--smaj-text); background: var(--smaj-primary-soft); }
+.jobs-company-status.pending { color: var(--smaj-text) !important; background: color-mix(in srgb, var(--smaj-primary) 14%, var(--smaj-card)); }
+.jobs-company-status.changes_requested { color: var(--smaj-text) !important; background: color-mix(in srgb, var(--smaj-accent) 14%, var(--smaj-card)); }
+.jobs-company-status.approved { color: var(--smaj-success) !important; background: color-mix(in srgb, var(--smaj-success) 14%, var(--smaj-card)); }
 
 .jobs-company-register-form > div,
 .jobs-company-register-form > button {
@@ -5044,6 +5053,8 @@
   .jobs-company-workspace-head > button {
     width: 100%;
   }
+  .jobs-company-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .jobs-company-tabs button { padding-inline: 8px; }
 
   .jobs-company-register-form,
   .jobs-company-toolbar,
