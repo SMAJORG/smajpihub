@@ -101,9 +101,12 @@ export default function mountNotificationEndpoints(router: Router) {
       return res.status(200).json({ notifications: [], unreadCount: 0 });
     }
     const userId = currentUser.uid;
-    const notifications = await req.app.locals.notificationCollection.find({ userId }).sort({ createdAt: -1 }).limit(100).toArray();
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+    const skip = Math.min(100000, Math.max(0, Number(req.query.skip) || 0));
+    const notifications = await req.app.locals.notificationCollection.find({ userId }).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).toArray();
+    const total = await req.app.locals.notificationCollection.countDocuments({ userId });
     const unreadCount = await req.app.locals.notificationCollection.countDocuments({ userId, read: false });
-    return res.status(200).json({ notifications: notifications.map(serialize), unreadCount });
+    return res.status(200).json({ notifications: notifications.map(serialize), unreadCount, total, hasMore: skip + notifications.length < total });
   });
 
   router.patch("/read-all", async (req, res) => {
@@ -126,6 +129,30 @@ export default function mountNotificationEndpoints(router: Router) {
     const unreadCount = await req.app.locals.notificationCollection.countDocuments({ userId: currentUser.uid, read: false });
     publishUserNotificationState(currentUser.uid, unreadCount);
     return res.status(200).json({ message: "Notification marked as read" });
+  });
+
+  router.patch("/bulk/read", async (req, res) => {
+    const currentUser = await resolveCurrentUser(req);
+    if (!currentUser) return res.status(401).json({ error: "unauthorized" });
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.length < 1 || ids.length > 500 || !ids.every((id: unknown) => typeof id === "string" && ObjectId.isValid(id))) return res.status(400).json({ error: "invalid_ids" });
+    await req.app.locals.notificationCollection.updateMany({ userId: currentUser.uid, _id: { $in: ids.map((id: string) => new ObjectId(id)) } }, { $set: { read: true } });
+    const unreadCount = await req.app.locals.notificationCollection.countDocuments({ userId: currentUser.uid, read: false });
+    publishUserNotificationState(currentUser.uid, unreadCount);
+    return res.json({ updated: true });
+  });
+
+  router.post("/bulk/delete", async (req, res) => {
+    const currentUser = await resolveCurrentUser(req);
+    if (!currentUser) return res.status(401).json({ error: "unauthorized" });
+    const all = req.body?.all === true;
+    const ids = req.body?.ids;
+    if (!all && (!Array.isArray(ids) || ids.length < 1 || ids.length > 500 || !ids.every((id: unknown) => typeof id === "string" && ObjectId.isValid(id)))) return res.status(400).json({ error: "invalid_ids" });
+    const query = all ? { userId: currentUser.uid } : { userId: currentUser.uid, _id: { $in: ids.map((id: string) => new ObjectId(id)) } };
+    const result = await req.app.locals.notificationCollection.deleteMany(query);
+    const unreadCount = await req.app.locals.notificationCollection.countDocuments({ userId: currentUser.uid, read: false });
+    publishUserNotificationState(currentUser.uid, unreadCount);
+    return res.json({ deletedCount: result.deletedCount });
   });
 
   router.delete("/:id", async (req, res) => {
