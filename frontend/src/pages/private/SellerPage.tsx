@@ -666,7 +666,7 @@ function SellerWorkspace({
                         </li>
                       ))}
                     </ul>
-                  )}
+                  )}</> : null}
                 </section>
               </div>
               <details className="seller-ws-card seller-ws-trust">
