@@ -28,7 +28,7 @@ import TrustBadge from "../../components/TrustBadge";
 import LanguageSoonButton from "../../components/LanguageSoonButton";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { getHeroBannerState, getHeroBannerLabel, getHeroBannerTarget, getHeroBannerButtonText } from "../../lib/heroBanners";
-import { getServiceLaunchLabel, getServiceLaunchStatus, serviceCatalog, type ServiceDefinition } from "../../content/serviceCatalog";
+import { getServiceLaunchLabel, serviceCatalog, type ServiceDefinition } from "../../content/serviceCatalog";
 import { axiosClient } from "../../lib/axiosClient";
 import { countryDisplayName, countryFlag, formatPiAmount } from "../../lib/formatters";
 import { getStreamCatalog, type StreamCatalogTitle } from "../../lib/streamCatalog";
@@ -43,7 +43,6 @@ type DiscoveryTab = "for-you" | "trending" | "lifestyle" | "categories";
 
 const why = [[PublicOutlinedIcon, "Access anywhere", "Access multiple digital services from anywhere you are."], [LockOutlinedIcon, "Simple access", "One account for your everyday needs."], [HubOutlinedIcon, "Connect everyone", "People, businesses, and opportunities connected together."], [RocketLaunchOutlinedIcon, "Built for the future", "A growing ecosystem designed for everyday life."]] as const;
 const discoveryTabs = [["For you", "for-you"], ["Trending", "trending"], ["Lifestyle", "lifestyle"], ["Categories", "categories"]] as const;
-const serviceHints: Record<string, string> = { store: "Shopping - Deals", food: "Eat - Delivery", jobs: "Work - Hire", education: "Learn - Skills", health: "Care - Doctors", transport: "Ride - Move", agro: "Farm - Trade", energy: "Power - Bills", charity: "Give - Help", housing: "Rent - Buy", events: "Tickets - Fun", swap: "Trade - Exchange", stream: "Watch - Videos", sports: "Play - Scores", token: "Rewards - Utility" };
 const categoryGroups = [
   { title: "Shopping & Entertainment", description: "Shop, watch, play, and discover experiences.", slugs: ["store", "stream", "sports", "events"] },
   { title: "Daily Life", description: "Handle food, care, travel, and your home.", slugs: ["food", "health", "transport", "housing"] },
