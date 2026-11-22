@@ -93,6 +93,8 @@ export type JobsProfile = {
   summary: string;
   updatedAt?: string;
   verificationStatus?: "unverified" | "pending" | "verified" | "rejected";
+  verificationRejectionReason?: string;
+  verificationRequestedAt?: string;
   avatarConfirmationStatus?: "confirmed" | "deferred";
   avatarConfirmationValue?: string;
   avatar?: string;
@@ -324,11 +326,8 @@ export const requestCompanyVerification = async (
   id: string,
   evidence: { registrationNumber: string; businessEmail: string; representativeRole: string; notes: string }
 ) => (await axiosClient.post(`/jobs/companies/${encodeURIComponent(id)}/verification-request`, evidence)).data;
-export const requestCandidateVerification = async (evidence: {
-  portfolio: string;
-  credential: string;
-  notes: string;
-}) => (await axiosClient.post("/jobs/profile/verification-request", evidence)).data;
+export const requestCandidateVerification = async () =>
+  (await axiosClient.post<{ verificationStatus: JobsProfile["verificationStatus"] }>("/jobs/profile/verification-request", {})).data;
 export type JobsBillingPlan = { id: string; name: string; priceUsdt: number; pricePi: number; piRateUsed: number };
 export type JobsBillingIntent = JobsBillingPlan & {
   billingId: string;
@@ -367,9 +366,14 @@ export type JobsAdminReviewProfile = {
   candidateName: string;
   candidateAvatar?: string;
   title?: string;
+  summary?: string;
+  skills?: string[] | string;
   portfolio?: string;
+  employment?: Array<{ position?: string; employer?: string; current?: boolean; startYear?: string; endYear?: string; description?: string }>;
+  cv?: { name?: string; url?: string };
   verificationEvidence?: { portfolio?: string; credential?: string; notes?: string };
   verificationRequestedAt?: string;
+  verificationRejectionReason?: string;
 };
 export const getJobsAdminReview = async () =>
   (
@@ -383,8 +387,8 @@ export const moderateJobCompany = async (id: string, status: "approved" | "rejec
   (await axiosClient.patch<{ moderationStatus: string }>(`/jobs/admin/companies/${encodeURIComponent(id)}/moderate`, { status, feedback })).data;
 export const verifyJobsCompany = async (id: string, status: "verified" | "pi_kyb" | "rejected") =>
   (await axiosClient.patch<{ verificationStatus: string }>(`/jobs/admin/companies/${encodeURIComponent(id)}/verify`, { status })).data;
-export const verifyJobsCandidate = async (userId: string, status: "verified" | "rejected") =>
-  (await axiosClient.patch<{ verificationStatus: string }>(`/jobs/admin/profiles/${encodeURIComponent(userId)}/verify`, { status })).data;
+export const verifyJobsCandidate = async (userId: string, status: "verified" | "rejected", reason = "") =>
+  (await axiosClient.patch<{ verificationStatus: string; verificationRejectionReason?: string }>(`/jobs/admin/profiles/${encodeURIComponent(userId)}/verify`, { status, reason })).data;
 
 export type JobsSalaryDispute = {
   id: string;

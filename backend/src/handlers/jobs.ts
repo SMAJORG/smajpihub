@@ -816,8 +816,20 @@ export default function mountJobsEndpoints(router: Router) {
     const user = await requireUser(req, res); if (!user) return;
     const profile = await req.app.locals.jobProfileCollection.findOne({ userId: userId(user) });
     if (!profile?.title || !profile?.summary) return res.status(400).json({ error: "profile_incomplete", message: "Complete your professional profile first." });
-    const evidence = { portfolio: String(req.body?.portfolio || profile.portfolio || "").trim().slice(0, 500), credential: String(req.body?.credential || "").trim().slice(0, 500), notes: String(req.body?.notes || "").trim().slice(0, 1000) };
-    await req.app.locals.jobProfileCollection.updateOne({ userId: userId(user) }, { $set: { verificationStatus: "pending", verificationEvidence: evidence, verificationRequestedAt: new Date().toISOString() } });
+    if (profile.verificationStatus === "pending" || profile.verificationStatus === "verified")
+      return res.json({ verificationStatus: profile.verificationStatus });
+    const verificationRequestedAt = new Date().toISOString();
+    const result = await req.app.locals.jobProfileCollection.updateOne(
+      { userId: userId(user), verificationStatus: { $nin: ["pending", "verified"] } },
+      {
+        $set: { verificationStatus: "pending", verificationRequestedAt },
+        $unset: { verificationRejectionReason: "" },
+      },
+    );
+    if (!result.matchedCount) {
+      const current = await req.app.locals.jobProfileCollection.findOne({ userId: userId(user) });
+      return res.json({ verificationStatus: current?.verificationStatus || "unverified" });
+    }
     await audit(req, user, "candidate.verification_requested", userId(user)); res.json({ verificationStatus: "pending" });
   });
   router.get("/profile/:candidateId/cv/download", async (req, res) => {
@@ -1442,12 +1454,29 @@ export default function mountJobsEndpoints(router: Router) {
     if (!user || !isAdmin(user))
       return user ? res.status(403).json({ error: "admin_required" }) : undefined;
     const verificationStatus = ["verified", "rejected"].includes(req.body?.status) ? req.body.status : "pending";
+    const verificationRejectionReason = String(req.body?.reason || "").trim().slice(0, 1000);
+    if (verificationStatus === "rejected" && !verificationRejectionReason)
+      return res.status(400).json({ error: "rejection_reason_required", message: "Provide a reason when rejecting professional verification." });
     await req.app.locals.jobProfileCollection.updateOne(
       { userId: req.params.userId },
-      { $set: { verificationStatus, verifiedAt: new Date().toISOString(), verifierId: userId(user) } },
+      {
+        $set: {
+          verificationStatus,
+          verifiedAt: new Date().toISOString(),
+          verifierId: userId(user),
+          ...(verificationStatus === "rejected" ? { verificationRejectionReason } : {}),
+        },
+        ...(verificationStatus === "verified" ? { $unset: { verificationRejectionReason: "" } } : {}),
+      },
     );
-    await audit(req, user, "candidate.verification_reviewed", req.params.userId, { verificationStatus });
-    res.json({ verificationStatus });
+    await audit(req, user, "candidate.verification_reviewed", req.params.userId, {
+      verificationStatus,
+      ...(verificationStatus === "rejected" ? { reason: verificationRejectionReason } : {}),
+    });
+    res.json({
+      verificationStatus,
+      ...(verificationStatus === "rejected" ? { verificationRejectionReason } : {}),
+    });
   });
   router.get("/employer/candidates/search", async (req, res) => {
     const user = await requireEmployer(req, res);

@@ -1658,19 +1658,26 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       setActionMessage("Company verification request could not be submitted.");
     }
   };
-  const submitCandidateVerification = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
+  const submitCandidateVerification = async () => {
+    if (profile?.verificationStatus === "pending" || profile?.verificationStatus === "verified") return;
+    if (!profile?.title || !(profile.summary || "").trim()) {
+      setActionMessage("Add a professional headline and summary to your existing Jobs profile before requesting verification.");
+      return;
+    }
     try {
-      await requestCandidateVerification({
-        portfolio: String(data.get("verificationPortfolio") || ""),
-        credential: String(data.get("credential") || ""),
-        notes: String(data.get("verificationNotes") || ""),
-      });
-      setProfile(current => (current ? { ...current, verificationStatus: "pending" } : current));
-      setActionMessage("Professional verification submitted for review.");
-    } catch {
-      setActionMessage("Complete your professional profile before requesting verification.");
+      const result = await requestCandidateVerification();
+      const status = result.verificationStatus || "pending";
+      setProfile(current => (current ? {
+        ...current,
+        verificationStatus: status,
+        verificationRejectionReason: undefined,
+      } : current));
+      setActionMessage(status === "pending"
+        ? "Your existing Jobs profile was submitted for professional verification."
+        : `Professional verification is ${status.replace(/_/g, " ")}.`);
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setActionMessage(message || "Your professional verification request could not be submitted.");
     }
   };
   const refreshEmployerPayments = async () => {
@@ -4034,7 +4041,11 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       {currentAvatar ? <img src={currentAvatar} alt="" /> : (user?.displayName || "P")[0]}
                     </span>
                     <div className="jobs-profile-intro">
-                      <h2>Hi {user?.displayName || user?.piUsername || user?.username || "Pioneer"} !<SmajVerifiedBadge userId={user?.uid} /></h2>
+                      <h2>
+                        Hi {user?.displayName || user?.piUsername || user?.username || "Pioneer"} !
+                        <SmajVerifiedBadge userId={user?.uid} />
+                        {profile?.verificationStatus === "verified" ? <span className="jobs-professional-badge">Verified Professional</span> : null}
+                      </h2>
                       <p>
                         {profile?.employment?.[0]?.position || profile?.title || "Add your professional title"}
                         {profile?.employment?.[0]?.employer ? ` at ${profile.employment[0].employer}` : ""}
@@ -4042,7 +4053,6 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                       <span><LocationOnOutlinedIcon /> {profile?.location || user?.country || "Add your country"}</span>
                       <span>
                         <CheckCircleRoundedIcon /> {user?.piUsername ? `@${user.piUsername}` : "SMAJ PI HUB account"}
-                        {profile?.verificationStatus === "verified" ? <b>Verified</b> : null}
                       </span>
                       {user?.contactPhone ? <span><PhoneOutlinedIcon /> {user.contactPhone}</span> : null}
                     </div>
@@ -4316,35 +4326,36 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                     </form>
                   </div>
                 ) : null}
-                <form className="job-form jobs-verification-form" onSubmit={submitCandidateVerification}>
+                <section className="job-form jobs-verification-form">
                   <h2>Professional verification</h2>
                   <p>
-                    Status: <b>{profile?.verificationStatus || "unverified"}</b>. Verification reviews evidence; it does
-                    not guarantee a candidate's work.
+                    Status: <b>{({
+                      unverified: "Not Verified",
+                      pending: "Pending Review",
+                      verified: "Verified",
+                      rejected: "Rejected",
+                    } as const)[profile?.verificationStatus || "unverified"]}</b>
                   </p>
-                  <label>
-                    Portfolio or work URL
-                    <input
-                      name="verificationPortfolio"
-                      type="url"
-                      defaultValue={profile?.portfolio}
-                      placeholder="https://..."
-                    />
-                  </label>
-                  <label>
-                    Credential URL
-                    <input name="credential" type="url" placeholder="https://..." />
-                  </label>
-                  <label>
-                    Review notes
-                    <textarea
-                      name="verificationNotes"
-                      rows={3}
-                      placeholder="Explain what the reviewer should confirm"
-                    />
-                  </label>
-                  <button type="submit">Request professional verification</button>
-                </form>
+                  {profile?.verificationStatus === "rejected" ? (
+                    <p role="alert"><b>Reason:</b> {profile.verificationRejectionReason || "No reason was recorded. Contact support for clarification."}</p>
+                  ) : null}
+                  <p>
+                    Review uses your existing SMAJ Jobs profile, including your professional details, skills, work history,
+                    portfolio, summary, and CV. Update those details above before requesting review if needed.
+                  </p>
+                  {profile?.verificationStatus !== "pending" && profile?.verificationStatus !== "verified" ? (
+                    <button
+                      type="button"
+                      onClick={() => void submitCandidateVerification()}
+                      disabled={!profile?.title || !(profile.summary || "").trim()}
+                    >
+                      {profile?.verificationStatus === "rejected" ? "Resubmit for review" : "Request verification review"}
+                    </button>
+                  ) : null}
+                  {!profile?.title || !(profile.summary || "").trim() ? (
+                    <p>Add a professional headline and summary to your existing profile to request verification.</p>
+                  ) : null}
+                </section>
                 {actionMessage ? <p className="jobs-action-message">{actionMessage}</p> : null}
               </div>
             ) : kind === "employer" ? (

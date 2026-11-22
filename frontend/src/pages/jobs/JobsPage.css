@@ -3085,6 +3085,18 @@
   font-size: 17px;
   font-weight: 600;
 }
+.jobs-profile-intro h2 > .jobs-professional-badge {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--smaj-success);
+  background: color-mix(in srgb, var(--smaj-success) 14%, var(--smaj-card));
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .jobs-profile-intro {
   display: grid;
   gap: 6px;

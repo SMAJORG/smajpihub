@@ -236,8 +236,15 @@ export const AdminJobsReviewPage = () => {
     }
   };
   const decideCandidate = async (userId: string, status: "verified" | "rejected") => {
+    const reason = status === "rejected"
+      ? window.prompt("Why is this professional verification being rejected?", "")?.trim() || ""
+      : "";
+    if (status === "rejected" && !reason) {
+      showFeedback("Provide a rejection reason for the candidate.", "error");
+      return;
+    }
     try {
-      await verifyJobsCandidate(userId, status);
+      await verifyJobsCandidate(userId, status, reason);
       setMessage(`Candidate ${status === "verified" ? "verified" : "rejected"}.`);
       await load();
     } catch (error) {
@@ -343,7 +350,16 @@ export const AdminJobsReviewPage = () => {
           <div>
             <span>{profile.title || "Candidate"}</span>
             <h3>{profile.candidateName}</h3>
-            {profile.verificationEvidence ? <p>{profile.verificationEvidence.credential || "No credential provided"}</p> : null}
+            {profile.skills ? <p><b>Skills:</b> {Array.isArray(profile.skills) ? profile.skills.join(", ") : profile.skills}</p> : null}
+            {profile.employment?.length ? (
+              <p><b>Experience:</b> {profile.employment.map(item => `${item.position || "Role"} at ${item.employer || "employer"}${item.current ? " (current)" : ""}`).join(" · ")}</p>
+            ) : null}
+            {profile.summary ? <p><b>Professional summary:</b> {profile.summary}</p> : null}
+            {profile.portfolio ? <p><b>Portfolio:</b> {profile.portfolio}</p> : null}
+            {profile.cv?.name ? <p><b>CV:</b> {profile.cv.name}</p> : null}
+            {profile.verificationEvidence ? (
+              <p><b>Previously submitted review details:</b> {[profile.verificationEvidence.portfolio, profile.verificationEvidence.credential, profile.verificationEvidence.notes].filter(Boolean).join(" · ")}</p>
+            ) : null}
             <small>{profile.verificationRequestedAt ? new Date(profile.verificationRequestedAt).toLocaleString() : ""}</small>
           </div>
           <div className="row-actions">
