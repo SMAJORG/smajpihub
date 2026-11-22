@@ -1,3 +1,4 @@
+import "../pages/admin/admin-analytics.css";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
