@@ -3,6 +3,9 @@ import { useAuthContext } from "../../contexts/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import MoreHorizOutlinedIcon from "@mui/icons-material/MoreHorizOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import MarketplaceProductCard from "../../components/MarketplaceProductCard";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import TrustBadge from "../../components/TrustBadge";
@@ -30,6 +33,9 @@ const SellerProfilePage = () => {
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"products" | "reviews">("products");
   const [showBackToTop, setShowBackToTop] = useState(false);
   const { addProductToCart, cartToast } = useAddToCartToast();
 
@@ -63,10 +69,13 @@ const SellerProfilePage = () => {
 
   const productTotal = data.pagination?.total ?? data.seller.totalProducts ?? data.products.length;
   const hasMoreProducts = data.pagination?.hasMore ?? false;
+  const hasAnyProducts = productTotal > 0;
+  const filtersApplied = Boolean(search || category || sort !== "newest");
 
   return (
     <main className="private-page seller-profile-page">
       {cartToast}
+      <div className="seller-profile-topbar"><h2>Seller Profile</h2><button type="button" aria-label="More seller options" aria-haspopup="dialog" onClick={() => setReportMenuOpen(true)}><MoreHorizOutlinedIcon /></button></div>
       <section className="seller-profile-hero">
         <UserAvatarFrame className="profile-avatar seller-profile-avatar" name={data.seller.displayName} image={data.seller.avatar} frame={data.seller.avatarFrame} size={92} />
         <div className="seller-profile-identity">
@@ -77,22 +86,20 @@ const SellerProfilePage = () => {
           </h1>
           <p className="seller-profile-username">@{data.seller.piUsername || data.seller.username}</p>
           {data.seller.uid !== user?.uid ? <Link className="private-primary-button" to={chatLink(data.seller)}>Message</Link> : null}
-          <Link className="private-secondary-button seller-report-button" to="/report-abuse">Report seller</Link>
+          
         </div>
         <div className="seller-profile-stats">
           <strong>{data.seller.totalProducts || 0}<span>Products</span></strong>
           <strong>{data.seller.successfulOrders || 0}<span>Successful orders</span></strong>
-          <strong>{data.seller.averageRating?.toFixed(1) || "New"}<span>Rating</span></strong>
+          <strong>{data.seller.averageRating ? data.seller.averageRating.toFixed(1) : "—"}<span>{data.seller.averageRating ? "Rating" : "No ratings yet"}</span></strong>
         </div>
       </section>
       <p className="seller-joined">Joined {data.seller.createdAt ? new Date(data.seller.createdAt).toLocaleDateString() : "recently"}</p>
 
+      <div className="seller-profile-tabs" role="tablist" aria-label="Seller information"><button type="button" role="tab" aria-selected={activeTab === "products"} className={activeTab === "products" ? "active" : ""} onClick={() => setActiveTab("products")}>Products</button><button type="button" role="tab" aria-selected={activeTab === "reviews"} className={activeTab === "reviews" ? "active" : ""} onClick={() => setActiveTab("reviews")}>Buyer reviews</button></div>
+      {activeTab === "products" ? <>
       <section className="section-title seller-products-title"><div><h2>Products listed</h2><p>Showing {data.products.length} of {productTotal}</p></div></section>
-      <section className="seller-product-tools" aria-label="Filter seller products">
-        <label className="seller-product-search">
-          <SearchOutlinedIcon aria-hidden="true" />
-          <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="Search products" aria-label="Search products" />
-        </label>
+      {hasAnyProducts ? <><div className="seller-profile-filterbar"><label className="seller-product-search"><SearchOutlinedIcon aria-hidden="true" /><input type="search" value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="Search seller products..." aria-label="Search seller products" /></label><button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(value => !value)}><TuneOutlinedIcon /> Filters</button></div>{filtersOpen ? <section className="seller-product-tools seller-profile-advanced" aria-label="Filter seller products">
         <select value={category} onChange={(event) => { setCategory(event.target.value); resetPage(); }} aria-label="Filter by category">
           <option value="">All categories</option>
           {categories.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -103,17 +110,17 @@ const SellerProfilePage = () => {
           <option value="price_low">Price: low to high</option>
           <option value="price_high">Price: high to low</option>
         </select>
-      </section>
+      </section> : null}</> : null}
 
       {data.products.length ? (
         <section className="product-grid seller-product-grid">
           {data.products.map((product) => <MarketplaceProductCard key={product._id} product={product} variant="compact" onAddToCart={addProductToCart} />)}
         </section>
-      ) : <div className="private-state"><h2>No matching products</h2><p>Try another search or category.</p></div>}
+      ) : <div className="private-state"><h2>{hasAnyProducts && filtersApplied ? "No matching products" : "No products listed yet"}</h2><p>{hasAnyProducts && filtersApplied ? "Try another search or category." : "This seller hasn’t published any products. Check back later."}</p>{filtersApplied ? <button type="button" className="private-secondary-button" onClick={() => { setSearch(""); setCategory(""); setSort("newest"); resetPage(); }}>Clear filters</button> : null}</div>}
 
       {hasMoreProducts ? <div className="seller-load-more"><button type="button" className="private-secondary-button" disabled={loadingMore} onClick={() => setPage((value) => value + 1)}>{loadingMore ? "Loading..." : "Load 20 more"}</button></div> : null}
 
-      <section className="reviews-panel">
+      </> : <section className="reviews-panel">
         <div className="section-title"><div><h2>Buyer reviews</h2><p>{data.reviews.length ? `${data.reviews.length} marketplace reviews` : "No reviews yet"}</p></div></div>
         {data.reviews.map((review) => (
           <article key={review._id}>
@@ -122,7 +129,9 @@ const SellerProfilePage = () => {
             <small>{review.buyerName} · {new Date(review.createdAt).toLocaleDateString()}</small>
           </article>
         ))}
-      </section>
+        {!data.reviews.length ? <div className="seller-reviews-empty"><h3>No reviews yet</h3><p>Verified buyer reviews will appear here after eligible purchases.</p></div> : null}
+      </section>}
+      {reportMenuOpen ? <div className="seller-report-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setReportMenuOpen(false); }}><section role="dialog" aria-modal="true" aria-labelledby="seller-options-title" className="seller-report-dialog"><header><h2 id="seller-options-title">Seller options</h2><button type="button" aria-label="Close seller options" onClick={() => setReportMenuOpen(false)}><CloseOutlinedIcon /></button></header><p>Help keep the SMAJ marketplace safe.</p><Link className="private-secondary-button" to="/report-abuse">Report seller</Link><button type="button" onClick={() => setReportMenuOpen(false)}>Cancel</button></section></div> : null}
       {showBackToTop ? <button type="button" className="seller-back-to-top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top">↑</button> : null}
     </main>
   );
