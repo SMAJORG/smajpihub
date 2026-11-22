@@ -8,6 +8,8 @@ const preferences = readFileSync(new URL("../src/pages/jobs/JobPreferencesPanel.
 const styles = readFileSync(new URL("../src/pages/jobs/JobsPage.css", import.meta.url), "utf8");
 const backend = readFileSync(new URL("../../backend/src/handlers/jobs.ts", import.meta.url), "utf8");
 const backendIndex = readFileSync(new URL("../../backend/src/index.ts", import.meta.url), "utf8");
+const companyFormStart = page.indexOf('className="job-form jobs-company-register-form"');
+const companyForm = page.slice(companyFormStart, page.indexOf("</form>", companyFormStart));
 
 assert.match(page, /Loading live opportunities/);
 assert.match(page, /loading && kind !== "home"/);
@@ -28,11 +30,26 @@ assert.match(backend, /Company name, industry, location, and company description
 assert.match(page, /moderationFeedback/);
 assert.match(page, /changes_requested/);
 assert.match(backend, /moderationStatus === "changes_requested"/);
+assert.doesNotMatch(companyForm, /Logo URL/);
+assert.match(companyForm, /Upload Company Logo/);
+assert.match(companyForm, /accept="image\/jpeg,image\/png,image\/webp/);
+assert.match(companyForm, /companyLogoDataUrl/);
+assert.match(companyForm, /Replace logo/);
+assert.match(companyForm, /aria-label="Search company country"/);
+assert.match(companyForm, /filteredCompanyRegistrationCountries/);
+assert.match(companyForm, /name="country"/);
+assert.match(companyForm, /City \/ State \/ Region/);
+assert.match(page, /purpose: "jobs-company-logo"/);
+assert.match(page, /country: String\(data\.get\("country"\) \|\| companyCountry\.name\)/);
+assert.match(page, /location: String\(data\.get\("location"\) \|\| companyLocation\)/);
 assert.match(page, /companySubmittingRef/);
 assert.match(page, /requestId: companyRequestIdRef\.current/);
 assert.match(page, /<form className="job-form jobs-company-register-form" onSubmit=\{createCompany\} noValidate hidden=\{!companyRegistrationOpen\}>/);
 assert.match(page, /company\.moderationStatus === "approved"/);
 assert.match(styles, /\.jobs-company-register-form\[hidden\] \{ display: none; \}/);
+assert.match(styles, /\.jobs-company-register-form > \.jobs-company-country-picker/);
+assert.match(styles, /\.jobs-company-country-options \{/);
+assert.match(styles, /@media \(max-width: 700px\)[\s\S]*?\.jobs-company-register-form/);
 assert.match(backendIndex, /partialFilterExpression: \{ requestId: \{ \$type: "string" \} \}/);
 assert.match(backend, /Company name, industry, location, and company description are required/);
 assert.match(backend, /moderationStatus === "changes_requested"/);

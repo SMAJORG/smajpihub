@@ -366,6 +366,14 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
   const [companySubmitting, setCompanySubmitting] = useState(false);
   const companySubmittingRef = useRef(false);
   const companyRequestIdRef = useRef("");
+  const [companyCountry, setCompanyCountry] = useState<(typeof JOB_COUNTRIES)[number] | null>(null);
+  const [companyCountryQuery, setCompanyCountryQuery] = useState("");
+  const [companyCountryOpen, setCompanyCountryOpen] = useState(false);
+  const [companyLocation, setCompanyLocation] = useState("");
+  const [companyLogoDataUrl, setCompanyLogoDataUrl] = useState("");
+  const [companyLogoUrl, setCompanyLogoUrl] = useState("");
+  const [companyLogoReading, setCompanyLogoReading] = useState(false);
+  const companyLogoInputRef = useRef<HTMLInputElement | null>(null);
   const [companyWorkspaceTab, setCompanyWorkspaceTab] = useState<"mine" | "directory">("mine");
   const [verificationCompanyId, setVerificationCompanyId] = useState("");
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -615,6 +623,12 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
     () => ["All", ...Array.from(new Set(companies.map(company => company.field).filter(Boolean))).sort()],
     [companies],
   );
+  const filteredCompanyRegistrationCountries = useMemo(() => {
+    const term = companyCountryQuery.trim().toLowerCase();
+    return JOB_COUNTRIES.filter(country =>
+      !term || `${country.name} ${country.code} ${country.label}`.toLowerCase().includes(term),
+    );
+  }, [companyCountryQuery]);
   const filteredCompanies = useMemo(() => {
     const term = companyQuery.trim().toLowerCase();
     return companies.filter(company => company.moderationStatus === "approved").filter(company => {
@@ -1510,10 +1524,60 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       setApplicationSubmitting(false);
     }
   };
+  const selectCompanyLogo = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase() || "";
+    const mimeByExtension: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+    const mime = file.type.toLowerCase() === "image/jpg" ? "image/jpeg" : file.type.toLowerCase() || mimeByExtension[extension] || "";
+    if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) {
+      setActionMessage("Choose a JPG, PNG, or WebP company logo.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setActionMessage("Company logos must be 5 MB or smaller.");
+      return;
+    }
+    setCompanyLogoReading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "").replace(/^data:[^;]*;/i, `data:${mime};`);
+      if (!dataUrl.startsWith("data:image/")) {
+        setCompanyLogoReading(false);
+        setActionMessage("The selected company logo could not be read.");
+        return;
+      }
+      setCompanyLogoDataUrl(dataUrl);
+      setCompanyLogoUrl("");
+      setCompanyLogoReading(false);
+      setActionMessage("");
+    };
+    reader.onerror = () => {
+      setCompanyLogoReading(false);
+      setActionMessage("The selected company logo could not be read.");
+    };
+    reader.readAsDataURL(file);
+  };
+  const selectCompanyCountry = (country: (typeof JOB_COUNTRIES)[number]) => {
+    setCompanyLocation(current => companyCountry?.code === country.code ? current : "");
+    setCompanyCountry(country);
+    setCompanyCountryQuery(country.label);
+    setCompanyCountryOpen(false);
+  };
   const createCompany = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (companySubmittingRef.current) return;
     const form = event.currentTarget;
+    if (!companyCountry) {
+      setCompanyCountryOpen(true);
+      setActionMessage("Choose a country from the country list.");
+      return;
+    }
+    if (companyLogoReading) {
+      setActionMessage("Please wait for the company logo preview to finish loading.");
+      return;
+    }
     if (!form.reportValidity()) return;
     const data = new FormData(form);
     companySubmittingRef.current = true;
@@ -1521,12 +1585,23 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
     try {
       await enrollEmployer();
       if (!companyRequestIdRef.current) companyRequestIdRef.current = crypto.randomUUID();
+      let logoUrl = companyLogoUrl;
+      if (companyLogoDataUrl && !logoUrl) {
+        const { data: upload } = await axiosClient.post<{ url: string }>("/uploads/image", {
+          image: companyLogoDataUrl,
+          purpose: "jobs-company-logo",
+        }, { timeout: 90_000 });
+        if (!upload.url?.startsWith("https://")) throw new Error("Company logo storage did not return a valid image URL.");
+        logoUrl = upload.url;
+        setCompanyLogoUrl(logoUrl);
+      }
       const company = await createJobCompany({
         name: String(data.get("name") || "").trim(),
         field: String(data.get("field") || "").trim(),
-        logoUrl: String(data.get("logoUrl") || "").trim(),
+        logoUrl,
         website: String(data.get("website") || "").trim(),
-        location: String(data.get("location") || "").trim(),
+        location: String(data.get("location") || companyLocation).trim(),
+        country: String(data.get("country") || companyCountry.name).trim(),
         description: String(data.get("description") || "").trim(),
         requestId: companyRequestIdRef.current,
       });
@@ -1535,6 +1610,13 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
       setCompanyRegistrationOpen(false);
       form.reset();
       companyRequestIdRef.current = "";
+      setCompanyCountry(null);
+      setCompanyCountryQuery("");
+      setCompanyCountryOpen(false);
+      setCompanyLocation("");
+      setCompanyLogoDataUrl("");
+      setCompanyLogoUrl("");
+      setCompanyLogoReading(false);
     } catch (error) {
       const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
       setActionMessage(message || "Company could not be submitted. Please check the details and try again.");
@@ -4404,24 +4486,86 @@ const JobsPage = ({ kind = "home" }: { kind?: JobsPageKind }) => {
                           {["Agriculture", "Arts and Entertainment", "Construction", "Education", "Energy", "Finance", "Food and Hospitality", "Government", "Healthcare", "Manufacturing", "Media and Communications", "Nonprofit", "Professional Services", "Retail and Commerce", "Software and Technology", "Transportation and Logistics", "Other"].map(industry => <option key={industry} value={industry}>{industry}</option>)}
                         </select>
                       </label>
-                      <label>
-                        Logo URL
-                        <input name="logoUrl" type="url" maxLength={1000} placeholder="https://company.com/logo.png" />
-                      </label>
+                      <div className="jobs-company-logo-field" role="group" aria-labelledby="jobs-company-logo-label">
+                        <span id="jobs-company-logo-label">Upload Company Logo <small>(optional · JPG, PNG, or WebP)</small></span>
+                        <input ref={companyLogoInputRef} id="jobs-company-logo-file" className="jobs-company-logo-input" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" disabled={companyLogoReading || companySubmitting} onChange={selectCompanyLogo} />
+                        {companyLogoDataUrl ? (
+                          <div className="jobs-company-logo-preview">
+                            <img src={companyLogoDataUrl} alt="Company logo preview" />
+                            <button type="button" disabled={companyLogoReading || companySubmitting} onClick={() => companyLogoInputRef.current?.click()}>Replace logo</button>
+                            <button type="button" disabled={companyLogoReading || companySubmitting} onClick={() => { setCompanyLogoDataUrl(""); setCompanyLogoUrl(""); }}>Remove</button>
+                          </div>
+                        ) : (
+                          <button type="button" className="jobs-company-logo-choose" disabled={companyLogoReading || companySubmitting} onClick={() => companyLogoInputRef.current?.click()}>Choose logo</button>
+                        )}
+                      </div>
                       <label>
                         Website
                         <input name="website" type="url" maxLength={500} placeholder="https://company.com" />
                       </label>
-                      <label>
-                        Location
-                        <input name="location" required maxLength={160} placeholder="City, country or Remote" />
-                      </label>
+                      <div className="jobs-company-country-picker">
+                        <label htmlFor="jobs-company-country-input">Country</label>
+                        <input
+                          id="jobs-company-country-input"
+                          type="search"
+                          role="combobox"
+                          aria-label="Search company country"
+                          aria-autocomplete="list"
+                          aria-expanded={companyCountryOpen}
+                          aria-controls="jobs-company-country-options"
+                          aria-required="true"
+                          autoComplete="off"
+                          required
+                          value={companyCountry?.label || companyCountryQuery}
+                          placeholder="Search countries"
+                          onFocus={() => setCompanyCountryOpen(true)}
+                          onBlur={event => {
+                            if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setCompanyCountryOpen(false);
+                          }}
+                          onChange={event => {
+                            setCompanyCountry(null);
+                            setCompanyCountryQuery(event.target.value);
+                            setCompanyCountryOpen(true);
+                          }}
+                          onKeyDown={event => {
+                            if (event.key === "Escape") setCompanyCountryOpen(false);
+                            if (event.key === "Enter" && companyCountryOpen && filteredCompanyRegistrationCountries[0]) {
+                              event.preventDefault();
+                              selectCompanyCountry(filteredCompanyRegistrationCountries[0]);
+                            }
+                          }}
+                        />
+                        <input type="hidden" name="country" value={companyCountry?.name || ""} />
+                        {companyCountryOpen ? (
+                          <ul id="jobs-company-country-options" className="jobs-company-country-options" role="listbox" aria-label="Countries">
+                            {filteredCompanyRegistrationCountries.length ? filteredCompanyRegistrationCountries.map(country => (
+                              <li key={country.code} role="presentation">
+                                <button
+                                  type="button"
+                                  role="option"
+                                  aria-selected={companyCountry?.code === country.code}
+                                  onPointerDown={event => event.preventDefault()}
+                                  onClick={() => selectCompanyCountry(country)}
+                                >
+                                  {country.label}
+                                </button>
+                              </li>
+                            )) : <li className="empty" role="option" aria-disabled="true">No countries found</li>}
+                          </ul>
+                        ) : null}
+                      </div>
+                      {companyCountry ? (
+                        <label>
+                          City / State / Region
+                          <input name="location" required maxLength={160} value={companyLocation} onChange={event => setCompanyLocation(event.target.value)} placeholder="Enter city, state, or region" />
+                        </label>
+                      ) : null}
                       <label className="wide">
                         About company
                         <textarea name="description" required rows={3} maxLength={1200} placeholder="What your company builds and who you serve" />
                       </label>
-                      <button type="submit" disabled={companySubmitting} aria-busy={companySubmitting}>
-                        {companySubmitting ? "Submitting…" : "Submit company for review"}
+                      <button type="submit" disabled={companySubmitting || companyLogoReading} aria-busy={companySubmitting || companyLogoReading}>
+                        {companySubmitting ? "Submitting…" : companyLogoReading ? "Loading logo…" : "Submit company for review"}
                       </button>
                     </form>
 

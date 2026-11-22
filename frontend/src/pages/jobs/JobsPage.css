@@ -4776,6 +4776,94 @@
   background: #fff;
   box-shadow: 0 10px 28px rgb(43 26 83 / 7%);
 }
+.jobs-company-register-form > .jobs-company-logo-field {
+  grid-column: auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 8px;
+}
+.jobs-company-logo-field > span {
+  color: var(--smaj-text);
+  font-size: .85rem;
+  font-weight: 800;
+}
+.jobs-company-logo-field > span small {
+  color: var(--smaj-text-secondary);
+  font-size: .75rem;
+  font-weight: 600;
+}
+.jobs-company-logo-input { display: none !important; }
+.jobs-company-logo-choose,
+.jobs-company-logo-preview button {
+  min-height: 36px;
+  padding: 0 11px;
+  color: var(--smaj-primary);
+  background: var(--smaj-card);
+  border: 1px solid var(--smaj-border);
+  border-radius: 9px;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.jobs-company-logo-preview {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.jobs-company-logo-preview img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  border: 1px solid var(--smaj-border);
+  border-radius: 8px;
+  background: var(--smaj-card);
+}
+.jobs-company-register-form > .jobs-company-country-picker {
+  position: relative;
+  grid-column: auto;
+  grid-template-columns: minmax(0, 1fr);
+}
+.jobs-company-country-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  margin: 0;
+  padding: 5px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--smaj-card);
+  border: 1px solid var(--smaj-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgb(20 30 55 / 16%);
+}
+.jobs-company-country-options button {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 9px;
+  color: var(--smaj-text);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  text-align: left;
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.jobs-company-country-options button:hover,
+.jobs-company-country-options button[aria-selected="true"] { background: var(--smaj-primary-soft); }
+.jobs-company-country-options .empty {
+  padding: 10px;
+  color: var(--smaj-text-secondary);
+  font-size: .8rem;
+}
 .jobs-company-register-form[hidden] { display: none; }
 .jobs-company-tabs { display: flex; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--smaj-border); }
 .jobs-company-tabs button { min-height: 40px; padding: 0 14px; color: var(--smaj-text); background: var(--smaj-card); border: 1px solid var(--smaj-border); border-radius: 10px; font: inherit; font-weight: 800; cursor: pointer; }
