@@ -390,3 +390,33 @@
     font-size: 13px;
   }
 }
+
+
+/* Referral dashboard compact polish; shared SMAJ theme tokens */
+.referral-page{max-width:760px;gap:12px;padding-bottom:24px}
+.referral-heading{gap:12px;padding:2px 0}
+.referral-heading-icon{width:46px;height:46px;flex-basis:46px;border-radius:13px}
+.referral-heading-icon svg{font-size:25px}
+.referral-heading h1{font-size:clamp(23px,3vw,29px)}
+.referral-heading>div>p:last-child{font-size:13px;margin-top:3px}
+.referral-link-panel,.referral-stats-panel,.referral-history-panel,.referral-reward-panel{padding:16px;border-radius:17px}
+.referral-section-title{margin-bottom:12px;gap:9px}
+.referral-section-title h2{font-size:16px}
+.referral-link-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+.referral-link-row input{grid-column:1/-1}
+.referral-link-row button{min-height:44px}
+.referral-stat-grid{gap:9px}
+.referral-stat-grid article{padding:13px;gap:9px}
+.referral-stat-label{display:flex;align-items:center;gap:7px;color:var(--smaj-text-secondary);font-size:12px}
+.referral-stat-label svg{font-size:18px}
+.referral-stat-grid article strong{font-size:27px}
+.referral-stats-panel .referral-note{font-size:11px;margin-top:10px}
+.referral-empty-state{padding:22px 12px;text-align:center;font-size:13px}
+.referral-reward-panel>p{padding:0;border:0;background:transparent;font-size:13px}
+.referral-soon{display:inline-flex;vertical-align:middle;margin-left:8px;padding:4px 8px;border-radius:100px;background:var(--smaj-secondary-bg);color:var(--smaj-text-secondary);font-size:10px;font-weight:600}
+.referral-history-search input{width:100%;height:42px;margin-bottom:10px;padding:0 12px;border:1px solid var(--smaj-border);border-radius:11px;background:var(--smaj-secondary-bg);color:var(--smaj-text);font:inherit}
+.referral-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.referral-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:12px;color:var(--smaj-text-secondary)}
+.referral-pagination button{padding:9px 13px;border:1px solid var(--smaj-border);border-radius:10px;background:var(--smaj-secondary-bg);color:var(--smaj-text);cursor:pointer}
+.referral-pagination button:disabled{opacity:.45;cursor:default}
+@media(max-width:640px){.referral-page{gap:11px}.referral-heading{align-items:center}.referral-link-panel,.referral-stats-panel,.referral-history-panel,.referral-reward-panel{padding:14px}.referral-link-row{grid-template-columns:repeat(2,minmax(0,1fr))}.referral-stat-grid article{padding:12px}}
