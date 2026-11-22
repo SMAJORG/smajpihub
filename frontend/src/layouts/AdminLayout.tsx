@@ -56,6 +56,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
   const [showSignOut, setShowSignOut] = useState(false);
   const [adminSearch, setAdminSearch] = useState("");
+  const [sidebarSearch, setSidebarSearch] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<number[]>([1]);
   const [mobileUtilitiesOpen, setMobileUtilitiesOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -217,10 +218,12 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
               {sidebarCollapsed ? <KeyboardDoubleArrowRightIcon /> : <KeyboardDoubleArrowLeftIcon />}
             </button>
           </div>
+          <div className="admin-drawer-heading"><div><strong>Admin Navigation</strong><small>Manage your workspace</small></div><span>Admin</span></div>
+          <label className="admin-drawer-search"><SearchOutlinedIcon /><input type="search" value={sidebarSearch} onChange={event => setSidebarSearch(event.target.value)} placeholder="Search menu..." aria-label="Search admin navigation" /></label>
           <nav className="admin-navigation">
-            {adminNavigation.map((group) => {
+            {adminNavigation.filter(group => !sidebarSearch.trim() || group.label.toLowerCase().includes(sidebarSearch.trim().toLowerCase()) || group.items.some(item => item.label.toLowerCase().includes(sidebarSearch.trim().toLowerCase()))).map((group) => {
               const active = group.items.some((item) => item.to === location.pathname);
-              const open = active || expandedGroups.includes(group.number);
+              const open = Boolean(sidebarSearch.trim()) || active || expandedGroups.includes(group.number);
               return <section className={"admin-nav-group " + (open ? "open " : "") + (active ? "active" : "")} key={group.number}>
                 <button type="button" className="admin-nav-group-toggle" onClick={() => toggleGroup(group.number)} aria-expanded={open} title={sidebarCollapsed ? group.label : undefined}>
                   <span className="admin-nav-group-icon">{groupIcon(group.icon)}</span>
@@ -228,7 +231,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
                   <KeyboardArrowDownOutlinedIcon className="private-nav-label admin-nav-chevron" />
                 </button>
                 {open ? <div className="admin-nav-children">
-                  {group.items.map((item, index) => item.to ? (
+                  {group.items.filter(item => !sidebarSearch.trim() || group.label.toLowerCase().includes(sidebarSearch.trim().toLowerCase()) || item.label.toLowerCase().includes(sidebarSearch.trim().toLowerCase())).map((item, index) => item.to ? (
                     <Link className={location.pathname === item.to && group.items.findIndex((candidate) => candidate.to === item.to) === index ? "active" : ""} to={item.to} onClick={() => setMobileSidebarOpen(false)} key={group.number + "-" + item.label}>
                       <span>{item.label}</span>
                     </Link>
@@ -241,7 +244,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
               </section>;
             })}
           </nav>
-          <button className="private-sidebar-logout" type="button" onClick={() => setShowSignOut(true)} title={sidebarCollapsed ? "Logout" : undefined} aria-label="Logout"><LogoutIcon /><span className="private-nav-label">Logout</span></button>
+          <div className="admin-drawer-footer"><span className="admin-drawer-account"><PeopleOutlineIcon /><span><strong>{adminName}</strong><small>Administrator</small></span></span><button className="private-sidebar-logout" type="button" onClick={() => setShowSignOut(true)} title={sidebarCollapsed ? "Logout" : undefined} aria-label="Logout"><LogoutIcon /><span className="private-nav-label">Logout</span></button></div>
         </aside>
         {mobileSidebarOpen ? <button className="private-overlay" onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu" /> : null}
         <div className="private-content">{children}</div>
