@@ -23274,3 +23274,20 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .discovery-compact-layout .mobile-feed-section,.discovery-compact-layout .desktop-feed-section{margin:0;min-width:0}
 .discovery-compact-layout .discovery-section-note{display:none}
 @media(min-width:768px){.discovery-compact-layout,.discovery-compact-directory{gap:24px}.discovery-lifestyle-cards{grid-template-columns:repeat(4,minmax(0,1fr))}.discovery-compact-icons{grid-template-columns:repeat(4,minmax(0,90px));gap:16px}}
+
+
+/* Keep account package beside identity, matching the approved account screenshot. */
+.account-dashboard-page .account-dashboard-identity{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:12px;row-gap:0}
+.account-dashboard-page .account-dashboard-identity>div{min-width:0}
+.account-dashboard-page .account-dashboard-identity .profile-package-shortcut.account-package-link{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;width:76px;min-width:76px;min-height:76px;margin:0;padding:8px 4px;border-radius:16px;overflow:hidden;text-decoration:none}
+.account-dashboard-page .account-dashboard-identity .profile-package-shortcut.account-package-link .profile-package-icon{width:34px;height:34px}
+.account-dashboard-page .account-dashboard-identity .profile-package-shortcut.account-package-link>span:nth-child(2){font-size:12px}
+.account-dashboard-page .account-dashboard-identity .profile-package-shortcut.account-package-link>small{position:absolute;top:7px;right:-19px}
+.account-dashboard-page .account-marketplace-actions{margin-bottom:0}
+.account-dashboard-page .account-marketplace-actions + .invite-promo-card{margin-top:12px}
+@media(max-width:640px){
+.account-dashboard-page .account-dashboard-identity{grid-template-columns:auto minmax(0,1fr) 76px;gap:10px;padding-block:12px}
+.account-dashboard-page .account-dashboard-identity .profile-name-line{min-width:0;font-size:clamp(15px,3.5vw,21px)}
+.account-dashboard-page .account-dashboard-identity .profile-name-text{overflow-wrap:anywhere}
+.account-dashboard-page .account-dashboard-identity .profile-package-shortcut.account-package-link{width:76px;min-width:76px;min-height:76px}
+}
