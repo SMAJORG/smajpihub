@@ -177,7 +177,7 @@ const ContinueSection = ({ items, compact = false }: { items: RecentItem[]; comp
 };
 
 const PopularSearchSection = ({ compact = false }: { compact?: boolean }) => (
-  <section className={compact ? "mobile-feed-section beta-home-section" : "desktop-feed-section beta-home-section"}>
+  <section className={compact ? "mobile-feed-section beta-home-section smaj-refined-home-section" : "desktop-feed-section beta-home-section smaj-refined-home-section"}>
     <div className="desktop-feed-section-head mobile-section-heading"><div><h2>Popular Searches</h2><p>Fast paths into marketplace and services.</p></div></div>
     <SectionState empty={!popularSearches.length ? "No popular searches yet" : ""}>
       <div className="beta-search-chips">{popularSearches.map((term) => <Link to={`/store?search=${encodeURIComponent(term)}`} key={term}>{term}</Link>)}</div>
@@ -186,18 +186,18 @@ const PopularSearchSection = ({ compact = false }: { compact?: boolean }) => (
 );
 
 const RecentlyAddedSection = ({ products, loading, error, compact = false }: { products: Product[]; loading: boolean; error: string; compact?: boolean }) => (
-  <section className={compact ? "mobile-feed-section beta-home-section" : "desktop-feed-section beta-home-section"}>
-    <div className="desktop-feed-section-head mobile-section-heading"><div><h2>Recently Added</h2><p>Newest live listings and services.</p></div><Link to="/store">See all</Link></div>
-    <SectionState loading={loading} error={error} empty={!products.length ? "No recent listings yet" : ""}>
+  <section className={compact ? "mobile-feed-section beta-home-section smaj-refined-home-section" : "desktop-feed-section beta-home-section smaj-refined-home-section"}>
+    <div className="desktop-feed-section-head mobile-section-heading"><div><h2>Recently Added</h2><p>Fresh products and services from sellers.</p></div><Link to="/store">See all</Link></div>
+    <SectionState loading={loading} error={error} empty={!products.length ? "New listings coming soon. Explore SMAJ Store for available products." : ""}>
       <div className="beta-product-strip">{products.slice(0, 6).map((product) => { const country = countryDisplayName(product.country || product.location?.split(" - ")[0]); const flag = countryFlag(country); const city = product.city || product.stateRegion?.replace(" Emirate", "") || product.location?.split(" - ")[1]?.replace(" Emirate", "") || ""; return <Link to={`/product/${product._id}`} className={`beta-product-card${compact ? " mobile-recent-product-card" : ""}`} key={product._id}>{product.image ? <img src={product.image} alt="" /> : <span className="beta-product-placeholder" /> }<strong>{product.title}</strong>{compact ? <><span className="mobile-product-category">{product.category}</span><span className="mobile-product-details"><b>{formatPiAmount(product.pricePi)}</b><small>{flag ? <span role="img" aria-label={country}>{flag}</span> : "📍"} {city || country || "Global"}</small></span></> : <small>{product.category} - {product.location || "Global"}</small>}</Link>; })}</div>
     </SectionState>
   </section>
 );
 
 const FeaturedSellersSection = ({ sellers, loading, error, compact = false }: { sellers: SellerCard[]; loading: boolean; error: string; compact?: boolean }) => (
-  <section className={compact ? "mobile-feed-section beta-home-section" : "desktop-feed-section beta-home-section"}>
-    <div className="desktop-feed-section-head mobile-section-heading"><div><h2>Featured Sellers</h2><p>{compact ? "Marketplace sellers with active listings." : "Trusted sellers active in beta."}</p></div></div>
-    <SectionState loading={loading} error={error} empty={!sellers.length ? "No featured sellers yet" : ""}>
+  <section className={compact ? "mobile-feed-section beta-home-section smaj-refined-home-section" : "desktop-feed-section beta-home-section smaj-refined-home-section"}>
+    <div className="desktop-feed-section-head mobile-section-heading"><div><h2>Featured Sellers</h2><p>Explore sellers with active listings.</p></div></div>
+    <SectionState loading={loading} error={error} empty={!sellers.length ? "Featured sellers will appear as active shops become available." : ""}>
       <div className="beta-seller-grid">{sellers.map((seller) => compact ? <Link className="beta-seller-card mobile-seller-card" to={`/seller/${seller.id}`} key={seller.id}><div className="mobile-seller-identity"><span className="mobile-seller-avatar">{seller.avatar ? <img src={seller.avatar} alt="" /> : seller.name.slice(0, 1).toUpperCase()}</span><div><strong>{seller.name}<TrustBadge userId={seller.id} /></strong><span>{seller.location.toLowerCase().includes("united arab emirates") ? `${seller.location.split(" - ")[1]?.replace(" Emirate", "") || "UAE"}, UAE` : seller.location.split(" - ").slice(0, 2).join(", ")}</span></div></div><div className="mobile-seller-meta"><span><StarRoundedIcon /> {seller.rating}</span><small>{seller.listings} listings</small><ChevronRightOutlinedIcon /></div></Link> : <article className="beta-seller-card" key={seller.id}><div><strong>{seller.name}<TrustBadge userId={seller.id} /></strong><span>{seller.location}</span></div><small>{seller.rating} star - {seller.listings} listings</small></article>)}</div>
     </SectionState>
   </section>
@@ -225,7 +225,7 @@ const ActivityFeedSection = ({ products, loading, error, compact = false }: { pr
 };
 
 const TrustSection = ({ compact = false }: { compact?: boolean }) => (
-  <section className={compact ? "mobile-feed-section beta-home-section" : "desktop-feed-section beta-home-section"}>
+  <section className={compact ? "mobile-feed-section beta-home-section smaj-refined-home-section" : "desktop-feed-section beta-home-section smaj-refined-home-section"}>
     <div className="desktop-feed-section-head mobile-section-heading"><div><h2>Trust Indicators</h2><p>Signals that help keep beta safer.</p></div></div>
     <SectionState empty={!trustIndicators.length ? "No trust indicators yet" : ""} skeleton="stats">
       <div className="beta-trust-grid">{trustIndicators.map((item) => <article key={item}><ShieldOutlinedIcon /><strong>{item}</strong></article>)}</div>
