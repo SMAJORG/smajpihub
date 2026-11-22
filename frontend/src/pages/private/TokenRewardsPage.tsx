@@ -3,38 +3,39 @@ import CardGiftcardOutlinedIcon from "@mui/icons-material/CardGiftcardOutlined";
 import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import TollRoundedIcon from "@mui/icons-material/TollRounded";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { Link } from "react-router-dom";
 
 const TokenRewardsPage = () => (
-  <main className="token-rewards-page">
+  <main className="token-rewards-page token-rewards-compact">
     <header className="token-rewards-header">
       <Link to="/settings" aria-label="Back to account"><ArrowBackRoundedIcon /></Link>
       <div>
         <span>SMAJ PI HUB</span>
         <h1>Token Rewards</h1>
-        <p>Collect rewards, unlock member packages, and redeem gift codes—all in one place.</p>
+        <p>Your rewards, all in one place.</p>
       </div>
       <span className="token-rewards-soon">COMING SOON</span>
     </header>
     <section className="token-rewards-summary" aria-label="Reward overview">
-      <article><span><TollRoundedIcon /></span><strong>0</strong><small>SMAJ Tokens</small></article>
-      <article><span><StarsRoundedIcon /></span><strong>0</strong><small>Reward Points</small></article>
-      <article className="token-package-card"><span><CardGiftcardOutlinedIcon /></span><strong>Package</strong><small>Available soon</small><b>SOON</b></article>
+      <article><span><TollRoundedIcon /></span><strong>0</strong><small>Tokens</small></article>
+      <article><span><StarsRoundedIcon /></span><strong>0</strong><small>Points</small></article>
+      <article className="token-package-card"><span><CardGiftcardOutlinedIcon /></span><strong>—</strong><small>Package</small></article>
     </section>
     <section className="token-redeem-card">
       <span className="token-redeem-icon"><RedeemOutlinedIcon /></span>
-      <div><h2>Redeem Gift Code</h2><p>Enter a reward code when SMAJ Token Rewards launches.</p></div>
-      <button type="button" disabled>Coming soon</button>
+      <div><h2>Redeem gift code</h2><p>Available when rewards launch.</p></div>
+      <button type="button" disabled><LockOutlinedIcon fontSize="small" /> Coming soon</button>
     </section>
     <section className="token-rewards-preview">
-      <span>REWARDS PREVIEW</span>
-      <h2>More rewards from SMAJ PI HUB</h2>
-      <p>Packages, milestones, and redemption options will appear here as each SMAJ PI HUB reward becomes available.</p>
-      <div>
-        <article><CardGiftcardOutlinedIcon /><strong>Member packages</strong><small>Unlock future SMAJ PI HUB benefits.</small></article>
-        <article><StarsRoundedIcon /><strong>Activity rewards</strong><small>Earn recognition for eligible activity.</small></article>
+      <div className="token-rewards-preview-heading"><h2>Explore future rewards</h2><span>PREVIEW</span></div>
+      <div className="token-rewards-preview-list">
+        <article><CardGiftcardOutlinedIcon /><div><strong>Member packages</strong><small>Exclusive member benefits</small></div><LockOutlinedIcon className="token-rewards-locked" /></article>
+        <article><StarsRoundedIcon /><div><strong>Activity rewards</strong><small>Recognition for eligible activity</small></div><LockOutlinedIcon className="token-rewards-locked" /></article>
       </div>
     </section>
+    <p className="token-rewards-disclaimer"><InfoOutlinedIcon fontSize="small" /> Rewards are not active yet. No token distribution or redemption is available.</p>
   </main>
 );
 
