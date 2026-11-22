@@ -61,7 +61,8 @@ export const uploadImageToCloudinary = async (image: string, purpose = "image", 
     throw Object.assign(new Error("Upload a valid image file."), { statusCode: 400 });
   }
 
-  if (image.length > 6_500_000) {
+  const maxEncodedLength = purpose.startsWith("ambassador-private-") ? 7_000_000 : 6_500_000;
+  if (image.length > maxEncodedLength) {
     throw Object.assign(new Error("Image must be smaller than 5 MB."), { statusCode: 413 });
   }
 

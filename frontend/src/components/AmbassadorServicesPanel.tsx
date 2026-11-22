@@ -193,8 +193,12 @@ const AmbassadorServicesPanel = () => {
     setSelfieCameraOpen(false);
     showFeedback("Live selfie captured.", "success");
   };
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!event.currentTarget.reportValidity()) {
+      showFeedback("Please correct the highlighted fields before submitting.", "error");
+      return;
+    }
     if (!selectedCountry || !selectedRegionName || !form.services.length) {
       showFeedback("Choose a country, region, and at least one service.", "error");
       return;
@@ -216,16 +220,16 @@ const AmbassadorServicesPanel = () => {
         uploadImage(form.selfie, "ambassador-private-selfie"),
       ]);
       const { data } = await axiosClient.post<{ application: Application }>("/ambassadors", {
-        displayName: form.displayName,
-        email: form.email,
-        phone: form.phone,
+        displayName: form.displayName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
         countryCode: selectedCountry.isoCode,
         countryName: selectedCountry.name,
         countryFlag: selectedCountry.flag,
         regionCode: selectedRegion?.isoCode || "LOCAL",
         regionName: selectedRegionName,
         services: form.services,
-        message: form.message,
+        message: form.message.trim(),
         idFrontUrl,
         idBackUrl,
         selfieUrl,
@@ -254,7 +258,7 @@ const AmbassadorServicesPanel = () => {
         {mode === "find" ? <div className="ambassador-directory">
           <div className="ambassador-directory-filters"><select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}><option value="">🌍 All countries</option>{countries.map((country) => <option key={country.isoCode} value={country.isoCode}>{country.flag} {country.name}</option>)}</select><select value={serviceFilter} onChange={(event) => setServiceFilter(event.target.value)}>{serviceOptions.map((service) => <option key={service.slug} value={service.slug}>{service.name}</option>)}</select></div>
           {directoryLoading ? <p>Loading ambassadors…</p> : ambassadors.length ? <div className="ambassador-directory-list">{ambassadors.map((ambassador) => <article key={ambassador._id}><span>{flagFor(ambassador.countryCode)}</span><div><strong>{ambassador.displayName}</strong><p>{ambassador.regionName}, {ambassador.countryName}</p><small>{ambassador.services.includes("all") ? "All SMAJ services" : ambassador.services.join(" · ")}</small></div><VerifiedUserOutlinedIcon /></article>)}</div> : <div className="ambassador-empty"><GroupsOutlinedIcon /><strong>No approved ambassadors found</strong><p>Try another country or service.</p></div>}
-        </div> : application ? <div className="ambassador-application-status"><VerifiedUserOutlinedIcon /><h3>Application {application.status}</h3><p>{application.countryName} · {application.regionName}</p><small>Updated {new Date(application.updatedAt).toLocaleDateString()}</small>{application.status === "rejected" ? <button type="button" onClick={() => setApplication(null)}>Update and resubmit</button> : null}</div> : <form className="ambassador-form" onSubmit={submit}>
+        </div> : application ? <div className="ambassador-application-status"><VerifiedUserOutlinedIcon /><h3>Application {application.status}</h3><p>{application.countryName} · {application.regionName}</p><small>Updated {new Date(application.updatedAt).toLocaleDateString()}</small>{application.status === "rejected" ? <button type="button" onClick={() => setApplication(null)}>Update and resubmit</button> : null}</div> : <form className="ambassador-form" noValidate onSubmit={submit}>
           <p className="ambassador-privacy-note"><VerifiedUserOutlinedIcon />Your ID and selfie are included only in the private admin review and never shown in the ambassador directory.</p>
           <label>Full name<input required maxLength={100} value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} /></label>
           <div className="ambassador-form-row"><label>Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><label>Phone<input required type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label></div>
@@ -263,7 +267,7 @@ const AmbassadorServicesPanel = () => {
           <label>Why do you want to become an ambassador?<textarea required minLength={20} maxLength={1500} value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} placeholder="Tell us about your local community and experience." /></label>
           <fieldset><legend>Private identity verification</legend><div className="ambassador-identity-grid">{([['idFront', 'ID front'], ['idBack', 'ID back']] as const).map(([field, label]) => <div className="ambassador-identity-control" key={field}><button type="button" className={`ambassador-id-tile${form[field] ? " uploaded" : ""}`} onClick={() => idInputRefs.current[field]?.click()} aria-label={`${form[field] ? "Replace" : "Choose"} ${label} image`}>{form[field] ? <img src={form[field]} alt={`${label} preview`} /> : <BadgeOutlinedIcon />}<strong>{form[field] ? `${label} added` : label}</strong><span>{form[field] ? "Tap to replace" : "JPG, PNG or WebP · max 5 MB"}</span></button><input ref={element => { idInputRefs.current[field] = element; }} className="ambassador-id-input" type="file" tabIndex={-1} accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(event) => void selectImage(field, event)} /></div>)}<button type="button" className={`ambassador-selfie-tile${form.selfie ? " uploaded" : ""}`} onClick={() => setSelfieCameraOpen(true)}>{form.selfie ? <img src={form.selfie} alt="Live selfie preview" /> : <PhotoCameraOutlinedIcon />}<strong>{form.selfie ? "Live selfie added" : "Live selfie"}</strong><span>{form.selfie ? "Tap to retake" : "Open camera to capture"}</span></button></div></fieldset>
           <label className="ambassador-consent"><input required type="checkbox" />I confirm these details are mine and consent to private identity review.</label>
-          <button className="ambassador-submit" disabled={submitting}>{submitting ? "Uploading and submitting…" : "Submit private application"}</button>
+          <button type="submit" className="ambassador-submit" disabled={submitting}>{submitting ? "Uploading and submitting…" : "Submit private application"}</button>
         </form>}
       </section>
       {selfieCameraOpen ? (
