@@ -458,7 +458,7 @@
   width: 100%;
   max-width: 740px;
   margin: 0 auto;
-  padding: 12px 14px calc(100px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   color: var(--smaj-text);
 }
