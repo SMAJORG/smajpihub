@@ -833,3 +833,24 @@
 .seller-workspace .seller-ws-badge.negative {
   color: #b42318 !important;
 }
+
+
+/* Compact seller dashboard refresh */
+.seller-workspace .seller-ws-sales{padding:18px 20px;border-radius:20px}
+.seller-workspace .seller-ws-sales-total{font-size:clamp(28px,4vw,38px)}
+.seller-workspace .seller-ws-periods{margin-top:12px;padding-top:12px}
+.seller-workspace .seller-ws-funds{margin-top:12px;padding-top:12px;gap:9px}
+.seller-workspace .seller-ws-sales-note{margin-top:10px}
+.seller-workspace .seller-ws-stats article{padding:13px;gap:6px}
+.seller-workspace .seller-ws-stats strong{font-size:23px}
+.seller-workspace .seller-ws-primary-columns{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.seller-workspace .seller-ws-secondary-columns{grid-template-columns:repeat(2,minmax(0,1fr))}
+.seller-workspace .seller-ws-chart-empty{padding:32px 10px;text-align:center;color:var(--seller-ws-muted);font-size:13px;line-height:1.6}
+.seller-workspace .seller-ws-collapsible{padding:13px 16px}
+.seller-workspace .seller-ws-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:35px;padding:0;border:0;background:transparent;color:var(--seller-ws-text);font-size:15px;font-weight:700;text-align:left}
+.seller-workspace .seller-ws-toggle span{color:var(--seller-ws-muted);font-size:12px;font-weight:500}
+.seller-workspace .seller-ws-collapsible .seller-ws-card-heading{margin-top:12px}
+.seller-workspace .seller-ws-quick a{flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;min-height:74px}
+.seller-workspace .seller-ws-quick svg{margin:0;width:22px;height:22px}
+.seller-workspace .seller-ws-sync{font-size:11px}
+@media(max-width:700px){.seller-workspace .seller-ws-primary-columns,.seller-workspace .seller-ws-secondary-columns{grid-template-columns:minmax(0,1fr)}.seller-workspace .seller-ws-sales{padding:16px!important}.seller-workspace .seller-ws-funds{grid-template-columns:repeat(2,minmax(0,1fr))}.seller-workspace .seller-ws-quick a{min-height:70px}.seller-workspace .seller-ws-collapsible{padding:12px 14px!important}}
