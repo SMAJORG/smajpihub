@@ -23127,3 +23127,30 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .orders-compact-results .orders-list{display:grid;gap:12px}.orders-compact-results .order-card{margin:0}
 .orders-compact-empty{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:36px 14px}.orders-compact-empty>span{display:grid;place-items:center;width:70px;height:70px;border-radius:50%;background:#f5f3fa;color:#748095;font-size:32px}.orders-compact-empty h3{margin:0;font-size:19px}.orders-compact-empty p{margin:0;color:#6b7789;font-size:14px}.orders-compact-empty button,.orders-load-more{min-height:44px;padding:10px 20px;border:1px solid #7737f5;border-radius:12px;background:#7737f5;color:white;font-weight:650;cursor:pointer}.orders-load-more{display:block;margin:16px auto;background:transparent;color:#7737f5}
 @media(max-width:480px){.orders-compact-tabs button{padding:11px;min-height:58px}.orders-compact-filters button{padding:8px 12px}}
+
+
+/* Seller profile modern compact layout */
+.seller-profile-page .seller-profile-topbar{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px}
+.seller-profile-topbar h2{font-size:20px;margin:0}.seller-profile-topbar button{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--smaj-border);border-radius:12px;background:var(--smaj-card);color:var(--smaj-text);cursor:pointer}
+.seller-profile-page .seller-profile-hero{padding:18px;border:1px solid var(--smaj-border);border-radius:18px;margin-bottom:8px}
+.seller-profile-page .seller-joined{font-size:12px;margin:8px 0 14px;color:var(--smaj-text-secondary)}
+.seller-profile-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px;background:var(--smaj-secondary-bg);border-radius:14px;margin:12px 0 15px}
+.seller-profile-tabs button{min-height:42px;border:0;border-radius:10px;background:transparent;color:var(--smaj-text-secondary);font-weight:650;cursor:pointer}
+.seller-profile-tabs button.active{background:var(--smaj-card);color:var(--smaj-primary);box-shadow:0 2px 9px #00000010}
+.seller-profile-filterbar{display:flex;gap:9px;align-items:center;margin:10px 0}
+.seller-profile-filterbar .seller-product-search{flex:1;min-width:0;display:flex;align-items:center;gap:7px;padding:0 10px;border:1px solid var(--smaj-border);border-radius:12px;background:var(--smaj-card)}
+.seller-profile-filterbar .seller-product-search svg{width:20px;height:20px;flex-shrink:0}
+.seller-profile-filterbar input{width:100%;min-width:0;min-height:44px;border:0;outline-offset:2px;background:transparent;color:var(--smaj-text)}
+.seller-profile-filterbar>button{min-height:44px;display:flex;align-items:center;gap:6px;padding:0 12px;border:1px solid var(--smaj-border);border-radius:12px;background:var(--smaj-card);color:var(--smaj-text);cursor:pointer}
+.seller-profile-filterbar>button svg{width:19px;height:19px}
+.seller-profile-page .seller-profile-advanced{position:static;display:grid;grid-template-columns:1fr 1fr;margin-bottom:12px}
+.seller-profile-page .seller-product-grid{margin-top:10px;gap:10px}
+.seller-profile-page .seller-load-more{padding:14px 0}
+.seller-reviews-empty{text-align:center;padding:30px 12px}.seller-reviews-empty h3{margin:0 0 8px}.seller-reviews-empty p{margin:0;color:var(--smaj-text-secondary);font-size:14px}
+.seller-report-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;background:#10101b88}
+.seller-report-dialog{width:min(100%,390px);display:flex;flex-direction:column;gap:14px;padding:22px;border-radius:20px;background:var(--smaj-card);color:var(--smaj-text);box-shadow:0 24px 80px #0003}
+.seller-report-dialog header{display:flex;align-items:center;justify-content:space-between}.seller-report-dialog h2{font-size:19px;margin:0}
+.seller-report-dialog header button{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:var(--smaj-secondary-bg);color:var(--smaj-text);cursor:pointer}
+.seller-report-dialog p{margin:0;font-size:14px;color:var(--smaj-text-secondary)}
+.seller-report-dialog>a{justify-content:center;text-align:center}.seller-report-dialog>button{min-height:44px;border:1px solid var(--smaj-border);border-radius:11px;background:var(--smaj-card);color:var(--smaj-text);cursor:pointer}
+@media(max-width:550px){.seller-profile-page .seller-profile-hero{padding:13px}.seller-profile-page .seller-profile-advanced{grid-template-columns:1fr 1fr;gap:8px}.seller-profile-page .seller-product-tools{top:auto}}
