@@ -721,13 +721,13 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
                 {saved ? <BookmarkOutlinedIcon /> : <BookmarkBorderOutlinedIcon />}
                 <span>{saved ? "Remove from saved posts" : "Save post"}</span>
               </button>
-              <button type="button" disabled={busy} onClick={() => { closeOptionsMenu(); void share(); }}><ShareOutlinedIcon /> <span>Share via</span></button>
+              <button type="button" disabled={busy} onClick={() => { closeOptionsMenu(); void share(); }}><IosShareOutlinedIcon /> <span>Share via</span></button>
             </> : <>
               <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void toggleSavedPost())}>
                 {saved ? <BookmarkOutlinedIcon /> : <BookmarkBorderOutlinedIcon />}
                 <span>{saved ? "Remove from saved posts" : "Save post"}</span>
               </button>
-              <button type="button" disabled={busy} onClick={() => { closeOptionsMenu(); void share(); }}><ShareOutlinedIcon /> <span>Share via</span></button>
+              <button type="button" disabled={busy} onClick={() => { closeOptionsMenu(); void share(); }}><IosShareOutlinedIcon /> <span>Share via</span></button>
               {following ? <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void unfollowAuthor())}><PersonRemoveOutlinedIcon /> <span>Unfollow</span></button> : null}
               <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void hideAuthorPosts())}><VisibilityOffOutlinedIcon /> <span>Hide posts by {menuAuthor.displayName}</span></button>
               <button type="button" disabled={busy} onClick={() => closeOptionsMenu(() => void markNotInterested())}><ThumbDownAltOutlinedIcon /> <span>Not interested</span></button>
