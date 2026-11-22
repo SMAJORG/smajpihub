@@ -67,6 +67,7 @@ function SalesChart({ finance }: { finance: SellerFinance }) {
   const selected =
     values[Math.min(point ?? values.length - 1, values.length - 1)];
   const max = Math.max(...values.map((item) => item.sales), 0.0000001);
+  const hasSales = values.some((item) => item.payments > 0);
   const path = values
     .map(
       (item, index) =>
@@ -121,7 +122,7 @@ function SalesChart({ finance }: { finance: SellerFinance }) {
           {selected?.date} &middot; {selected?.payments ?? 0} verified payments
         </span>
       </div>
-      <svg
+      {hasSales ? <><svg
         viewBox="0 0 640 170"
         role="img"
         aria-label={
@@ -164,6 +165,8 @@ function SalesChart({ finance }: { finance: SellerFinance }) {
           />
         ) : null}
       </svg>
+      </> : <p className="seller-ws-chart-empty">No verified sales in this period. Your chart will appear after your first verified payment.</p>}
+      {hasSales ? <>
       <input
         aria-label="Explore sales dates"
         type="range"
@@ -176,6 +179,7 @@ function SalesChart({ finance }: { finance: SellerFinance }) {
         <span>{values[0]?.date}</span>
         <span>{values[values.length - 1]?.date}</span>
       </div>
+      </> : null}
       <p className="seller-ws-caption">
         {values.some((item) => item.payments)
           ? "Verified receipts only. "
@@ -202,6 +206,7 @@ function SellerWorkspace({
     [busy, setBusy] = useState(false),
     [offline, setOffline] = useState(!navigator.onLine);
   const [network, setNetwork] = useState("");
+  const [managementOpen, setManagementOpen] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   const search = params.get("search") || "";
   const [action, setAction] = useState<{
@@ -537,10 +542,7 @@ function SellerWorkspace({
                   marked unavailable.
                 </p>
               ) : null}
-              <div className="seller-ws-columns">
-                {finance ? (
-                  <SalesChart key={selectedNetwork} finance={finance} />
-                ) : null}
+              <div className="seller-ws-columns seller-ws-primary-columns">
                 <div className="seller-ws-side">
                   <section className="seller-ws-card">
                     <h2>Quick actions</h2>
@@ -562,9 +564,9 @@ function SellerWorkspace({
                       </a>
                     </nav>
                   </section>
-                  <section className="seller-ws-card">
+                  <section className="seller-ws-card seller-ws-collapsible"><button type="button" className="seller-ws-toggle" aria-expanded={managementOpen === "orders"} onClick={() => setManagementOpen(managementOpen === "orders" ? null : "orders")}>Order management <span>{data.stats.totalOrders ?? 0} orders ▾</span></button>{managementOpen === "orders" ? <>
                     <div className="seller-ws-card-heading">
-                      <h2>Order management</h2>
+                      <h2>Order status</h2>
                       <Link to="/orders">View all</Link>
                     </div>
                     <div className="seller-ws-pipeline">
@@ -592,13 +594,14 @@ function SellerWorkspace({
                     <p className="seller-ws-caption">
                       New includes unpaid and paid orders awaiting processing;
                       delivered includes completed.
-                    </p>
+                    </p></> : null}
                   </section>
                 </div>
+                {finance ? <SalesChart key={selectedNetwork} finance={finance} /> : null}
               </div>
-              <div className="seller-ws-columns">
-                <section className="seller-ws-card">
-                  <h2>Seller performance</h2>
+              <div className="seller-ws-columns seller-ws-secondary-columns">
+                <section className="seller-ws-card seller-ws-collapsible"><button type="button" className="seller-ws-toggle" aria-expanded={managementOpen === "performance"} onClick={() => setManagementOpen(managementOpen === "performance" ? null : "performance")}>Seller performance <span>View details ▾</span></button>{managementOpen === "performance" ? <>
+                  <h2>Performance details</h2>
                   <div className="seller-ws-performance">
                     <div>
                       <span>Average rating</span>
@@ -636,11 +639,11 @@ function SellerWorkspace({
                     {data.performance.conversations} buyer-initiated
                     conversations in the last 90 days. Response rate counts
                     conversations with a seller reply.
-                  </p>
+                  </p></> : null}
                 </section>
-                <section className="seller-ws-card">
+                <section className="seller-ws-card seller-ws-collapsible"><button type="button" className="seller-ws-toggle" aria-expanded={managementOpen === "notifications"} onClick={() => setManagementOpen(managementOpen === "notifications" ? null : "notifications")}>Notifications <span>{data.notifications?.length ?? 0} updates ▾</span></button>{managementOpen === "notifications" ? <>
                   <div className="seller-ws-card-heading">
-                    <h2>Notifications</h2>
+                    <h2>Recent notifications</h2>
                     <Link to="/notifications">View all</Link>
                   </div>
                   {data.notifications === null ? (
