@@ -125,7 +125,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     setProfileMenuOpen(false);
   };
 
-  const toggleGroup = (number: number) => setExpandedGroups((groups) => groups.includes(number) ? groups.filter((item) => item !== number) : [...groups, number]);
+  const toggleGroup = (number: number) => setExpandedGroups((groups) => groups.includes(number) ? groups.filter((item) => item !== number) : [number]);
   const toggleAdminTheme = () => setAdminTheme((theme) => {
     const next = theme === "light" ? "dark" : "light";
     window.localStorage.setItem(ADMIN_THEME_STORAGE_KEY, next);
@@ -213,18 +213,12 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
       </header>
       <div className={`private-body ${sidebarCollapsed ? "private-body-collapsed" : ""}`}>
         <aside id="admin-mobile-sidebar" className={`private-sidebar ${sidebarCollapsed ? "private-sidebar-collapsed" : ""} ${mobileSidebarOpen ? "private-sidebar-open" : ""}`}>
-          <div className="private-sidebar-top">
-            <Link to="/admin" className="private-sidebar-brand" title="Admin dashboard" aria-label="Admin dashboard"><img src={logoImage} alt="" /></Link>
-            <button className="private-sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
-              {sidebarCollapsed ? <KeyboardDoubleArrowRightIcon /> : <KeyboardDoubleArrowLeftIcon />}
-            </button>
-          </div>
           <div className="admin-drawer-heading"><div><strong>Admin Navigation</strong><small>Manage your workspace</small></div><span>Admin</span></div>
           <label className="admin-drawer-search"><SearchOutlinedIcon /><input type="search" value={sidebarSearch} onChange={event => setSidebarSearch(event.target.value)} placeholder="Search menu..." aria-label="Search admin navigation" /></label>
           <nav className="admin-navigation">
             {adminNavigation.filter(group => !sidebarSearch.trim() || group.label.toLowerCase().includes(sidebarSearch.trim().toLowerCase()) || group.items.some(item => item.label.toLowerCase().includes(sidebarSearch.trim().toLowerCase()))).map((group) => {
               const active = group.items.some((item) => item.to === location.pathname);
-              const open = Boolean(sidebarSearch.trim()) || active || expandedGroups.includes(group.number);
+              const open = Boolean(sidebarSearch.trim()) || expandedGroups.includes(group.number);
               return <section className={"admin-nav-group " + (open ? "open " : "") + (active ? "active" : "")} key={group.number}>
                 <button type="button" className="admin-nav-group-toggle" onClick={() => toggleGroup(group.number)} aria-expanded={open} title={sidebarCollapsed ? group.label : undefined}>
                   <span className="admin-nav-group-icon">{groupIcon(group.icon)}</span>
