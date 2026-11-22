@@ -206,6 +206,8 @@ function SellerWorkspace({
     [busy, setBusy] = useState(false),
     [offline, setOffline] = useState(!navigator.onLine);
   const [network, setNetwork] = useState("");
+  const [inventoryStatus, setInventoryStatus] = useState("all");
+  const [inventorySort, setInventorySort] = useState("newest");
   const [managementOpen, setManagementOpen] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   const search = params.get("search") || "";
@@ -343,11 +345,20 @@ function SellerWorkspace({
       setActivating(false);
     }
   };
-  const filteredProducts = (data?.products || []).filter(
-    (product) =>
-      !inventoryOnly ||
-      product.title.toLowerCase().includes(search.trim().toLowerCase()),
-  );
+  const inventoryProducts = (data?.products || []).filter((product) => {
+    const matchesSearch = product.title.toLowerCase().includes(search.trim().toLowerCase());
+    const matchesStatus = inventoryStatus === "all" ||
+      (inventoryStatus === "active" && product.approved === true && product.reviewStatus === "approved" && product.active && product.quantity !== 0 && !product.hidden) ||
+      (inventoryStatus === "pending" && product.reviewStatus !== "approved" && product.reviewStatus !== "rejected") ||
+      (inventoryStatus === "soldout" && (!product.active || product.quantity === 0)) ||
+      (inventoryStatus === "rejected" && product.reviewStatus === "rejected");
+    return matchesSearch && matchesStatus;
+  });
+  const filteredProducts = inventoryOnly ? [...inventoryProducts].sort((a, b) => {
+    if (inventorySort === "price_high") return (Number(b.pricePi) || 0) - (Number(a.pricePi) || 0);
+    if (inventorySort === "price_low") return (Number(a.pricePi) || 0) - (Number(b.pricePi) || 0);
+    return inventorySort === "oldest" ? a._id.localeCompare(b._id) : b._id.localeCompare(a._id);
+  }) : data?.products || [];
   const pages = Math.max(1, Math.ceil(filteredProducts.length / 20));
   const page = Math.min(
     pages,
@@ -742,37 +753,32 @@ function SellerWorkspace({
               )}
             </div>
             {inventoryOnly ? (
-              <div className="seller-ws-inventory-tools">
-                <Link to="/seller">Back to dashboard</Link>
-                <label>
-                  Search products
-                  <input
-                    type="search"
-                    value={search}
-                    placeholder="Search by product title"
-                    onChange={(event) =>
-                      setParams(
-                        { search: event.target.value, page: "1" },
-                        { replace: true },
-                      )
-                    }
-                  />
-                </label>
-                <p>
-                  {filteredProducts.length} products
-                  {filteredProducts.length
-                    ? " - showing " +
-                      ((page - 1) * 20 + 1) +
-                      "-" +
-                      Math.min(page * 20, filteredProducts.length)
-                    : ""}
-                </p>
+              <div className="seller-ws-inventory-tools seller-inventory-redesign">
+                <div className="seller-inventory-summary">
+                  <div><span>Total products</span><strong>{data.products.length}</strong></div>
+                  <div><span>Active listings</span><strong>{data.products.filter((product) => product.approved === true && product.reviewStatus === "approved" && product.active && product.quantity !== 0 && !product.hidden).length}</strong></div>
+                  <Link className="seller-inventory-add" to="/add-product">+ Add new product</Link>
+                </div>
+                {data.products.length ? <>
+                  <label className="seller-inventory-search">
+                    <span className="seller-ws-sr-only">Search products</span>
+                    <input type="search" value={search} placeholder="Search your products..." onChange={(event) => setParams({ search: event.target.value, page: "1" }, { replace: true })} />
+                  </label>
+                  <div className="seller-inventory-filters">
+                    <select aria-label="Filter product status" value={inventoryStatus} onChange={(event) => { setInventoryStatus(event.target.value); setParams({ search, page: "1" }, { replace: true }); }}>
+                      <option value="all">All statuses</option><option value="active">Active</option><option value="pending">Pending review</option><option value="soldout">Sold out</option><option value="rejected">Rejected</option>
+                    </select>
+                    <select aria-label="Sort products" value={inventorySort} onChange={(event) => { setInventorySort(event.target.value); setParams({ search, page: "1" }, { replace: true }); }}>
+                      <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="price_high">Highest price</option><option value="price_low">Lowest price</option>
+                    </select>
+                  </div>
+                  <div className="seller-inventory-results"><span>{filteredProducts.length} products found</span><button type="button" onClick={() => { setInventoryStatus("all"); setInventorySort("newest"); setParams({ search: "", page: "1" }, { replace: true }); }}>Reset filters</button></div>
+                </> : null}
               </div>
             ) : null}
             {!data.products.length ? (
               <div className="seller-ws-empty">
-                No products yet.{" "}
-                <Link to="/add-product">Add your first product</Link>
+                {inventoryOnly ? <div className="seller-inventory-empty"><span aria-hidden="true">◇</span><h3>Your store is ready!</h3><p>You haven’t added any products yet. Create your first listing to start selling.</p><Link className="seller-inventory-add" to="/add-product">Add your first product →</Link></div> : <>No products yet. <Link to="/add-product">Add your first product</Link></>}
               </div>
             ) : (
               <ul className="seller-ws-products">
