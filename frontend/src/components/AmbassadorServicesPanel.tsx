@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
 import { isAxiosError } from "axios";
 import { Country, State } from "country-state-city";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
@@ -16,13 +16,24 @@ type PublicAmbassador = { _id: string; displayName: string; countryName: string;
 type ImageField = "idFront" | "idBack" | "selfie";
 type IdImageField = Exclude<ImageField, "selfie">;
 type ImageUploadStatus = { state: "idle" | "uploading" | "uploaded" | "error"; progress: number };
+type CropRect = { x: number; y: number; width: number; height: number };
 type CropEditor = {
   field: IdImageField;
   image: HTMLImageElement;
-  zoom: number;
   rotation: number;
   offsetX: number;
   offsetY: number;
+  cropRect: CropRect;
+};
+type CropDrag = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  mode: "image" | "resize";
+  handle: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "";
+  offsetX: number;
+  offsetY: number;
+  cropRect: CropRect;
 };
 type FeedbackNotice = { message: string; type: "success" | "error" | "warning" | "info" };
 type FormState = {
@@ -42,8 +53,7 @@ type FormState = {
 const MAX_IDENTITY_IMAGE_BYTES = 5 * 1024 * 1024;
 const ID_CROP_WIDTH = 800;
 const ID_CROP_HEIGHT = 505;
-const ID_CROP_OUTPUT_WIDTH = 1800;
-const ID_CROP_OUTPUT_HEIGHT = Math.round(ID_CROP_OUTPUT_WIDTH * ID_CROP_HEIGHT / ID_CROP_WIDTH);
+const ID_CROP_OUTPUT_MAX_EDGE = 1800;
 const IDENTITY_UPLOAD_TIMEOUT_MS = 120_000;
 const identityImageMimeByExtension: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const flagFor = (code: string) => code.replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
@@ -77,23 +87,100 @@ const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, re
   image.src = source;
 });
 
+const rotatedImageBounds = (image: HTMLImageElement, rotation: number) => {
+  const radians = rotation * Math.PI / 180;
+  return {
+    width: Math.abs(image.naturalWidth * Math.cos(radians)) + Math.abs(image.naturalHeight * Math.sin(radians)),
+    height: Math.abs(image.naturalWidth * Math.sin(radians)) + Math.abs(image.naturalHeight * Math.cos(radians)),
+  };
+};
+
+const fitScale = (image: HTMLImageElement, rotation: number, width: number, height: number) => {
+  const bounds = rotatedImageBounds(image, rotation);
+  return Math.min(width / bounds.width, height / bounds.height);
+};
+
+const initialCropRect = (image: HTMLImageElement, rotation: number): CropRect => {
+  const bounds = rotatedImageBounds(image, rotation);
+  const scale = Math.min(ID_CROP_WIDTH / bounds.width, ID_CROP_HEIGHT / bounds.height);
+  const width = Math.max(1, bounds.width * scale);
+  const height = Math.max(1, bounds.height * scale);
+  return { x: (ID_CROP_WIDTH - width) / 2, y: (ID_CROP_HEIGHT - height) / 2, width, height };
+};
+
 const drawIdCrop = (context: CanvasRenderingContext2D, width: number, height: number, crop: CropEditor) => {
-  const radians = crop.rotation * Math.PI / 180;
-  const boundWidth = Math.abs(crop.image.naturalWidth * Math.cos(radians)) + Math.abs(crop.image.naturalHeight * Math.sin(radians));
-  const boundHeight = Math.abs(crop.image.naturalWidth * Math.sin(radians)) + Math.abs(crop.image.naturalHeight * Math.cos(radians));
-  const scale = Math.max(width / boundWidth, height / boundHeight) * crop.zoom;
+  const scale = fitScale(crop.image, crop.rotation, width, height);
   context.clearRect(0, 0, width, height);
   context.fillStyle = "white";
   context.fillRect(0, 0, width, height);
   context.save();
-  context.translate(
-    width / 2 + crop.offsetX * width / ID_CROP_WIDTH,
-    height / 2 + crop.offsetY * height / ID_CROP_HEIGHT,
-  );
-  context.rotate(radians);
+  context.translate(width / 2 + crop.offsetX * width / ID_CROP_WIDTH, height / 2 + crop.offsetY * height / ID_CROP_HEIGHT);
+  context.rotate(crop.rotation * Math.PI / 180);
   context.scale(scale, scale);
   context.drawImage(crop.image, -crop.image.naturalWidth / 2, -crop.image.naturalHeight / 2);
   context.restore();
+
+  const rect = {
+    x: crop.cropRect.x * width / ID_CROP_WIDTH,
+    y: crop.cropRect.y * height / ID_CROP_HEIGHT,
+    width: crop.cropRect.width * width / ID_CROP_WIDTH,
+    height: crop.cropRect.height * height / ID_CROP_HEIGHT,
+  };
+  context.fillStyle = "rgba(10, 20, 35, .48)";
+  context.fillRect(0, 0, width, rect.y);
+  context.fillRect(0, rect.y + rect.height, width, height - rect.y - rect.height);
+  context.fillRect(0, rect.y, rect.x, rect.height);
+  context.fillRect(rect.x + rect.width, rect.y, width - rect.x - rect.width, rect.height);
+  context.strokeStyle = "#fff";
+  context.lineWidth = 3;
+  context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  const handleSize = Math.max(16, Math.min(24, Math.min(rect.width, rect.height) / 5));
+  context.fillStyle = "#fff";
+  context.strokeStyle = "#5b2bd9";
+  context.lineWidth = 3;
+  [
+    [rect.x, rect.y],
+    [rect.x + rect.width, rect.y],
+    [rect.x, rect.y + rect.height],
+    [rect.x + rect.width, rect.y + rect.height],
+  ].forEach(([x, y]) => {
+    context.beginPath();
+    context.rect(x - handleSize / 2, y - handleSize / 2, handleSize, handleSize);
+    context.fill();
+    context.stroke();
+  });
+};
+
+const resizeCropRect = (rect: CropRect, handle: CropDrag["handle"], x: number, y: number): CropRect => {
+  const minSize = 32;
+  const left = rect.x;
+  const right = rect.x + rect.width;
+  const top = rect.y;
+  const bottom = rect.y + rect.height;
+  const nextLeft = handle.includes("left") ? Math.max(0, Math.min(right - minSize, x)) : left;
+  const nextRight = handle.includes("right") ? Math.min(ID_CROP_WIDTH, Math.max(left + minSize, x)) : right;
+  const nextTop = handle.startsWith("top") ? Math.max(0, Math.min(bottom - minSize, y)) : top;
+  const nextBottom = handle.startsWith("bottom") ? Math.min(ID_CROP_HEIGHT, Math.max(top + minSize, y)) : bottom;
+  return { x: nextLeft, y: nextTop, width: nextRight - nextLeft, height: nextBottom - nextTop };
+};
+
+const renderIdCrop = (crop: CropEditor) => {
+  const outputScale = Math.min(ID_CROP_OUTPUT_MAX_EDGE / crop.cropRect.width, ID_CROP_OUTPUT_MAX_EDGE / crop.cropRect.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(crop.cropRect.width * outputScale));
+  canvas.height = Math.max(1, Math.round(crop.cropRect.height * outputScale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("The cropped ID image could not be prepared. Please try again.");
+  context.fillStyle = "white";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.scale(outputScale, outputScale);
+  context.translate(-crop.cropRect.x, -crop.cropRect.y);
+  context.translate(ID_CROP_WIDTH / 2 + crop.offsetX, ID_CROP_HEIGHT / 2 + crop.offsetY);
+  context.rotate(crop.rotation * Math.PI / 180);
+  const scale = fitScale(crop.image, crop.rotation, ID_CROP_WIDTH, ID_CROP_HEIGHT);
+  context.scale(scale, scale);
+  context.drawImage(crop.image, -crop.image.naturalWidth / 2, -crop.image.naturalHeight / 2);
+  return canvas.toDataURL("image/jpeg", 0.94);
 };
 
 const storedImageUrl = (value: unknown): value is string => {
@@ -112,7 +199,7 @@ const AmbassadorServicesPanel = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const selfieStreamRef = useRef<MediaStream | null>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const dragRef = useRef<{ pointerId: number; x: number; y: number; offsetX: number; offsetY: number } | null>(null);
+  const dragRef = useRef<CropDrag | null>(null);
   const idInputRefs = useRef<Record<IdImageField, HTMLInputElement | null>>({ idFront: null, idBack: null });
   const [mode, setMode] = useState<"apply" | "find" | null>(() =>
     searchParams.get("ambassador") === "apply" ? "apply" : null);
@@ -125,7 +212,9 @@ const AmbassadorServicesPanel = () => {
   const [selfieCameraOpen, setSelfieCameraOpen] = useState(false);
   const [selfieCameraReady, setSelfieCameraReady] = useState(false);
   const [cropEditor, setCropEditor] = useState<CropEditor | null>(null);
+  const [cropSources, setCropSources] = useState<Partial<Record<IdImageField, string>>>({});
   const [notice, setNotice] = useState<FeedbackNotice | null>(null);
+  const [uploadErrors, setUploadErrors] = useState<Partial<Record<ImageField, string>>>({});
   const [uploadStatus, setUploadStatus] = useState<Record<ImageField, ImageUploadStatus>>({
     idFront: { state: "idle", progress: 0 },
     idBack: { state: "idle", progress: 0 },
@@ -205,7 +294,7 @@ const AmbassadorServicesPanel = () => {
     };
   }, [notify, selfieCameraOpen]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!cropEditor || !cropCanvasRef.current) return;
     const canvas = cropCanvasRef.current;
     const context = canvas.getContext("2d");
@@ -240,53 +329,95 @@ const AmbassadorServicesPanel = () => {
     try {
       const source = await readImage(file);
       const image = await loadImage(source);
-      setCropEditor({ field, image, zoom: 1, rotation: 0, offsetX: 0, offsetY: 0 });
+      setCropEditor({
+        field,
+        image,
+        rotation: 0,
+        offsetX: 0,
+        offsetY: 0,
+        cropRect: initialCropRect(image, 0),
+      });
     } catch (err) {
       notify(err instanceof Error ? err.message : "The image could not be selected.", "error");
     } finally {
       input.value = "";
     }
   };
-  const confirmCrop = () => {
+  const reopenCrop = async (field: IdImageField) => {
+    const source = cropSources[field];
+    if (!source) return;
+    try {
+      const image = await loadImage(source);
+      setCropEditor({ field, image, rotation: 0, offsetX: 0, offsetY: 0, cropRect: initialCropRect(image, 0) });
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "The saved ID image could not be reopened.", "error");
+    }
+  };
+  const confirmCrop = async () => {
     if (!cropEditor) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = ID_CROP_OUTPUT_WIDTH;
-    canvas.height = ID_CROP_OUTPUT_HEIGHT;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      notify("The cropped ID image could not be prepared. Please try again.", "error");
+    let croppedImage = "";
+    try {
+      croppedImage = renderIdCrop(cropEditor);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "The cropped ID image could not be prepared. Please try again.", "error");
       return;
     }
-    drawIdCrop(context, canvas.width, canvas.height, cropEditor);
-    const croppedImage = canvas.toDataURL("image/jpeg", 0.94);
-    setForm((current) => ({ ...current, [cropEditor.field]: croppedImage }));
-    setUploadStatus((current) => ({ ...current, [cropEditor.field]: { state: "idle", progress: 0 } }));
+    const field = cropEditor.field;
     setCropEditor(null);
-    notify(`${cropEditor.field === "idFront" ? "ID front" : "ID back"} crop confirmed.`, "success");
+    setCropSources(current => ({ ...current, [field]: croppedImage }));
+    setForm(current => ({ ...current, [field]: croppedImage }));
+    try {
+      await uploadIdentityImage(field, croppedImage);
+      notify(`${field === "idFront" ? "ID front" : "ID back"} crop saved.`, "success");
+    } catch {
+      // The selected crop remains in the form and can be retried from its thumbnail.
+    }
   };
   const startCropDrag = (event: PointerEvent<HTMLCanvasElement>) => {
     if (!cropEditor) return;
+    event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) * ID_CROP_WIDTH / bounds.width;
+    const y = (event.clientY - bounds.top) * ID_CROP_HEIGHT / bounds.height;
+    const rect = cropEditor.cropRect;
+    const radius = 30;
+    const corners = [
+      { handle: "top-left", x: rect.x, y: rect.y },
+      { handle: "top-right", x: rect.x + rect.width, y: rect.y },
+      { handle: "bottom-left", x: rect.x, y: rect.y + rect.height },
+      { handle: "bottom-right", x: rect.x + rect.width, y: rect.y + rect.height },
+    ] as const;
+    const corner = corners.find(item => Math.hypot(x - item.x, y - item.y) <= radius);
     dragRef.current = {
       pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
+      startX: x,
+      startY: y,
+      mode: corner ? "resize" : "image",
+      handle: corner?.handle || "",
       offsetX: cropEditor.offsetX,
       offsetY: cropEditor.offsetY,
+      cropRect: rect,
     };
   };
   const moveCrop = (event: PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) * ID_CROP_WIDTH / bounds.width;
+    const y = (event.clientY - bounds.top) * ID_CROP_HEIGHT / bounds.height;
+    const dx = x - drag.startX;
+    const dy = y - drag.startY;
     setCropEditor((current) => current ? {
       ...current,
-      offsetX: drag.offsetX + (event.clientX - drag.x) * ID_CROP_WIDTH / bounds.width,
-      offsetY: drag.offsetY + (event.clientY - drag.y) * ID_CROP_HEIGHT / bounds.height,
+      ...(drag.mode === "resize"
+        ? { cropRect: resizeCropRect(drag.cropRect, drag.handle, x, y) }
+        : { offsetX: drag.offsetX + dx, offsetY: drag.offsetY + dy }),
     } : current);
   };
   const uploadIdentityImage = async (field: ImageField, source: string) => {
     if (storedImageUrl(source)) return source;
+    setUploadErrors(current => ({ ...current, [field]: undefined }));
     setUploadStatus((current) => ({ ...current, [field]: { state: "uploading", progress: 0 } }));
     try {
       if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -307,13 +438,15 @@ const AmbassadorServicesPanel = () => {
       });
       if (!storedImageUrl(data.url)) throw new Error("Image storage did not return a saved media URL.");
       setForm((current) => ({ ...current, [field]: data.url }));
+      setUploadErrors(current => ({ ...current, [field]: undefined }));
       setUploadStatus((current) => ({ ...current, [field]: { state: "uploaded", progress: 100 } }));
       return data.url;
     } catch (err: unknown) {
-      setUploadStatus((current) => ({ ...current, [field]: { state: "error", progress: 0 } }));
       const message = isAxiosError<{ message?: string }>(err)
         ? err.response?.data?.message || "Image upload failed. Check your connection and retry."
         : err instanceof Error ? err.message : "Image upload failed. Check your connection and retry.";
+      setUploadErrors(current => ({ ...current, [field]: message }));
+      setUploadStatus((current) => ({ ...current, [field]: { state: "error", progress: 0 } }));
       notify(`${field === "idFront" ? "ID front" : field === "idBack" ? "ID back" : "Live selfie"} upload failed: ${message}`, "error");
       throw err;
     }
@@ -359,6 +492,10 @@ const AmbassadorServicesPanel = () => {
     ].find((item) => !item.value);
     if (missingIdentity) {
       notify(`Add ${missingIdentity.label} before submitting.`, "error");
+      return;
+    }
+    if (Object.values(uploadStatus).some(status => status.state === "uploading")) {
+      notify("Wait for the identity image uploads to finish before submitting.", "warning");
       return;
     }
     setSubmitting(true);
@@ -430,14 +567,15 @@ const AmbassadorServicesPanel = () => {
           <fieldset><legend>Private identity verification</legend><div className="ambassador-identity-grid">
             {([["idFront", "ID front"], ["idBack", "ID back"]] as const).map(([field, label]) => (
               <div className="ambassador-identity-control" key={field}>
-                <button type="button" className={`ambassador-id-tile${form[field] ? " uploaded" : ""}`} disabled={submitting} onClick={() => idInputRefs.current[field]?.click()} aria-label={`${form[field] ? "Replace" : "Choose"} ${label} image`}>
+                <button type="button" className={`ambassador-id-tile${form[field] ? " uploaded" : ""}`} disabled={submitting || uploadStatus[field].state === "uploading"} onClick={() => idInputRefs.current[field]?.click()} aria-label={`${form[field] ? "Replace" : "Choose"} ${label} image`}>
                   {form[field] ? <img src={form[field]} alt={`${label} preview`} /> : <BadgeOutlinedIcon />}
                   <strong>{form[field] ? `${label} added` : label}</strong>
                   <span>{form[field] ? uploadStatus[field].state === "uploaded" ? "Uploaded · tap to replace" : "Tap to replace" : "JPG, PNG or WebP · max 5 MB"}</span>
                 </button>
                 <input ref={element => { idInputRefs.current[field] = element; }} className="ambassador-id-input" type="file" tabIndex={-1} accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(event) => void selectImage(field, event)} />
+                {form[field] && cropSources[field] ? <button type="button" className="ambassador-recrop-button" disabled={submitting || uploadStatus[field].state === "uploading"} onClick={() => void reopenCrop(field)}>Recrop {label}</button> : null}
                 {uploadStatus[field].state === "uploading" ? <div className="ambassador-upload-progress" role="status"><span>Uploading {uploadStatus[field].progress}%</span><progress max="100" value={uploadStatus[field].progress} /></div> : null}
-                {uploadStatus[field].state === "error" ? <div className="ambassador-upload-retry"><span>Upload failed</span><button type="button" disabled={submitting} onClick={() => retryImageUpload(field)}>Retry upload</button></div> : null}
+                {uploadStatus[field].state === "error" ? <div className="ambassador-upload-retry"><span role="alert">{uploadErrors[field] || "Upload failed. Your selected image is preserved."}</span><button type="button" disabled={submitting} onClick={() => retryImageUpload(field)}>Retry upload</button></div> : null}
               </div>
             ))}
             <div className="ambassador-identity-control">
@@ -451,17 +589,30 @@ const AmbassadorServicesPanel = () => {
             </div>
           </div></fieldset>
           <label className="ambassador-consent"><input required type="checkbox" />I confirm these details are mine and consent to private identity review.</label>
-          <button type="submit" className="ambassador-submit" disabled={submitting}>{submitting ? "Uploading and submitting…" : "Submit private application"}</button>
+          <button type="submit" className="ambassador-submit" disabled={submitting || Object.values(uploadStatus).some(status => status.state === "uploading")}>{submitting ? "Uploading and submitting…" : "Submit private application"}</button>
         </form>}
       </section>
-      {cropEditor ? <div className="ambassador-crop-backdrop" role="presentation">
+      {cropEditor ? <div className="ambassador-crop-backdrop" role="presentation" onMouseDown={event => {
+        event.stopPropagation();
+        if (event.target === event.currentTarget) setCropEditor(null);
+      }} onClick={event => event.stopPropagation()} onTouchStart={event => {
+        event.stopPropagation();
+        if (event.target === event.currentTarget) setCropEditor(null);
+      }}>
         <section className="ambassador-crop-dialog" role="dialog" aria-modal="true" aria-label={`Crop ${cropEditor.field === "idFront" ? "ID front" : "ID back"}`}>
           <header><h3>Adjust {cropEditor.field === "idFront" ? "ID front" : "ID back"}</h3><button type="button" onClick={() => setCropEditor(null)} aria-label="Cancel crop"><CloseOutlinedIcon /></button></header>
-          <p>Drag to position the document. Zoom or rotate before confirming.</p>
-          <canvas ref={cropCanvasRef} width={ID_CROP_WIDTH} height={ID_CROP_HEIGHT} className="ambassador-crop-canvas" onPointerDown={startCropDrag} onPointerMove={moveCrop} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} />
-          <label className="ambassador-crop-zoom">Zoom<input type="range" min="1" max="3" step="0.05" value={cropEditor.zoom} onChange={(event) => setCropEditor(current => current ? { ...current, zoom: Number(event.target.value) } : current)} /></label>
-          <div className="ambassador-crop-actions"><button type="button" onClick={() => setCropEditor(current => current ? { ...current, rotation: (current.rotation + 270) % 360 } : current)}>Rotate left</button><button type="button" onClick={() => setCropEditor(current => current ? { ...current, rotation: (current.rotation + 90) % 360 } : current)}>Rotate right</button></div>
-          <footer><button type="button" onClick={() => setCropEditor(null)}>Cancel</button><button type="button" className="primary" onClick={confirmCrop}>Confirm crop</button></footer>
+          <p>Drag the image to reposition it or drag a corner handle to resize the crop frame.</p>
+          <canvas ref={cropCanvasRef} width={ID_CROP_WIDTH} height={ID_CROP_HEIGHT} className="ambassador-crop-canvas" aria-label="ID image crop frame with four resize handles" onPointerDown={startCropDrag} onPointerMove={moveCrop} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} />
+          <div className="ambassador-crop-actions"><button type="button" onClick={() => setCropEditor(current => {
+            if (!current) return current;
+            const rotation = (current.rotation + 270) % 360;
+            return { ...current, rotation, offsetX: 0, offsetY: 0, cropRect: initialCropRect(current.image, rotation) };
+          })}>Rotate left</button><button type="button" onClick={() => setCropEditor(current => {
+            if (!current) return current;
+            const rotation = (current.rotation + 90) % 360;
+            return { ...current, rotation, offsetX: 0, offsetY: 0, cropRect: initialCropRect(current.image, rotation) };
+          })}>Rotate right</button></div>
+          <footer><button type="button" onClick={() => setCropEditor(null)}>Cancel</button><button type="button" className="primary" onClick={() => void confirmCrop()}>Confirm crop</button></footer>
         </section>
       </div> : null}
       {selfieCameraOpen ? (
