@@ -164,7 +164,7 @@ test('same wallet cannot receive again through a different UID',async()=>{
 test('dashboard reports verified unique-wallet progress and restricts payment fields',async()=>{
  const {testnetDashboard}=require('../build/services/testnetA2UDashboard');const old=process.env.PI_TESTNET_API_KEY;delete process.env.PI_TESTNET_API_KEY;let projection;
  const cursor={project(fields){projection=fields;return this;},sort(){return this;},skip(){return this;},limit(){return this;},toArray:async()=>[]};
- const collection={find:()=>cursor,countDocuments:async()=>0,findOne:async()=>null,distinct:async(field,filter)=>{assert.equal(field,'recipientWalletAddress');assert.equal(filter.status,'completed');assert.equal(filter['piStatus.transaction_verified'],true);assert.equal(filter['piStatus.developer_completed'],true);assert.equal(filter.network,'Pi Testnet');return ['wallet1','wallet2'];}};
+ const collection={find:()=>cursor,countDocuments:async()=>0,findOne:async()=>null,aggregate:pipeline=>{assert.equal(pipeline[0].$match.network,'Pi Testnet');assert.equal(pipeline[0].$match.status,'completed');assert.equal(pipeline[0].$match.ledgerVerified,true);assert.equal(pipeline[1].$group._id,'$recipientWalletAddress');assert.equal(pipeline[2].$count,'total');return{toArray:async()=>[{total:2}]};}};
  try{const result=await testnetDashboard({testnetA2UCollection:collection},1);assert.equal(result.successfulUniqueWallets,2);assert.equal(result.target,5);assert.equal(result.wallet.ready,false);assert(!('accessToken' in projection));assert(!('adminUid' in projection));assert.equal(projection.txid,1);}finally{if(old)process.env.PI_TESTNET_API_KEY=old;}
 });
 test('eligible list freshly verifies UID and wallet consent and never returns tokens',async()=>{
