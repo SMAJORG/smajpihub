@@ -103,7 +103,7 @@ export function ManagedHomeSection({
   const cards = section.cards;
   return (
     <section
-      className={(compact ? "mobile-feed-section" : "desktop-feed-section") + " managed-home-section"}
+      className={(compact ? "mobile-feed-section" : "desktop-feed-section") + " managed-home-section" + (section.id === "discover" ? " smaj-refined-discover" : "")}
       data-home-section={section.id}
     >
       <div className={compact ? "mobile-section-heading" : "desktop-feed-section-head"}>
