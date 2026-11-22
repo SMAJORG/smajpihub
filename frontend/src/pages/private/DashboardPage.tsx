@@ -274,48 +274,74 @@ const ServiceList = ({ services, mode }: { services: ServiceDefinition[]; mode: 
 );
 
 
-const TrendingMobileContent = ({ products, productsLoading, productsError, streamRows, streamLoading, sportsCatalog, sportsLoading }: { products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; recommendedServices: ServiceDefinition[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => (
-  <>
-    <section className="mobile-feed-section discovery-tab-intro"><span>POPULAR NOW</span><h1>See what is happening across SMAJ</h1><p>Popular services, searches, entertainment, sports, and events in one live view.</p></section>
-    <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Popular in SMAJ</h2><Link to="/app/services">See all</Link></div><p className="discovery-section-note">Beta ranking based on the services people explore most.</p><ServiceList services={trendingSlugs.slice(0, 6).map((slug) => serviceCatalog.find((service) => service.slug === slug)).filter(Boolean) as ServiceDefinition[]} mode="mobile" /></section>
-    <DashboardStreamSections rows={streamRows.filter((row) => row.title === "Trending now")} loading={streamLoading} compact />
-    <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact />
-    <RecentlyAddedSection compact products={products.slice(0, 3)} loading={productsLoading} error={productsError} />
-    <DashboardEventsSection />
-  </>
+const CompactCategoryGrid = ({ mode }: { mode: "mobile" | "desktop" }) => (
+  <div className={`discovery-compact-directory ${mode}`}>
+    <div className="discovery-compact-title"><h2>All categories</h2><span>{categoryGroups.reduce((count, group) => count + group.slugs.length, 0)} services</span></div>
+    {[
+      { title: "Shopping & Everyday", slugs: ["store", "housing", "food", "transport"] },
+      { title: "Entertainment & Social", slugs: ["stream", "sports", "events", "charity"] },
+      { title: "Work, Learning & Care", slugs: ["jobs", "education", "health", "agro"] },
+      { title: "More services", slugs: ["energy", "swap", "token"] },
+    ].map(group => <section className="discovery-compact-group" key={group.title}>
+      <h3>{group.title}</h3>
+      <div className="discovery-compact-icons">
+        {group.slugs.map(slug => {
+          const service = serviceCatalog.find(item => item.slug === slug);
+          if (!service) return null;
+          return <Link key={slug} to={servicePath(service)} state={serviceLaunchNavigationState(slug)} className="discovery-compact-item">
+            <span className="discovery-compact-art"><ServiceArt index={service.atlasIndex} /></span>
+            <span>{service.name.replace("SMAJ ", "")}</span>
+          </Link>;
+        })}
+      </div>
+    </section>)}
+  </div>
 );
 
-const LifestyleMobileContent = ({ sellers, recentItems }: { products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; recommendedServices: ServiceDefinition[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => (
-  <>
-    <section className="mobile-feed-section discovery-tab-intro"><span>EVERYDAY LIFE</span><h1>What would you like to do?</h1><p>Services organized around real needs instead of popularity.</p></section>
-    {lifestyleGroups.map((group) => <section className="mobile-feed-section discovery-service-group" key={group.title}><div className="mobile-section-heading"><div><h2>{group.title}</h2><p>{group.description}</p></div></div><ServiceList services={group.slugs.map((slug) => serviceCatalog.find((service) => service.slug === slug)).filter(Boolean) as ServiceDefinition[]} mode="mobile" /></section>)}
-    <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Pick up where you left off</h2></div><div className="mobile-recent-strip">{recentItems.filter((item) => lifestyleSlugs.some((slug) => item.to.includes(slug))).slice(0, 3).map((item) => <Link className="mobile-recent-card" to={item.to} key={`${item.to}-${item.label}`}><span className="mobile-recent-icon">{recentItemIcon(item.to)}</span><ChevronRightOutlinedIcon className="mobile-recent-arrow" /><strong>{item.label}</strong><small>{item.meta && item.meta !== "Recent page" ? item.meta : "Recently viewed"}</small></Link>)}</div></section>
-    <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Featured providers</h2></div><div className="mobile-services-grid">{sellers.slice(0, 3).map((seller) => <Link to={`/seller/${seller.id}`} key={seller.id}><div><strong>{seller.name}</strong><small>{seller.location}</small></div><small>{seller.rating} star • {seller.listings} listings</small></Link>)}</div></section>
-    <section className="mobile-feed-section"><div className="mobile-section-heading"><h2>Health & education</h2></div><div className="mobile-feature-strip">{featureCards.filter((card) => card.slug === "health" || card.slug === "education").map((card) => <Link className="mobile-feature-card" to={card.slug === "store" ? "/store" : `/app/services/${card.slug}`} key={card.slug}><img src={card.image} alt="" /><div><h3>{card.title}</h3><p>{card.text}</p><span>Explore <ArrowForwardOutlinedIcon /></span></div></Link>)}</div></section>
-  </>
+const CompactLifestyle = ({ mode }: { mode: "mobile" | "desktop" }) => (
+  <div className={`discovery-compact-layout ${mode}`}>
+    <header className="discovery-compact-title"><div><h2>Lifestyle</h2><p>Explore services for everyday living</p></div></header>
+    <div className="discovery-lifestyle-cards">
+      {[
+        { title: "Find a home", subtitle: "Housing & rentals", slug: "housing", image: featureCards.find(card => card.slug === "housing")?.image },
+        { title: "Food & dining", subtitle: "Meals & delivery", slug: "food", image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80" },
+        { title: "Health & care", subtitle: "Find health services", slug: "health", image: featureCards.find(card => card.slug === "health")?.image },
+        { title: "Get around", subtitle: "Transport services", slug: "transport", image: "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=600&q=80" },
+      ].map(card => {
+        const service = serviceCatalog.find(item => item.slug === card.slug);
+        return <Link to={service ? servicePath(service) : "/app/services"} state={serviceLaunchNavigationState(card.slug)} className="discovery-lifestyle-card" key={card.slug}>
+          <img src={card.image} alt="" loading="lazy" />
+          <div><strong>{card.title}</strong><small>{card.subtitle}</small></div>
+        </Link>;
+      })}
+    </div>
+    <Link className="discovery-lifestyle-learning" to="/app/services/education" state={serviceLaunchNavigationState("education")}>
+      <span className="discovery-learning-icon"><ServiceArt index={serviceCatalog.find(service => service.slug === "education")?.atlasIndex ?? 0} /></span>
+      <span><strong>Learn something new</strong><small>Courses, skills & education</small></span><ChevronRightOutlinedIcon />
+    </Link>
+  </div>
 );
 
-const CategoriesMobileContent = (_props: { products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; recommendedServices: ServiceDefinition[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => (
-  <>
-    <section className="mobile-feed-section discovery-tab-intro"><span>ALL SERVICES</span><h1>Explore by category</h1><p>Every SMAJ service, organized so you can find the right one quickly.</p></section>
-    {categoryGroups.map((group) => <section className="mobile-feed-section discovery-service-group" key={group.title}><div className="mobile-section-heading"><div><h2>{group.title}</h2><p>{group.description} · {group.slugs.length} services</p></div></div><ServiceList services={group.slugs.map((slug) => serviceCatalog.find((service) => service.slug === slug)).filter(Boolean) as ServiceDefinition[]} mode="mobile" /></section>)}
-  </>
+const CompactTrending = ({ mode, streamRows, streamLoading, sportsCatalog, sportsLoading }: { mode: "mobile" | "desktop"; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => (
+  <div className={`discovery-compact-layout ${mode}`}>
+    <header className="discovery-compact-title"><div><h2>Trending now</h2><p>Explore what's popular</p></div></header>
+    <DashboardStreamSections rows={streamRows.filter(row => row.title === "Trending now")} loading={streamLoading} compact={mode === "mobile"} />
+    <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact={mode === "mobile"} />
+    <DashboardEventsSection compact={mode !== "mobile"} />
+  </div>
 );
 
-const DesktopDiscoveryContent = ({ activeTab, products, productsLoading, productsError, streamRows, streamLoading, sportsCatalog, sportsLoading }: { activeTab: Exclude<DiscoveryTab, "for-you">; products: Product[]; productsLoading: boolean; productsError: string; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => {
-  if (activeTab === "trending") return <>
-    <section className="desktop-feed-section discovery-tab-intro"><span>POPULAR NOW</span><h1>See what is happening across SMAJ</h1><p>Popular services, searches, entertainment, sports, and events in one live view.</p></section>
-    <section className="desktop-feed-section"><div className="desktop-feed-section-head"><div><h2>Popular in SMAJ</h2><p>Beta ranking based on the services people explore most.</p></div><Link to="/app/services">See all</Link></div><ServiceList services={trendingSlugs.slice(0, 6).map((slug) => serviceCatalog.find((service) => service.slug === slug)).filter(Boolean) as ServiceDefinition[]} mode="desktop" /></section>
-    <DashboardStreamSections rows={streamRows.filter((row) => row.title === "Trending now")} loading={streamLoading} compact={false} />
-    <DashboardSportsSection catalog={sportsCatalog} loading={sportsLoading} compact={false} />
-    <RecentlyAddedSection products={products.slice(0, 6)} loading={productsLoading} error={productsError} />
-    <DashboardEventsSection compact={false} />
-  </>;
-  const groups = activeTab === "lifestyle" ? lifestyleGroups : categoryGroups;
-  return <>
-    <section className="desktop-feed-section discovery-tab-intro"><span>{activeTab === "lifestyle" ? "EVERYDAY LIFE" : "ALL SERVICES"}</span><h1>{activeTab === "lifestyle" ? "What would you like to do?" : "Explore by category"}</h1><p>{activeTab === "lifestyle" ? "Services organized around real needs instead of popularity." : "Every SMAJ service, organized so you can find the right one quickly."}</p></section>
-    {groups.map((group) => <section className="desktop-feed-section discovery-service-group" key={group.title}><div className="desktop-feed-section-head"><div><h2>{group.title}</h2><p>{group.description}{activeTab === "categories" ? ` · ${group.slugs.length} services` : ""}</p></div></div><ServiceList services={group.slugs.map((slug) => serviceCatalog.find((service) => service.slug === slug)).filter(Boolean) as ServiceDefinition[]} mode="desktop" /></section>)}
-  </>;
+const TrendingMobileContent = ({ streamRows, streamLoading, sportsCatalog, sportsLoading }: { products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; recommendedServices: ServiceDefinition[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) =>
+  <CompactTrending mode="mobile" streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} />;
+
+const LifestyleMobileContent = (_props: { products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; recommendedServices: ServiceDefinition[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => <CompactLifestyle mode="mobile" />;
+
+const CategoriesMobileContent = (_props: { products: Product[]; productsLoading: boolean; productsError: string; sellers: SellerCard[]; recentItems: RecentItem[]; recommendedServices: ServiceDefinition[]; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => <CompactCategoryGrid mode="mobile" />;
+
+const DesktopDiscoveryContent = ({ activeTab, streamRows, streamLoading, sportsCatalog, sportsLoading }: { activeTab: Exclude<DiscoveryTab, "for-you">; products: Product[]; productsLoading: boolean; productsError: string; streamRows: DashboardStreamRow[]; streamLoading: boolean; sportsCatalog: SportsCatalog; sportsLoading: boolean }) => {
+  if (activeTab === "trending") return <CompactTrending mode="desktop" streamRows={streamRows} streamLoading={streamLoading} sportsCatalog={sportsCatalog} sportsLoading={sportsLoading} />;
+  if (activeTab === "lifestyle") return <CompactLifestyle mode="desktop" />;
+  return <CompactCategoryGrid mode="desktop" />;
 };
 
 const DashboardStreamCard = ({ item, compact }: { item: StreamCatalogTitle; compact: boolean }) => {
