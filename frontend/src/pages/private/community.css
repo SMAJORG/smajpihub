@@ -2598,3 +2598,39 @@
     animation: none;
   }
 }
+
+
+/* Community feed action bar: balanced icons, preserved audience globe and functionality. */
+.community-feed-actions.community-feed-actions-refined {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: clamp(2px, 1vw, 10px);
+  padding: 12px 0 6px;
+  align-items: center;
+}
+.community-feed-actions-refined .community-feed-action-refined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 7px 4px;
+  border-radius: 10px;
+  transition: background-color .15s ease, color .15s ease;
+}
+.community-feed-actions-refined .community-feed-action-refined svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.community-feed-actions-refined .community-feed-action-refined span { font-size: 13px; font-variant-numeric: tabular-nums; }
+.community-feed-actions-refined .community-feed-action-refined:hover { background: var(--smaj-secondary-bg); }
+.community-feed-actions-refined .community-feed-action-refined[aria-pressed="true"] { color: var(--smaj-primary); }
+.community-feed-actions-refined .community-feed-action-refined:focus-visible { outline: 2px solid var(--smaj-primary); outline-offset: 2px; }
+@media(max-width: 480px) {
+  .community-feed-actions.community-feed-actions-refined { gap: 2px; }
+  .community-feed-actions-refined .community-feed-action-refined { gap: 4px; padding-inline: 2px; }
+  .community-feed-actions-refined .community-feed-action-refined svg { width: 21px; height: 21px; }
+  .community-feed-actions-refined .community-feed-action-refined span { font-size: 12px; }
+}
