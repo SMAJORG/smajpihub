@@ -23055,3 +23055,33 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .account-dashboard-page .account-package-link .profile-package-icon { flex-shrink:0; }
 .account-dashboard-page .account-package-link > small { font-size:9px; }
 .account-dashboard-page .account-dashboard-list > a > svg:first-child { flex-shrink:0; color:var(--smaj-text-secondary); }
+
+
+/* Compact profile redesign; scoped to private profile only. */
+.real-profile-page .real-profile-cover { min-height: clamp(110px, 19vw, 190px); }
+.real-profile-page .real-profile-cover-edit { font-size: 13px; }
+.real-profile-page .real-profile-stats { grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.real-profile-page .real-profile-stats article { min-height:105px; padding:12px 8px; border-radius:16px; justify-items:center; text-align:center; gap:5px; }
+.real-profile-page .real-profile-stats article > svg { width:22px; height:22px; }
+.real-profile-page .real-profile-stats strong { font-size:23px; line-height:1.1; min-height:24px; display:flex; align-items:center; justify-content:center; }
+.real-profile-page .real-profile-stats strong .trust-badge { font-size:18px; }
+.real-profile-page .real-profile-stats span { font-size:12px; }
+.real-profile-page .real-profile-grid { grid-template-columns:1fr; gap:12px; }
+.real-profile-page .real-profile-card { border-radius:16px; padding:18px; }
+.real-profile-page .real-profile-card-head { margin-bottom:10px; }
+.real-profile-page .real-profile-card-head h2 { font-size:19px; }
+.real-profile-page .real-profile-card dl > div { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:11px 0; }
+.real-profile-page .real-profile-card dl dt { flex-shrink:0; }
+.real-profile-page .real-profile-card dl dd { text-align:right; overflow-wrap:anywhere; }
+.real-profile-page .real-profile-seller-compact p { margin:5px 0 12px; }
+.real-profile-page .real-profile-preferences-compact { padding-block:15px; }
+@media(max-width:700px) {
+ .real-profile-page .real-profile-cover { min-height:125px; }
+ .real-profile-page .real-profile-identity { padding-top:12px; padding-bottom:16px; }
+ .real-profile-page .real-profile-stats { gap:7px; }
+ .real-profile-page .real-profile-stats article { min-height:91px; padding:10px 4px; border-radius:13px; }
+ .real-profile-page .real-profile-stats strong { font-size:21px; }
+ .real-profile-page .real-profile-stats span { font-size:11px; }
+ .real-profile-page .real-profile-card { padding:15px; }
+ .real-profile-page .real-profile-card dl > div { gap:8px; }
+}
