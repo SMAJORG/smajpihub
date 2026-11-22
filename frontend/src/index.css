@@ -23154,3 +23154,39 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .seller-report-dialog p{margin:0;font-size:14px;color:var(--smaj-text-secondary)}
 .seller-report-dialog>a{justify-content:center;text-align:center}.seller-report-dialog>button{min-height:44px;border:1px solid var(--smaj-border);border-radius:11px;background:var(--smaj-card);color:var(--smaj-text);cursor:pointer}
 @media(max-width:550px){.seller-profile-page .seller-profile-hero{padding:13px}.seller-profile-page .seller-profile-advanced{grid-template-columns:1fr 1fr;gap:8px}.seller-profile-page .seller-product-tools{top:auto}}
+
+
+/* Token Rewards: compact launch-preview design */
+.token-rewards-compact{width:min(100%,760px);max-width:760px;margin-inline:auto;gap:12px;padding:12px}
+.token-rewards-compact .token-rewards-header{grid-template-columns:40px minmax(0,1fr) auto;gap:10px;align-items:center;padding:18px;border-radius:18px;box-shadow:none}
+.token-rewards-compact .token-rewards-header>div{min-width:0}
+.token-rewards-compact .token-rewards-header>div>span{color:#f5d98a}
+.token-rewards-compact .token-rewards-header h1{color:#fff;font-size:clamp(21px,4vw,29px);line-height:1.18;margin:3px 0}
+.token-rewards-compact .token-rewards-header p{color:#f1e9ff;font-size:12px;font-weight:500;line-height:1.4}
+.token-rewards-compact .token-rewards-header .token-rewards-soon{grid-column:auto;margin:0;padding:7px 9px;white-space:nowrap;color:#4c1d95;background:#fef3c7;font-size:9px}
+.token-rewards-compact .token-rewards-summary{gap:8px}
+.token-rewards-compact .token-rewards-summary article{min-height:104px;padding:12px;gap:5px;border-radius:15px;box-shadow:none}
+.token-rewards-compact .token-rewards-summary article>span{width:33px;height:33px;border-radius:10px}
+.token-rewards-compact .token-rewards-summary article>span svg{font-size:20px}
+.token-rewards-compact .token-rewards-summary strong{font-size:23px;line-height:1.15}
+.token-rewards-compact .token-rewards-summary small{font-size:11px}
+.token-rewards-compact .token-redeem-card{grid-template-columns:40px minmax(0,1fr) auto;padding:14px;gap:10px;border-radius:16px;box-shadow:none}
+.token-rewards-compact .token-redeem-icon{width:40px;height:40px;border-radius:12px;color:#7c3aed;background:#ede9fe}
+.token-rewards-compact .token-redeem-card h2{font-size:15px}
+.token-rewards-compact .token-redeem-card p{font-size:12px}
+.token-rewards-compact .token-redeem-card button{display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;cursor:not-allowed}
+.token-rewards-compact .token-rewards-preview{padding:15px;border-radius:17px;background:var(--smaj-surface);border:1px solid var(--smaj-border)}
+.token-rewards-compact .token-rewards-preview-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 9px}
+.token-rewards-compact .token-rewards-preview-heading h2{margin:0;font-size:16px;color:var(--smaj-text)}
+.token-rewards-compact .token-rewards-preview-heading>span{padding:5px 8px;border-radius:20px;background:#ede9fe;color:#6d28d9;font-size:10px;font-weight:800;letter-spacing:0}
+.token-rewards-compact .token-rewards-preview-list{display:grid;grid-template-columns:1fr;gap:0;margin:0}
+.token-rewards-compact .token-rewards-preview-list article{display:flex;align-items:center;gap:12px;padding:13px 4px;border-radius:0;background:transparent}
+.token-rewards-compact .token-rewards-preview-list article+article{border-top:1px solid var(--smaj-border)}
+.token-rewards-compact .token-rewards-preview-list article>svg:first-child{flex:none;font-size:22px;color:#7c3aed}
+.token-rewards-compact .token-rewards-preview-list article>div{display:grid;gap:3px;min-width:0;flex:1}
+.token-rewards-compact .token-rewards-preview-list article strong{color:var(--smaj-text);font-size:14px}
+.token-rewards-compact .token-rewards-preview-list article small{color:var(--smaj-text-secondary);font-size:12px}
+.token-rewards-compact .token-rewards-locked{font-size:18px;color:var(--smaj-text-secondary)}
+.token-rewards-compact .token-rewards-disclaimer{display:flex;align-items:flex-start;gap:7px;margin:0;padding:5px 2px;color:var(--smaj-text-secondary);font-size:11px;line-height:1.5}
+.token-rewards-compact .token-rewards-disclaimer svg{flex:none}
+@media(max-width:640px){.token-rewards-compact .token-rewards-header{grid-template-columns:36px minmax(0,1fr);padding:15px}.token-rewards-compact .token-rewards-header .token-rewards-soon{grid-column:2;justify-self:start}.token-rewards-compact .token-redeem-card{grid-template-columns:40px minmax(0,1fr)}.token-rewards-compact .token-redeem-card button{grid-column:1/-1;min-height:38px}.token-rewards-compact .token-rewards-summary article{padding:10px 8px}.token-rewards-compact .token-rewards-summary strong{font-size:20px}.token-rewards-compact .token-rewards-summary small{font-size:10px}}
