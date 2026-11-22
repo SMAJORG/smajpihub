@@ -67,6 +67,15 @@ const AccountDashboardPage = () => {
           <p><Link className="account-dashboard-username" to={`/people/${encodeURIComponent(user?.uid || "")}`}>@{user?.piUsername || user?.username}</Link></p>
         </div>
 
+        <Link
+          className="profile-package-shortcut account-package-link"
+          to="/app/services/token/rewards"
+          aria-label="Open SMAJ Token Rewards package preview"
+        >
+          <span className="profile-package-icon" aria-hidden="true"><CardGiftcardOutlinedIcon /></span>
+          <span>Package</span>
+          <small>SOON</small>
+        </Link>
       </section>
 
       <section className="account-quick-grid">
@@ -86,16 +95,6 @@ const AccountDashboardPage = () => {
           </Link>
         ))}
       </section>
-
-      <div className="account-package-row">        <Link
-          className="profile-package-shortcut account-package-link"
-          to="/app/services/token/rewards"
-          aria-label="Open SMAJ Token Rewards package preview"
-        >
-          <span className="profile-package-icon" aria-hidden="true"><CardGiftcardOutlinedIcon /></span>
-          <span>Package</span>
-          <small>SOON</small>
-        </Link></div>
 
       <InvitePromoCard placement="account" />
 
