@@ -28,6 +28,7 @@ const AdminModulePage = () => {
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const isPendingActions = location.pathname.endsWith("/pending-actions");
 
   const load = useCallback(async () => {
     if (!group || !item) return;
@@ -67,7 +68,18 @@ const AdminModulePage = () => {
         subtitle: text(row.piUsername || row.sellerName || row.description || row.details || row.type) || group.label,
         status: rowStatus,
         updatedAt: dateText(row.updatedAt || row.createdAt || row.paidAt),
-        href: source.key === "activity" && /ambassador/i.test([row.title, row.label, row.description, row.details, row.type, row.reason].map(text).join(" ")) ? "/admin/ambassadors" : source.href,
+        href: (() => {
+          const activity = [row.title, row.label, row.description, row.details, row.type, row.reason].map(text).join(" ").toLowerCase();
+          const recordId = text(row._id || row.uid || row.id || row.userId || row.entityId || row.targetId);
+          const destination = /ambassador/.test(activity) ? "/admin/ambassadors" :
+            /new user|user joined|user registered|account created/.test(activity) ? "/admin/users" :
+            /verification|kyc/.test(activity) ? "/admin/users" :
+            /product|listing/.test(activity) ? "/admin/products" :
+            /job|employer/.test(activity) ? "/admin/jobs" :
+            /order|payment|dispute/.test(activity) ? "/admin/orders" :
+            /report|moderation/.test(activity) ? "/admin/reports" : source.href;
+          return destination + (recordId && destination !== source.href ? "?record=" + encodeURIComponent(recordId) : "");
+        })(),
       };
     }));
     setLoading(false);
@@ -98,6 +110,17 @@ const AdminModulePage = () => {
 
   if (!group || !item) {
     return <main className="private-page"><section className="private-state"><h2>Admin module not found</h2><Link className="private-primary-button" to="/admin">Back to dashboard</Link></section></main>;
+  }
+
+  if (isPendingActions) {
+    return <main className="private-page admin-module-page admin-live-workspace pending-actions-redesign">
+      <header className="pending-actions-head"><div><p className="private-kicker">ADMIN / OVERVIEW</p><h1>Pending Actions</h1><p>Review activity and open the relevant management section.</p></div><button type="button" onClick={() => void load()} disabled={loading}><RefreshOutlinedIcon />{loading ? "Refreshing" : "Refresh"}</button></header>
+      {error ? <div className="private-alert error" role="alert">{error}</div> : null}
+      <section className="pending-actions-kpis" aria-label="Activity summary"><article><span>Records</span><strong>{records.length}</strong></article><article><span>Needs review</span><strong>{attentionCount}</strong></article><article><span>Users</span><strong>{stats.totalUsers ?? "—"}</strong></article></section>
+      <section className="pending-actions-filters"><label className="pending-actions-search"><SearchOutlinedIcon /><input type="search" aria-label="Search actions" placeholder="Search actions..." value={query} onChange={event => setQuery(event.target.value)} /></label><div className="pending-actions-tabs" role="group" aria-label="Filter actions">{[{value:"all",label:"All"},{value:"pending",label:"Pending"},{value:"active",label:"Active"}].map(option => <button key={option.value} type="button" aria-pressed={status === option.value} onClick={() => setStatus(option.value)}>{option.label}</button>)}</div></section>
+      <div className="pending-actions-list-head"><h2>Recent activity</h2><span>{visible.length} shown</span></div>
+      {loading ? <div className="private-state compact"><h3>Loading activity…</h3></div> : visible.length ? <section className="pending-actions-cards">{visible.map(record => <Link className="pending-actions-card" key={record.id} to={record.href} aria-label={`Open management for ${record.title}`}><div className="pending-actions-card-top"><span className="pending-actions-card-icon">↗</span><div><strong>{record.title}</strong><small>{record.subtitle}</small></div><em className={`pending-actions-status ${record.status.toLowerCase()}`}>{record.status}</em></div><div className="pending-actions-card-bottom"><time>{record.updatedAt}</time><span>Open management ↗</span></div></Link>)}</section> : <div className="private-state compact"><h3>No matching actions</h3><p>{error ? "Activity could not be loaded. Try Refresh." : "Try another search or status."}</p></div>}
+    </main>;
   }
 
   return (
