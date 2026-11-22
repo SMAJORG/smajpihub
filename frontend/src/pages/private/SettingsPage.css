@@ -915,3 +915,83 @@
     transition: none;
   }
 }
+
+
+/* Premium compact Settings polish: consistent spacing, touch targets and contrast. */
+.settings-page.settings-compact {
+  --settings-accent-soft: color-mix(in srgb, var(--smaj-primary, #7434f5) 9%, var(--settings-card));
+  gap: 12px;
+}
+.settings-compact .settings-profile-card {
+  border-radius: 18px;
+  padding: 13px 14px;
+  box-shadow: 0 2px 12px #10182808;
+}
+.settings-compact .settings-profile-card > a:not(.settings-profile-avatar-link) {
+  transition: background-color .15s ease;
+}
+.settings-compact .settings-profile-card > a:not(.settings-profile-avatar-link):hover {
+  background: var(--settings-accent-soft);
+}
+.settings-compact .settings-menu-card {
+  padding: 0 12px;
+  border-radius: 20px;
+  box-shadow: 0 3px 18px #10182807;
+}
+.settings-page.settings-compact .settings-group-toggle {
+  min-height: 76px;
+  padding: 12px 2px;
+  gap: 11px;
+  border-radius: 12px;
+}
+.settings-page.settings-compact .settings-group-toggle:hover {
+  background: var(--settings-accent-soft);
+}
+.settings-group-toggle[aria-expanded="true"] .settings-group-icon {
+  background: var(--settings-accent-soft);
+}
+.settings-group-toggle[aria-expanded="true"] .settings-group-chevron {
+  color: var(--smaj-primary);
+}
+.settings-compact .settings-group-body {
+  padding: 2px 10px 12px;
+}
+.settings-page.settings-compact .setting-line {
+  min-height: 54px;
+  padding: 12px 0;
+  gap: 10px;
+}
+.settings-page.settings-compact .setting-line strong,
+.settings-page.settings-compact .settings-device-link strong {
+  color: var(--smaj-text);
+}
+.settings-page.settings-compact .settings-device-link {
+  min-height: 54px;
+}
+.settings-page.settings-compact .settings-action-row button,
+.settings-page.settings-compact .settings-menu-row {
+  min-height: 48px;
+}
+.settings-page.settings-compact .settings-group-body select {
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.settings-page.settings-compact .settings-save-bar {
+  box-shadow: 0 8px 28px #10182818;
+}
+.settings-page.settings-compact .settings-save-bar > button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.settings-compact .settings-language-row .language-soon-button:hover {
+  background: var(--settings-accent-soft);
+}
+.settings-page.settings-compact :is(button, a, input, select):focus-visible {
+  outline: 2px solid var(--smaj-primary, #7434f5);
+  outline-offset: 2px;
+}
+@media (max-width: 420px) {
+  .settings-page.settings-compact { padding-left: 12px; padding-right: 12px; }
+  .settings-compact .settings-menu-card { padding: 0 10px; }
+  .settings-compact .settings-group-body { padding-left: 6px; padding-right: 6px; }
+  .settings-page.settings-compact .settings-group-copy > small { line-height: 1.35; }
+}
