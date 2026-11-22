@@ -1,4 +1,3 @@
-import "./OrdersPage.css";
 import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { chatLink } from "../../lib/chatCache";
 import { useCallback, useEffect, useMemo, useState } from "react";
