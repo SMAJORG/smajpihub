@@ -23085,3 +23085,28 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
  .real-profile-page .real-profile-card { padding:15px; }
  .real-profile-page .real-profile-card dl > div { gap:8px; }
 }
+
+
+/* Edit profile: compact form, aligned country/language controls */
+.real-profile-edit-mode .real-profile-cover { min-height: 95px; }
+.real-profile-edit-mode .real-profile-form { max-width: 720px; }
+.real-profile-edit-mode .real-profile-form section { gap: 10px; }
+.real-profile-edit-mode .real-profile-form section > h2 { margin: 6px 0 2px; font-size: 20px; }
+.real-profile-edit-mode .real-profile-form .profile-edit-section-title { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--smaj-border); font-size: 16px; }
+.real-profile-edit-mode .real-profile-form textarea { min-height: 82px; }
+.real-profile-edit-mode .profile-edit-region-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.real-profile-edit-mode .country-picker-label,.real-profile-edit-mode .language-picker-label { min-width:0; }
+.real-profile-edit-mode .country-picker-trigger,.real-profile-edit-mode .language-picker-trigger {
+ width:100%; min-width:0; min-height:48px; display:flex; align-items:center; gap:8px; padding:9px 12px;
+}
+.real-profile-edit-mode .country-picker-trigger > span { flex:1; min-width:0; }
+.real-profile-edit-mode .language-picker-trigger > strong { flex:0 1 auto; min-width:0; }
+.real-profile-edit-mode .language-picker-trigger > small { flex:1; min-width:0; }
+.real-profile-edit-mode .profile-picker-chevron { width:20px; height:20px; flex-shrink:0; margin-left:auto; color:var(--smaj-text-secondary); }
+.real-profile-edit-mode .real-profile-form .form-actions { display:flex; gap:10px; flex-wrap:wrap; }
+@media(max-width:480px) {
+ .real-profile-edit-mode .profile-edit-region-row { gap:8px; }
+ .real-profile-edit-mode .country-picker-trigger,.real-profile-edit-mode .language-picker-trigger { padding:8px; gap:5px; }
+ .real-profile-edit-mode .language-picker-trigger > small { display:none; }
+ .real-profile-edit-mode .real-profile-form section > h2 { font-size:19px; }
+}
