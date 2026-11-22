@@ -7,7 +7,6 @@ import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CameraAltOutlinedIcon from "@mui/icons-material/CameraAltOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
-import LanguageOutlinedIcon from "@mui/icons-material/LanguageOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
