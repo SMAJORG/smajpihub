@@ -8,8 +8,6 @@ import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined
 import BookmarkBorderOutlinedIcon from "@mui/icons-material/BookmarkBorderOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import MusicNoteOutlinedIcon from "@mui/icons-material/MusicNoteOutlined";
@@ -36,8 +34,8 @@ const marketplaceCards = [
 
 const accountRows = [
   ["Help center", "Support and marketplace guidance", "/help"],
-  ["Settings", "Account preferences", "/settings/preferences"],
-  ["About SMAJ PI HUB", "Vision and platform information", "/white-paper"],
+  ["Legal", "Terms, privacy, and platform rules", "/legal"],
+  ["White Paper", "Vision, ecosystem, utility, and roadmap", "/white-paper"],
 ] as const;
 
 const socialLinks = [
@@ -101,7 +99,6 @@ const AccountDashboardPage = () => {
       <section className="account-dashboard-list">
         {accountRows.map(([label, description, to]) => (
           <Link to={to} key={label}>
-            {label === "Help center" ? <ShieldOutlinedIcon aria-hidden="true" /> : label === "Settings" ? <SettingsOutlinedIcon aria-hidden="true" /> : <InfoOutlinedIcon aria-hidden="true" />}
             <span>{label}<small>{description}</small></span>
             <ChevronRightOutlinedIcon />
           </Link>
