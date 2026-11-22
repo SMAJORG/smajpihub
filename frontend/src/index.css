@@ -23036,3 +23036,22 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .services-filter-empty { grid-column:1/-1; text-align:center; color:var(--smaj-text-secondary); padding:30px 8px; }
 .services-mobile-toolbar :is(button):focus-visible { outline:2px solid var(--smaj-text); outline-offset:3px; }
 @media(max-width:600px) { .services-mobile-toolbar { margin:18px 0 12px; } .services-refined-grid { row-gap:25px; } }
+
+
+/* Account hub: compact, accessible mobile layout */
+@media (max-width: 700px) {
+  .account-dashboard-page .account-dashboard-identity { padding: 12px 6px 16px; gap: 13px; }
+  .account-dashboard-page .account-dashboard-identity h1 { font-size: clamp(17px, 4.5vw, 23px); }
+  .account-dashboard-page .account-dashboard-identity p { margin: 3px 0; }
+  .account-dashboard-page .account-quick-grid { gap: 8px; }
+  .account-dashboard-page .account-quick-grid a { min-height: 74px; padding: 9px 4px; border-radius: 14px; gap: 7px; }
+  .account-dashboard-page .account-marketplace-actions { margin-top: 10px; }
+  .account-dashboard-page .account-dashboard-list { margin-top: 16px; }
+  .account-dashboard-page .account-dashboard-list > a { display:flex; align-items:center; gap:12px; }
+  .account-dashboard-page .account-dashboard-list > a > svg:first-child { flex-shrink:0; width:20px; height:20px; color:var(--smaj-text-secondary); }
+}
+.account-dashboard-page .account-package-row { display:flex; justify-content:flex-end; margin:12px 0; }
+.account-dashboard-page .account-package-link { width:auto; min-height:48px; display:flex; align-items:center; gap:9px; padding:8px 26px 8px 12px; }
+.account-dashboard-page .account-package-link .profile-package-icon { flex-shrink:0; }
+.account-dashboard-page .account-package-link > small { font-size:9px; }
+.account-dashboard-page .account-dashboard-list > a > svg:first-child { flex-shrink:0; color:var(--smaj-text-secondary); }
