@@ -223,3 +223,34 @@
  .admin-shell .private-sidebar .admin-navigation{margin-bottom:0!important}
  .admin-shell .private-sidebar .admin-drawer-footer{margin-top:auto}
 }
+
+
+/* Pending Actions layout hardening — scoped to this page only */
+.admin-shell .pending-actions-redesign{display:flex;flex-direction:column;gap:20px;max-width:1160px;width:100%;margin-inline:auto;box-sizing:border-box}
+.admin-shell .pending-actions-redesign *{box-sizing:border-box}
+.admin-shell .pending-actions-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.admin-shell .pending-actions-head>div{min-width:0;flex:1 1 220px}
+.admin-shell .pending-actions-head h1{font-size:clamp(25px,5vw,36px);line-height:1.15;overflow-wrap:break-word}
+.admin-shell .pending-actions-head button{appearance:none;border:1px solid #e1e4ea;border-radius:12px;background:#fff;padding:10px 14px;font:inherit;font-size:14px;display:inline-flex;align-items:center;gap:8px}
+.admin-shell .pending-actions-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;width:100%}
+.admin-shell .pending-actions-kpis article{display:flex;flex-direction:column;gap:8px;min-width:0;padding:14px 12px;background:#f7f8fb;border:1px solid #e6e7ec;border-radius:15px}
+.admin-shell .pending-actions-kpis article span{display:block;font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.admin-shell .pending-actions-kpis article strong{display:block;font-size:clamp(22px,5vw,32px);line-height:1.2}
+.admin-shell .pending-actions-filters{display:flex;flex-direction:column;align-items:stretch;gap:12px;width:100%}
+.admin-shell .pending-actions-search{display:flex;align-items:center;gap:9px;width:100%;min-width:0;padding:0 12px;min-height:46px;border:1px solid #e1e4ea;border-radius:12px;background:#f7f8fb}
+.admin-shell .pending-actions-search input{display:block;min-width:0;flex:1;width:100%;border:0;outline:0;background:transparent;font:inherit;font-size:14px}
+.admin-shell .pending-actions-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.admin-shell .pending-actions-tabs button{appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 15px;border:1px solid #e1e4ea;border-radius:11px;background:#fff;color:#475467;font:inherit;font-size:13px;font-weight:650}
+.admin-shell .pending-actions-tabs button[aria-pressed="true"]{background:#f0eaff;border-color:#d8c9ff;color:#6b35d5}
+.admin-shell .pending-actions-list-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.admin-shell .pending-actions-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;width:100%}
+.admin-shell .pending-actions-card{display:flex;flex-direction:column;gap:14px;min-width:0;padding:16px;border:1px solid #e2e5e9;border-radius:16px;background:#fff;color:#172033;text-decoration:none;overflow:hidden}
+.admin-shell .pending-actions-card-top{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.admin-shell .pending-actions-card-top>div{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.admin-shell .pending-actions-card-top strong{display:block;overflow-wrap:anywhere;font-size:15px}
+.admin-shell .pending-actions-card-top small{display:block;overflow-wrap:anywhere;font-size:12px;line-height:1.5}
+.admin-shell .pending-actions-status{display:inline-flex;align-items:center;flex-shrink:0;max-width:85px;font-size:11px;line-height:1.3;padding:5px 8px;border-radius:99px;white-space:normal}
+.admin-shell .pending-actions-card-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px;line-height:1.5}
+.admin-shell .pending-actions-card-bottom span{font-size:12px}
+@media(min-width:760px){.admin-shell .pending-actions-filters{flex-direction:row;align-items:center;justify-content:space-between}.admin-shell .pending-actions-search{max-width:480px}.admin-shell .pending-actions-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:390px){.admin-shell .pending-actions-kpis article{padding:11px 8px}.admin-shell .pending-actions-kpis article span{font-size:11px}.admin-shell .pending-actions-card{padding:13px}}
