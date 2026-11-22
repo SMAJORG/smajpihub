@@ -67,7 +67,7 @@ const AdminModulePage = () => {
         subtitle: text(row.piUsername || row.sellerName || row.description || row.details || row.type) || group.label,
         status: rowStatus,
         updatedAt: dateText(row.updatedAt || row.createdAt || row.paidAt),
-        href: source.href,
+        href: source.key === "activity" && /ambassador/i.test([row.title, row.label, row.description, row.details, row.type, row.reason].map(text).join(" ")) ? "/admin/ambassadors" : source.href,
       };
     }));
     setLoading(false);
