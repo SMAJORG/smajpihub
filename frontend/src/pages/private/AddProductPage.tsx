@@ -175,6 +175,7 @@ const AddProductPage = () => {
   };
   const hasListing = Boolean(form.title || form.description || form.images.length || form.pricePi || form.priceUsdt || form.variants.length);
   const [error, setError] = useState("");
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [activatingSeller, setActivatingSeller] = useState(false);
@@ -225,6 +226,7 @@ const AddProductPage = () => {
   const showIssues = (next: ProductIssue[]) => {
     setIssues(next);
     if (!next.length) return false;
+    setNoticeDismissed(false);
     goToStep(next[0].step);
     window.setTimeout(() => {
       const field = formRef.current?.querySelector<HTMLElement>(`[name="${next[0].field}"]`);
@@ -272,7 +274,7 @@ const AddProductPage = () => {
 
   const setUsdtPrice = (value: string) => {
     const amount = Number(value);
-    setForm((current) => ({ ...current, priceUsdt: value, pricePi: Number.isFinite(amount) && amount > 0 ? trimAmount(piFromUsdt(amount), 8) : "" }));
+    setForm((current) => ({ ...current, priceUsdt: value, pricePi: Number.isFinite(amount) && amount > 0 ? trimAmount(piFromUsdt(amount), 12) : "" }));
   };
 
   const setPiPrice = (value: string) => {
@@ -282,6 +284,7 @@ const AddProductPage = () => {
 
   const selectImages = (files?: FileList | null) => {
     setError("");
+    setNoticeDismissed(false);
     const selected = Array.from(files || []);
     if (!selected.length) return;
     const availableSlots = MAX_PRODUCT_IMAGES - form.images.length;
@@ -444,7 +447,7 @@ const AddProductPage = () => {
   return (
     <main className="add-product-page product-wizard">
       <header className="product-wizard-header">
-        <div><p className="private-kicker">SELLER TOOLS</p><h1>Add Product</h1><p>Create a listing in SMAJ Store</p></div>
+        <div><p className="private-kicker">SELLER TOOLS</p><h1>Add Product</h1></div>
         <span className="product-step-count" aria-live="polite">Step {step + 1} of 4</span>
       </header>
       <ol className="product-wizard-progress" aria-label="Listing progress">
@@ -460,7 +463,7 @@ const AddProductPage = () => {
       ) : null}
       <form ref={formRef} className="private-form product-form-accordions smart-product-form" aria-label={productSteps[step]} noValidate onChangeCapture={(event) => { const field = (event.target as HTMLElement).getAttribute("name"); if (field) setIssues(current => current.filter(issue => issue.field !== field)); }} onSubmit={(event) => void submit(event)}>
         <details className="product-accordion" data-product-step="0" hidden={step !== 0} open>
-          <summary><span><strong>Product Search / Name</strong><small>Type the product name to suggest the best category and fields.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <summary><span><strong>Product name</strong></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <label>Product name<input {...fieldProps("title")} required maxLength={120} value={form.title} onChange={(event) => setProductTitle(event.target.value)} placeholder="Example: Nike running shoes size 42" />{fieldError("title")}</label>
           <div className={`product-name-guide ${titleInsight ? "good" : "weak"}`}>
             <div><strong>{titleInsight ? `${titleInsight.category} detected` : "Add a clear product name"}</strong><p>{titleInsight ? "Only relevant details are shown below." : "Use brand, model, size, storage, or type so buyers can find it quickly."}</p></div>
@@ -470,13 +473,13 @@ const AddProductPage = () => {
         </details>
 
         <details className="product-accordion" data-product-step="1" hidden={step !== 1} open>
-          <summary><span><strong>Photos</strong><small>Add up to 12 clear images. First image is the main image.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <summary><span><strong>Photos</strong><small>Up to 12 images</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <label>Product gallery ({form.images.length}/12 images)<input {...fieldProps("images")} multiple type="file" accept="image/*" onChange={(event) => { selectImages(event.target.files); event.currentTarget.value = ""; }} />{fieldError("images")}</label>
           {form.images.length ? <div className="product-gallery-preview">{form.images.map((image, index) => <figure key={`${image.slice(-30)}-${index}`}><img src={image} alt={`Product preview ${index + 1}`} />{index === 0 ? <span>Main</span> : null}<button type="button" onClick={() => removeImage(index)}>Remove</button></figure>)}</div> : null}
         </details>
 
         <details className="product-accordion" data-product-step="0" hidden={step !== 0} open>
-          <summary><span><strong>Basic Details</strong><small>Required basics kept short.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <summary><span><strong>Basic details</strong></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row">
             <label>Condition<select {...fieldProps("condition")} required value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value })}>{["New", "Like New", "Used", "Refurbished"].map((item) => <option key={item}>{item}</option>)}</select>{fieldError("condition")}</label>
             <label>Quantity<input {...fieldProps("quantity")} required type="number" min="1" step="1" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />{fieldError("quantity")}</label>
@@ -485,7 +488,7 @@ const AddProductPage = () => {
         </details>
 
         <details className="product-accordion" data-product-step="1" hidden={step !== 1} open>
-          <summary><span><strong>Price in USDT + PI</strong><small>{formatPiRate()}. Edit either field.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <summary><span><strong>Price</strong><small>{formatPiRate()} · Auto-converts</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row">
             <label>$ price (USDT)<input {...fieldProps("priceUsdt")} required type="number" min="0.01" step="any" value={form.priceUsdt} onChange={(event) => setUsdtPrice(event.target.value)} />{fieldError("priceUsdt")}</label>
             <label>π price<input {...fieldProps("pricePi")} required type="number" min="0.00000001" step="any" value={form.pricePi} onChange={(event) => setPiPrice(event.target.value)} />{fieldError("pricePi")}</label>
@@ -494,7 +497,7 @@ const AddProductPage = () => {
         </details>
 
         <details className="product-accordion" data-product-step="2" hidden={step !== 2} open>
-          <summary><span><strong>Category-Specific Details</strong><small>Only details for {form.category}.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <summary><span><strong>Product details</strong><small>{form.category}</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="private-form-row">{activeFields.map((field) => renderSpecField(field))}</div>
         </details>
 
@@ -526,7 +529,7 @@ const AddProductPage = () => {
         </details>
 
         <details className="product-accordion" data-product-step="3" hidden={step !== 3} open>
-          <summary><span><strong>Review & Publish</strong><small>Status is pending review by default.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <summary><span><strong>Review listing</strong></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
           <div className="product-wizard-review">
             {form.image ? <img src={form.image} alt="Main product preview" /> : null}
             <div><strong>{form.title || "Product name required"}</strong><p>{form.category} · {form.condition} · Quantity {form.quantity}</p><p>{formatUsdAmount(priceUsdt)} USDT · {formatPiAmount(pricePi)}</p></div>
@@ -544,13 +547,11 @@ const AddProductPage = () => {
         </details>
 
         <details className="product-accordion" data-product-step="3" hidden={step !== 3} open>
-          <summary><span><strong>Seller Agreement</strong><small>Required before publish.</small></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
-          <label className="setting-line"><span><strong>Seller agreement</strong><small>Read the official <Link className="seller-agreement-link" to="/seller-agreement" target="_blank" rel="noreferrer">SMAJ PI HUB Seller Agreement</Link> before accepting. I confirm this product is real, photos are clear, pricing is fair, location is valid, and SMAJ PI HUB may review before publishing.</small></span><input {...fieldProps("sellerAgreementAccepted")} type="checkbox" checked={form.sellerAgreementAccepted} onChange={(event) => setForm({ ...form, sellerAgreementAccepted: event.target.checked })} />{fieldError("sellerAgreementAccepted")}</label>
+          <summary><span><strong>Seller agreement</strong></span><span className="accordion-chevron" aria-hidden="true">▾</span></summary>
+          <label className="setting-line"><span><strong>Seller agreement</strong><small>I agree to the <Link className="seller-agreement-link" to="/seller-agreement" target="_blank" rel="noreferrer">Seller Agreement</Link> and confirm my listing is accurate.</small></span><input {...fieldProps("sellerAgreementAccepted")} type="checkbox" checked={form.sellerAgreementAccepted} onChange={(event) => setForm({ ...form, sellerAgreementAccepted: event.target.checked })} />{fieldError("sellerAgreementAccepted")}</label>
         </details>
 
-        {issues.length ? <div className="product-wizard-errors" role="alert"><strong>Please check these fields:</strong><ul>{issues.map(issue => <li key={issue.field}><button type="button" onClick={() => showIssues([issue])}>{issue.message}</button></li>)}</ul></div> : null}
-        {error ? <div className="private-alert error" role="alert">{error}</div> : null}
-        {draftError ? <div className="private-alert error" role="alert">{draftError}</div> : null}
+
         {success ? <div className="private-alert success" role="status">{success}</div> : null}
         {processingImages > 0 ? <p role="status">Processing selected images...</p> : null}
         <div className="product-wizard-actions" aria-label="Listing form actions">
@@ -560,6 +561,7 @@ const AddProductPage = () => {
         </div>
         {step === 3 && !form.sellerAgreementAccepted ? <p className="form-help">Accept the seller agreement to enable Publish for Review.</p> : null}
       </form>
+      {!noticeDismissed && (error || draftError || issues.length > 0) ? <div className="product-notice-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setNoticeDismissed(true); }}><section className="product-notice-dialog" role="alertdialog" aria-modal="true" aria-labelledby="product-notice-title"><div className="product-notice-icon" aria-hidden="true">!</div><h2 id="product-notice-title">Please check your listing</h2><p>{error || draftError || issues[0]?.message}</p>{issues.length > 1 && !error && !draftError ? <small>{issues.length} fields need attention</small> : null}<button type="button" className="private-primary-button" autoFocus onClick={() => { setNoticeDismissed(true); if (issues.length) { const field = formRef.current?.querySelector<HTMLElement>(`[name="${issues[0].field}"]`); field?.focus(); } }}>Got it</button></section></div> : null}
       {blocker.state === "blocked" ? <div className="product-leave-backdrop"><section className="product-leave-dialog" role="alertdialog" aria-modal="true" aria-labelledby="product-leave-title" onKeyDown={(event) => { if (event.key === "Escape") blocker.reset(); if (event.key === "Tab") { const buttons = event.currentTarget.querySelectorAll("button"); const target = event.shiftKey ? buttons[0] : buttons[buttons.length - 1]; if (document.activeElement === target) { event.preventDefault(); (event.shiftKey ? buttons[buttons.length - 1] : buttons[0]).focus(); } } }}><h2 id="product-leave-title">Keep your listing?</h2><p>Your latest changes or selected images have not finished saving.</p><button type="button" className="private-primary-button" autoFocus onClick={() => { saveDraft(); blocker.reset(); }}>Stay and save draft</button><button type="button" className="private-secondary-button" onClick={() => blocker.proceed()}>Leave without saving latest changes</button></section></div> : null}
     </main>
   );
