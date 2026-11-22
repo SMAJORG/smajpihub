@@ -1,3 +1,4 @@
+import "./ambassador-review.css";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isAxiosError } from "axios";
 import { Link } from "react-router-dom";
@@ -105,6 +106,8 @@ export const AdminAmbassadorsPage = () => {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("pending");
   const [updatingId, setUpdatingId] = useState("");
+  const [preview, setPreview] = useState<{ url: string; label: string } | null>(null);
+  const [decision, setDecision] = useState<{ id: string; status: "approved" | "rejected"; name: string } | null>(null);
   const load = useCallback(async () => {
     try {
       const { data } = await axiosClient.get<{ applications: AmbassadorApplication[] }>("/admin/ambassadors");
@@ -115,12 +118,20 @@ export const AdminAmbassadorsPage = () => {
     }
   }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => {
+    if (!preview && !decision) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") { setPreview(null); setDecision(null); } };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [preview, decision]);
   const update = async (id: string, status: AmbassadorApplication["status"]) => {
+    if (updatingId) return;
     setUpdatingId(id);
     setError("");
     try {
       await axiosClient.patch(`/admin/ambassadors/${id}`, { status });
       setMessage(`Ambassador application ${status}. The applicant was notified.`);
+      setDecision(null);
       await load();
     } catch {
       setError("The ambassador application could not be updated.");
@@ -128,37 +139,36 @@ export const AdminAmbassadorsPage = () => {
       setUpdatingId("");
     }
   };
-  const visible = useMemo(() => filter === "all" ? applications : applications.filter((item) => item.status === filter), [applications, filter]);
-
+  const visible = useMemo(() => filter === "all" ? applications : applications.filter(item => item.status === filter), [applications, filter]);
   return (
-    <main className="private-page">
+    <main className="private-page ambassador-review-page">
       <PullToRefresh onRefresh={load} />
-      <Head title="Ambassador Applications" description="Privately review regional ambassador applications, identity evidence, and service coverage." />
+      <section className="ambassador-review-heading"><div><p className="private-kicker">ADMIN / AMBASSADORS</p><h1>Ambassador Applications</h1></div><span className="ambassador-review-heading-icon" aria-hidden="true">♙</span></section>
       <Notice text={message} />
-      {error ? <div className="private-alert error">{error}</div> : null}
-      <section className="admin-filter-bar">
-        <label>Status filter<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label>
-        <span>{visible.length} applications</span>
+      {error ? <div className="private-alert error" role="alert">{error}</div> : null}
+      <section className="ambassador-review-toolbar">
+        <label className="ambassador-review-filter"><span className="sr-only">Application status</span><select aria-label="Application status" value={filter} onChange={event => setFilter(event.target.value)}><option value="pending">Pending</option><option value="all">All applications</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label>
+        <span className="ambassador-review-count">{visible.length} total</span>
       </section>
-      {visible.length ? <div className="management-list">{visible.map((item) => (
-        <article className="report-card onboarding-admin-card ambassador-admin-card" key={item._id}>
-          <div>
-            <span>{item.countryFlag} {item.countryName} · {item.regionName}</span>
-            <h3>{item.displayName}</h3>
-            <p>{item.email} · {item.phone}</p>
-            <p><strong>Services:</strong> {item.services.includes("all") ? "All SMAJ services" : item.services.join(" · ")}</p>
-            <p>{item.message}</p>
-            <small>Submitted {new Date(item.createdAt || item.updatedAt).toLocaleString()}</small>
-            <div className="ambassador-admin-identity" aria-label="Private identity evidence">
-              {item.identity?.idFrontUrl ? <a href={item.identity.idFrontUrl} target="_blank" rel="noreferrer"><img src={item.identity.idFrontUrl} alt="ID front" /><span>ID front</span></a> : null}
-              {item.identity?.idBackUrl ? <a href={item.identity.idBackUrl} target="_blank" rel="noreferrer"><img src={item.identity.idBackUrl} alt="ID back" /><span>ID back</span></a> : null}
-              {item.identity?.selfieUrl ? <a href={item.identity.selfieUrl} target="_blank" rel="noreferrer"><img src={item.identity.selfieUrl} alt="Applicant selfie" /><span>Live selfie</span></a> : null}
-            </div>
+      {visible.length ? <div className="ambassador-review-list">{visible.map(item => (
+        <article className="ambassador-review-card" key={item._id}>
+          <div className="ambassador-review-card-top"><div><h2>{item.displayName}</h2><p>{item.countryFlag} {item.regionName}, {item.countryName}</p></div><span className={`ambassador-review-status ambassador-review-status--${item.status}`}>{item.status}</span></div>
+          <div className="ambassador-review-details">
+            <p><span>Contact</span><strong>{item.email}{item.phone ? ` · ${item.phone}` : ""}</strong></p>
+            <p><span>Services</span><strong>{item.services.includes("all") ? "All SMAJ services" : item.services.join(" · ")}</strong></p>
+            <p><span>Submitted</span><strong>{new Date(item.createdAt || item.updatedAt).toLocaleDateString()}</strong></p>
+            {item.message ? <div><span>Application reason</span><p>{item.message}</p></div> : null}
           </div>
-          <strong className={item.status === "approved" ? "resolved" : "open"}>{item.status}</strong>
-          <div className="row-actions"><button disabled={updatingId === item._id} onClick={() => void update(item._id, "pending")}>Pending</button><button disabled={updatingId === item._id} onClick={() => void update(item._id, "approved")}>Approve</button><button className="danger" disabled={updatingId === item._id} onClick={() => void update(item._id, "rejected")}>Reject</button></div>
+          <div className="ambassador-review-documents"><h3>Identity documents</h3><div className="ambassador-review-document-grid">
+            {([{ url: item.identity?.idFrontUrl, label: "ID Front" }, { url: item.identity?.idBackUrl, label: "ID Back" }, { url: item.identity?.selfieUrl, label: "Selfie" }]).map(doc => (
+              <button key={doc.label} type="button" disabled={!doc.url} onClick={() => doc.url && setPreview({ url: doc.url, label: doc.label })} aria-label={`View ${doc.label}`}><span className="ambassador-review-document-thumb">{doc.url ? <img src={doc.url} alt="" loading="lazy" /> : <span>Unavailable</span>}</span><span>{doc.label}</span></button>
+            ))}
+          </div><small>Tap an image to view it privately.</small></div>
+          {item.status === "pending" ? <div className="ambassador-review-actions"><button type="button" disabled={Boolean(updatingId)} className="ambassador-review-approve" onClick={() => setDecision({ id: item._id, status: "approved", name: item.displayName })}>✓ Approve</button><button type="button" disabled={Boolean(updatingId)} className="ambassador-review-reject" onClick={() => setDecision({ id: item._id, status: "rejected", name: item.displayName })}>× Reject</button></div> : null}
         </article>
       ))}</div> : <div className="private-state"><h2>No ambassador applications</h2><p>No applications match this status filter.</p></div>}
+      {preview ? <div className="ambassador-review-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPreview(null); }}><section role="dialog" aria-modal="true" aria-label={`${preview.label} image preview`} className="ambassador-review-dialog"><header><h2>{preview.label}</h2><button type="button" aria-label="Close image" onClick={() => setPreview(null)}>×</button></header><img src={preview.url} alt={preview.label} /><button type="button" className="ambassador-review-dialog-close" onClick={() => setPreview(null)}>Close image</button></section></div> : null}
+      {decision ? <div className="ambassador-review-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDecision(null); }}><section role="dialog" aria-modal="true" aria-label="Confirm ambassador decision" className="ambassador-review-dialog ambassador-review-confirm"><header><h2>{decision.status === "approved" ? "Approve" : "Reject"} application?</h2><button type="button" aria-label="Cancel" onClick={() => setDecision(null)}>×</button></header><p>{decision.name} · This decision updates the application status.</p><div className="ambassador-review-actions"><button type="button" className="ambassador-review-reject" disabled={Boolean(updatingId)} onClick={() => setDecision(null)}>Cancel</button><button type="button" className="ambassador-review-approve" disabled={Boolean(updatingId)} onClick={() => void update(decision.id, decision.status)}>{updatingId ? "Saving…" : "Confirm"}</button></div></section></div> : null}
     </main>
   );
 };
