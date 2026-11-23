@@ -658,7 +658,7 @@ const PrivateLayout = ({ children, fullScreen }: PrivateLayoutProps) => {
         )}
         {mobileSidebarOpen && !fullScreen ? <button className="private-overlay" onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu" /> : null}
         <div className="private-content">
-          {backFallback && location.pathname !== "/settings/preferences" && !isCommunityFeed ? (
+          {!fullScreen && backFallback && location.pathname !== "/settings/preferences" && !isCommunityFeed ? (
             <button
               className="private-route-back"
               type="button"
