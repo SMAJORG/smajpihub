@@ -23347,3 +23347,11 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
     padding-top: 20px !important;
   }
 }
+
+
+/* Seller options: compact dropdown below the three-dot control, no modal. */
+.seller-profile-page .seller-profile-menu-anchor{position:relative;flex-shrink:0}
+.seller-profile-page .seller-profile-menu-dismiss{position:fixed!important;inset:0!important;z-index:1490!important;width:auto!important;height:auto!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;cursor:default!important}
+.seller-profile-page .seller-profile-dropdown{position:absolute;top:calc(100% + 6px);right:0;z-index:1500;width:180px;max-width:calc(100vw - 32px);padding:5px;border:1px solid var(--smaj-border);border-radius:10px;background:var(--smaj-card);box-shadow:0 10px 30px rgba(15,23,42,.14)}
+.seller-profile-page .seller-profile-dropdown a{display:flex;align-items:center;min-height:42px;padding:10px 12px;border-radius:7px;color:var(--smaj-text);font-size:14px;font-weight:600;text-decoration:none}
+.seller-profile-page .seller-profile-dropdown a:hover,.seller-profile-page .seller-profile-dropdown a:focus-visible{background:var(--smaj-secondary-bg)}
