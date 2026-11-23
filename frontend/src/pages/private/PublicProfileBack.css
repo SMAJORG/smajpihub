@@ -4,3 +4,55 @@
 .public-profile-cover-back svg { font-size: 29px; }
 .public-profile-cover-back:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 @media (max-width: 640px) { .public-profile-cover-back { top: 16px; left: 16px; } }
+
+/* Public profile: edge-to-edge cover and quiet, borderless summary. */
+.full-screen-page .public-profile-page,
+.public-profile-page {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  gap: 0 !important;
+}
+.full-screen-page .public-profile-page > .public-profile-hero,
+.public-profile-page > .public-profile-hero {
+  margin-top: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+.public-profile-page .public-profile-cover,
+.public-profile-page .public-profile-cover-placeholder {
+  border-radius: 0 !important;
+  margin: 0 !important;
+}
+.public-profile-page .public-profile-main { padding-bottom: 14px; }
+.public-profile-page .public-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+  border: 0 !important;
+}
+.public-profile-page .public-profile-stats > * {
+  min-width: 0;
+  text-align: center;
+}
+.public-profile-page .public-profile-sticky-stack {
+  margin-top: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.public-profile-page .public-profile-tabs {
+  border: 0 !important;
+}
+.public-profile-page .public-profile-tabs button {
+  border: 0 !important;
+}
+.public-profile-page .public-profile-actions a.private-secondary-button,
+.public-profile-page .public-profile-actions a.private-secondary-button:hover,
+.public-profile-page .public-profile-actions a.private-secondary-button:focus-visible {
+  text-decoration: none !important;
+}
