@@ -20,6 +20,21 @@ import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import RestaurantOutlinedIcon from "@mui/icons-material/RestaurantOutlined";
+import DirectionsCarOutlinedIcon from "@mui/icons-material/DirectionsCarOutlined";
+import MovieOutlinedIcon from "@mui/icons-material/MovieOutlined";
+import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import VolunteerActivismOutlinedIcon from "@mui/icons-material/VolunteerActivismOutlined";
+import WorkOutlineOutlinedIcon from "@mui/icons-material/WorkOutlineOutlined";
+import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
+import FavoriteBorderOutlinedIcon from "@mui/icons-material/FavoriteBorderOutlined";
+import AgricultureOutlinedIcon from "@mui/icons-material/AgricultureOutlined";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
+import CurrencyExchangeOutlinedIcon from "@mui/icons-material/CurrencyExchangeOutlined";
+import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import ServiceArt from "../../components/ServiceArt";
 import { serviceLaunchNavigationState } from "../../lib/serviceLaunch";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
@@ -239,6 +254,13 @@ const DiscoveryTabButtons = ({ activeTab, onTabChange, className }: { activeTab:
   </nav>
 );
 
+const categoryServiceIcons: Record<string, typeof ShoppingBagOutlinedIcon> = {
+  store: ShoppingBagOutlinedIcon, housing: HomeOutlinedIcon, food: RestaurantOutlinedIcon,
+  transport: DirectionsCarOutlinedIcon, stream: MovieOutlinedIcon, sports: EmojiEventsOutlinedIcon,
+  events: EventOutlinedIcon, charity: VolunteerActivismOutlinedIcon, jobs: WorkOutlineOutlinedIcon,
+  education: SchoolOutlinedIcon, health: FavoriteBorderOutlinedIcon, agro: AgricultureOutlinedIcon,
+  energy: BoltOutlinedIcon, swap: CurrencyExchangeOutlinedIcon, token: RedeemOutlinedIcon,
+};
 const CompactCategoryGrid = ({ mode }: { mode: "mobile" | "desktop" }) => (
   <div className={`discovery-compact-directory ${mode}`}>
     <div className="discovery-compact-title"><h2>All categories</h2><span>{categoryGroups.reduce((count, group) => count + group.slugs.length, 0)} services</span></div>
@@ -253,8 +275,9 @@ const CompactCategoryGrid = ({ mode }: { mode: "mobile" | "desktop" }) => (
         {group.slugs.map(slug => {
           const service = serviceCatalog.find(item => item.slug === slug);
           if (!service) return null;
+          const CategoryIcon = categoryServiceIcons[slug] || AppsOutlinedIcon;
           return <Link key={slug} to={servicePath(service)} state={serviceLaunchNavigationState(slug)} className="discovery-compact-item">
-            <span className="discovery-compact-art"><ServiceArt index={service.atlasIndex} /></span>
+            <span className="discovery-compact-art"><CategoryIcon aria-hidden="true" /></span>
             <span>{service.name.replace("SMAJ ", "")}</span>
           </Link>;
         })}
