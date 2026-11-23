@@ -5,7 +5,6 @@ import { Link, useParams } from "react-router-dom";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import MoreHorizOutlinedIcon from "@mui/icons-material/MoreHorizOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
-import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import MarketplaceProductCard from "../../components/MarketplaceProductCard";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import TrustBadge from "../../components/TrustBadge";
@@ -75,11 +74,10 @@ const SellerProfilePage = () => {
   return (
     <main className="private-page seller-profile-page">
       {cartToast}
-      <div className="seller-profile-topbar"><h2>Seller Profile</h2><button type="button" aria-label="More seller options" aria-haspopup="dialog" onClick={() => setReportMenuOpen(true)}><MoreHorizOutlinedIcon /></button></div>
+      <div className="seller-profile-topbar"><h2>Seller Profile</h2><div className="seller-profile-menu-anchor"><button type="button" aria-label="More seller options" aria-haspopup="menu" aria-expanded={reportMenuOpen} onClick={() => setReportMenuOpen(open => !open)}><MoreHorizOutlinedIcon /></button>{reportMenuOpen ? <><button type="button" className="seller-profile-menu-dismiss" aria-label="Close seller options" onClick={() => setReportMenuOpen(false)} /><div className="seller-profile-dropdown" role="menu"><Link role="menuitem" to="/report-abuse" onClick={() => setReportMenuOpen(false)}>Report seller</Link></div></> : null}</div></div>
       <section className="seller-profile-hero">
         <UserAvatarFrame className="profile-avatar seller-profile-avatar" name={data.seller.displayName} image={data.seller.avatar} frame={data.seller.avatarFrame} size={92} />
         <div className="seller-profile-identity">
-          <p className="private-kicker">SELLER PROFILE</p>
           <h1 className="profile-name-line">
             <span className="profile-name-text">{data.seller.displayName}</span>
             <TrustBadge userId={data.seller.uid} />
@@ -131,7 +129,6 @@ const SellerProfilePage = () => {
         ))}
         {!data.reviews.length ? <div className="seller-reviews-empty"><h3>No reviews yet</h3><p>Verified buyer reviews will appear here after eligible purchases.</p></div> : null}
       </section>}
-      {reportMenuOpen ? <div className="seller-report-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setReportMenuOpen(false); }}><section role="dialog" aria-modal="true" aria-labelledby="seller-options-title" className="seller-report-dialog"><header><h2 id="seller-options-title">Seller options</h2><button type="button" aria-label="Close seller options" onClick={() => setReportMenuOpen(false)}><CloseOutlinedIcon /></button></header><p>Help keep the SMAJ marketplace safe.</p><Link className="private-secondary-button" to="/report-abuse">Report seller</Link><button type="button" onClick={() => setReportMenuOpen(false)}>Cancel</button></section></div> : null}
       {showBackToTop ? <button type="button" className="seller-back-to-top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top">↑</button> : null}
     </main>
   );
