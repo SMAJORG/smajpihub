@@ -1,0 +1,24 @@
+/* Scoped to the owner's profile; no changes to other pages. */
+.real-profile-page .real-profile-hero { position: relative; }
+.real-profile-page .real-profile-cover-back {
+  position: absolute; z-index: 5; top: 16px; left: 16px;
+  width: 52px; height: 52px; padding: 0; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: rgba(55,55,55,.88);
+  color: #fff; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.real-profile-page .real-profile-cover-back svg { font-size: 29px; }
+.real-profile-page .real-profile-cover-back:focus-visible,
+.real-profile-page .real-profile-frames-icon:focus-visible { outline: 3px solid #7134ff; outline-offset: 3px; }
+.real-profile-page .real-profile-identity { position: relative; }
+.real-profile-page .real-profile-frames-icon {
+  position: absolute; z-index: 4; top: 76px; right: 18px;
+  width: 42px; height: 42px; display: grid; place-items: center;
+  border: 1px solid var(--smaj-border); border-radius: 50%;
+  background: var(--smaj-secondary-bg); color: var(--smaj-text-secondary);
+  text-decoration: none; box-shadow: 0 2px 6px rgba(15,23,42,.07);
+}
+.real-profile-page .real-profile-frames-icon svg { font-size: 23px; }
+.real-profile-page .real-profile-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; gap: 9px; }
+.real-profile-page .real-profile-actions > * { min-width: 0; width: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10px 8px; font-size: clamp(12px,3.3vw,15px); text-decoration: none; }
+.real-profile-page .real-profile-actions > :only-child { grid-column: 1 / -1; }
+@media (max-width: 640px) { .real-profile-page .real-profile-frames-icon { top: 76px; right: 14px; } }
