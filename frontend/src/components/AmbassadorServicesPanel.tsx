@@ -204,6 +204,7 @@ const AmbassadorServicesPanel = () => {
   const [mode, setMode] = useState<"apply" | "find" | null>(() =>
     searchParams.get("ambassador") === "apply" ? "apply" : null);
   const [application, setApplication] = useState<Application | null>(null);
+  const [applicationLoading, setApplicationLoading] = useState(true);
   const [ambassadors, setAmbassadors] = useState<PublicAmbassador[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(false);
   const [countryFilter, setCountryFilter] = useState("");
@@ -241,10 +242,14 @@ const AmbassadorServicesPanel = () => {
   const notify = useCallback((message: string, type: FeedbackNotice["type"] = "info") => setNotice({ message, type }), []);
 
   useEffect(() => {
+    let cancelled = false;
+    setApplicationLoading(true);
     axiosClient.get<{ application: Application | null }>("/ambassadors/me")
-      .then(({ data }) => setApplication(data.application))
-      .catch(() => undefined);
-  }, []);
+      .then(({ data }) => { if (!cancelled) setApplication(data.application); })
+      .catch(() => { if (!cancelled) notify("Application status could not be loaded. Please retry.", "warning"); })
+      .finally(() => { if (!cancelled) setApplicationLoading(false); });
+    return () => { cancelled = true; };
+  }, [user?.uid, notify]);
 
   useEffect(() => {
     if (!user?.country || form.countryCode) return;
@@ -547,8 +552,8 @@ const AmbassadorServicesPanel = () => {
     <section className="services-ambassador-card">
       <div className="services-ambassador-icon"><GroupsOutlinedIcon /></div>
       <div><small>SMAJ AMBASSADORS</small><h2>Represent SMAJ in your region</h2><p>Find trusted community ambassadors or apply across any SMAJ service.</p></div>
-      <div className="services-ambassador-actions"><button type="button" onClick={() => setMode("find")}>Find ambassadors</button><button type="button" className="primary" onClick={() => setMode("apply")}>{application ? "My application" : "Become an ambassador"} <span>→</span></button></div>
-      {application ? <strong className={`ambassador-status ${application.status}`}>{application.status}</strong> : null}
+      <div className="services-ambassador-actions"><button type="button" onClick={() => setMode("find")}>Find ambassadors</button><button type="button" className="primary" disabled={applicationLoading} aria-busy={applicationLoading} onClick={() => setMode("apply")}>{applicationLoading ? "Checking application…" : application ? "My application" : "Become an ambassador"} <span>→</span></button></div>
+      <span className="ambassador-status-slot" aria-live="polite">{applicationLoading ? <span className="ambassador-status-loading">Checking status</span> : application ? <strong className={`ambassador-status ${application.status}`}>{application.status}</strong> : null}</span>
     </section>
 
     {mode ? <div className="ambassador-modal-backdrop" role="presentation" onMouseDown={close}>
