@@ -199,7 +199,7 @@ const NotificationsPage = () => {
       <section className="private-page-head">
         <div><h1>Notifications</h1><p className="private-kicker">{total} notifications</p></div>
         <div className="notification-global-menu">
-          <button type="button" className="private-secondary-button" onClick={() => void markAll()}>Read all</button>
+          <button type="button" className="private-secondary-button notification-read-all" onClick={() => void markAll()}>Read all</button>
           <button type="button" className="notification-more-button" aria-label="Notification actions" aria-expanded={menuId === "global"} onClick={() => setMenuId(menuId === "global" ? null : "global")}><MoreVertIcon /></button>
           {menuId === "global" && <div className="notification-popover" role="menu">
             <button onClick={() => { setSelectMode(true); setMenuId(null); }}>Select notifications</button>
