@@ -1,3 +1,4 @@
+import "./OrdersPageLayout.css";
 import SmajVerifiedBadge from "../../components/SmajVerifiedBadge";
 import { chatLink } from "../../lib/chatCache";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -235,15 +236,15 @@ const OrdersPage = () => {
       {message ? <div className="private-alert success">{message}</div> : null}
       {error ? <div className="private-alert error" role="alert">{error} <button type="button" onClick={() => void loadOrders()}>Retry</button></div> : null}
       <div className="orders-compact-tabs" role="tablist" aria-label="Order type">
-        <button type="button" role="tab" aria-selected={orderTab === "buyer"} className={orderTab === "buyer" ? "active" : ""} onClick={() => changeTab("buyer")}>Purchases <strong>{buyerOrders.length}</strong></button>
-        <button type="button" role="tab" aria-selected={orderTab === "seller"} className={orderTab === "seller" ? "active" : ""} onClick={() => changeTab("seller")}>Sales <strong>{sellerOrders.length}</strong></button>
+        <button type="button" role="tab" aria-selected={orderTab === "buyer"} className={orderTab === "buyer" ? "active" : ""} onClick={() => changeTab("buyer")}><span className="orders-tab-title">Purchases</span><strong>{buyerOrders.length}</strong></button>
+        <button type="button" role="tab" aria-selected={orderTab === "seller"} className={orderTab === "seller" ? "active" : ""} onClick={() => changeTab("seller")}><span className="orders-tab-title">Sales</span><strong>{sellerOrders.length}</strong></button>
       </div>
       <div className="orders-compact-search">
-        <label className="sr-only" htmlFor="orders-search">Search orders</label>
-        <input id="orders-search" type="search" value={orderSearch} onChange={event => {setOrderSearch(event.target.value);setVisibleCount(20);}} placeholder="Search orders..." />
+        <label className="orders-control-label" htmlFor="orders-search">Search orders</label>
+        <input id="orders-search" type="search" value={orderSearch} onChange={event => {setOrderSearch(event.target.value);setVisibleCount(20);}} placeholder="Search by order ID or product" />
       </div>
       <div className="orders-compact-filters">
-        <label className="sr-only" htmlFor="orders-status">Order status</label>
+        <div className="orders-status-field"><label className="orders-control-label" htmlFor="orders-status">Order status</label>
         <select id="orders-status" value={statusFilter} onChange={event => {setStatusFilter(event.target.value);setVisibleCount(20);}}>
           <option value="all">All orders</option>
           <option value="pending">Pending</option>
@@ -253,26 +254,26 @@ const OrdersPage = () => {
           <option value="delivered">Delivered</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
-        </select>
-        <button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced(!showAdvanced)}>☷ Filter</button>
+        </select></div>
+        <div className="orders-filter-field"><span className="orders-control-label">More filters</span><button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced(!showAdvanced)}>☷ Filters {showAdvanced ? "⌃" : "⌄"}</button></div>
       </div>
       {showAdvanced ? <div className="orders-compact-advanced">
-        <label htmlFor="orders-sort">Sort orders</label>
+        <label htmlFor="orders-sort">Sort by</label>
         <select id="orders-sort" value={sortOrder} onChange={event => setSortOrder(event.target.value)}>
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="highest">Highest amount</option>
         </select>
-        <button type="button" onClick={() => {setStatusFilter("all");setSortOrder("newest");setOrderSearch("");setVisibleCount(20);setShowAdvanced(false);}}>Reset filters</button>
+        <button type="button" onClick={() => {setStatusFilter("all");setSortOrder("newest");setOrderSearch("");setVisibleCount(20);setShowAdvanced(false);}}>Clear filters</button>
       </div> : null}
       {loading ? <PrivateSkeleton variant="orders" count={4} /> : (
         <section className="orders-compact-results">
           <div className="orders-compact-results-head"><h2>{orderTab === "buyer" ? "Purchase history" : "Sales history"}</h2><span>{filteredOrders.length} orders</span></div>
           {filteredOrders.length ? <div className="orders-list">{filteredOrders.slice(0,visibleCount).map(order => renderOrder(order,orderTab))}</div> : <div className="orders-compact-empty">
-            <span aria-hidden="true">♡</span>
+            <span aria-hidden="true">{orderTab === "buyer" ? "▢" : "▣"}</span>
             <h3>{activeOrders.length ? "No matching orders" : orderTab === "buyer" ? "No purchases yet" : "No sales yet"}</h3>
             <p>{activeOrders.length ? "Try a different search or filter." : orderTab === "buyer" ? "Your purchases will appear here." : "Customer orders will appear here."}</p>
-            {activeOrders.length ? <button type="button" onClick={() => {setStatusFilter("all");setOrderSearch("");}}>Clear filters</button> : orderTab === "buyer" ? <button type="button" onClick={() => navigate("/store")}>Explore Store</button> : null}
+            {activeOrders.length ? <button type="button" onClick={() => {setStatusFilter("all");setOrderSearch("");}}>Clear filters</button> : orderTab === "buyer" ? <button type="button" onClick={() => navigate("/store")}>Explore Store</button> : <button type="button" onClick={() => navigate("/seller")}>Manage Products</button>}
           </div>}
           {filteredOrders.length > visibleCount ? <button className="orders-load-more" type="button" onClick={() => setVisibleCount(n => n+20)}>Load more ({filteredOrders.length-visibleCount} remaining)</button> : null}
         </section>
