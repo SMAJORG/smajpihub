@@ -1,0 +1,86 @@
+/* Full-bleed X-inspired connections view. */
+.public-profile-connections-page.private-page {
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+}
+.public-profile-connections-page .public-profile-connections-header {
+  top: 0 !important;
+  min-height: 76px;
+  padding: 14px 20px;
+  border: 0;
+  background: var(--surface);
+  backdrop-filter: none;
+}
+.public-profile-connections-page .public-profile-connections-header h1 {
+  font-size: clamp(17px, 4.8vw, 22px);
+  font-weight: 800;
+}
+.public-profile-connections-page .public-profile-connections-header > button { width: 44px; height: 44px; }
+.public-profile-connections-page .public-profile-connections-header > button svg { font-size: 29px; }
+.public-profile-connections-page .public-profile-connections-tabs {
+  top: 76px !important;
+  overflow-x: auto;
+  justify-content: flex-start;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+}
+.public-profile-connections-page .public-profile-connections-tabs::-webkit-scrollbar { display: none; }
+.public-profile-connections-page .public-profile-connections-tabs a,
+.public-profile-connections-page .public-profile-connections-tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 58px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.public-profile-connections-page .public-profile-connections-tabs .active { color: var(--text); }
+.public-profile-connections-page .public-profile-connections-tabs .active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 18px;
+  right: 18px;
+  height: 4px;
+  background: #7134ff;
+  border-radius: 4px 4px 0 0;
+}
+.public-profile-connections-page .public-profile-connections-list article {
+  min-height: 84px;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.public-profile-connections-page .public-profile-connection-identity { flex: 1; }
+.public-profile-connections-page .public-profile-connection-identity strong { font-size: 16px; }
+.public-profile-connections-page .public-profile-connection-identity small { font-size: 14px; }
+.public-profile-connections-page .public-profile-connections-list article > button {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+}
+.public-profile-connections-page .public-profile-connections-list article > button.following { color: #7134ff; }
+.public-profile-connections-page .public-profile-connections-list article > button svg { font-size: 23px; }
