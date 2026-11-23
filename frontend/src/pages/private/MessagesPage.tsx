@@ -1391,8 +1391,7 @@ const MessagesPageContent = () => {
     <main className={`private-page messages-page ${selectedId ? "conversation-selected" : ""}`} aria-label="SMAJ PI HUB Messages">
       {!chatFullscreen ? <header className="messages-inbox-header">
         <button type="button" className="messages-header-back" onClick={() => {
-          if (typeof window.history.state?.idx === "number" && window.history.state.idx > 0) navigate(-1);
-          else navigate("/community/feed");
+          navigate("/community/feed", { replace: true });
         }} aria-label="Back">
           <ArrowBackOutlinedIcon />
         </button>
@@ -1431,7 +1430,7 @@ const MessagesPageContent = () => {
                 onClick={() => {
                   if (manageConversations) { toggleSelectedConversation(item); return; }
                   if (selectedConversationIds.size > 0 || conversationLongPressTriggeredRef.current) return;
-                  flushSync(() => setParams({ conversation: item._id }));
+                  flushSync(() => setParams({ conversation: item._id }, { replace: true }));
                 }}
                 onMouseDown={() => handleConversationMouseDown(item)}
                 onMouseLeave={clearConversationLongPressTimer}
@@ -1468,7 +1467,7 @@ const MessagesPageContent = () => {
             {active ? (
               <>
                 <header>
-                  <button className="chat-mobile-back" onClick={() => { saveChatViewport(); flushSync(() => setParams({})); }} aria-label="Back to messages">
+                  <button className="chat-mobile-back" onClick={() => { saveChatViewport(); flushSync(() => setParams({}, { replace: true })); }} aria-label="Back to messages">
                     <ArrowBackOutlinedIcon />
                   </button>
                   <div className="chat-person">
@@ -1593,7 +1592,7 @@ const MessagesPageContent = () => {
             {active ? (
               <>
                 <header>
-                  <button className="chat-mobile-back" onClick={() => setParams({})} aria-label="Back to messages">
+                  <button className="chat-mobile-back" onClick={() => setParams({}, { replace: true })} aria-label="Back to messages">
                     <ArrowBackOutlinedIcon />
                   </button>
                   <div className="chat-person">
