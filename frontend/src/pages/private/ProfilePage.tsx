@@ -5,6 +5,9 @@ import { isAxiosError } from "axios";
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CameraAltOutlinedIcon from "@mui/icons-material/CameraAltOutlined";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import PhotoFilterOutlinedIcon from "@mui/icons-material/PhotoFilterOutlined";
+import "./ProfileCompactActions.css";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
@@ -686,6 +689,7 @@ const ProfilePage = () => {
       />
 
       <section className="real-profile-hero">
+        <button type="button" className="real-profile-cover-back" aria-label="Back" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate("/settings"); }}><ArrowBackRoundedIcon /></button>
         <button
           type="button"
           className="real-profile-cover"
@@ -721,6 +725,7 @@ const ProfilePage = () => {
               <b>{sellerActive ? "Seller enabled" : "Buyer account"}</b>
             </div>
           </div>
+          <Link className="real-profile-frames-icon" to="/profile/frames" aria-label="Avatar Frames" title="Avatar Frames"><PhotoFilterOutlinedIcon /></Link>
           <div className="real-profile-controls">
             <div className="real-profile-actions">
               <button className="private-primary-button" type="button" onClick={() => setEditing(true)}>
@@ -732,10 +737,6 @@ const ProfilePage = () => {
                 </Link>
               ) : null}
             </div>
-            <Link className="profile-frames-navigation" to="/profile/frames">
-              <span>Avatar Frames</span>
-              <ChevronRightOutlinedIcon aria-hidden="true" />
-            </Link>
           </div>
         </div>
       </section>
