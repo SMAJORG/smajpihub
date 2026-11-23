@@ -58,13 +58,13 @@ public class MainActivity extends BridgeActivity {
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decor);
         controller.setAppearanceLightStatusBars(true);
     }
-    @Override protected void onResume() {
+    @Override public void onResume() {
         super.onResume();
         configureLightStatusBar();
     }
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) configureTransparentStatusBar();
+        if (hasFocus) configureLightStatusBar();
     }
     @android.annotation.TargetApi(Build.VERSION_CODES.O)
     public PictureInPictureParams pipParams(boolean playing) {
