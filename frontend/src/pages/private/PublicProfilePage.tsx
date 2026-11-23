@@ -16,6 +16,7 @@ import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { getCommunityFeed, getPublicProfile, toggleCommunityFollow, type CommunityMedia, type CommunityPost, type PublicProfileResponse } from "../../lib/communityApi";
 import "./community.css";
 import "./PublicProfileBack.css";
+import "./PublicProfileVideos.css";
 
 type ProfileTab = "posts" | "about" | "activity" | "media";
 
@@ -98,11 +99,6 @@ const PublicProfilePage = () => {
     return content.media
       .filter(media => media.type === "video")
       .map(media => ({ post, media, author: content.author || post.author, content: content.content }));
-  }), [posts]);
-
-  const mediaItems = useMemo(() => posts.flatMap(post => {
-    const content = post.originalPost ? { ...post, ...post.originalPost } : post;
-    return content.media.map(media => ({ post, media }));
   }), [posts]);
 
   const openVideo = useCallback((post: CommunityPost, media: CommunityMedia) => {
@@ -290,25 +286,27 @@ const PublicProfilePage = () => {
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, borderTop: "1px solid #f0f0f2", paddingTop: 12, color: "#758092", fontSize: 12 }}><ShieldOutlinedIcon fontSize="small" />Only public activity is displayed</div>
         </section> : null}
 
-        {activeTab === "media" ? <section className="public-profile-panel">
-          <div className="community-section-heading"><div><h2>Media</h2><p>Images and videos from {profile.displayName}’s posts.</p></div></div>
+        {activeTab === "media" ? <section className="public-profile-videos" aria-label="Profile videos">
+          <h2 className="public-profile-videos-heading">Videos</h2>
           {postsLoadedForUid !== uid ? <CommunitySkeleton variant="profilePosts" count={2} />
-            : mediaItems.length ? <div className="public-profile-media-grid">{mediaItems.map(({ post, media }, index) => {
-              const aspectRatio = media.width && media.height ? `${media.width} / ${media.height}` : "16 / 9";
-              const postHref = `/community/feed?post=${encodeURIComponent(post._id)}`;
-              return media.type === "video"
-                ? <article className="public-profile-media-item" key={`${post._id}:${media.url}`}>
-                  <video controls playsInline preload="metadata" src={media.url} style={{ aspectRatio }} />
-                  <Link to={postHref}>View post</Link>
-                </article>
-                : <Link className="public-profile-media-item" key={`${post._id}:${media.url}`} to={postHref} aria-label={`View image post ${index + 1}`}>
-                  <img loading="lazy" decoding="async" src={media.url} alt={media.altText || `Post image ${index + 1}`} style={{ aspectRatio }} />
-                  <span>View post</span>
-                </Link>;
-            })}</div>
+            : profileVideoItems.length ? <div className="public-profile-videos-list">
+              {profileVideoItems.map(({ post, media, content }, index) => (
+                <button className="public-profile-video-row" type="button" key={`${post._id}:${media.url}:${index}`}
+                  onClick={() => openVideo(post, media)} aria-label={`Play video: ${content || "Video post"}`}>
+                  <span className="public-profile-video-thumb">
+                    <video src={media.url} muted playsInline preload="metadata" aria-hidden="true" tabIndex={-1} />
+                    <span className="public-profile-video-play" aria-hidden="true">▶</span>
+                  </span>
+                  <span className="public-profile-video-info">
+                    <strong>{content?.trim() || "Video post"}</strong>
+                    <span>{new Date(post.originalPost?.createdAt || post.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
               : postsError ? <p className="public-profile-tab-error" role="alert">{postsError}</p>
-                : <p className="public-profile-empty">No media posts yet.</p>}
-          {postsHasMore ? <button className="community-load-more" type="button" disabled={loadingMorePosts} onClick={() => void loadMorePosts()}>{loadingMorePosts ? "Loading…" : "Load more media"}</button> : null}
+                : <p className="public-profile-empty">No public videos yet.</p>}
+          {postsHasMore ? <button className="community-load-more" type="button" disabled={loadingMorePosts} onClick={() => void loadMorePosts()}>{loadingMorePosts ? "Loading…" : "Load more videos"}</button> : null}
         </section> : null}
       </section>
       {videoViewer ? <CommunityVideoViewer
