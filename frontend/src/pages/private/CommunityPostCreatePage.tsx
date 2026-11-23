@@ -472,11 +472,35 @@ export default function CommunityPostCreatePage() {
     setSheet(type === "media" ? "media" : type === "document" ? "document" : type === "event" ? "event" : type === "celebration" ? "celebration" : type === "job" ? "job" : type === "poll" ? "poll" : null);
   };
 
-  const chooseMedia = (list: FileList | null) => {
+  const chooseMedia = async (list: FileList | null) => {
     const files = Array.from(list || []);
     if (mediaFiles.length + existingMedia.length + files.length > 4 || files.some(file => !["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "video/quicktime"].includes(file.type))
-      || files.some(file => file.size > (file.type.startsWith("video/") ? 5 : 4) * 1024 * 1024)) {
-      showFeedback("Choose up to four photos (4 MB each) or MP4, WebM, or MOV videos (5 MB each).", "error");
+      || files.some(file => file.size > (file.type.startsWith("video/") ? 50 : 4) * 1024 * 1024)) {
+      showFeedback("Choose up to four photos (4 MB each) or MP4, WebM, or MOV videos (50 MB each, maximum 1 minute 30 seconds).", "error");
+      return;
+    }
+    // Read local metadata before accepting a video; reject videos longer than 90 seconds.
+    const durationIsValid = (file: File): Promise<boolean> => new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      let settled = false;
+      const finish = (valid: boolean) => {
+        if (settled) return;
+        settled = true;
+        video.removeAttribute("src");
+        video.load();
+        URL.revokeObjectURL(url);
+        resolve(valid);
+      };
+      video.preload = "metadata";
+      video.onloadedmetadata = () => finish(Number.isFinite(video.duration) && video.duration > 0 && video.duration <= 90);
+      video.onerror = () => finish(false);
+      video.src = url;
+      setTimeout(() => finish(false), 10000);
+    });
+    const videoChecks = await Promise.all(files.filter(file => file.type.startsWith("video/")).map(durationIsValid));
+    if (videoChecks.some(valid => !valid)) {
+      showFeedback("Videos must be 1 minute 30 seconds or shorter. Please select a shorter video.", "error");
       return;
     }
     const queue = files.map(file => ({
