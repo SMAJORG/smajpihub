@@ -23376,3 +23376,26 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
   .orders-page .orders-compact-filters button{padding:8px 12px;white-space:nowrap}
   .orders-page .orders-compact-empty{max-width:100%;padding-inline:12px}
 }
+
+
+/* Notifications: white Read all action and safe mobile gutters. */
+.notifications-page{box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow-x:clip}
+.notifications-page,.notifications-page *,.notifications-page *::before,.notifications-page *::after{box-sizing:border-box}
+.notifications-page .notification-read-all,.notifications-page .notification-read-all:hover{background:var(--smaj-card)!important;color:var(--smaj-text)!important;border:1px solid var(--smaj-border)!important;box-shadow:none!important;text-decoration:none!important}
+.notifications-page .private-page-head{min-width:0;max-width:100%;flex-wrap:wrap}
+.notifications-page .private-page-head>div:first-child{min-width:0;flex:1 1 auto}
+.notifications-page .notification-global-menu{min-width:0}
+.notifications-page .notification-toolbar{min-width:0;max-width:100%}
+.notifications-page .notification-toolbar select{min-width:0;max-width:min(185px,65vw)}
+.notifications-page .notification-list-compact{width:100%;min-width:0;max-width:100%}
+.notifications-page .notification-list-compact article{width:100%;min-width:0;max-width:100%;padding-left:12px;padding-right:12px}
+.notifications-page .notification-list-compact .notification-open{min-width:0;max-width:100%;flex:1 1 auto}
+.notifications-page .notification-list-compact .notification-open>div{min-width:0;overflow-wrap:anywhere}
+.notifications-page .notification-list-compact .notification-open strong,.notifications-page .notification-list-compact .notification-open p{overflow-wrap:anywhere;white-space:normal}
+.notifications-page .notification-item-menu{flex:0 0 auto}
+@media(max-width:600px){
+  .notifications-page{padding-left:16px!important;padding-right:16px!important}
+  .notifications-page .private-page-head{gap:8px}
+  .notifications-page .notification-global-menu{gap:6px}
+  .notifications-page .notification-list-compact article{padding-left:10px;padding-right:10px}
+}
