@@ -69,3 +69,41 @@
     overflow-wrap: break-word;
   }
 }
+
+/* Switching tabs must never resize the control or move it through scroll anchoring. */
+.seller-profile-page {
+  overflow-anchor: none;
+}
+.seller-profile-page .seller-profile-tabs {
+  flex: none !important;
+  block-size: 58px !important;
+  min-block-size: 58px !important;
+  max-block-size: 58px !important;
+  grid-template-rows: 48px !important;
+  overflow-anchor: none;
+  contain: layout size;
+}
+.seller-profile-page .seller-profile-tabs > button,
+.seller-profile-page .seller-profile-tabs > button.active {
+  inline-size: 100% !important;
+  min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  block-size: 48px !important;
+  min-block-size: 48px !important;
+  max-block-size: 48px !important;
+  flex: none !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  animation: none !important;
+}
+/* Keep both panels tall enough that changing an empty tab does not collapse
+   the page and cause the browser to jump the tab strip vertically. */
+.seller-profile-page > .reviews-panel {
+  min-height: 390px;
+}
+.seller-profile-page > .seller-products-title + .private-state,
+.seller-profile-page > .seller-products-title + .seller-profile-filterbar,
+.seller-profile-page > .seller-products-title + .product-grid {
+  min-height: 300px;
+}
