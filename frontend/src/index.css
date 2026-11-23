@@ -23355,3 +23355,24 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .seller-profile-page .seller-profile-dropdown{position:absolute;top:calc(100% + 6px);right:0;z-index:1500;width:180px;max-width:calc(100vw - 32px);padding:5px;border:1px solid var(--smaj-border);border-radius:10px;background:var(--smaj-card);box-shadow:0 10px 30px rgba(15,23,42,.14)}
 .seller-profile-page .seller-profile-dropdown a{display:flex;align-items:center;min-height:42px;padding:10px 12px;border-radius:7px;color:var(--smaj-text);font-size:14px;font-weight:600;text-decoration:none}
 .seller-profile-page .seller-profile-dropdown a:hover,.seller-profile-page .seller-profile-dropdown a:focus-visible{background:var(--smaj-secondary-bg)}
+
+
+/* My Orders: equal tab cards and safe mobile edges; no changes to data or actions. */
+.orders-page{box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow-x:clip}
+.orders-page,.orders-page *,.orders-page *::before,.orders-page *::after{box-sizing:border-box}
+.orders-page .orders-compact-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;max-width:100%;gap:10px}
+.orders-page .orders-compact-tabs button{width:100%;min-width:0;height:64px;min-height:64px;max-height:64px;border-width:2px;gap:6px;overflow:hidden}
+.orders-page .orders-compact-tabs button strong{flex-shrink:0}
+.orders-page .orders-compact-search,.orders-page .orders-compact-filters,.orders-page .orders-compact-results,.orders-page .orders-compact-advanced{width:100%;max-width:100%;min-width:0}
+.orders-page .orders-compact-search input,.orders-page .orders-compact-filters select,.orders-page .orders-compact-filters button,.orders-page .orders-compact-advanced select{max-width:100%;min-width:0}
+.orders-page .orders-compact-filters{grid-template-columns:minmax(0,1fr) auto}
+.orders-page .orders-compact-results .orders-list,.orders-page .orders-compact-results .order-card{min-width:0;max-width:100%}
+.orders-page .orders-compact-results-head{min-width:0;flex-wrap:wrap}
+.orders-page .order-main{min-width:0;overflow-wrap:anywhere}
+@media(max-width:600px){
+  .orders-page{padding-left:16px!important;padding-right:16px!important}
+  .orders-page .orders-compact-tabs button{padding:10px 12px}
+  .orders-page .orders-compact-filters{gap:8px}
+  .orders-page .orders-compact-filters button{padding:8px 12px;white-space:nowrap}
+  .orders-page .orders-compact-empty{max-width:100%;padding-inline:12px}
+}
