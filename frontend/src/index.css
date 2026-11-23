@@ -23535,3 +23535,54 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
     min-width: 0 !important;
   }
 }
+
+
+/* Seller profile mobile containment: keep every heading and card inside the viewport. */
+@media (max-width: 600px) {
+  .private-page.seller-profile-page {
+    position: relative;
+    inset-inline: auto;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-inline: auto;
+    padding-inline: max(16px, env(safe-area-inset-left)) !important;
+    overflow-x: clip;
+  }
+  .seller-profile-page > :is(.seller-profile-topbar, .seller-profile-hero, .seller-joined, .seller-profile-tabs, .seller-products-title, .private-state, .reviews-panel, .seller-profile-filterbar, .seller-product-grid) {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-inline: 0 !important;
+    inset-inline: auto;
+    transform: none;
+  }
+  .seller-profile-page .seller-profile-topbar,
+  .seller-profile-page .seller-products-title,
+  .seller-profile-page .seller-joined {
+    padding-inline: 0 !important;
+    text-align: start;
+  }
+  .seller-profile-page .seller-profile-hero {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  }
+  .seller-profile-page .seller-profile-stats {
+    min-width: 0;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .seller-profile-page .seller-profile-stats > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* The Store empty-state listing CTA uses the same purple as the primary promo action. */
+.storefront-page a.storefront-empty-cta,
+.storefront-page a.storefront-empty-cta:visited {
+  background-color: #7134ff;
+  border-color: #7134ff;
+  color: #fff;
+}
