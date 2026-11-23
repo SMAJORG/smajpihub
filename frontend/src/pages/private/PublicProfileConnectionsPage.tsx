@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
+import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
+import "./PublicProfileConnectionsFullScreen.css";
 import { useAuthContext } from "../../contexts/AuthContext";
 import AppLayout from "../../layouts/AppLayout";
 import PrivateLayout from "../../layouts/PrivateLayout";
@@ -15,6 +18,7 @@ const PublicProfileConnectionsContent = ({ relation }: { relation: CommunityConn
   const navigate = useNavigate();
   const { user, requireAuth } = useAuthContext();
   const [profile, setProfile] = useState<CommunityIdentity | null>(null);
+  const [filter, setFilter] = useState<"all" | "verified" | "known">("all");
   const [people, setPeople] = useState<CommunityConnectionUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -96,6 +100,7 @@ const PublicProfileConnectionsContent = ({ relation }: { relation: CommunityConn
   };
 
   const title = relation === "followers" ? "Followers" : "Following";
+  const visiblePeople = relation === "following" || filter === "all" ? people : people.filter(person => filter === "known" ? person.following : person.verificationStatus === "approved" || person.verificationLevel === "verified" || person.verificationLevel === "trusted");
   const profileHref = `/people/${encodeURIComponent(uid)}`;
   return (
     <main className="private-page public-profile-connections-page">
@@ -105,17 +110,19 @@ const PublicProfileConnectionsContent = ({ relation }: { relation: CommunityConn
         </button>
         <div>
           <h1>{profile ? <>{profile.displayName}<TrustBadge userId={profile.uid} /></> : title}</h1>
-          <p>{total} {title.toLowerCase()}</p>
+
         </div>
       </header>
       <nav className="public-profile-connections-tabs" aria-label="Profile connections">
-        <Link className={relation === "followers" ? "active" : ""} to={`${profileHref}/followers`}>Followers</Link>
-        <Link className={relation === "following" ? "active" : ""} to={`${profileHref}/following`}>Following</Link>
+        <button type="button" className={relation === "followers" && filter === "verified" ? "active" : ""} onClick={() => { setFilter("verified"); if (relation === "following") navigate(`${profileHref}/followers`); }}>Verified followers</button>
+        <button type="button" className={relation === "followers" && filter === "known" ? "active" : ""} onClick={() => { setFilter("known"); if (relation === "following") navigate(`${profileHref}/followers`); }}>Followers you know</button>
+        <Link className={relation === "followers" && filter === "all" ? "active" : ""} onClick={() => setFilter("all")} to={`${profileHref}/followers`}>Followers</Link>
+        <Link className={relation === "following" ? "active" : ""} onClick={() => setFilter("all")} to={`${profileHref}/following`}>Following</Link>
       </nav>
       {loading ? <p className="public-profile-connections-state" role="status">Loading {title.toLowerCase()}…</p>
         : error && !people.length ? <div className="public-profile-connections-state" role="alert"><p>{error}</p><button type="button" onClick={() => setReloadKey(current => current + 1)}>Try again</button></div>
-          : people.length ? <div className="public-profile-connections-list">
-            {people.map(person => (
+          : visiblePeople.length ? <div className="public-profile-connections-list">
+            {visiblePeople.map(person => (
               <article key={person.uid}>
                 <Link className="public-profile-connection-identity" to={`/people/${encodeURIComponent(person.uid)}`}>
                   <UserAvatarFrame name={person.displayName} image={person.avatar} frame={person.activeAvatarFrame} size={48} />
@@ -131,7 +138,7 @@ const PublicProfileConnectionsContent = ({ relation }: { relation: CommunityConn
                     disabled={busyIds.has(person.uid)}
                     aria-pressed={person.following}
                     onClick={() => void changeFollow(person)}
-                  >{busyIds.has(person.uid) ? "…" : person.following ? "Following" : "Follow"}</button>}
+                   aria-label={person.following ? `Unfollow ${person.displayName}` : `Follow ${person.displayName}`} title={person.following ? "Following" : "Follow"}>{busyIds.has(person.uid) ? "…" : person.following ? <HowToRegOutlinedIcon /> : <PersonAddAltOutlinedIcon />}</button>}
               </article>
             ))}
             {error ? <p className="public-profile-connections-error" role="alert">{error}</p> : null}
@@ -145,8 +152,8 @@ const PublicProfileConnectionsContent = ({ relation }: { relation: CommunityConn
 const PublicProfileConnectionsPage = ({ relation }: { relation: CommunityConnectionRelation }) => {
   const { isAuthenticated, isLoading } = useAuthContext();
   return isLoading || isAuthenticated
-    ? <PrivateLayout><PublicProfileConnectionsContent relation={relation} /></PrivateLayout>
-    : <AppLayout><PublicProfileConnectionsContent relation={relation} /></AppLayout>;
+    ? <PrivateLayout fullScreen><PublicProfileConnectionsContent relation={relation} /></PrivateLayout>
+    : <AppLayout showHeader={false} showFooter={false}><PublicProfileConnectionsContent relation={relation} /></AppLayout>;
 };
 
 export default PublicProfileConnectionsPage;
