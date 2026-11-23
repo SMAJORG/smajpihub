@@ -1,0 +1,6 @@
+/* Back control sits on the profile cover, without a toolbar or search. */
+.public-profile-hero { position: relative; }
+.public-profile-cover-back { position: absolute; top: 20px; left: 20px; z-index: 5; display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 0; border-radius: 50%; background: rgba(55,55,55,.88); color: #fff; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.public-profile-cover-back svg { font-size: 29px; }
+.public-profile-cover-back:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media (max-width: 640px) { .public-profile-cover-back { top: 16px; left: 16px; } }
