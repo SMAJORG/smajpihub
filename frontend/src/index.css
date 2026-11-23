@@ -23483,3 +23483,55 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
     font-size: 11px;
   }
 }
+
+/* Seller profile mobile viewport: keep every heading and card inside the visible page. */
+.seller-profile-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-left: auto;
+  margin-right: auto;
+}
+.seller-profile-page *,
+.seller-profile-page *::before,
+.seller-profile-page *::after {
+  box-sizing: border-box;
+}
+.seller-profile-page .seller-profile-topbar,
+.seller-profile-page .seller-profile-tabs,
+.seller-profile-page .seller-products-title,
+.seller-profile-page .seller-joined,
+.seller-profile-page .private-state,
+.seller-profile-page .reviews-panel,
+.seller-profile-page .seller-profile-hero {
+  position: relative;
+  left: auto;
+  right: auto;
+  transform: none;
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: 0;
+}
+.seller-profile-page .seller-profile-identity,
+.seller-profile-page .profile-name-line,
+.seller-profile-page .seller-profile-username {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .seller-profile-page {
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+  .seller-profile-page .seller-profile-topbar,
+  .seller-profile-page .seller-products-title,
+  .seller-profile-page .seller-joined {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .seller-profile-page .seller-profile-identity {
+    min-width: 0 !important;
+  }
+}
