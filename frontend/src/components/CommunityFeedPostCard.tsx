@@ -19,8 +19,12 @@ import IosShareOutlinedIcon from "@mui/icons-material/IosShareOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import ThumbDownAltOutlinedIcon from "@mui/icons-material/ThumbDownAltOutlined";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import FavoriteBorderOutlinedIcon from "@mui/icons-material/FavoriteBorderOutlined";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import CommunitySkeleton from "./CommunitySkeleton";
+import "./CommunityPostActions.css";
 import UserAvatarFrame, { type AvatarFrameId } from "./UserAvatarFrame";
 import TrustBadge from "./TrustBadge";
 import CommunityVideoPreview from "./CommunityVideoPreview";
@@ -655,7 +659,7 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
         <div className="community-reaction-control">
           <button
             type="button"
-            className="community-feed-action community-feed-action-refined"
+            className="community-feed-action community-feed-action-refined community-feed-like"
             aria-label={`${reaction === "like" ? "Unlike" : "Like"}, ${likeCount}`}
             aria-pressed={reaction === "like"}
             aria-expanded={reactionMenuOpen}
@@ -666,14 +670,14 @@ function CommunityFeedPostCard({ post, viewerId, viewerAvatarFrame, onChange, on
             onPointerCancel={finishReactionPress}
             onContextMenu={openReactionsFromContextMenu}
             onClick={handleLikeClick}
-          ><ThumbUpAltOutlinedIcon /> <span>{likeCount}</span></button>
+          >{reaction === "like" ? <FavoriteIcon /> : <FavoriteBorderOutlinedIcon />} <span>{likeCount}</span></button>
           {reactionMenuOpen ? <div className="community-reaction-picker" role="group" aria-label="Reactions">
             {reactionOptions.map(option => <button key={option.type} type="button" aria-label={option.label} aria-pressed={reaction === option.type} onClick={() => void chooseReaction(option.type)}>{option.emoji}</button>)}
           </div> : null}
         </div>
         <button type="button" className="community-feed-action" aria-label={`Comments, ${commentCount}`} disabled={busy || content.canComment === false} onClick={() => void toggleComments()}><ChatBubbleOutlineOutlinedIcon /> <span>{commentCount}</span></button>
         <button type="button" className="community-feed-action" aria-label={`Repost, ${repostCount}`} disabled={busy} onClick={() => void repost()}><RepeatOutlinedIcon /> <span>{repostCount}</span></button>
-        <button type="button" className="community-feed-action" aria-label="Share post" onClick={() => void share()}><IosShareOutlinedIcon /></button>
+        <button type="button" className="community-feed-action" aria-label="Share post" onClick={() => void share()}><ShareOutlinedIcon /></button>
         <div className="community-reaction-summary" aria-label="Reaction counts">
           {reactionOptions.filter(option => Number(counts[option.type] || 0) > 0).map(option => <span key={option.type} title={`${option.label}: ${counts[option.type]}`}><span aria-hidden="true">{option.emoji}</span>{counts[option.type]}</span>)}
         </div>
