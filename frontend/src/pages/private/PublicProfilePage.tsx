@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import "./PublicProfileBack.css";
 import { useAuthContext } from "../../contexts/AuthContext";
 import CommunityFeedPostCard from "../../components/CommunityFeedPostCard";
 import CommunitySkeleton from "../../components/CommunitySkeleton";
@@ -10,6 +9,7 @@ import TrustBadge from "../../components/TrustBadge";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { getCommunityFeed, getPublicProfile, toggleCommunityFollow, type CommunityMedia, type CommunityPost, type PublicProfileResponse } from "../../lib/communityApi";
 import "./community.css";
+import "./PublicProfileBack.css";
 
 type ProfileTab = "posts" | "about" | "activity" | "media";
 
