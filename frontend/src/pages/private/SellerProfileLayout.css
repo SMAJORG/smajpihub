@@ -1,0 +1,71 @@
+/* Seller Profile: stable tab dimensions and readable mobile gutters. */
+.seller-profile-page .seller-profile-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-rows: 48px !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  min-height: 58px !important;
+  max-height: 58px !important;
+  padding: 5px !important;
+  gap: 5px !important;
+  overflow: hidden;
+}
+.seller-profile-page .seller-profile-tabs > button,
+.seller-profile-page .seller-profile-tabs > button.active,
+.seller-profile-page .seller-profile-tabs > button:focus,
+.seller-profile-page .seller-profile-tabs > button:active {
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  line-height: 1.2 !important;
+  font-size: 14px !important;
+  transform: none !important;
+  scale: 1 !important;
+  transition: background-color .15s ease, color .15s ease !important;
+  outline-offset: -3px;
+}
+.seller-profile-page .seller-profile-tabs > button.active {
+  background: var(--smaj-card) !important;
+  color: var(--smaj-primary) !important;
+}
+@media (max-width: 600px) {
+  .private-page.seller-profile-page {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: 0 !important;
+    padding-inline: 16px !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    overflow-x: clip;
+  }
+  .seller-profile-page > :is(.seller-profile-topbar, .seller-profile-hero, .seller-joined, .seller-profile-tabs, .section-title, .private-state, .reviews-panel, .seller-profile-filterbar, .product-grid) {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: 0 !important;
+    padding-inline-start: 0;
+    transform: none !important;
+  }
+  .seller-profile-page > .seller-profile-hero {
+    padding: 14px !important;
+  }
+  .seller-profile-page :is(.seller-profile-topbar h2, .seller-joined, .section-title h2, .section-title p, .reviews-panel h2, .reviews-panel p) {
+    text-indent: 0 !important;
+    margin-inline-start: 0 !important;
+    overflow-wrap: break-word;
+  }
+}
