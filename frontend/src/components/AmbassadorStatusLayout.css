@@ -1,0 +1,34 @@
+/* Keep application status from inserting content and shifting the banner. */
+.services-ambassador-card { position: relative; }
+.services-ambassador-card .ambassador-status-slot {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 110px;
+  height: 25px;
+  min-width: 110px;
+  pointer-events: none;
+}
+.services-ambassador-card .ambassador-status-slot .ambassador-status,
+.services-ambassador-card .ambassador-status-slot .ambassador-status-loading {
+  position: static !important;
+  inset: auto !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 23px;
+  margin: 0;
+  white-space: nowrap;
+}
+.services-ambassador-card .ambassador-status-loading {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  opacity: .9;
+}
+.services-ambassador-actions > button.primary:disabled { cursor: wait; opacity: .85; }
