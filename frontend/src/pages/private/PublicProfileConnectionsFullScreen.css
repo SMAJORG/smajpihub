@@ -1,7 +1,11 @@
 /* Full-bleed X-inspired connections view. */
 .public-profile-connections-page.private-page {
+  display: block;
   width: 100%;
   max-width: none;
+  height: auto;
+  align-content: start;
+  justify-content: start;
   min-height: 100dvh;
   margin: 0;
   padding: 0;
@@ -11,8 +15,10 @@
 }
 .public-profile-connections-page .public-profile-connections-header {
   top: 0 !important;
-  min-height: 76px;
-  padding: 14px 20px;
+  height: 64px;
+  min-height: 64px;
+  margin: 0;
+  padding: 8px 16px;
   border: 0;
   background: var(--surface);
   backdrop-filter: none;
@@ -24,7 +30,12 @@
 .public-profile-connections-page .public-profile-connections-header > button { width: 44px; height: 44px; }
 .public-profile-connections-page .public-profile-connections-header > button svg { font-size: 29px; }
 .public-profile-connections-page .public-profile-connections-tabs {
-  top: 76px !important;
+  top: 64px !important;
+  height: 54px;
+  min-height: 54px;
+  margin: 0;
+  padding: 0;
+  align-items: stretch;
   overflow-x: auto;
   justify-content: flex-start;
   scrollbar-width: none;
@@ -35,7 +46,7 @@
 .public-profile-connections-page .public-profile-connections-tabs button {
   position: relative;
   flex: 0 0 auto;
-  min-height: 58px;
+  min-height: 54px;
   padding: 0 18px;
   border: 0;
   border-radius: 0;
@@ -61,9 +72,16 @@
   background: var(--primary);
   border-radius: 4px 4px 0 0;
 }
+.public-profile-connections-page .public-profile-connections-list {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
 .public-profile-connections-page .public-profile-connections-list article {
-  min-height: 84px;
-  padding: 15px 20px;
+  height: 80px;
+  min-height: 80px;
+  margin: 0;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   gap: 12px;
 }
