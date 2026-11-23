@@ -23307,3 +23307,11 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 }
 .discovery-compact-art svg{display:block!important;width:28px!important;height:28px!important;max-width:none!important;max-height:none!important;fill:currentColor!important;color:#7c3aed!important;opacity:1!important;visibility:visible!important}
 .discovery-compact-item:focus-visible{outline:2px solid #7c3aed;outline-offset:3px;border-radius:10px}
+
+
+/* Category directory reuses the exact artwork component and sprite from Services. */
+.discovery-compact-directory .discovery-compact-art{display:block!important;width:70px!important;height:70px!important;max-width:100%!important;padding:0!important;background:transparent!important;border-radius:17px!important;overflow:visible!important}
+.discovery-compact-directory .discovery-compact-art>.service-art{display:block!important;width:100%!important;height:100%!important;margin:0!important;border-radius:17px!important;background-repeat:no-repeat!important;background-color:transparent!important;box-shadow:0 7px 17px rgba(15,23,42,.10)}
+.discovery-compact-directory .discovery-compact-icons{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 6px}
+.discovery-compact-directory .discovery-compact-item{align-items:center;gap:8px}
+@media(max-width:380px){.discovery-compact-directory .discovery-compact-art{width:62px!important;height:62px!important}}
