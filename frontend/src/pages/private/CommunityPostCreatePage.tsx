@@ -1132,7 +1132,7 @@ export default function CommunityPostCreatePage() {
               <button type="button" onClick={rotateEditorImage}><RotateRightOutlinedIcon /> Rotate</button>
             </div>
           </> : null}
-          {mediaEditor.type === "video" ? <label className="community-media-editor-captions">Closed captions (WebVTT)<textarea value={mediaEditor.captionsVtt} maxLength={20_000} onChange={event => setMediaEditor(current => current ? { ...current, captionsVtt: event.target.value } : current)} placeholder={"WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nCaption text"} /></label> : null}
+          
         </div>
       </section> : null}
 
