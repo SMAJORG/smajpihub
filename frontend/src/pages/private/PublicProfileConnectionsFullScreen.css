@@ -58,7 +58,7 @@
   left: 18px;
   right: 18px;
   height: 4px;
-  background: #7134ff;
+  background: var(--primary);
   border-radius: 4px 4px 0 0;
 }
 .public-profile-connections-page .public-profile-connections-list article {
@@ -82,5 +82,5 @@
   background: transparent;
   color: var(--text);
 }
-.public-profile-connections-page .public-profile-connections-list article > button.following { color: #7134ff; }
+.public-profile-connections-page .public-profile-connections-list article > button.following { color: var(--primary); }
 .public-profile-connections-page .public-profile-connections-list article > button svg { font-size: 23px; }
