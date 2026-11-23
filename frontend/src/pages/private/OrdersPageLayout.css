@@ -1,0 +1,126 @@
+/* My Orders layout: stable controls, clear labels, consistent mobile gutters. */
+.private-page.orders-page {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+  padding-inline: max(16px, env(safe-area-inset-left)) !important;
+  overflow-x: clip;
+  overflow-anchor: none;
+}
+.orders-page > :is(.orders-compact-header, .orders-compact-tabs, .orders-compact-search, .orders-compact-filters, .orders-compact-advanced, .orders-compact-results) {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-inline: 0;
+  transform: none !important;
+}
+.orders-page .orders-compact-header { text-align: start; padding-inline: 0; }
+.orders-page .orders-compact-header h1 { margin: 0 0 4px; }
+.orders-page .orders-compact-header p { margin: 0 0 16px; }
+.orders-page .orders-compact-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  grid-template-rows: 76px !important;
+  gap: 8px !important;
+  height: 76px !important;
+  min-height: 76px !important;
+  max-height: 76px !important;
+  margin-bottom: 18px;
+  overflow-anchor: none;
+}
+.orders-page .orders-compact-tabs > button,
+.orders-page .orders-compact-tabs > button.active,
+.orders-page .orders-compact-tabs > button:active,
+.orders-page .orders-compact-tabs > button:focus {
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 76px !important;
+  min-height: 76px !important;
+  max-height: 76px !important;
+  padding: 12px !important;
+  margin: 0 !important;
+  border: 2px solid var(--smaj-border) !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  transform: none !important;
+  scale: 1 !important;
+  animation: none !important;
+  transition: background-color .15s ease,color .15s ease,border-color .15s ease !important;
+  overflow: hidden;
+}
+.orders-page .orders-compact-tabs > button.active {
+  border-color: #7134ff !important;
+  background: rgba(113,52,255,.07) !important;
+  color: #7134ff !important;
+}
+.orders-page .orders-tab-title { display: block; text-align: start; font-weight: 700; }
+.orders-page .orders-compact-tabs strong { align-self: flex-end; font-size: 20px; line-height: 1; }
+.orders-page .orders-control-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  margin-bottom: 7px;
+  color: var(--smaj-text);
+  text-align: start;
+}
+.orders-page .orders-compact-search { margin-bottom: 14px; }
+.orders-page .orders-compact-search input {
+  display: block;
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  margin: 0;
+  border-radius: 12px;
+}
+.orders-page .orders-compact-filters {
+  display: grid !important;
+  grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  align-items: end;
+  gap: 10px !important;
+  margin-bottom: 16px;
+}
+.orders-page .orders-status-field,
+.orders-page .orders-filter-field { min-width: 0; width: 100%; }
+.orders-page .orders-compact-filters select,
+.orders-page .orders-compact-filters button {
+  box-sizing: border-box !important;
+  display: block;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--smaj-border) !important;
+  border-radius: 12px !important;
+  background: var(--smaj-card);
+  color: var(--smaj-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: start;
+  transform: none !important;
+}
+.orders-page .orders-compact-filters button { text-align: center; cursor: pointer; }
+.orders-page .orders-compact-advanced { display: grid; grid-template-columns: minmax(0,1fr); align-items: stretch; gap: 8px; }
+.orders-page .orders-compact-advanced select,
+.orders-page .orders-compact-advanced button { width: 100%; max-width: 100%; }
+.orders-page .orders-compact-results-head { align-items: center; }
+.orders-page .orders-compact-empty { min-height: 250px; text-align: center; }
+.orders-page .orders-compact-empty > button { background: #7134ff; color: #fff; border-color: #7134ff; }
+@media(max-width:600px) {
+  .private-page.orders-page { padding-left: max(16px,env(safe-area-inset-left)) !important; padding-right: max(16px,env(safe-area-inset-right)) !important; }
+  .orders-page .orders-compact-tabs > button { padding: 12px !important; }
+  .orders-page .orders-compact-filters { gap: 8px !important; }
+}
