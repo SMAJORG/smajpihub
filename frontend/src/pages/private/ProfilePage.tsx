@@ -17,7 +17,6 @@ import TrustBadge from "../../components/TrustBadge";
 import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { axiosClient } from "../../lib/axiosClient";
 import { uploadImage } from "../../lib/uploadImage";
-import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 
