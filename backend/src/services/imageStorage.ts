@@ -101,8 +101,8 @@ export const uploadVideoToCloudinary = async (video: string, purpose = "communit
   if (!/^data:video\/(mp4|webm|quicktime);base64,/i.test(video)) {
     throw Object.assign(new Error("Upload an MP4, WebM, or MOV video."), { statusCode: 400 });
   }
-  if (video.length > 7_000_000) {
-    throw Object.assign(new Error("Video must be 5 MB or smaller."), { statusCode: 413 });
+  if (video.length > Math.ceil(50 * 1024 * 1024 * 4 / 3) + 128) {
+    throw Object.assign(new Error("Video must be 50 MB or smaller."), { statusCode: 413 });
   }
   if (!env.cloudinary_cloud_name || !env.cloudinary_upload_preset) {
     throw Object.assign(new Error("Cloudinary video upload is not configured."), { statusCode: 503 });
