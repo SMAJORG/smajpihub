@@ -225,7 +225,7 @@ const OrdersPage = () => {
   };
 
   return (
-    <main className="private-page">
+    <main className="private-page orders-page">
       <PullToRefresh onRefresh={loadOrders} />
       <header className="orders-compact-header">
         <h1>My Orders</h1>
