@@ -12,9 +12,9 @@ const TokenRewardsPage = () => (
     <header className="token-rewards-header">
       <Link to="/settings" aria-label="Back to account"><ArrowBackRoundedIcon /></Link>
       <div>
-        <span>SMAJ PI HUB</span>
-        <h1>Token Rewards</h1>
-        <p>Your rewards, all in one place.</p>
+        <span style={{ color: "#fef3c7" }}>SMAJ PI HUB</span>
+        <h1 style={{ color: "#ffffff" }}>Token Rewards</h1>
+        <p style={{ color: "#f3e8ff" }}>Your rewards, all in one place.</p>
       </div>
       <span className="token-rewards-soon">COMING SOON</span>
     </header>
