@@ -23412,3 +23412,74 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .seller-profile-page .seller-profile-identity{min-width:0}
 .seller-profile-page .profile-name-line,.seller-profile-page .seller-profile-username{overflow-wrap:anywhere}
 @media(max-width:600px){.seller-profile-page{padding-left:16px!important;padding-right:16px!important}.seller-profile-page .seller-profile-tabs{margin-top:12px!important;margin-bottom:15px!important}}
+
+
+/* Seller profile: contained mobile layout without clipped left-edge content. */
+.seller-profile-page {
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 24px);
+  overflow-x: visible;
+}
+.seller-profile-page > *,
+.seller-profile-page .seller-profile-hero > *,
+.seller-profile-page .seller-profile-stats > *,
+.seller-profile-page .seller-products-title > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.seller-profile-page .seller-profile-topbar,
+.seller-profile-page .seller-products-title {
+  width: 100%;
+  margin-inline: 0;
+  padding-inline: 0;
+  text-align: start;
+}
+.seller-profile-page .seller-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin-left: 0;
+}
+.seller-profile-page .seller-profile-stats strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.seller-profile-page .seller-profile-stats span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.seller-profile-page .seller-profile-hero {
+  width: 100%;
+  min-width: 0;
+}
+.seller-profile-page .seller-joined,
+.seller-profile-page .seller-products-title h2,
+.seller-profile-page .seller-products-title p {
+  margin-left: 0;
+  text-indent: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .seller-profile-page {
+    width: 100%;
+    padding-inline: 16px !important;
+  }
+  .seller-profile-page .seller-profile-hero {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px;
+  }
+  .seller-profile-page .seller-profile-stats {
+    grid-column: 1 / -1;
+    padding-top: 12px;
+    border-top: 1px solid var(--smaj-border);
+  }
+  .seller-profile-page .seller-profile-stats strong {
+    font-size: 18px;
+  }
+  .seller-profile-page .seller-profile-stats span {
+    font-size: 11px;
+  }
+}
