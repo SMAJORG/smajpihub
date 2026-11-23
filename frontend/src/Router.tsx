@@ -281,8 +281,8 @@ const swapRoutes: Array<[string, SwapPageKind]> = [
 const PublicProfileRoute = () => {
   const { isAuthenticated, isLoading } = useAuthContext();
   return isLoading || isAuthenticated
-    ? <PrivateLayout><PublicProfilePage /></PrivateLayout>
-    : <AppLayout><PublicProfilePage /></AppLayout>;
+    ? <PrivateLayout fullScreen><PublicProfilePage /></PrivateLayout>
+    : <AppLayout showHeader={false} showFooter={false}><PublicProfilePage /></AppLayout>;
 };
 
 const AdminChunkError = () => {
