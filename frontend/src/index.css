@@ -23399,3 +23399,16 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
   .notifications-page .notification-global-menu{gap:6px}
   .notifications-page .notification-list-compact article{padding-left:10px;padding-right:10px}
 }
+
+
+/* Seller Profile: keep both tabs equal when selected and protect mobile edges. */
+.seller-profile-page{box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow-x:clip}
+.seller-profile-page,.seller-profile-page *,.seller-profile-page *::before,.seller-profile-page *::after{box-sizing:border-box}
+.seller-profile-page .seller-profile-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important;width:100%!important;max-width:100%!important;min-width:0!important;padding:5px!important;align-items:stretch!important}
+.seller-profile-page .seller-profile-tabs button,.seller-profile-page .seller-profile-tabs button.active{display:flex!important;align-items:center!important;justify-content:center!important;min-width:0!important;width:100%!important;height:46px!important;min-height:46px!important;max-height:46px!important;margin:0!important;padding:8px!important;border:0!important;border-radius:10px!important;font-size:14px!important;line-height:1.2!important;transform:none!important;flex:initial!important;box-shadow:none!important;white-space:normal!important;text-align:center!important}
+.seller-profile-page .seller-profile-tabs button{background:transparent!important;color:var(--smaj-text-secondary)!important}
+.seller-profile-page .seller-profile-tabs button.active{background:var(--smaj-card)!important;color:var(--smaj-primary)!important;box-shadow:0 2px 9px #00000010!important}
+.seller-profile-page .seller-profile-topbar,.seller-profile-page .seller-profile-hero,.seller-profile-page .seller-profile-stats,.seller-profile-page .section-title{min-width:0;max-width:100%}
+.seller-profile-page .seller-profile-identity{min-width:0}
+.seller-profile-page .profile-name-line,.seller-profile-page .seller-profile-username{overflow-wrap:anywhere}
+@media(max-width:600px){.seller-profile-page{padding-left:16px!important;padding-right:16px!important}.seller-profile-page .seller-profile-tabs{margin-top:12px!important;margin-bottom:15px!important}}
