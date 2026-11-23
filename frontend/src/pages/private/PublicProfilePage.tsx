@@ -167,7 +167,7 @@ const PublicProfilePage = () => {
       {error ? <div className="private-alert error" role="alert">{error}</div> : null}
       {!data.isPublic && data.viewer.isSelf ? <p className="public-profile-private-note">This profile is hidden from other people. You can still preview it here.</p> : null}
       <header className="public-profile-hero">
-        <button type="button" className="public-profile-cover-back" aria-label="Back" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate("/dashboard"); }}><ArrowBackRoundedIcon /></button>
+        <button type="button" className="public-profile-cover-back" aria-label="Back" onClick={() => { navigate("/dashboard", { replace: true }); }}><ArrowBackRoundedIcon /></button>
         {profile.coverImage ? <img className="public-profile-cover" src={profile.coverImage} alt="" /> : <div className="public-profile-cover-placeholder" />}
         <div className="public-profile-main">
           <div className="public-profile-top-row">
