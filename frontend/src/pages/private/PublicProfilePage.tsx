@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
+import WorkOutlineOutlinedIcon from "@mui/icons-material/WorkOutlineOutlined";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import { useAuthContext } from "../../contexts/AuthContext";
 import CommunityFeedPostCard from "../../components/CommunityFeedPostCard";
 import CommunitySkeleton from "../../components/CommunitySkeleton";
@@ -32,6 +38,7 @@ const PublicProfilePage = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
+  const [activityFilter, setActivityFilter] = useState<"All" | "Posts" | "Listings" | "Jobs" | "Videos">("All");
   const [videoViewer, setVideoViewer] = useState<{ items: CommunityVideoItem[]; index: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -247,18 +254,40 @@ const PublicProfilePage = () => {
           </dl>
         </section> : null}
 
-        {activeTab === "activity" ? <section className="public-profile-panel">
-          <div className="community-section-heading"><div><h2>Service activity</h2><p>Current public activity across SMAJ PI HUB.</p></div></div>
-          <div className="public-profile-activity-stats">
-            <span><strong>{data.stats.posts}</strong>Posts</span>
-            <Link to={`/people/${encodeURIComponent(profile.uid)}/followers`}><strong>{data.stats.followers}</strong>Followers</Link>
-            <Link to={`/people/${encodeURIComponent(profile.uid)}/following`}><strong>{data.stats.following}</strong>Following</Link>
-            <span><strong>{data.activities.marketplaceListings.length}</strong>Recent listings</span>
-            <span><strong>{data.activities.jobs}</strong>Active jobs</span>
-            <span><strong>{data.activities.streamVideos}</strong>Videos</span>
+        {activeTab === "activity" ? <section className="public-profile-panel public-profile-activity-redesign" style={{ padding: "18px 16px", display: "grid", gap: 16 }}>
+          <div className="community-section-heading" style={{ margin: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div><h2 style={{ margin: 0 }}>Activity</h2><p style={{ margin: "4px 0 0", fontSize: 13 }}>Public activity across SMAJ PI HUB</p></div>
+            <span style={{ background: "#f2edff", color: "#7134ff", padding: 10, borderRadius: 12 }}><ShieldOutlinedIcon /></span>
           </div>
-          {data.activities.marketplaceListings.length ? <div className="public-profile-listings">{data.activities.marketplaceListings.map(item => <Link key={item.id} to={`/product/${encodeURIComponent(item.id)}`}>{item.image ? <img src={item.image} alt="" /> : null}<strong>{item.title}</strong></Link>)}</div> : null}
-          {!data.activities.marketplaceListings.length && !data.activities.jobs && !data.activities.streamVideos ? <p className="public-profile-empty">No public service activity yet.</p> : null}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+            {([
+              { label: "Posts", count: data.stats.posts, icon: <ArticleOutlinedIcon /> },
+              { label: "Listings", count: data.activities.marketplaceListings.length, icon: <StorefrontOutlinedIcon /> },
+              { label: "Jobs", count: data.activities.jobs, icon: <WorkOutlineOutlinedIcon /> }
+            ]).map(stat => <div key={stat.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "14px 6px", background: "#f7f6fa", borderRadius: 14, color: "#7134ff" }}>
+              {stat.icon}<strong style={{ fontSize: 23, color: "#141c2c" }}>{stat.count}</strong><span style={{ color: "#667285", fontSize: 12 }}>{stat.label}</span>
+            </div>)}
+          </div>
+          <div role="group" aria-label="Filter public activity" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+            {(["All", "Posts", "Listings", "Jobs", "Videos"] as const).map(filter =>
+              <button key={filter} type="button" aria-pressed={activityFilter === filter} onClick={() => setActivityFilter(filter)}
+                style={{ flexShrink: 0, border: activityFilter === filter ? "1px solid #7134ff" : "1px solid #e5e7eb", background: activityFilter === filter ? "#7134ff" : "#fff", color: activityFilter === filter ? "#fff" : "#586579", padding: "8px 13px", borderRadius: 999, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{filter}</button>)}
+          </div>
+          <div style={{ display: "grid", gap: 0 }}>
+            {([
+              { label: "Posts", title: "Community posts", detail: `${data.stats.posts} posts shared with the community`, count: data.stats.posts, icon: <ArticleOutlinedIcon />, href: "#public-profile-posts" },
+              { label: "Listings", title: "Store listings", detail: data.activities.marketplaceListings.length ? "Public store listings" : "No public listings yet", count: data.activities.marketplaceListings.length, icon: <StorefrontOutlinedIcon />, href: "" },
+              { label: "Jobs", title: "Job activity", detail: data.activities.jobs ? "Active public jobs" : "No active public jobs yet", count: data.activities.jobs, icon: <WorkOutlineOutlinedIcon />, href: "" },
+              { label: "Videos", title: "Videos", detail: data.activities.streamVideos ? "Public videos" : "No public videos yet", count: data.activities.streamVideos, icon: <VideocamOutlinedIcon />, href: "" }
+            ]).filter(item => activityFilter === "All" || item.label === activityFilter).map(item =>
+              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", minHeight: 68 }}>
+                <span style={{ display: "grid", placeItems: "center", width: 44, height: 44, flexShrink: 0, borderRadius: 12, background: "#f2edff", color: "#7134ff" }}>{item.icon}</span>
+                <div style={{ minWidth: 0, flex: 1 }}><strong style={{ display: "block", fontSize: 15 }}>{item.title}</strong><span style={{ fontSize: 12, color: "#667285" }}>{item.detail}</span></div>
+                <strong>{item.count}</strong><ChevronRightRoundedIcon sx={{ color: "#98a0ad" }} />
+              </div>)}
+          </div>
+          {data.activities.marketplaceListings.length && (activityFilter === "All" || activityFilter === "Listings") ? <div className="public-profile-listings">{data.activities.marketplaceListings.map(item => <Link key={item.id} to={`/product/${encodeURIComponent(item.id)}`}>{item.image ? <img src={item.image} alt="" /> : null}<strong>{item.title}</strong></Link>)}</div> : null}
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, borderTop: "1px solid #f0f0f2", paddingTop: 12, color: "#758092", fontSize: 12 }}><ShieldOutlinedIcon fontSize="small" />Only public activity is displayed</div>
         </section> : null}
 
         {activeTab === "media" ? <section className="public-profile-panel">
