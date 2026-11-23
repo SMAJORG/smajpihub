@@ -1,0 +1,38 @@
+.pi-notification-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+  padding: 16px;
+  color: var(--smaj-text);
+  background: var(--smaj-card);
+  border: 1px solid var(--smaj-border);
+  border-radius: 14px;
+}
+
+.pi-notification-card > div {
+  min-width: 0;
+}
+
+.pi-notification-card strong {
+  display: block;
+}
+
+.pi-notification-card p {
+  margin: 4px 0 0;
+  color: var(--smaj-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pi-notification-card button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 560px) {
+  .pi-notification-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

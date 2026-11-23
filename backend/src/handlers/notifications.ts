@@ -4,10 +4,54 @@ import { resolveCurrentUser } from "../services/auth";
 import { getVapidPublicKey, nativePushConfigured, pushConfigured } from "../services/pushNotifications";
 import { currentDeviceSessionKey } from "../services/deviceSessions";
 import { publishUserNotificationState, subscribeToUserNotifications } from "../services/notificationEvents";
+import { piInAppNotificationsConfigured, verifyPiInAppNotificationScope } from "../services/piInAppNotifications";
 
 const serialize = (item: Record<string, any>) => ({ ...item, _id: item._id.toString() });
 
 export default function mountNotificationEndpoints(router: Router) {
+  router.get("/pi/status", async (req, res) => {
+    const currentUser = await resolveCurrentUser(req);
+    if (!currentUser) return res.status(401).json({ error: "unauthorized" });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({
+      configured: piInAppNotificationsConfigured(),
+      enabled: currentUser.piInAppNotificationsEnabled === true,
+    });
+  });
+
+  router.post("/pi/consent", async (req, res) => {
+    const currentUser = await resolveCurrentUser(req);
+    if (!currentUser) return res.status(401).json({ error: "unauthorized" });
+    const enabled = req.body?.enabled;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "invalid_consent" });
+    }
+
+    if (enabled) {
+      if (!piInAppNotificationsConfigured()) {
+        return res.status(503).json({ error: "pi_notifications_unavailable" });
+      }
+      const accessToken = typeof req.body?.accessToken === "string" ? req.body.accessToken.trim() : "";
+      if (!accessToken || accessToken.length > 8192) {
+        return res.status(400).json({ error: "invalid_pi_access_token" });
+      }
+      try {
+        const verified = await verifyPiInAppNotificationScope(accessToken, currentUser.uid);
+        if (!verified) return res.status(403).json({ error: "pi_notification_scope_required" });
+      } catch {
+        return res.status(502).json({ error: "pi_identity_verification_unavailable" });
+      }
+    }
+
+    const result = await req.app.locals.userCollection.updateOne(
+      { uid: currentUser.uid },
+      { $set: { piInAppNotificationsEnabled: enabled } },
+    );
+    if (!result.matchedCount) return res.status(404).json({ error: "user_not_found" });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ configured: piInAppNotificationsConfigured(), enabled });
+  });
+
   router.get("/stream", async (req, res) => {
     const currentUser = await resolveCurrentUser(req);
     if (!currentUser) return res.status(401).end();

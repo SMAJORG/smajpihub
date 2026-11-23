@@ -11,6 +11,8 @@ import type { AppNotification } from "../../types/marketplace";
 import PrivateSkeleton from "../../components/PrivateSkeleton";
 import PullToRefresh from "../../components/PullToRefresh";
 import { showFeedback } from "../../lib/feedback";
+import { authenticatePiWithTimeout, ensurePiInitialized } from "../../lib/piSdk";
+import "./NotificationsPage.css";
 
 const tabs = ["All", "Unread", "Community", "Jobs", "Orders", "Messages", "Payments", "Security", "Updates", "Account"];
 
@@ -44,6 +46,9 @@ const NotificationsPage = () => {
   const [busy, setBusy] = useState(false);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [piNotifications, setPiNotifications] = useState<{ configured: boolean; enabled: boolean } | null>(null);
+  const [piNotificationsBusy, setPiNotificationsBusy] = useState(false);
+  const [piNotificationsStatusError, setPiNotificationsStatusError] = useState(false);
   const refreshNotificationBadge = () => window.dispatchEvent(new Event("smaj:notifications-refresh"));
   const loadNotifications = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
@@ -57,6 +62,18 @@ const NotificationsPage = () => {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    axiosClient.get<{ configured: boolean; enabled: boolean }>("/notifications/pi/status")
+      .then(({ data }) => {
+        if (active) setPiNotifications(data);
+      })
+      .catch(() => {
+        if (active) setPiNotificationsStatusError(true);
+      });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -193,6 +210,42 @@ const NotificationsPage = () => {
     } catch { showFeedback("Could not update notification.", "error"); }
   };
 
+  const togglePiNotifications = async () => {
+    if (!piNotifications || piNotificationsBusy) return;
+    setPiNotificationsBusy(true);
+    try {
+      if (piNotifications.enabled) {
+        const { data } = await axiosClient.post<{ configured: boolean; enabled: boolean }>("/notifications/pi/consent", { enabled: false });
+        setPiNotifications(data);
+        showFeedback("Pi App notifications disabled.", "success");
+        return;
+      }
+
+      if (!window.Pi) {
+        showFeedback("Open SMAJ PI HUB in Pi Browser to enable Pi notifications.", "info");
+        return;
+      }
+      await ensurePiInitialized();
+      const auth = await authenticatePiWithTimeout(["in_app_notifications"], 60_000);
+      const { data } = await axiosClient.post<{ configured: boolean; enabled: boolean }>("/notifications/pi/consent", {
+        enabled: true,
+        accessToken: auth.accessToken,
+      });
+      setPiNotifications(data);
+      showFeedback("Pi App notifications enabled.", "success");
+    } catch (error) {
+      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      showFeedback(
+        message === "pi_notification_scope_required"
+          ? "Grant the in-app notifications permission in Pi Browser and try again."
+          : error instanceof Error ? error.message : "Pi App notifications could not be updated.",
+        "error",
+      );
+    } finally {
+      setPiNotificationsBusy(false);
+    }
+  };
+
   return (
     <main className="private-page notifications-page">
       <PullToRefresh onRefresh={() => loadNotifications(false)} />
@@ -207,6 +260,28 @@ const NotificationsPage = () => {
             <button className="danger" onClick={() => { setDeleteMode("all"); setMenuId(null); }}>Delete all notifications</button>
           </div>}
         </div>
+      </section>
+      <section className="pi-notification-card" aria-label="Pi App Notification Center">
+        <div>
+          <strong>Pi App Notification Center</strong>
+          <p>
+            {piNotificationsStatusError
+              ? "Pi App notification status could not be loaded. Refresh to try again."
+              : piNotifications?.enabled
+              ? "Important SMAJ PI HUB updates can also appear in your Pi App Notification Center."
+              : piNotifications?.configured
+                ? "Choose whether SMAJ PI HUB may send updates to your Pi App Notification Center."
+                : "Pi App notifications are not configured on this server yet."}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="private-secondary-button"
+          disabled={!piNotifications || piNotificationsStatusError || piNotificationsBusy || (!piNotifications.enabled && !piNotifications.configured)}
+          onClick={() => void togglePiNotifications()}
+        >
+          {piNotificationsBusy ? "Saving..." : piNotifications?.enabled ? "Disable Pi notifications" : "Enable Pi notifications"}
+        </button>
       </section>
       <div className="notification-toolbar">
         {selectMode ? <label className="notification-select-all"><input type="checkbox" checked={visible.length > 0 && visible.every(item => selected.includes(item._id))} onChange={event => setSelected(event.target.checked ? Array.from(new Set([...selected, ...visible.map(item => item._id)])) : selected.filter(id => !visible.some(item => item._id === id)))} /> Select visible</label> : <span>{items.filter(item => !item.read).length} unread</span>}

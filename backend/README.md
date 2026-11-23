@@ -32,6 +32,16 @@ Configure the following variables:
 
 You can obtain your `PI_API_KEY` from the Pi Developer Portal. See the [Pi Developer Guide](https://pi-apps.github.io/community-developer-guide/docs/gettingStarted/devPortal/) for details.
 
+### Pi App Notification Center
+
+The existing notification pipeline can optionally deliver user-approved updates to the Pi App Notification Center. Configure the server-side Pi API key for the deployment network (`PI_API_KEY` for legacy/Testnet or `PI_MAINNET_API_KEY` for Mainnet). Users enable the `in_app_notifications` scope from the app's Notifications page; the backend verifies the Pi identity and scope before saving consent. The key must remain on the backend and must not be added to frontend `VITE_*` variables.
+
+Run the notification API and delivery tests with:
+
+```sh
+npm run test:notifications
+```
+
 ### 3. Set up MongoDB
 
 The default MongoDB port is `27017`. Update your `.env` file if you use different credentials.

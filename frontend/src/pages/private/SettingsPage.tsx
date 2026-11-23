@@ -648,6 +648,16 @@ const SettingsPage = () => {
                 <i />
               </button>
             </div>
+            <Link className="settings-device-link" to="/notifications">
+              <span className="settings-device-icon" aria-hidden="true">
+                <NotificationsNoneOutlinedIcon />
+              </span>
+              <span>
+                <strong>In-app notification center</strong>
+                <small>Review updates and manage Pi App notification consent.</small>
+              </span>
+              <ChevronRightOutlinedIcon aria-hidden="true" />
+            </Link>
             <label className="setting-line toggle-line">
               <span>
                 <strong>Email notifications</strong>

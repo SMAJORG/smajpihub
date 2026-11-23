@@ -22,6 +22,7 @@ export interface UserData {
   allowContact?: boolean,
   openToWork?: boolean,
   activeAvatarFrame?: "ambassador" | "open_to_work" | "seller" | "hiring" | null,
+  piInAppNotificationsEnabled?: boolean,
   blocked?: boolean,
   smajVerification?: SmajVerificationRecord,
   verificationLevel?: "basic" | "pi_verified" | "seller_verified" | "trusted_seller",

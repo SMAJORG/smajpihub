@@ -135,14 +135,22 @@ const upsertDelegatedNotification = async (req: any, idempotencyKey: string, inp
   if (result.upsertedCount) {
     try {
       const { sendPushNotification } = await import("../services/pushNotifications");
-      await sendPushNotification(req.app, input.userId, {
-        title: input.title,
-        body: input.message,
-        icon: "/logo.png",
-        badge: "/notification-badge.png",
-        url: input.relatedId === "messages" || input.type.includes("message") ? "/messages" : `/orders/${input.relatedId}/track`,
-        tag: `${input.type}:${input.relatedId || input.title}`,
-      });
+      const { sendPiInAppNotificationToUser } = await import("../services/notifications");
+      await Promise.all([
+        sendPushNotification(req.app, input.userId, {
+          title: input.title,
+          body: input.message,
+          icon: "/logo.png",
+          badge: "/notification-badge.png",
+          url: input.relatedId === "messages" || input.type.includes("message") ? "/messages" : `/orders/${input.relatedId}/track`,
+          tag: `${input.type}:${input.relatedId || input.title}`,
+        }),
+        sendPiInAppNotificationToUser(req.app, input.userId, {
+          title: input.title,
+          body: input.message,
+          subroute: input.relatedId === "messages" || input.type.includes("message") ? "/messages" : `/orders/${input.relatedId}/track`,
+        }),
+      ]);
     } catch (error) {
       console.error("Delegated action push notification failed:", error);
     }

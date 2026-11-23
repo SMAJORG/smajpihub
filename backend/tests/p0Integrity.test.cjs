@@ -43,7 +43,10 @@ function harness() {
       if (name.endsWith("/auth"))
         return { resolveCurrentUser: async () => actor };
       if (name.endsWith("/notifications"))
-        return { createNotification: async () => {} };
+        return {
+          createNotification: async () => {},
+          sendPiInAppNotificationToUser: async () => false,
+        };
       if (name.startsWith("."))
         return load(
           path.relative(

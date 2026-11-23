@@ -20,8 +20,9 @@ async function main() {
     async findOne(key: any) { return rows.find(row => Object.entries(key).every(([k,v]) => String(row[k]) === String(v))) || null; },
     async updateOne(key: any, update: any) {
       if (!rows.some(row => Object.entries(key).every(([k,v]) => String(row[k]) === String(v)))) {
-        rows.push({ _id: new ObjectId(), ...key, ...update.$setOnInsert });
-        return { matchedCount: 0, upsertedCount: 1 };
+        const insertedId = new ObjectId();
+        rows.push({ _id: insertedId, ...key, ...update.$setOnInsert });
+        return { matchedCount: 0, upsertedCount: 1, upsertedId: insertedId };
       }
       return { matchedCount: 1, upsertedCount: 0 };
     },
@@ -35,7 +36,20 @@ async function main() {
   app.locals.jobApplicationCollection = collection(applications);
   app.locals.favoriteCollection = collection(favorites);
   app.locals.jobAuditCollection = { async insertOne(record: any) { audits.push(record); } };
-  app.locals.notificationCollection = { async insertOne(record: any) { notifications.push(record); } };
+  app.locals.notificationCollection = {
+    async insertOne(record: any) { notifications.push(record); return { insertedId: record._id || new ObjectId() }; },
+    async updateOne(query: any, update: any) {
+      if (notifications.some(record => Object.entries(query).every(([key, value]) => String(record[key]) === String(value)))) {
+        return { matchedCount: 1, upsertedCount: 0 };
+      }
+      const record = { ...update.$setOnInsert };
+      notifications.push(record);
+      return { matchedCount: 0, upsertedCount: 1, upsertedId: record._id || new ObjectId() };
+    },
+    async countDocuments(query: any) {
+      return notifications.filter(record => Object.entries(query).every(([key, value]) => record[key] === value)).length;
+    },
+  };
   const router = express.Router(); mountAiDelegationEndpoints(router); app.use("/ai-delegation", router);
   const server = app.listen(0, "127.0.0.1"); await new Promise<void>(resolve => server.once("listening", resolve));
   const address = server.address() as {port:number}; const base = `http://127.0.0.1:${address.port}/ai-delegation`;
