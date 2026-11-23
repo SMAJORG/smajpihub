@@ -14,6 +14,8 @@ import android.content.res.Configuration;
 import android.graphics.drawable.Icon;
 import android.util.Rational;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import java.util.Arrays;
 
@@ -32,24 +34,33 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SmajGalleryPlugin.class);
         registerPlugin(SmajUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
-        configureTransparentStatusBar();
+        configureLightStatusBar();
         bridge.getWebView().setWebChromeClient(new SmajWebChromeClient(bridge));
         bridge.getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
         ContextCompat.registerReceiver(this, pipReceiver, new IntentFilter(getPackageName() + ".PIP_CONTROL"), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
-    private void configureTransparentStatusBar() {
+    private void configureLightStatusBar() {
         // Keep the Android system status bar readable on light app screens.
         // Do not lay the WebView underneath it: that previously caused white
         // status icons to disappear against the white community background.
         Window window = getWindow();
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        WindowCompat.setDecorFitsSystemWindows(window, true);
         window.setStatusBarColor(Color.WHITE);
         View decor = window.getDecorView();
         int flags = decor.getSystemUiVisibility();
         flags &= ~(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN);
         flags |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
         decor.setSystemUiVisibility(flags);
+        // Capacitor and Android can reset system bar appearance on resume.
+        // Force dark status icons via the supported AndroidX controller.
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decor);
+        controller.setAppearanceLightStatusBars(true);
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        configureLightStatusBar();
     }
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
