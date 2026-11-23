@@ -688,7 +688,7 @@ const ProfilePage = () => {
       />
 
       <section className="real-profile-hero">
-        <button type="button" className="real-profile-cover-back" aria-label="Back" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate("/settings"); }}><ArrowBackRoundedIcon /></button>
+        <button type="button" className="real-profile-cover-back" aria-label="Back" onClick={() => { navigate("/app", { replace: true }); }}><ArrowBackRoundedIcon /></button>
         <button
           type="button"
           className="real-profile-cover"
