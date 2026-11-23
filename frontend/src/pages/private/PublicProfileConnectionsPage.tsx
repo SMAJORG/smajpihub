@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
 import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
-import "./PublicProfileConnectionsFullScreen.css";
 import { useAuthContext } from "../../contexts/AuthContext";
 import AppLayout from "../../layouts/AppLayout";
 import PrivateLayout from "../../layouts/PrivateLayout";
@@ -12,6 +11,7 @@ import UserAvatarFrame from "../../components/UserAvatarFrame";
 import { getCommunityConnections, setCommunityFollow, type CommunityConnectionRelation, type CommunityConnectionUser, type CommunityIdentity } from "../../lib/communityApi";
 import { showFeedback } from "../../lib/feedback";
 import "./community.css";
+import "./PublicProfileConnectionsFullScreen.css";
 
 const PublicProfileConnectionsContent = ({ relation }: { relation: CommunityConnectionRelation }) => {
   const { uid = "" } = useParams();
