@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
     LocalNotifications: { smallIcon: "ic_stat_smaj", iconColor: "#08768b" },
     StatusBar: {
       overlaysWebView: false,
-      style: "DARK",
+      style: "LIGHT",
       backgroundColor: "#FFFFFF",
     },
   },
