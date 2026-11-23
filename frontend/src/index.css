@@ -23291,3 +23291,19 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
 .account-dashboard-page .account-dashboard-identity .profile-name-text{overflow-wrap:anywhere}
 .account-dashboard-page .account-dashboard-identity .profile-package-shortcut.account-package-link{width:76px;min-width:76px;min-height:76px}
 }
+
+
+/* Discovery tab visibility and safe mobile spacing fixes. */
+@media(max-width:767px){
+  .discovery-compact-layout.mobile,.discovery-compact-directory.mobile{padding:20px 16px 24px!important;margin:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;overflow:visible!important}
+  .discovery-compact-title{padding-top:4px}
+  .discovery-compact-title h2{font-size:21px;line-height:1.3}
+  .discovery-compact-group{min-width:0}
+  .discovery-compact-icons{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 8px}
+  .discovery-compact-item{min-width:0;gap:7px}
+  .discovery-compact-art{width:54px;height:54px}
+  .discovery-lifestyle-cards{gap:12px}
+  .discovery-lifestyle-card>img{aspect-ratio:5/4}
+}
+.discovery-compact-art svg{display:block!important;width:28px!important;height:28px!important;max-width:none!important;max-height:none!important;fill:currentColor!important;color:#7c3aed!important;opacity:1!important;visibility:visible!important}
+.discovery-compact-item:focus-visible{outline:2px solid #7c3aed;outline-offset:3px;border-radius:10px}
