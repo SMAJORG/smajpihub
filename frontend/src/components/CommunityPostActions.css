@@ -1,0 +1,27 @@
+/* X-style community actions: icon-only surfaces, no pill/card borders. */
+.community-feed-actions.community-feed-actions-refined {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.community-feed-actions-refined .community-feed-action,
+.community-feed-actions-refined .community-reaction-control .community-feed-action {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.community-feed-actions-refined .community-feed-action:hover,
+.community-feed-actions-refined .community-feed-action:active {
+  background: transparent !important;
+}
+.community-feed-actions-refined .community-feed-like[aria-pressed="true"] {
+  color: #7134ff !important;
+}
+.community-feed-actions-refined .community-feed-like[aria-pressed="true"] svg {
+  color: #7134ff !important;
+}
+.community-feed-actions-refined .community-feed-action svg {
+  font-size: 22px;
+}
