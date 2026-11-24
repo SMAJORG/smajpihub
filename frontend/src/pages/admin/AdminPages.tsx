@@ -386,6 +386,9 @@ export const AdminProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [message, setMessage] = useState("");
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [dialog, setDialog] = useState<{ type: "reject" | "delete"; product: Product } | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const load = useCallback(async () => setProducts((await axiosClient.get("/admin/products")).data.products), []);
@@ -414,25 +417,52 @@ export const AdminProductsPage = () => {
       setDialogBusy(false);
     }
   };
-  const visible = useMemo(() => products.filter((product) => filter === "all" || (filter === "pending" && (product.reviewStatus || (product.approved === false ? "pending" : "approved")) === "pending" && !product.hidden) || (filter === "visible" && product.approved === true && product.reviewStatus === "approved" && !product.hidden) || (filter === "rejected" && product.reviewStatus === "rejected") || (filter === "hidden" && product.hidden)), [products, filter]);
+  const visible = useMemo(() => products.filter((product) => (product.title || "").toLowerCase().includes(search.toLowerCase()) || (product.sellerName || "").toLowerCase().includes(search.toLowerCase()) || product._id.toLowerCase().includes(search.toLowerCase())).filter((product) => filter === "all" || (filter === "pending" && (product.reviewStatus || (product.approved === false ? "pending" : "approved")) === "pending" && !product.hidden) || (filter === "visible" && product.approved === true && product.reviewStatus === "approved" && !product.hidden) || (filter === "rejected" && product.reviewStatus === "rejected") || (filter === "hidden" && product.hidden)), [products, filter, search]);
+  const pageSize = 20;
+  const pages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const pagedProducts = visible.slice((page - 1) * pageSize, page * pageSize);
+  const statusOptions = [{ value: "all", label: "All" }, { value: "pending", label: "Pending" }, { value: "visible", label: "Approved" }, { value: "hidden", label: "Hidden" }, { value: "rejected", label: "Rejected" }];
 
   return (
     <main className="private-page">
       <Head title="Products" description="Approve, hide, or remove marketplace listings." />
       <Notice text={message} />
-      <section className="admin-filter-bar">
-        <label>Status filter<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All</option><option value="pending">Pending review</option><option value="visible">Visible</option><option value="rejected">Rejected</option><option value="hidden">Hidden</option></select></label>
-        <span>{visible.length} products</span>
+      <section style={{ marginBottom: 16 }}>
+        <input aria-label="Search products" type="search" placeholder="Search products, sellers or IDs" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} style={{ width: "100%", boxSizing: "border-box", padding: "13px 14px", borderRadius: 12, border: "1px solid #dce0e8", background: "#fff", color: "#172033", fontSize: 15 }} />
+        <div role="tablist" aria-label="Product status" style={{ display: "flex", gap: 8, overflowX: "auto", flexWrap: "nowrap", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", padding: "14px 0 4px" }}>
+          {statusOptions.map(option => <button key={option.value} type="button" role="tab" aria-selected={filter === option.value} onClick={() => { setFilter(option.value); setPage(1); }} style={{ flex: "0 0 auto", whiteSpace: "nowrap", padding: "10px 16px", borderRadius: 999, border: filter === option.value ? "1px solid #7137ef" : "1px solid #e2e5eb", background: filter === option.value ? "#7137ef" : "#fff", color: filter === option.value ? "#fff" : "#526071", fontWeight: 700 }}>{option.label}</button>)}
+        </div>
+        <p style={{ margin: "10px 0 0", color: "#667085", fontSize: 13 }}>{visible.length} matching products</p>
       </section>
-      <div className="management-list">{visible.map((product) => (
-        <article className="management-row" key={product._id}>
-          <img src={product.image} alt="" />
-          <div className="management-main"><h3>{product.title}</h3><p>{product.sellerName} - {formatPiAmount(product.pricePi)}</p></div>
-          <span className={`availability ${product.hidden || product.reviewStatus !== "approved" ? "sold" : "available"}`}>{product.hidden ? "Hidden" : product.reviewStatus === "rejected" ? "Rejected" : product.reviewStatus === "approved" ? "Visible" : "Pending"}</span>
-          {product.rejectionReason ? <small>{product.rejectionReason}</small> : null}
-          <div className="row-actions"><button onClick={() => void update(product._id, { approved: true, hidden: false })}>Approve</button><button onClick={() => setDialog({ type: "reject", product })}>Reject</button><button onClick={() => void update(product._id, { hidden: !product.hidden })}>{product.hidden ? "Show" : "Hide"}</button><button className="danger" onClick={() => setDialog({ type: "delete", product })}>Delete</button></div>
-        </article>
-      ))}</div>
+      <div style={{ display: "grid", gap: 0 }}>
+        {pagedProducts.map(product => <article key={product._id} style={{ display: "flex", gap: 12, alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e9eaf0", minWidth: 0 }}>
+          <img src={product.image} alt="" loading="lazy" style={{ width: 60, height: 60, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontSize: 15, lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{product.title}</h3>
+            <p style={{ margin: "4px 0", fontSize: 12, color: "#667085", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.sellerName} · {formatPiAmount(product.pricePi)}</p>
+            <span style={{ fontSize: 12, fontWeight: 700, color: product.hidden ? "#667085" : product.reviewStatus === "approved" ? "#15803d" : product.reviewStatus === "rejected" ? "#b91c1c" : "#a16207" }}>{product.hidden ? "Hidden" : product.reviewStatus === "rejected" ? "Rejected" : product.reviewStatus === "approved" ? "Approved" : "Pending"}</span>
+          </div>
+          <button type="button" aria-label={`Actions for ${product.title}`} onClick={() => setActionProduct(product)} style={{ flexShrink: 0, width: 42, height: 42, border: "none", background: "#f4f4f8", borderRadius: 12, fontSize: 24, color: "#172033", cursor: "pointer" }}>⋮</button>
+        </article>)}
+        {!visible.length ? <p style={{ color: "#667085", padding: "28px 0" }}>No products match your search.</p> : null}
+      </div>
+      {pages > 1 ? <nav aria-label="Product pages" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+        <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</button><span>Page {page} of {pages}</span><button type="button" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>Next</button>
+      </nav> : null}
+      {actionProduct ? <div role="presentation" onClick={() => setActionProduct(null)} style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(13,20,34,.48)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <section role="dialog" aria-modal="true" aria-label="Product actions" onClick={event => event.stopPropagation()} style={{ width: "100%", maxWidth: 520, boxSizing: "border-box", borderRadius: "22px 22px 0 0", padding: "20px 20px max(24px, env(safe-area-inset-bottom))", background: "#fff", color: "#172033", boxShadow: "0 -12px 40px #0002" }}>
+          <div style={{ width: 42, height: 5, borderRadius: 5, background: "#d7dbe2", margin: "0 auto 20px" }} />
+          <h2 style={{ fontSize: 19, margin: "0 0 6px" }}>Manage product</h2>
+          <p style={{ fontSize: 14, color: "#667085", margin: "0 0 16px" }}>{actionProduct.title}</p>
+          <div style={{ display: "grid", gap: 8 }}>
+            <button type="button" onClick={() => { void update(actionProduct._id, { approved: true, hidden: false }); setActionProduct(null); }} style={{ padding: 14, textAlign: "left", background: "#f5f2ff", border: "none", borderRadius: 12, color: "#7137ef", fontWeight: 700 }}>Approve product</button>
+            <button type="button" onClick={() => { setDialog({ type: "reject", product: actionProduct }); setActionProduct(null); }} style={{ padding: 14, textAlign: "left", background: "#f7f8fa", border: "none", borderRadius: 12, color: "#172033", fontWeight: 700 }}>Reject product</button>
+            <button type="button" onClick={() => { void update(actionProduct._id, { hidden: !actionProduct.hidden }); setActionProduct(null); }} style={{ padding: 14, textAlign: "left", background: "#f7f8fa", border: "none", borderRadius: 12, color: "#172033", fontWeight: 700 }}>{actionProduct.hidden ? "Show product" : "Hide product"}</button>
+            <button type="button" onClick={() => { setDialog({ type: "delete", product: actionProduct }); setActionProduct(null); }} style={{ padding: 14, textAlign: "left", background: "#fff0f0", border: "none", borderRadius: 12, color: "#dc2626", fontWeight: 700 }}>Delete product</button>
+            <button type="button" onClick={() => setActionProduct(null)} style={{ padding: 14, background: "#fff", border: "1px solid #e2e5eb", borderRadius: 12, color: "#667085" }}>Cancel</button>
+          </div>
+        </section>
+      </div> : null}
       <ActionDialog open={Boolean(dialog)} title={dialog?.type === "reject" ? `Reject “${dialog.product.title}”?` : `Delete “${dialog?.product.title || "product"}”?`} description={dialog?.type === "reject" ? "The seller will see this reason and can update the listing." : "This permanently removes the listing and cannot be undone."} confirmLabel={dialog?.type === "reject" ? "Reject product" : "Delete product"} danger busy={dialogBusy} inputLabel={dialog?.type === "reject" ? "Rejection reason" : undefined} initialValue={dialog?.product.rejectionReason || "Product photos, price, description, or seller details need review."} minLength={5} onCancel={() => setDialog(null)} onConfirm={value => void completeDialog(value)} />
     </main>
   );
