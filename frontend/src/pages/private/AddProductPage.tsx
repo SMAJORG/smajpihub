@@ -15,13 +15,17 @@ const MAX_PRODUCT_IMAGES = 12;
 const MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024;
 const PRODUCT_DRAFT_KEY = "smaj_add_product_draft";
 const PRODUCT_STEP_KEY = PRODUCT_DRAFT_KEY + "_step";
-const categoryNames = ["Fashion & Clothing", "Electronics", "Cars & Vehicles", "Home & Living", "Beauty & Health", "Sports & Outdoors", "Books & Education", "Digital Products", "Services"] as const;
+const categoryNames = ["Fashion & Clothing", "Electronics", "Cars & Vehicles", "Home & Living", "Home & Kitchen", "Electrical Equipment", "Office & Stationery", "Gift Sets & Bundles", "Beauty & Health", "Sports & Outdoors", "Books & Education", "Digital Products", "Services"] as const;
 type CategoryName = (typeof categoryNames)[number];
 const categoryFields: Record<CategoryName, string[]> = {
   "Fashion & Clothing": ["Brand", "Gender", "Color", "Size", "Material", "Pattern", "Sleeve Length", "Fit"],
   Electronics: ["Brand", "Model", "Color", "Storage", "RAM", "Processor", "Screen Size", "Battery"],
   "Cars & Vehicles": ["Brand", "Model", "Year", "Mileage", "Fuel Type", "Transmission", "Engine Size", "Exterior Color", "Interior Color"],
   "Home & Living": ["Brand", "Material", "Color", "Dimensions", "Weight"],
+  "Home & Kitchen": ["Brand", "Material", "Color", "Dimensions", "Capacity"],
+  "Electrical Equipment": ["Brand", "Model", "Voltage", "Power", "Wattage", "Warranty"],
+  "Office & Stationery": ["Brand", "Material", "Color", "Dimensions", "Pack Size"],
+  "Gift Sets & Bundles": ["Occasion", "Recipient", "Package Type", "Packaging", "Items Included"],
   "Beauty & Health": ["Brand", "Expiry Date", "Size"],
   "Sports & Outdoors": ["Brand", "Size", "Material", "Color"],
   "Books & Education": ["Author", "Publisher", "Language", "ISBN", "Edition"],
@@ -37,6 +41,10 @@ const titleSignals: Array<{ category: CategoryName; words: string[]; fields?: st
   { category: "Electronics", words: ["phone", "iphone", "samsung", "tablet"], fields: ["Brand", "Model", "Storage", "RAM", "Color", "Battery"], variants: ["storage", "color"] },
   { category: "Electronics", words: ["tv", "camera", "headphone", "speaker", "console", "gaming"], variants: ["model", "color"] },
   { category: "Cars & Vehicles", words: ["car", "suv", "van", "truck", "motorcycle", "bicycle", "boat", "airplane", "spare part"], fields: ["Brand", "Model", "Year", "Mileage", "Engine Size", "Fuel Type", "Transmission", "Exterior Color", "Interior Color"] },
+  { category: "Electrical Equipment", words: ["generator", "inverter", "solar panel", "transformer", "circuit breaker", "extension cable", "electrical equipment", "power supply", "voltage regulator"] },
+  { category: "Office & Stationery", words: ["stationery", "printer paper", "notebook", "pen set", "office supplies", "stapler", "desk organizer", "filing cabinet"] },
+  { category: "Gift Sets & Bundles", words: ["gift set", "gift box", "gift hamper", "bundle", "combo pack", "gift basket"] },
+  { category: "Home & Kitchen", words: ["cookware", "utensil", "blender", "microwave", "kettle", "rice cooker", "kitchen appliance", "cutlery"] },
   { category: "Home & Living", words: ["sofa", "bed", "table", "chair", "furniture", "kitchen", "decor", "lighting"] },
   { category: "Beauty & Health", words: ["makeup", "skincare", "haircare", "perfume", "medical"] },
   { category: "Sports & Outdoors", words: ["football", "basketball", "gym", "camping", "fishing", "cycling"] },
