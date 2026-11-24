@@ -29,16 +29,59 @@ html[dir="rtl"] .storefront-page .storefront-mobile-drawer-panel { direction: rt
   text-overflow: ellipsis;
 }
 .storefront-page .storefront-search input::placeholder { color: #64748b; opacity: 1; }
-.storefront-page .storefront-promo-strip { padding: 10px 14px; }
-.storefront-page .storefront-promo-strip > div {
-  display: flex;
-  max-width: 100%;
-  gap: 12px 24px;
-  overflow-x: auto;
-  animation: none;
-  scrollbar-width: thin;
+/* Seamless, edge-to-edge, left-moving store benefits ticker. */
+.storefront-page .storefront-promo-strip {
+  padding: 10px 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-.storefront-page .storefront-promo-strip span { flex: 0 0 auto; }
+.storefront-page .storefront-promo-strip > .storefront-promo-track {
+  display: flex;
+  width: max-content;
+  max-width: none;
+  gap: 0;
+  overflow: visible;
+  white-space: nowrap;
+  scrollbar-width: none;
+  animation: storefrontBenefitsLoop 22s linear infinite;
+}
+.storefront-page .storefront-promo-group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 24px;
+  padding-right: 24px;
+}
+.storefront-page .storefront-promo-strip span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+@keyframes storefrontBenefitsLoop {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .storefront-page .storefront-promo-strip > .storefront-promo-track { animation: none; }
+}
+/* Purple primary actions and legible white labels, including active filter state. */
+.storefront-page .storefront-tool-panel > .storefront-filter-apply,
+.storefront-page .storefront-tool-panel > .storefront-filter-apply:hover {
+  background: #7134ff;
+  border-color: #7134ff;
+  color: #ffffff;
+}
+.storefront-page .storefront-tool-menu.open > .storefront-tool-trigger,
+html[data-private-theme="dark"] .storefront-page .storefront-tool-menu.open > .storefront-tool-trigger {
+  background: #7134ff !important;
+  border-color: #7134ff !important;
+  color: #ffffff !important;
+}
+.storefront-page .storefront-tool-menu.open > .storefront-tool-trigger span,
+.storefront-page .storefront-tool-menu.open > .storefront-tool-trigger svg {
+  color: #ffffff !important;
+}
 .storefront-page .storefront-tool-panel > button,
 .storefront-page .storefront-mobile-drawer-panel nav button { text-align: start; }
 .storefront-page .storefront-cart-count { right: auto; inset-inline-end: -7px; }
