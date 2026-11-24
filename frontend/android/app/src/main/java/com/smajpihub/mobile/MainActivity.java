@@ -34,65 +34,44 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SmajGalleryPlugin.class);
         registerPlugin(SmajUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
-        configureLightStatusBar();
+        configureTransparentStatusBar();
         bridge.getWebView().setWebChromeClient(new SmajWebChromeClient(bridge));
         bridge.getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
         ContextCompat.registerReceiver(this, pipReceiver, new IntentFilter(getPackageName() + ".PIP_CONTROL"), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
-    private void configureLightStatusBar() {
-        // Keep the Android system status bar readable on light app screens.
-        // Do not lay the WebView underneath it: that previously caused white
-        // status icons to disappear against the white community background.
+    private void configureTransparentStatusBar() {
         Window window = getWindow();
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        WindowCompat.setDecorFitsSystemWindows(window, true);
-        window.setStatusBarColor(Color.WHITE);
+        window.setStatusBarColor(Color.TRANSPARENT);
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+
         View decor = window.getDecorView();
-        int flags = decor.getSystemUiVisibility();
-        flags &= ~(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN);
-        flags |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        decor.setSystemUiVisibility(flags);
-        // Capacitor and Android can reset system bar appearance on resume.
-        // Force dark status icons via the supported AndroidX controller.
+        decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decor);
-        controller.setAppearanceLightStatusBars(true);
+        controller.setAppearanceLightStatusBars(false);
     }
     @Override public void onResume() {
         super.onResume();
-        configureLightStatusBar();
+        configureTransparentStatusBar();
     }
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) configureLightStatusBar();
+        if (hasFocus) configureTransparentStatusBar();
     }
     @android.annotation.TargetApi(Build.VERSION_CODES.O)
     public PictureInPictureParams pipParams(boolean playing) {
         return new PictureInPictureParams.Builder().setAspectRatio(new Rational(16, 9)).setActions(Arrays.asList(
             pipAction("back", "Back 10 seconds", android.R.drawable.ic_media_rew, 1),
-            pipAction("toggle", playing ? "Pause" : "Play", playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, 2),
+            pipAction("toggle", playing ? "Pause" : "Pause".equals(playing ? "Pause" : "Play") ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, 2),
             pipAction("forward", "Forward 10 seconds", android.R.drawable.ic_media_ff, 3))).build();
     }
     @android.annotation.TargetApi(Build.VERSION_CODES.O)
     private RemoteAction pipAction(String control, String title, int icon, int code) {
-        Intent intent = new Intent(getPackageName() + ".PIP_CONTROL").setPackage(getPackageName()).putExtra("control", control);
+        Intent intent = new Intent(getPackageName() + ".PIP_CONTROL").setPackage(getPackageName());
+        intent.putExtra("control", control);
         PendingIntent pending = PendingIntent.getBroadcast(this, code, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new RemoteAction(Icon.createWithResource(this, icon), title, title, pending);
     }
-    public void preparePictureInPicture(Runnable enter) {
-        bridge.getWebView().evaluateJavascript("document.documentElement.classList.add('smaj-native-pip')", result -> bridge.getWebView().postDelayed(enter, 80));
-    }
-    public void updatePipUi(boolean active) {
-        if (bridge != null) bridge.getWebView().evaluateJavascript("document.documentElement.classList." + (active ? "add" : "remove") + "('smaj-native-pip')", null);
-    }
-    @android.annotation.TargetApi(Build.VERSION_CODES.O)
-    @Override public void onPictureInPictureModeChanged(boolean active, Configuration configuration) {
-        super.onPictureInPictureModeChanged(active, configuration);
-        updatePipUi(active);
-    }
-    @Override public void onStop() {
-        super.onStop();
-        if (bridge != null) bridge.getWebView().evaluateJavascript("document.querySelector('.sw-pip-target video')?.pause()", null);
-    }
-    @Override public void onDestroy() { unregisterReceiver(pipReceiver); super.onDestroy(); }
 }

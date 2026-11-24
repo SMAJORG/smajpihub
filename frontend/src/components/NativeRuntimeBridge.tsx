@@ -35,9 +35,9 @@ const NativeRuntimeBridge = () => {
     document.documentElement.dataset.nativeApp = Capacitor.getPlatform();
     const showPhoneStatusBar = () => {
       if (document.documentElement.classList.contains("sw-player-is-fullscreen")) return;
-      void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
-      void StatusBar.setBackgroundColor({ color: "#FFFFFF" }).catch(() => undefined);
-      void StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
+      void StatusBar.setOverlaysWebView({ overlay: true }).catch(() => undefined);
+      void StatusBar.setBackgroundColor({ color: "#00000000" }).catch(() => undefined);
+      void StatusBar.setStyle({ style: Style.Light }).catch(() => undefined);
       void StatusBar.show().catch(() => undefined);
     };
     showPhoneStatusBar();
@@ -115,9 +115,7 @@ const NativeRuntimeBridge = () => {
         <p>{notificationIssue}</p>
         <small>Get new messages, orders, job updates and SMAJ alerts on this phone.</small>
         <div>
-          <button type="button" onClick={() => void retryNotifications()} disabled={requestingNotifications}>
-            {requestingNotifications ? "Checking…" : "Try again"}
-          </button>
+          <button type="button" onClick={() => void retryNotifications()} disabled={requestingNotifications}>Try again</button>
           <button type="button" className="secondary" onClick={() => setNotificationIssue("")} disabled={requestingNotifications}>Later</button>
         </div>
       </div>
