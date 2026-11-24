@@ -88,6 +88,7 @@ const initialForm = {
   images: [] as string[],
   priceUsdt: "",
   pricePi: "",
+  discountPercent: "0",
   description: "",
   category: "Fashion & Clothing" as CategoryName,
   condition: "New",
@@ -255,6 +256,9 @@ const AddProductPage = () => {
   const activeFields = titleInsight?.fields || categoryFields[form.category];
   const suggestedVariants = titleInsight?.variants || (["Fashion & Clothing", "Electronics"].includes(form.category) ? ["color", "size"] : []);
   const priceUsdt = Number(form.priceUsdt);
+  const discountPercent = Number(form.discountPercent || 0);
+  const discountedUsdt = Math.round(priceUsdt * (100 - discountPercent)) / 100;
+  const discountedPi = discountedUsdt > 0 ? piFromUsdt(discountedUsdt) : 0;
   const pricePi = Number(form.pricePi);
   const location = [form.country, form.stateRegion, form.city, form.areaAddress].map((item) => item.trim()).filter(Boolean).join(" - ");
   const publishDisabled = submitting || processingImages > 0 || !form.sellerAgreementAccepted;
@@ -471,7 +475,7 @@ const AddProductPage = () => {
         deliveryOption: form.deliveryOption,
         productStatus: form.productStatus,
         variants: uploadedVariants,
-        specifications: form.specifications,
+        specifications: { ...form.specifications, ...(discountPercent > 0 ? { "Original Price (USDT)": String(priceUsdt), "Discount Percent": String(discountPercent) } : {}) },
         attributes: {},
         shipping: form.shipping,
         warranty: form.warranty,
@@ -480,8 +484,8 @@ const AddProductPage = () => {
         digitalProduct: { ...form.digitalProduct, downloadLimit: Number(form.digitalProduct.downloadLimit || form.specifications["Download Limit"] || 0) },
         serviceDetails: form.serviceDetails,
         sellerContact: form.sellerContact.trim(),
-        pricePi,
-        priceUsdt,
+        pricePi: discountPercent > 0 ? discountedPi : pricePi,
+        priceUsdt: discountPercent > 0 ? discountedUsdt : priceUsdt,
         sellerAgreementAccepted: form.sellerAgreementAccepted,
       };
       const postProduct = () => axiosClient.post<{ product: Product }>("/marketplace/products", payload);
@@ -561,7 +565,18 @@ const AddProductPage = () => {
             <label>$ price (USDT)<input {...fieldProps("priceUsdt")} required type="number" min="0.01" step="any" value={form.priceUsdt} onChange={(event) => setUsdtPrice(event.target.value)} />{fieldError("priceUsdt")}</label>
             <label>π price<input {...fieldProps("pricePi")} required type="number" min="0.00000001" step="any" value={form.pricePi} onChange={(event) => setPiPrice(event.target.value)} />{fieldError("pricePi")}</label>
           </div>
-          {priceUsdt > 0 && pricePi > 0 ? <small className="product-price-preview">Listing price: {formatUsdAmount(priceUsdt)} USDT · {formatPiAmount(pricePi)}</small> : null}
+          <label>Offer discount
+            <select value={form.discountPercent} onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))}>
+              <option value="0">No discount</option>
+              <option value="10">10% off</option>
+              <option value="20">20% off</option>
+              <option value="30">30% off</option>
+              <option value="40">40% off</option>
+              <option value="50">50% off</option>
+            </select>
+          </label>
+          {discountPercent > 0 && priceUsdt > 0 && <div className="product-offer-preview"><span>Original: <s>{formatUsdAmount(priceUsdt)}</s></span><strong>{discountPercent}% off · {formatUsdAmount(discountedUsdt)} USDT · {formatPiAmount(discountedPi)}</strong><small>Discounted price is used at checkout.</small></div>}
+          {priceUsdt > 0 && pricePi > 0 ? <small className="product-price-preview">Original listing price: {formatUsdAmount(priceUsdt)} USDT · {formatPiAmount(pricePi)}</small> : null}
         </details>
 
         <details className="product-accordion" data-product-step="2" hidden={step !== 2} open>
