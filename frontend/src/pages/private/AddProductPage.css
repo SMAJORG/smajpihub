@@ -317,3 +317,11 @@
 .product-notice-dialog h2{margin:0;font-size:19px}.product-notice-dialog p{margin:0;color:var(--smaj-text-secondary,#64748b);font-size:14px;line-height:1.5}
 .product-notice-dialog small{color:var(--smaj-text-secondary,#64748b)}
 .product-notice-dialog button{width:100%;min-height:44px;margin-top:5px;border-radius:12px}
+
+/* Keep gallery action labels legible on their colored backgrounds. */
+.product-wizard .product-gallery-preview figure > span,
+.product-wizard .product-gallery-preview figure > button {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  opacity: 1;
+}
