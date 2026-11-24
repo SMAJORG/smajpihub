@@ -349,3 +349,10 @@
 .product-wizard .product-color-chips{display:flex;flex-wrap:wrap;gap:7px}
 .product-wizard .product-color-chips button{display:flex;align-items:center;gap:6px;min-height:32px;padding:5px 9px;border:0;border-radius:999px;background:#f3f4f6;color:#111827;font:inherit;font-size:12px;cursor:pointer}
 .product-wizard .product-color-chips i{width:14px;height:14px}
+
+/* Multi-select sizing in the product options step. */
+.product-wizard .product-size-picker{display:grid;gap:9px;min-width:0}
+.product-wizard .product-size-options{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow-y:auto}
+.product-wizard .product-size-options button{min-height:39px;padding:7px 13px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#111827;font:inherit;font-weight:600;cursor:pointer}
+.product-wizard .product-size-options button[aria-pressed=true]{background:#7134ff;color:#fff;border-color:#7134ff}
+.product-wizard .product-size-options small{padding:10px;color:#64748b}
