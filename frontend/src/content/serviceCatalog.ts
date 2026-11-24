@@ -33,6 +33,8 @@ export type ServiceLaunchStatus = "live" | "in-progress" | "coming-soon";
 const liveServiceSlugs = new Set(["store", "stream", "jobs", "events"]);
 
 export const getServiceLaunchStatus = (slug: string): ServiceLaunchStatus => {
+  // The simulated exchange is not a released Mainnet service.
+  if (slug === "swap") return "coming-soon";
   const configured = getSiteContent().services.find(service => service.slug === slug);
   if (configured) return configured.status;
   if (liveServiceSlugs.has(slug)) return "live";

@@ -3,7 +3,7 @@ import AdminHomeContentPage from "./pages/admin/AdminHomeContentPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import TestnetAdminAccessPage from "./pages/admin/TestnetAdminAccessPage";
 import TestnetWalletConsentPage from "./pages/private/TestnetWalletConsentPage";
-import { createBrowserRouter, Navigate, useRouteError } from "react-router-dom";
+import { createBrowserRouter, Link, Navigate, useRouteError } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { useAuthContext } from "./contexts/AuthContext";
@@ -130,7 +130,6 @@ import EventsPage, { type EventsPageKind } from "./pages/events/EventsPage";
 import AgroPage, { type AgroPageKind } from "./pages/agro/AgroPage";
 import EnergyPage, { type EnergyPageKind } from "./pages/energy/EnergyPage";
 import CharityPage, { type CharityPageKind } from "./pages/charity/CharityPage";
-import SwapPage, { type SwapPageKind } from "./pages/swap/SwapPage";
 import HealthAppointmentsPage from "./pages/health/HealthAppointmentsPage";
 import CareRouteHomePage from "./pages/careroute/CareRouteHomePage";
 import CareRouteRequestPage from "./pages/careroute/CareRouteRequestPage";
@@ -269,13 +268,17 @@ const charityRoutes: Array<[string, CharityPageKind]> = [
   ["fundraise", "fundraise"],
   ["dashboard", "dashboard"],
 ];
-const swapRoutes: Array<[string, SwapPageKind]> = [
-  ["tokens", "tokens"],
-  ["history", "history"],
-  ["pools", "pools"],
-  ["liquidity", "liquidity"],
-  ["confirm", "confirm"],
-];
+const SwapUnavailableRoute = () => (
+  <AppLayout>
+    <main className="home-page">
+      <section className="home-section">
+        <h1>Swap is not available</h1>
+        <p>Token swaps and liquidity pools are not available in this app. No swap payments are accepted.</p>
+        <Link to="/services">Explore available services</Link>
+      </section>
+    </main>
+  </AppLayout>
+);
 
 // eslint-disable-next-line react-refresh/only-export-components
 const PublicProfileRoute = () => {
@@ -400,7 +403,7 @@ export const router = createBrowserRouter([
       ) : platform.routeSegment === "charity" ? (
         <CharityPage />
       ) : platform.routeSegment === "swap" ? (
-        <SwapPage />
+        <SwapUnavailableRoute />
       ) : platform.routeSegment === "store" ? (
         <AppLayout showHeader={false} showFooter={false}><StorePage /></AppLayout>
       ) : (
@@ -521,11 +524,7 @@ export const router = createBrowserRouter([
   { path: "/services/charity/checkout/:id", element: <CharityPage kind="checkout" /> },
   { path: "/services/charity/receipt/:id", element: <CharityPage kind="receipt" /> },
   { path: "/services/charity/organization/:id", element: <CharityPage kind="organization" /> },
-  ...swapRoutes.map(([path, kind]) => ({
-    path: `/services/swap/${path}`,
-    element: <SwapPage kind={kind} />,
-  })),
-  { path: "/services/swap/receipt/:id", element: <SwapPage kind="receipt" /> },
+  { path: "/services/swap/*", element: <SwapUnavailableRoute /> },
   {
     path: "/services/jobs/job/:id",
     element: <JobsPage kind="job" />,
