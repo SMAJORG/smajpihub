@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "SMAJ PI HUB",
   webDir: "dist-capacitor",
   server: { androidScheme: "https", hostname: "smajpihub.com" },
-  android: { allowMixedContent: false, backgroundColor: "#f2f2f2" },
+  android: { allowMixedContent: false, backgroundColor: "#FFFFFF" },
   plugins: {
     LocalNotifications: { smallIcon: "ic_stat_smaj", iconColor: "#08768b" },
     StatusBar: {

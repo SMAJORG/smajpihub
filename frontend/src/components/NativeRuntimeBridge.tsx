@@ -33,12 +33,10 @@ const NativeRuntimeBridge = () => {
     if (!Capacitor.isNativePlatform()) return;
 
     document.documentElement.dataset.nativeApp = Capacitor.getPlatform();
-    // Keep Android system chrome in its own branded strip. Page artwork and app
-    // controls start below the clock, cutout, Wi-Fi, and battery area.
     const showPhoneStatusBar = () => {
       if (document.documentElement.classList.contains("sw-player-is-fullscreen")) return;
       void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => undefined);
-      void StatusBar.setBackgroundColor({ color: "#f2f2f2" }).catch(() => undefined);
+      void StatusBar.setBackgroundColor({ color: "#FFFFFF" }).catch(() => undefined);
       void StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
       void StatusBar.show().catch(() => undefined);
     };
@@ -58,8 +56,6 @@ const NativeRuntimeBridge = () => {
 
     void Network.getStatus().then(status => updateNetwork(status.connected, status.connectionType));
     void PushNotifications.createChannel({ id: "smaj_notifications", name: "SMAJ Notifications", description: "Messages, orders, jobs, courses and account alerts", importance: 5, visibility: 1, vibration: true }).catch(() => undefined);
-    // Wait for the authenticated Home dashboard to be visible before asking for
-    // Android permissions. Firebase registration follows the native dialogs.
     void runPostHomePermissionOnboarding().then(({ reachedHome, notificationGranted }) => {
       if (!active || !reachedHome || !notificationGranted) return;
       void ensureNativePushNotificationsEnabled().catch(error => {
