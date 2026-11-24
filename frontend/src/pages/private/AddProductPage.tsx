@@ -165,6 +165,31 @@ const ColorPicker = ({ value, onChange, multiple = false }: { value: string; onC
   </div>;
 };
 
+
+const SizePicker = ({ value, onChange, field }: { value: string; onChange: (value: string) => void; field: string }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const selected = value.split(",").map((item) => item.trim()).filter(Boolean);
+  const options = selectOptionsByField[field.toLowerCase()] || selectOptionsByField.size;
+  const matches = options.filter((size) => size.toLowerCase().includes(search.trim().toLowerCase()));
+  const toggle = (size: string) => onChange(selected.includes(size) ? selected.filter((item) => item !== size).join(", ") : [...selected, size].join(", "));
+  return <div className="product-size-picker">
+    <button type="button" className="product-color-dropdown-trigger" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <span className="product-color-selected-label">{selected.length ? selected.join(", ") : `Select ${field.toLowerCase()}(s)`}</span><span aria-hidden="true">{open ? "▴" : "▾"}</span>
+    </button>
+    {open && <div className="product-color-dropdown-panel">
+      <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sizes" aria-label="Search sizes" />
+      <div className="product-size-options">
+        {matches.map((size) => <button type="button" key={size} aria-pressed={selected.includes(size)} onClick={() => toggle(size)}>{size}{selected.includes(size) ? " ✓" : ""}</button>)}
+        {!matches.length && <small>No matching sizes</small>}
+      </div>
+      <button type="button" className="product-color-dropdown-done" onClick={() => setOpen(false)}>Done ({selected.length} selected)</button>
+    </div>}
+    {selected.length > 0 && <div className="product-color-chips">{selected.map((size) => <button type="button" key={size} onClick={() => toggle(size)} title={`Remove ${size}`}>{size} ×</button>)}</div>}
+    <small>Select one or more sizes</small>
+  </div>;
+};
+
 const loadProductDraft = (): typeof initialForm => {
   try {
     const saved = JSON.parse(localStorage.getItem(PRODUCT_DRAFT_KEY) || "null") as Partial<typeof initialForm> | null;
@@ -353,6 +378,8 @@ const AddProductPage = () => {
         {field}
         {field.toLowerCase().includes("color") ? (
           <ColorPicker value={form.specifications[field] || ""} onChange={(value) => setSpec(field, value)} multiple />
+        ) : field.toLowerCase().includes("size") && options ? (
+          <SizePicker field={field} value={form.specifications[field] || ""} onChange={(value) => setSpec(field, value)} />
         ) : options ? (
           <select value={form.specifications[field] || ""} onChange={(event) => setSpec(field, event.target.value)}>
             <option value="">Select {field.toLowerCase()}</option>
