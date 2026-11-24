@@ -1328,7 +1328,7 @@ export const router = createBrowserRouter([
     path: "/add-product",
     element: (
       <ProtectedRoute>
-        <PrivateLayout>
+        <PrivateLayout fullScreen>
           <AddProductPage />
         </PrivateLayout>
       </ProtectedRoute>
