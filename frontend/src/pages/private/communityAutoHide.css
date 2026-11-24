@@ -1,0 +1,35 @@
+.private-shell.community-private-shell.community-chrome-hidden .community-feed-chrome,
+.private-shell.community-private-shell.community-header-hidden .community-feed-chrome {
+  height: 0;
+  min-height: 0;
+  gap: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(-100% - env(safe-area-inset-top, 0px)));
+  transition: height 200ms ease, min-height 200ms ease, padding 200ms ease,
+    transform 200ms ease, opacity 200ms ease;
+}
+
+.private-shell.community-private-shell.community-chrome-hidden .community-feed-chrome,
+.private-shell.community-private-shell.community-header-hidden .community-feed-chrome,
+.private-shell.community-private-shell.community-chrome-hidden .community-feed-header,
+.private-shell.community-private-shell.community-header-hidden .community-feed-header,
+.private-shell.community-private-shell.community-chrome-hidden .community-feed-tabs,
+.private-shell.community-private-shell.community-header-hidden .community-feed-tabs {
+  visibility: hidden;
+  transition-delay: 0ms;
+}
+
+.private-shell.community-private-shell:not(.community-chrome-hidden):not(.community-header-hidden):not(.community-video-open) .community-feed-chrome {
+  height: auto;
+  min-height: 0;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition: height 200ms ease, min-height 200ms ease, padding 200ms ease,
+    transform 200ms ease, opacity 200ms ease, visibility 0s;
+}
