@@ -391,6 +391,21 @@ export default function mountMarketplaceEndpoints(router: Router) {
         }
         return created;
       });
+      if (!resumed) {
+        const { sendPiInAppNotificationToUser } = await import("../services/notifications");
+        await Promise.all([
+          sendPiInAppNotificationToUser(req.app, user.uid, {
+            title: "Order created",
+            body: `${order.productTitle} order is awaiting payment`,
+            subroute: `/orders/${order._id}/track`,
+          }),
+          sendPiInAppNotificationToUser(req.app, order.sellerId, {
+            title: "Order created",
+            body: `${order.productTitle} order is awaiting payment`,
+            subroute: `/orders/${order._id}/track`,
+          }),
+        ]);
+      }
       return res.status(resumed ? 200 : 201).json({ order: serialize(order) });
     } catch (error: any) { return res.status(error.status || 503).json({ message: error.status ? error.message : "Order creation unavailable. Retry the same checkout." }); }
   });

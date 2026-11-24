@@ -17,6 +17,7 @@
     "test:testnet-a2u": "npm run build && node --test tests/testnetA2U.test.cjs tests/testnetAdminAuth.test.cjs",
     "test:transactions": "node --test tests/liveTransactions.test.cjs",
     "test:i18n": "node --test tests/translations.test.cjs",
+    "test:notifications": "ts-node src/tests/piInAppNotifications.test.ts",
     "test:validation": "ts-node ./src/tests/storageValidation.test.ts",
     "test:jobs": "ts-node ./src/tests/jobsValidation.test.ts",
     "test:institutions": "node --test tests/institutions.test.cjs",

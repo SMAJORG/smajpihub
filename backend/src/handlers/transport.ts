@@ -692,6 +692,12 @@ export default function mountTransportEndpoints(router: Router) {
       createdAt: new Date(),
     };
     const result = await req.app.locals.transportNotificationCollection.insertOne(notification);
+    const { sendPiInAppNotificationToUser } = await import("../services/notifications");
+    await sendPiInAppNotificationToUser(req.app, user.uid, {
+      title: notification.title,
+      body: notification.message,
+      subroute: "/services/transport",
+    });
     return res.status(201).json({ notification: { ...notification, _id: result.insertedId.toString() } });
   });
 

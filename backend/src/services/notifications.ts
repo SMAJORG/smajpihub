@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { publishUserNotification } from "./notificationEvents";
+import { sendPiInAppNotification } from "./piInAppNotifications";
 
 type NotificationInput = {
   userId: string;
@@ -12,6 +13,39 @@ type NotificationInput = {
   action?: string;
   actionUrl?: string;
   dedupeKey?: string;
+};
+
+const defaultNotificationRoute = (input: NotificationInput) =>
+  input.relatedId === "messages" || input.type.includes("message")
+    ? "/messages"
+    : input.relatedId && (input.type.includes("order") || input.type.includes("payment"))
+      ? `/orders/${input.relatedId}/track`
+      : input.type.includes("product") && input.relatedId
+        ? `/product/${input.relatedId}`
+        : input.relatedId === "settings" || input.type.includes("security")
+          ? "/settings"
+          : "/notifications";
+
+export const sendPiInAppNotificationToUser = async (
+  app: any,
+  userId: string,
+  input: { title: string; body: string; subroute?: string },
+) => {
+  try {
+    const recipient = await app.locals.userCollection?.findOne({ uid: userId });
+    if (recipient?.piInAppNotificationsEnabled !== true) return false;
+    const sender = app.locals.piInAppNotificationSender || sendPiInAppNotification;
+    const result = await sender({
+      userId,
+      title: input.title,
+      body: input.body,
+      subroute: input.subroute || "/notifications",
+    });
+    return result.delivered;
+  } catch (error: any) {
+    console.error("Pi in-app notification delivery failed:", error?.status || "request_error");
+    return false;
+  }
 };
 
 export const createNotification = async (app: any, input: NotificationInput): Promise<void> => {
@@ -71,6 +105,14 @@ export const createNotification = async (app: any, input: NotificationInput): Pr
       notification: { ...document, _id: String(insertedId) },
       unreadCount,
     });
+    const subroute = input.actionUrl?.startsWith("/") && !input.actionUrl.startsWith("//")
+      ? input.actionUrl
+      : defaultNotificationRoute(input);
+    await sendPiInAppNotificationToUser(app, userId, {
+      title: input.title,
+      body: input.message,
+      subroute,
+    });
     const { sendPushNotification } = await import("./pushNotifications");
     await sendPushNotification(app, userId, {
       title: input.title,
@@ -78,13 +120,7 @@ export const createNotification = async (app: any, input: NotificationInput): Pr
       icon: "/logo.png",
       badge: "/notification-badge.png",
       image: actor?.avatar || input.image || undefined,
-      url: input.actionUrl || (input.relatedId === "messages" || input.type.includes("message")
-        ? "/messages"
-        : input.relatedId && (input.type.includes("order") || input.type.includes("payment"))
-          ? `/orders/${input.relatedId}/track`
-          : input.type.includes("product") && input.relatedId
-            ? `/product/${input.relatedId}`
-            : input.relatedId === "settings" || input.type.includes("security") ? "/settings" : "/notifications"),
+      url: input.actionUrl || defaultNotificationRoute(input),
       tag: input.dedupeKey || `${input.type}:${input.relatedId || input.title}`,
     });
   } catch (err) {
