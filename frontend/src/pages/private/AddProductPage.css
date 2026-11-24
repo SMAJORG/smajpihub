@@ -356,3 +356,12 @@
 .product-wizard .product-size-options button{min-height:39px;padding:7px 13px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#111827;font:inherit;font-weight:600;cursor:pointer}
 .product-wizard .product-size-options button[aria-pressed=true]{background:#7134ff;color:#fff;border-color:#7134ff}
 .product-wizard .product-size-options small{padding:10px;color:#64748b}
+
+/* Full-screen product listing: no surrounding navigation or side gutters. */
+.full-screen-page .product-wizard{max-width:100%;min-height:100dvh;padding:18px 16px calc(95px + env(safe-area-inset-bottom,0px));background:var(--smaj-card,#fff)}
+.full-screen-page .product-wizard-header{justify-content:flex-start}
+.full-screen-page .product-wizard-header>div{flex:1}
+.full-screen-page .product-wizard-back{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;text-decoration:none;color:var(--smaj-text,#111827);font-size:28px}
+.product-wizard .product-offer-preview{display:grid;gap:5px;padding:12px 14px;border-radius:12px;background:#f4efff;color:#3b167a}
+.product-wizard .product-offer-preview strong{font-size:15px}
+.product-wizard .product-offer-preview small{font-size:12px;color:#6b568b}
