@@ -519,6 +519,7 @@ const AddProductPage = () => {
   return (
     <main className="add-product-page product-wizard">
       <header className="product-wizard-header">
+        <Link className="product-wizard-back" to="/store" aria-label="Back to marketplace">←</Link>
         <div><p className="private-kicker">SELLER TOOLS</p><h1>Add Product</h1></div>
         <span className="product-step-count" aria-live="polite">Step {step + 1} of 4</span>
       </header>
