@@ -23586,3 +23586,14 @@ html[data-private-theme="dark"] .chat-panel.chat-panel-fullscreen { background-c
   border-color: #7134ff;
   color: #fff;
 }
+
+/* Android Home: position app controls below the system status bar without changing it.
+   Keep the existing hero artwork, colors, and edge-to-edge presentation. */
+@media (max-width: 1023px) {
+  html[data-native-app="android"] .mobile-home-shell .private-header {
+    top: max(28px, env(safe-area-inset-top, 0px)) !important;
+  }
+  .mobile-home-shell .mobile-home-hero {
+    min-height: 440px;
+  }
+}
