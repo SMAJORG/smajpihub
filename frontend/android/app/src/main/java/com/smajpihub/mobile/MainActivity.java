@@ -64,8 +64,29 @@ public class MainActivity extends BridgeActivity {
     public PictureInPictureParams pipParams(boolean playing) {
         return new PictureInPictureParams.Builder().setAspectRatio(new Rational(16, 9)).setActions(Arrays.asList(
             pipAction("back", "Back 10 seconds", android.R.drawable.ic_media_rew, 1),
-            pipAction("toggle", playing ? "Pause" : "Pause".equals(playing ? "Pause" : "Play") ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, 2),
+            pipAction("toggle", playing ? "Pause" : "Play", playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, 2),
             pipAction("forward", "Forward 10 seconds", android.R.drawable.ic_media_ff, 3))).build();
+    }
+    public void preparePictureInPicture(Runnable enter) {
+        if (bridge == null || bridge.getWebView() == null) {
+            enter.run();
+            return;
+        }
+        bridge.getWebView().evaluateJavascript("document.documentElement.classList.add('smaj-native-pip')", result -> bridge.getWebView().postDelayed(enter, 80));
+    }
+    public void updatePipUi(boolean active) {
+        if (bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().evaluateJavascript("document.documentElement.classList." + (active ? "add" : "remove") + "('smaj-native-pip')", null);
+        }
+    }
+    @android.annotation.TargetApi(Build.VERSION_CODES.O)
+    @Override public void onPictureInPictureModeChanged(boolean active, Configuration configuration) {
+        super.onPictureInPictureModeChanged(active, configuration);
+        updatePipUi(active);
+    }
+    @Override public void onDestroy() {
+        unregisterReceiver(pipReceiver);
+        super.onDestroy();
     }
     @android.annotation.TargetApi(Build.VERSION_CODES.O)
     private RemoteAction pipAction(String control, String title, int icon, int code) {
