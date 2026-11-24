@@ -527,7 +527,7 @@ const StorePage = () => {
         </section>
 
         <section className="storefront-promo-strip" aria-label="Store benefits">
-          <div>{promoStripItems.map(item => <span key={item}>{item}</span>)}</div>
+          <div className="storefront-promo-track"><div className="storefront-promo-group">{promoStripItems.map(item => <span key={item}>{item}</span>)}</div><div className="storefront-promo-group" aria-hidden="true">{promoStripItems.map(item => <span key={item}>{item}</span>)}</div></div>
         </section>
 
         {displayHeroSlides.length > 0 ? <section className="storefront-hero">
