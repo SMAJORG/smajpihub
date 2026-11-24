@@ -109,18 +109,59 @@ const initialForm = {
   sellerAgreementAccepted: false,
 };
 
+const resolveColorHex = (input: string): string | null => {
+  const raw = input.trim();
+  if (!raw || !CSS.supports("color", raw)) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.fillStyle = "#000000";
+  context.fillStyle = raw;
+  context.fillRect(0, 0, 1, 1);
+  const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+  return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+};
+
 const ColorPicker = ({ value, onChange, multiple = false }: { value: string; onChange: (value: string) => void; multiple?: boolean }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const selected = value.split(",").map((item) => item.trim()).filter(Boolean);
   const toggle = (name: string) => {
-    if (!multiple) return onChange(name);
+    if (!multiple) { onChange(name); setOpen(false); return; }
     onChange(selected.includes(name) ? selected.filter((item) => item !== name).join(", ") : [...selected, name].join(", "));
   };
-  return <div className="product-color-picker">
-    <div className="product-color-swatches" role={multiple ? "group" : "radiogroup"} aria-label="Choose product color">
-      {productColors.map(([name, hex]) => <button type="button" className={selected.includes(name) ? "selected" : ""} style={{ "--product-color": hex } as React.CSSProperties} aria-label={name} aria-pressed={selected.includes(name)} title={name} onClick={() => toggle(name)} key={name}><span /></button>)}
-      <label className="product-custom-color" title="Custom color"><input type="color" aria-label="Choose custom color" value={selected.find((item) => /^#[0-9a-f]{6}$/i.test(item)) || "#6d3fc0"} onChange={(event) => onChange(multiple ? [...selected.filter((item) => !/^#[0-9a-f]{6}$/i.test(item)), event.target.value].join(", ") : event.target.value)} /><span>+</span></label>
-    </div>
-    <small>{selected.length ? selected.join(", ") : multiple ? "Select one or more colors" : "Select a color"}</small>
+  const query = search.trim().toLowerCase();
+  const matches = productColors.filter(([name, hex]) => {
+    if (!query) return true;
+    const color = resolveColorHex(query);
+    return name.toLowerCase().includes(query) || hex.toLowerCase().includes(query) || (color !== null && color === hex.toLowerCase());
+  });
+  const customHex = query ? resolveColorHex(query) : null;
+  const customExists = customHex !== null && !productColors.some(([, hex]) => hex.toLowerCase() === customHex);
+  const displayColor = (name: string) => productColors.find(([label]) => label === name)?.[1] || resolveColorHex(name) || "#ffffff";
+  return <div className="product-color-picker product-color-dropdown">
+    <button type="button" className="product-color-dropdown-trigger" aria-expanded={open} aria-label="Choose product colors" onClick={() => setOpen(!open)}>
+      <span className="product-color-selected-dots">{selected.slice(0, 4).map((name) => <i key={name} style={{ backgroundColor: displayColor(name) }} />)}</span>
+      <span className="product-color-selected-label">{selected.length ? selected.join(", ") : "Choose product colors"}</span>
+      <span aria-hidden="true">{open ? "▴" : "▾"}</span>
+    </button>
+    {open && <div className="product-color-dropdown-panel">
+      <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, #HEX, RGB or HSL" aria-label="Search colors by name, HEX, RGB or HSL" />
+      <div className="product-color-dropdown-options">
+        {matches.map(([name, hex]) => <button type="button" key={name} className="product-color-option" onClick={() => toggle(name)} aria-pressed={selected.includes(name)}>
+          <i style={{ backgroundColor: hex }} /><span>{name}<small>{hex.toUpperCase()}</small></span><b>{selected.includes(name) ? "✓" : ""}</b>
+        </button>)}
+        {customExists && <button type="button" className="product-color-option" onClick={() => { toggle(customHex); setSearch(""); }} aria-pressed={selected.includes(customHex)}>
+          <i style={{ backgroundColor: customHex }} /><span>Custom color<small>{customHex.toUpperCase()}</small></span><b>{selected.includes(customHex) ? "✓" : "+"}</b>
+        </button>}
+        {!matches.length && !customExists && <small className="product-color-no-results">No matching color. Try a name, #FF5733, rgb(255, 87, 51), or hsl(14, 100%, 60%).</small>}
+      </div>
+      <label className="product-color-custom-picker">Exact color picker <input type="color" aria-label="Pick exact custom color" value={selected.find((item) => /^#[0-9a-f]{6}$/i.test(item)) || "#6d3fc0"} onChange={(event) => { const hex = event.target.value; onChange(multiple ? [...selected.filter((item) => !/^#[0-9a-f]{6}$/i.test(item)), hex].join(", ") : hex); }} /></label>
+      <button type="button" className="product-color-dropdown-done" onClick={() => setOpen(false)}>Done ({selected.length} selected)</button>
+    </div>}
+    {selected.length > 0 && <div className="product-color-chips">{selected.map((name) => <button type="button" key={name} onClick={() => toggle(name)} title={`Remove ${name}`}><i style={{ backgroundColor: displayColor(name) }} />{name} ×</button>)}</div>}
+    <small>Choose one or more colors</small>
   </div>;
 };
 
