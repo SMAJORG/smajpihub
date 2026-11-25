@@ -340,6 +340,20 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const returnTo = searchParams.get("returnTo");
   const [editing, setEditing] = useState(false);
+  const openProfileEditor = () => {
+    setEditing(true);
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      document.querySelector(".real-profile-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
+  };
+  const goBackFromProfile = () => {
+    if (editing) {
+      setEditing(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    navigate("/app", { replace: true });
+  };
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [stats, setStats] = useState({ totalProducts: 0, successfulOrders: 0 });
   const [countrySearch, setCountrySearch] = useState("");
@@ -688,7 +702,7 @@ const ProfilePage = () => {
       />
 
       <section className="real-profile-hero">
-        <button type="button" className="real-profile-cover-back" aria-label="Back" onClick={() => { navigate("/app", { replace: true }); }}><ArrowBackRoundedIcon /></button>
+        <button type="button" className="real-profile-cover-back" aria-label="Back" onClick={goBackFromProfile}><ArrowBackRoundedIcon /></button>
         <button
           type="button"
           className="real-profile-cover"
