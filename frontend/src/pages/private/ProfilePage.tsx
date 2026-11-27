@@ -352,7 +352,15 @@ const ProfilePage = () => {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    navigate("/app", { replace: true });
+    const backTarget =
+      returnTo
+      && returnTo.startsWith("/")
+      && !returnTo.startsWith("//")
+      && !returnTo.startsWith("/profile")
+      && !returnTo.startsWith("/app")
+        ? returnTo
+        : "/settings";
+    navigate(backTarget, { replace: true });
   };
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [stats, setStats] = useState({ totalProducts: 0, successfulOrders: 0 });
@@ -741,7 +749,7 @@ const ProfilePage = () => {
           <Link className="real-profile-frames-icon" to="/profile/frames" aria-label="Avatar Frames" title="Avatar Frames"><PhotoFilterOutlinedIcon /></Link>
           <div className="real-profile-controls">
             <div className="real-profile-actions">
-              <button className="private-primary-button" type="button" onClick={() => setEditing(true)}>
+              <button className="private-primary-button" type="button" onClick={openProfileEditor}>
                 Edit Profile
               </button>
               {sellerActive ? (
