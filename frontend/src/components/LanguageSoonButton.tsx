@@ -45,7 +45,7 @@ const LanguageSoonButton = ({ dashboardPrompt = false }: { dashboardPrompt?: boo
     if (busy) return;
     setBusy(true); setError('');
     try {
-      await updateLanguage(draft);
+      if (user?.uid) await updateLanguage(draft);
       persistLanguage(draft);
       await i18n.changeLanguage(draft);
       setOpen(false);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../src/i18n';
 import '../src/localization/rtl.css';
+import { AuthProvider } from '../src/contexts/AuthContext';
 import LanguageSoonButton from '../src/components/LanguageSoonButton';
 import DynamicTranslation from '../src/components/DynamicTranslation';
 
@@ -16,4 +17,4 @@ function Fixture() {
     <div id="dynamic"><DynamicTranslation text="A private product description." source="en" /></div>
   </main>;
 }
-createRoot(document.getElementById('root')!).render(<Fixture />);
+createRoot(document.getElementById('root')!).render(<AuthProvider><Fixture /></AuthProvider>);
