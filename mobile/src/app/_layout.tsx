@@ -9,7 +9,7 @@ export default function RootLayout() {
   useEffect(() => { void localeReady.then(() => setReady(true)); }, []);
   if (!ready) return null;
   return <AuthProvider>
-    <StatusBar style="light" translucent={true} backgroundColor="transparent" />
+    <StatusBar style="light" backgroundColor="transparent" />
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="service/[slug]" options={{ presentation: "card" }} />
