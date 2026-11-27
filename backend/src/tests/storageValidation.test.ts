@@ -32,8 +32,8 @@ const main = async () => {
   assert.equal(savedBody.includes("folder="), false);
   assert.equal(savedBody.includes("public_id="), false);
 
-  global.fetch = (async () => ({ ok: false, text: async () => "nope" }) as Response) as typeof fetch;
-  await assert.rejects(() => imageStorage.resolveImageValue(base64Png, "avatar", "avatar"), /Cloudinary upload failed/);
+  global.fetch = (async () => ({ ok: false, status: 502, text: async () => "nope" }) as Response) as typeof fetch;
+  await assert.rejects(() => imageStorage.resolveImageValue(base64Png, "avatar", "avatar"), /Media storage rejected the image upload \(HTTP 502\)/);
 
   assert.throws(
     () => imageStorage.assertNoBase64Images({ image: base64Png }, "product"),
