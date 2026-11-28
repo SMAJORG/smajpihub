@@ -6,7 +6,8 @@ async function select(page: Page, code: string) {
   await page.locator('.language-soon-button').click();
   await expect(page.locator('.language-choice-dialog option')).toHaveCount(10);
   await page.locator('.language-choice-dialog select').selectOption(code);
-  await page.keyboard.press('Escape');
+  await page.locator('.language-choice-save').click();
+  await expect(page.locator('.language-choice-dialog')).toBeHidden();
 }
 test('all languages switch immediately, preserve input, and persist after refresh', async ({ page }) => {
   await page.goto('/tests/localization.html');
